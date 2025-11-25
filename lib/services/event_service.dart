@@ -21,10 +21,12 @@ class EventService {
       final snapshot = await _firestore
           .collection('events')
           .where('status', isEqualTo: 'Active')
-          .orderBy('date', descending: false)
           .get();
 
-      return snapshot.docs.map((doc) => AlumniEvent.fromFirestore(doc)).toList();
+      // Sort in Dart instead of Firestore (temporary until index is created)
+      final events = snapshot.docs.map((doc) => AlumniEvent.fromFirestore(doc)).toList();
+      events.sort((a, b) => a.date.compareTo(b.date));
+      return events;
     } catch (e) {
       throw Exception('Error fetching events: $e');
     }
@@ -51,10 +53,12 @@ class EventService {
           .collection('events')
           .where('batchYear', isEqualTo: batchYear)
           .where('status', isEqualTo: 'Active')
-          .orderBy('date', descending: false)
           .get();
 
-      return snapshot.docs.map((doc) => AlumniEvent.fromFirestore(doc)).toList();
+      // Sort in Dart instead of Firestore (temporary until index is created)
+      final events = snapshot.docs.map((doc) => AlumniEvent.fromFirestore(doc)).toList();
+      events.sort((a, b) => a.date.compareTo(b.date));
+      return events;
     } catch (e) {
       throw Exception('Error fetching events by batch year: $e');
     }

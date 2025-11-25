@@ -39,6 +39,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     try {
       setState(() => isLoading = true);
       final events = await _eventService.getActiveEvents();
+      print('DEBUG: Loaded ${events.length} events');
       setState(() {
         activeEvents = events;
         filteredEvents = events;
@@ -46,6 +47,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       });
     } catch (e) {
       setState(() => isLoading = false);
+      print('DEBUG: Error loading events: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading events: $e')),
       );
@@ -106,7 +108,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         comments: 0,
       );
 
+      print('DEBUG: Adding event with ID: ${newEvent.id}');
       await _eventService.addEvent(newEvent);
+      print('DEBUG: Event added successfully');
       
       _themeController.clear();
       _batchYearController.clear();
@@ -118,9 +122,8 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       );
 
       await _loadEvents();
-      
-      if (mounted) Navigator.of(context).pop();
     } catch (e) {
+      print('DEBUG: Error adding event: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error adding event: $e')),
       );

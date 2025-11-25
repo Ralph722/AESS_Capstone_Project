@@ -26,21 +26,25 @@ class EmailService {
       'user_id': publicKey,
       'template_params': {
         'to_email': toEmail,
-        'to_name': username,
+        'user_name': username,
         'otp_code': otp,
       },
     };
 
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(payload),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to send OTP via EmailJS (${response.statusCode}): ${response.body}',
+    try {
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
       );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to send OTP via EmailJS (${response.statusCode}): ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error sending OTP: $e');
     }
   }
 }

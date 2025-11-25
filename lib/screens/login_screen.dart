@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:alumni_system/screens/register_screen.dart';
-import 'package:alumni_system/screens/home_screen.dart';
+import 'package:alumni_system/screens/main_navigation.dart';
+import 'package:alumni_system/screens/admin_dashboard_web.dart';
+import 'package:alumni_system/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _rememberMe = false;
   bool _isLoading = false;
+  final AuthService _authService = AuthService();
 
   @override
   void dispose() {
@@ -279,48 +281,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // Sign in with email and password
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final user = await _authService.loginWithEmailPassword(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
 
-      if (mounted) {
-        // Navigate to home screen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'An error occurred during login';
+      if (user != null && mounted) {
+        // Get the user role from Firestore
+        final userRole = await _authService.getUserRole(user.uid);
 
-      if (e.code == 'user-not-found') {
-        errorMessage = 'No user found for that email.';
-      } else if (e.code == 'wrong-password') {
-        errorMessage = 'Wrong password provided.';
-      } else if (e.code == 'invalid-email') {
-        errorMessage = 'The email address is invalid.';
-      } else if (e.code == 'user-disabled') {
-        errorMessage = 'This user account has been disabled.';
-      } else if (e.code == 'too-many-requests') {
-        errorMessage =
-            'Too many failed login attempts. Please try again later.';
-      } else if (e.code == 'operation-not-allowed') {
-        errorMessage = 'Email/password accounts are not enabled.';
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-        );
+        if (mounted) {
+          // Navigate based on role stored in Firestore
+          if (userRole == UserRole.admin) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminDashboardWeb()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const MainNavigation()),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An unexpected error occurred: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
         );
       }
     } finally {

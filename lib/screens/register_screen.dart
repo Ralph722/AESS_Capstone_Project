@@ -1,11 +1,11 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:alumni_system/config/emailjs_config.dart';
 import 'package:alumni_system/screens/login_screen.dart';
-import 'package:alumni_system/screens/home_screen.dart';
+import 'package:alumni_system/screens/main_navigation.dart';
 import 'package:alumni_system/services/email_service.dart';
+import 'package:alumni_system/services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -26,6 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _otpSent = false;
   String? _generatedOtp;
   late final EmailService _emailService;
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -418,51 +419,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-          );
+      // Register user with AuthService (automatically sets role to "user")
+      final user = await _authService.registerWithEmailPassword(
+        _emailController.text.trim(),
+        _passwordController.text,
+        _usernameController.text.trim().isEmpty
+            ? 'Alumni User'
+            : _usernameController.text.trim(),
+      );
 
-      if (credential.user != null &&
-          _usernameController.text.trim().isNotEmpty) {
-        await credential.user!.updateDisplayName(
-          _usernameController.text.trim(),
-        );
-        await credential.user!.reload();
-      }
-
-      if (mounted) {
+      if (user != null && mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      var errorMessage = 'An error occurred during registration';
-
-      if (e.code == 'weak-password') {
-        errorMessage = 'The password provided is too weak.';
-      } else if (e.code == 'email-already-in-use') {
-        errorMessage = 'An account already exists for that email.';
-      } else if (e.code == 'invalid-email') {
-        errorMessage = 'The email address is invalid.';
-      } else if (e.code == 'operation-not-allowed') {
-        errorMessage = 'Email/password accounts are not enabled.';
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+          MaterialPageRoute(builder: (context) => const MainNavigation()),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An unexpected error occurred: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
         );
       }
     } finally {

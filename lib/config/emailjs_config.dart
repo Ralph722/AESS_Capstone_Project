@@ -9,7 +9,7 @@ class EmailJsConfig {
   );
   static const templateId = String.fromEnvironment(
     'EMAILJS_TEMPLATE_ID',
-    defaultValue: 'template_41fnprx',
+    defaultValue: 'template_7jnfm9h',
   );
   static const publicKey = String.fromEnvironment(
     'EMAILJS_PUBLIC_KEY',

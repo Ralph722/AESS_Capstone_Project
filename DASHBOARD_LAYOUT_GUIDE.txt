@@ -1,0 +1,319 @@
+================================================================================
+                    ADMIN DASHBOARD - LAYOUT & STRUCTURE
+================================================================================
+
+VISUAL LAYOUT:
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ▌ Alumni Portal                                    👥 Users  👤 Welcome, admin │
+├──────────────┬──────────────────────────────────────────────────────────────┤
+│              │                                                              │
+│ Dashboard    │  Alumni Events Dashboard                                    │
+│ 🔔           │  ═══════════════════════════════════════════════════════   │
+│              │                                                              │
+│ 📦 Archived  │  ┌─────────────────────────┐  ┌──────────────────────────┐ │
+│   Events 1   │  │ Add New Alumni Event    │  │ Active Events            │ │
+│              │  │                         │  │ ═════════════════════    │ │
+│ 💬 Comments  │  │ Event Theme             │  │                          │ │
+│              │  │ ┌─────────────────────┐ │  │ Search: [search box] 🔍  │ │
+│ 👥 Alumni    │  │ │                     │ │  │ [Reset]                  │ │
+│   Members    │  │ └─────────────────────┘ │  │                          │ │
+│              │  │                         │  │ ┌────────────────────────┐│ │
+│ 🚪 Logout    │  │ Batch Year              │  │ │Theme│Year│Date│Venue   ││ │
+│              │  │ ┌─────────────────────┐ │  │ │Status│Comments│Actions││ │
+│              │  │ │                     │ │  │ ├────────────────────────┤│ │
+│              │  │ └─────────────────────┘ │  │ │Annual Reunion 2024     ││ │
+│              │  │                         │  │ │2020│12/15/24│Grand Hall││ │
+│              │  │ Event Date              │  │ │Active│5│[...]         ││ │
+│              │  │ ┌─────────────────────┐ │  │ ├────────────────────────┤│ │
+│              │  │ │ mm/dd/yyyy      📅  │ │  │ │Tech Talk Series        ││ │
+│              │  │ └─────────────────────┘ │  │ │2021│12/20/24│Auditorium││ │
+│              │  │                         │  │ │Active│3│[...]         ││ │
+│              │  │ Venue                   │  │ └────────────────────────┘│ │
+│              │  │ ┌─────────────────────┐ │  │                          │ │
+│              │  │ │                     │ │  │                          │ │
+│              │  │ └─────────────────────┘ │  │                          │ │
+│              │  │                         │  │                          │ │
+│              │  │ ┌─ Add Event ─────────┐ │  │                          │ │
+│              │  │ │ + Add Event         │ │  │                          │ │
+│              │  │ └─────────────────────┘ │  │                          │ │
+│              │  └─────────────────────────┘  └──────────────────────────┘ │
+│              │                                                              │
+│              │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
+│              │  │ Total Events │ │Active Events │ │Expiring Soon │        │
+│              │  │      12      │ │      2       │ │      3       │        │
+│              │  └──────────────┘ └──────────────┘ └──────────────┘        │
+│              │  ┌──────────────┐                                           │
+│              │  │Archived Events                                           │
+│              │  │      8       │                                           │
+│              │  └──────────────┘                                           │
+│              │                                                              │
+└──────────────┴──────────────────────────────────────────────────────────────┘
+
+================================================================================
+                            COMPONENT BREAKDOWN
+================================================================================
+
+HEADER SECTION:
+  Location: Top of screen
+  Height: ~60px
+  Components:
+    - Alumni Portal Logo (left)
+    - Users Button (center-right, yellow background)
+    - Welcome Message (right, "Welcome, admin")
+  Background: Dark Blue (#090A4F)
+  Text Color: White
+
+SIDEBAR NAVIGATION:
+  Location: Left side
+  Width: 200px
+  Background: Dark Blue (#090A4F)
+  Items:
+    1. Dashboard (selected, yellow background)
+    2. Archived Events (with red badge "1")
+    3. Comments
+    4. Alumni Members
+    5. Logout
+  Text Color: White (selected: Dark Blue)
+  Icon Color: White (selected: Dark Blue)
+
+MAIN CONTENT AREA:
+  Location: Right of sidebar
+  Background: White
+  Padding: 24px
+
+TITLE SECTION:
+  Text: "Alumni Events Dashboard"
+  Font Size: 32px
+  Font Weight: Bold
+  Color: Dark Blue (#090A4F)
+  Underline: Gold bar (270px wide, 4px height)
+
+FORM SECTION (Left Column):
+  Width: ~30% of content area
+  Background: White with border
+  Border Color: Light gray
+  Padding: 20px
+  Title: "Add New Alumni Event"
+  
+  Fields:
+    1. Event Theme
+       - Label: "Event Theme"
+       - Input: Text field
+       - Placeholder: "Enter event theme"
+    
+    2. Batch Year
+       - Label: "Batch Year"
+       - Input: Text field
+       - Placeholder: "Enter batch year"
+    
+    3. Event Date
+       - Label: "Event Date"
+       - Input: Text field with calendar icon
+       - Format: MM/DD/YYYY
+       - Placeholder: "mm/dd/yyyy"
+    
+    4. Venue
+       - Label: "Venue"
+       - Input: Text field
+       - Placeholder: "Enter venue"
+    
+    5. Add Event Button
+       - Style: Solid button
+       - Color: Dark Blue (#1A3A52)
+       - Text Color: White
+       - Icon: Plus sign
+       - Text: "Add Event"
+       - Width: 100% of form
+
+TABLE SECTION (Right Column):
+  Width: ~70% of content area
+  Background: White with border
+  Border Color: Light gray
+  
+  Header:
+    - Background: Gold (#FFD700)
+    - Text Color: Dark Blue (#090A4F)
+    - Title: "Active Events"
+    - Padding: 16px
+  
+  Search Bar:
+    - Width: 100%
+    - Placeholder: "Search events by theme, batch, venue..."
+    - Icon: Search icon (left)
+    - Button: Reset button (right)
+  
+  Table Headers:
+    - Theme (40%)
+    - Batch Year (15%)
+    - Date (20%)
+    - Venue (20%)
+    - Status (15%)
+    - Comments (10%)
+    - Actions (10%)
+  
+  Table Rows:
+    - Background: Light gray (#f5f5f5)
+    - Border: Light gray border
+    - Padding: 12px
+    - Alternating rows for clarity
+  
+  Status Badge:
+    - Background: Gold (#FFD700)
+    - Text Color: Dark Blue (#090A4F)
+    - Padding: 8px 4px
+    - Border Radius: 4px
+  
+  Actions Column:
+    - Menu icon (three dots)
+    - Options: Edit, Archive, Delete
+
+STATISTICS SECTION:
+  Location: Bottom of dashboard
+  Layout: 4 cards in a row
+  
+  Card 1 - Total Events:
+    - Background: Dark Blue (#1A3A52)
+    - Title: "Total Events"
+    - Icon: Event icon
+    - Value: "12"
+  
+  Card 2 - Active Events:
+    - Background: Gold (#FFD700)
+    - Title: "Active Events"
+    - Icon: Check circle icon
+    - Value: "2"
+  
+  Card 3 - Expiring Soon:
+    - Background: Gold (#FFD700)
+    - Title: "Expiring Soon"
+    - Icon: Warning icon
+    - Value: "3"
+  
+  Card 4 - Archived Events:
+    - Background: Dark Blue (#1A3A52)
+    - Title: "Archived Events"
+    - Icon: Archive icon
+    - Value: "8"
+
+================================================================================
+                            COLOR REFERENCE
+================================================================================
+
+Primary Dark Blue:     #090A4F
+  Used for: Sidebar, text, primary elements
+  
+Gold/Yellow Accent:    #FFD700
+  Used for: Highlights, active states, badges
+  
+Light Blue Secondary:  #1A3A52
+  Used for: Buttons, secondary elements
+  
+Light Gray Border:     #e0e0e0
+  Used for: Borders, dividers
+  
+Light Gray Background: #f5f5f5
+  Used for: Table rows, backgrounds
+  
+White:                 #FFFFFF
+  Used for: Main background, text on dark
+  
+Red Badge:             #FF6B6B
+  Used for: Notification badges
+
+================================================================================
+                            RESPONSIVE BEHAVIOR
+================================================================================
+
+Desktop (1200px+):
+  - Full layout as shown above
+  - Sidebar: 200px fixed
+  - Form: 30% of content
+  - Table: 70% of content
+
+Tablet (768px - 1199px):
+  - Sidebar may collapse to icons
+  - Form and table stack vertically
+  - Adjusted padding and spacing
+
+Mobile (< 768px):
+  - Sidebar becomes hamburger menu
+  - Full-width form and table
+  - Single column layout
+  - Adjusted font sizes
+
+================================================================================
+                            INTERACTION STATES
+================================================================================
+
+BUTTONS:
+  Normal:   Blue background, white text
+  Hover:    Darker blue, slight shadow
+  Active:   Gold background, dark text
+  Disabled: Gray background, gray text
+
+FORM FIELDS:
+  Normal:   White background, gray border
+  Focus:    White background, blue border
+  Error:    White background, red border
+  Filled:   White background, dark text
+
+TABLE ROWS:
+  Normal:   Light gray background
+  Hover:    Slightly darker gray
+  Selected: Gold highlight
+
+SIDEBAR ITEMS:
+  Normal:   Dark blue background, white text
+  Active:   Gold background, dark blue text
+  Hover:    Slightly lighter background
+
+================================================================================
+                            SPACING GUIDELINES
+================================================================================
+
+Padding:
+  - Large sections: 24px
+  - Medium sections: 16px
+  - Small sections: 8px
+  - Form fields: 12px horizontal, 10px vertical
+
+Margins:
+  - Between sections: 32px
+  - Between form fields: 16px
+  - Between table rows: 8px
+
+Border Radius:
+  - Buttons: 4px
+  - Cards: 8px
+  - Input fields: 4px
+  - Badges: 10px
+
+Font Sizes:
+  - Page title: 32px
+  - Section title: 18px
+  - Labels: 12px
+  - Body text: 13-14px
+  - Small text: 12px
+
+================================================================================
+                            ACCESSIBILITY
+================================================================================
+
+Color Contrast:
+  - Dark blue on white: High contrast ✓
+  - Gold on dark blue: High contrast ✓
+  - White on dark blue: High contrast ✓
+
+Focus States:
+  - All interactive elements have visible focus
+  - Tab navigation supported
+  - Keyboard shortcuts available
+
+Icons:
+  - All icons have text labels
+  - Tooltips for icon-only buttons
+  - Semantic HTML structure
+
+================================================================================

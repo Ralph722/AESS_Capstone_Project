@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:alumni_system/services/event_service.dart';
+import 'package:alumni_system/models/event_model.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -10,6 +13,78 @@ class EventsScreen extends StatefulWidget {
 class _EventsScreenState extends State<EventsScreen> {
   int _selectedFilter = 0;
   final List<String> _filters = ['All', 'This Week', 'This Month', 'Custom'];
+  final EventService _eventService = EventService();
+  List<AlumniEvent> allEvents = [];
+  List<AlumniEvent> filteredEvents = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    try {
+      setState(() => isLoading = true);
+      final events = await _eventService.getActiveEvents();
+      setState(() {
+        allEvents = events;
+        filteredEvents = events;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading events: $e')),
+      );
+    }
+  }
+
+  void _filterEvents(int filterIndex) {
+    setState(() {
+      _selectedFilter = filterIndex;
+      final now = DateTime.now();
+      
+      switch (filterIndex) {
+        case 0: // All
+          filteredEvents = allEvents;
+          break;
+        case 1: // This Week
+          final weekLater = now.add(const Duration(days: 7));
+          filteredEvents = allEvents.where((event) {
+            return event.date.isAfter(now) && event.date.isBefore(weekLater);
+          }).toList();
+          break;
+        case 2: // This Month
+          final monthLater = DateTime(now.year, now.month + 1, now.day);
+          filteredEvents = allEvents.where((event) {
+            return event.date.isAfter(now) && event.date.isBefore(monthLater);
+          }).toList();
+          break;
+        case 3: // Custom
+          // TODO: Implement custom date range picker
+          break;
+      }
+    });
+  }
+
+  String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return '0 minutes ago';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} minutes ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return DateFormat('MMM d, yyyy').format(dateTime);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,11 +136,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   (index) => Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedFilter = index;
-                        });
-                      },
+                      onTap: () => _filterEvents(index),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -114,136 +185,171 @@ class _EventsScreenState extends State<EventsScreen> {
               ),
             ),
 
-            // Event Card
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
+            // Events List
+            if (isLoading)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (filteredEvents.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+                child: Center(
+                  child: Text(
+                    'No events found',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header with Admin and Time
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF090A4F),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredEvents.length,
+                itemBuilder: (context, index) {
+                  final event = filteredEvents[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header with Admin and Time
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Admin',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF090A4F),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.person,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Admin',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF090A4F),
+                                        ),
+                                      ),
+                                      Text(
+                                        _getTimeAgo(event.createdAt),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.more_vert),
+                                onPressed: () {},
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Event Title
+                          Text(
+                            event.theme,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF090A4F),
+                            ),
+                          ),
+                          if (event.description.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                event.description,
+                                style: const TextStyle(
+                                  fontSize: 13,
                                   color: Color(0xFF090A4F),
                                 ),
                               ),
-                              Text(
-                                '5 hours ago',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          // Event Details
+                          _buildEventDetail(Icons.calendar_today, DateFormat('EEEE, MMMM d, yyyy').format(event.date)),
+                          const SizedBox(height: 8),
+                          _buildEventDetail(Icons.access_time, '${event.startTime} - ${event.endTime}'),
+                          const SizedBox(height: 8),
+                          _buildEventDetail(Icons.location_on, event.venue),
+                          const SizedBox(height: 16),
+                          // Action Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    // TODO: Implement reminder functionality
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF090A4F),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Text('Remind me'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    // TODO: Implement comment functionality
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF090A4F),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Text('Comment'),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Event Title
-                    const Text(
-                      'Alumni Homecoming 2030',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF090A4F),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    // Event Details
-                    _buildEventDetail(Icons.calendar_today, 'Saturday, October 20, 2023'),
-                    const SizedBox(height: 8),
-                    _buildEventDetail(Icons.access_time, '1:00 PM - 9:00 PM'),
-                    const SizedBox(height: 8),
-                    _buildEventDetail(Icons.location_on, 'USTP Covered Court'),
-                    const SizedBox(height: 16),
-                    // Action Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Not functional yet
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF090A4F),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text('Remind me'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Not functional yet
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF090A4F),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text('Comment'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // No more events message
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: Text(
-                  'No more added events',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-            ),
 
             const SizedBox(height: 100), // Space for bottom nav
           ],

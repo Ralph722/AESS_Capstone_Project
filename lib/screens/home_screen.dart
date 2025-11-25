@@ -1,8 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart' as intl;
+import 'package:alumni_system/services/event_service.dart';
+import 'package:alumni_system/models/event_model.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final EventService _eventService = EventService();
+  List<AlumniEvent> upcomingEvents = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUpcomingEvents();
+  }
+
+  Future<void> _loadUpcomingEvents() async {
+    try {
+      final events = await _eventService.getActiveEvents();
+      setState(() {
+        upcomingEvents = events.take(3).toList(); // Get first 3 upcoming events
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+      print('Error loading upcoming events: $e');
+    }
+  }
+
+  String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return '0 minutes ago';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} minutes ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return intl.DateFormat('MMM d, yyyy').format(dateTime);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,52 +154,177 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Alumni Homecoming 2030',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF090A4F),
+                  if (isLoading)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: const Center(child: CircularProgressIndicator()),
+                    )
+                  else if (upcomingEvents.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'No upcoming events',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: upcomingEvents.length,
+                      itemBuilder: (context, index) {
+                        final event = upcomingEvents[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Header with Admin
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF090A4F),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.person,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Admin',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF090A4F),
+                                              ),
+                                            ),
+                                            Text(
+                                              _getTimeAgo(event.createdAt),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.more_vert),
+                                      onPressed: () {},
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Event Title
+                                Text(
+                                  event.theme,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF090A4F),
+                                  ),
+                                ),
+                                if (event.description.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      event.description,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF090A4F),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 12),
+                                // Event Details
+                                _buildEventDetail(Icons.calendar_today, intl.DateFormat('EEEE, MMMM d, yyyy').format(event.date)),
+                                const SizedBox(height: 8),
+                                _buildEventDetail(Icons.access_time, '${event.startTime} - ${event.endTime}'),
+                                const SizedBox(height: 8),
+                                _buildEventDetail(Icons.location_on, event.venue),
+                                const SizedBox(height: 12),
+                                // Action Buttons
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          // TODO: Implement reminder
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF090A4F),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                        ),
+                                        child: const Text('Remind me', style: TextStyle(fontSize: 12)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          // TODO: Implement comment
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF090A4F),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                        ),
+                                        child: const Text('Comment', style: TextStyle(fontSize: 12)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_forward_ios,
-                            color: Color(0xFF090A4F),
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            // Not functional yet
-                          },
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF090A4F),
-                        width: 2,
-                        style: BorderStyle.solid,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -195,6 +368,26 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildEventDetail(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: const Color(0xFF090A4F),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF090A4F),
+          ),
+        ),
+      ],
     );
   }
 }

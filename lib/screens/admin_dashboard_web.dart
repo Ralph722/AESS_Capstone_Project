@@ -17,12 +17,16 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
   final TextEditingController _batchYearController = TextEditingController();
   final TextEditingController _eventDateController = TextEditingController();
   final TextEditingController _venueController = TextEditingController();
+  final TextEditingController _startTimeController = TextEditingController();
+  final TextEditingController _endTimeController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final AuthService _authService = AuthService();
   final EventService _eventService = EventService();
 
   int _selectedMenuItem = 0;
   List<AlumniEvent> activeEvents = [];
+  List<AlumniEvent> archivedEventsList = [];
   List<AlumniEvent> filteredEvents = [];
   bool isLoading = true;
   int totalEvents = 0;
@@ -32,26 +36,39 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
   @override
   void initState() {
     super.initState();
-    _loadEvents();
+    _loadAllData();
   }
 
-  Future<void> _loadEvents() async {
+  Future<void> _loadAllData() async {
     try {
       setState(() => isLoading = true);
       final events = await _eventService.getActiveEvents();
-      print('DEBUG: Loaded ${events.length} events');
+      final total = await _eventService.getTotalEventsCount();
+      final expiring = await _eventService.getExpiringEventsCount();
+      final archived = await _eventService.getArchivedEventsCount();
+      final archivedList = await _eventService.getArchivedEvents();
+      
+      print('DEBUG: Loaded ${events.length} active events, $total total, $expiring expiring, $archived archived');
       setState(() {
         activeEvents = events;
         filteredEvents = events;
+        totalEvents = total;
+        expiringEvents = expiring;
+        archivedEvents = archived;
+        archivedEventsList = archivedList;
         isLoading = false;
       });
     } catch (e) {
       setState(() => isLoading = false);
-      print('DEBUG: Error loading events: $e');
+      print('DEBUG: Error loading data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading events: $e')),
+        SnackBar(content: Text('Error loading data: $e')),
       );
     }
+  }
+
+  Future<void> _loadEvents() async {
+    await _loadAllData();
   }
 
   DateTime _parseDate(String dateString) {
@@ -90,9 +107,11 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     if (_themeController.text.isEmpty ||
         _batchYearController.text.isEmpty ||
         _eventDateController.text.isEmpty ||
-        _venueController.text.isEmpty) {
+        _venueController.text.isEmpty ||
+        _startTimeController.text.isEmpty ||
+        _endTimeController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
+        const SnackBar(content: Text('Please fill all required fields')),
       );
       return;
     }
@@ -106,6 +125,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         venue: _venueController.text,
         status: 'Active',
         comments: 0,
+        startTime: _startTimeController.text,
+        endTime: _endTimeController.text,
+        description: _descriptionController.text,
       );
 
       print('DEBUG: Adding event with ID: ${newEvent.id}');
@@ -116,6 +138,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       _batchYearController.clear();
       _eventDateController.clear();
       _venueController.clear();
+      _startTimeController.clear();
+      _endTimeController.clear();
+      _descriptionController.clear();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Event added successfully')),
@@ -156,6 +181,89 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         SnackBar(content: Text('Error archiving event: $e')),
       );
     }
+  }
+
+  Future<void> _restoreEvent(String eventId) async {
+    try {
+      await _eventService.restoreEvent(eventId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event restored')),
+      );
+      await _loadEvents();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error restoring event: $e')),
+      );
+    }
+  }
+
+  Future<void> _editEvent(AlumniEvent event) async {
+    _themeController.text = event.theme;
+    _batchYearController.text = event.batchYear;
+    _eventDateController.text = DateFormat('MM/dd/yyyy').format(event.date);
+    _venueController.text = event.venue;
+    _startTimeController.text = event.startTime;
+    _endTimeController.text = event.endTime;
+    _descriptionController.text = event.description;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Event'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildFormField('Event Theme', _themeController, 'Enter event theme'),
+              const SizedBox(height: 16),
+              _buildFormField('Batch Year', _batchYearController, 'Enter batch year'),
+              const SizedBox(height: 16),
+              _buildFormField('Event Date', _eventDateController, 'MM/DD/YYYY', isDate: true),
+              const SizedBox(height: 16),
+              _buildFormField('Venue', _venueController, 'Enter venue'),
+              const SizedBox(height: 16),
+              _buildFormField('Start Time', _startTimeController, 'HH:mm', isTime: true),
+              const SizedBox(height: 16),
+              _buildFormField('End Time', _endTimeController, 'HH:mm', isTime: true),
+              const SizedBox(height: 16),
+              _buildFormField('Description', _descriptionController, 'Enter event description', isMultiline: true),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                final updatedEvent = event.copyWith(
+                  theme: _themeController.text,
+                  batchYear: _batchYearController.text,
+                  date: _parseDate(_eventDateController.text),
+                  venue: _venueController.text,
+                  startTime: _startTimeController.text,
+                  endTime: _endTimeController.text,
+                  description: _descriptionController.text,
+                );
+                await _eventService.updateEvent(updatedEvent);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Event updated successfully')),
+                );
+                await _loadEvents();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error updating event: $e')),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _logout() async {
@@ -532,6 +640,16 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                   Expanded(child: _buildFormField('Venue', _venueController, 'Enter venue')),
                 ],
               ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildFormField('Start Time', _startTimeController, 'HH:mm', isTime: true)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildFormField('End Time', _endTimeController, 'HH:mm', isTime: true)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildFormField('Description', _descriptionController, 'Enter event description', isMultiline: true),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -621,7 +739,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                           DataCell(Text(event.comments.toString())),
                           DataCell(PopupMenuButton(
                             itemBuilder: (context) => [
-                              PopupMenuItem(child: const Text('Edit'), onTap: () {}),
+                              PopupMenuItem(child: const Text('Edit'), onTap: () => _editEvent(event)),
                               PopupMenuItem(child: const Text('Archive'), onTap: () => _archiveEvent(event.id)),
                               PopupMenuItem(child: const Text('Delete'), onTap: () => _deleteEvent(event.id)),
                             ],
@@ -679,7 +797,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
 
   Widget _buildArchivedContent() {
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -688,9 +805,63 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Archived Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
-          const SizedBox(height: 20),
-          Center(child: Text('No archived events yet', style: TextStyle(color: Colors.grey.shade600, fontSize: 16))),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A3A52),
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Archived Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text('${archivedEventsList.length} events', style: const TextStyle(fontSize: 14, color: Colors.white70)),
+              ],
+            ),
+          ),
+          if (archivedEventsList.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: Text('No archived events', style: TextStyle(color: Colors.grey.shade600, fontSize: 16))),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('Theme')),
+                  DataColumn(label: Text('Batch Year')),
+                  DataColumn(label: Text('Date')),
+                  DataColumn(label: Text('Venue')),
+                  DataColumn(label: Text('Status')),
+                  DataColumn(label: Text('Comments')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: archivedEventsList.map((event) {
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(event.theme)),
+                      DataCell(Text(event.batchYear)),
+                      DataCell(Text(DateFormat('MM/dd/yyyy').format(event.date))),
+                      DataCell(Text(event.venue)),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(4)),
+                        child: const Text('Archived', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                      )),
+                      DataCell(Text(event.comments.toString())),
+                      DataCell(PopupMenuButton(
+                        itemBuilder: (context) => [
+                          PopupMenuItem(child: const Text('Restore'), onTap: () => _restoreEvent(event.id)),
+                          PopupMenuItem(child: const Text('Delete'), onTap: () => _deleteEvent(event.id)),
+                        ],
+                        child: const Icon(Icons.more_vert),
+                      )),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
         ],
       ),
     );
@@ -755,7 +926,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     );
   }
 
-  Widget _buildFormField(String label, TextEditingController controller, String hint, {bool isDate = false}) {
+  Widget _buildFormField(String label, TextEditingController controller, String hint, {bool isDate = false, bool isTime = false, bool isMultiline = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -763,7 +934,8 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
-          readOnly: isDate,
+          readOnly: isDate || isTime,
+          maxLines: isMultiline ? 4 : 1,
           decoration: InputDecoration(
             hintText: hint,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
@@ -782,7 +954,20 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                       }
                     },
                   )
-                : null,
+                : isTime
+                    ? IconButton(
+                        icon: const Icon(Icons.access_time),
+                        onPressed: () async {
+                          final TimeOfDay? picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (picked != null) {
+                            controller.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                          }
+                        },
+                      )
+                    : null,
           ),
         ),
       ],
@@ -795,6 +980,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     _batchYearController.dispose();
     _eventDateController.dispose();
     _venueController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
+    _descriptionController.dispose();
     _searchController.dispose();
     super.dispose();
   }

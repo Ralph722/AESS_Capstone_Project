@@ -8,6 +8,10 @@ class AlumniEvent {
   final String venue;
   final String status;
   final int comments;
+  final String startTime; // Format: HH:mm (e.g., "14:00")
+  final String endTime;   // Format: HH:mm (e.g., "18:00")
+  final String description;
+  final DateTime createdAt; // When the event was created/posted
 
   AlumniEvent({
     required this.id,
@@ -17,7 +21,11 @@ class AlumniEvent {
     required this.venue,
     required this.status,
     required this.comments,
-  });
+    this.startTime = '09:00',
+    this.endTime = '17:00',
+    this.description = '',
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   /// Convert AlumniEvent to Firestore document
   Map<String, dynamic> toFirestore() {
@@ -29,6 +37,10 @@ class AlumniEvent {
       'venue': venue,
       'status': status,
       'comments': comments,
+      'startTime': startTime,
+      'endTime': endTime,
+      'description': description,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 
@@ -43,6 +55,10 @@ class AlumniEvent {
       venue: data['venue'] ?? '',
       status: data['status'] ?? 'Active',
       comments: data['comments'] ?? 0,
+      startTime: data['startTime'] ?? '09:00',
+      endTime: data['endTime'] ?? '17:00',
+      description: data['description'] ?? '',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
@@ -55,6 +71,10 @@ class AlumniEvent {
     String? venue,
     String? status,
     int? comments,
+    String? startTime,
+    String? endTime,
+    String? description,
+    DateTime? createdAt,
   }) {
     return AlumniEvent(
       id: id ?? this.id,
@@ -64,6 +84,10 @@ class AlumniEvent {
       venue: venue ?? this.venue,
       status: status ?? this.status,
       comments: comments ?? this.comments,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

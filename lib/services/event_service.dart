@@ -95,6 +95,86 @@ class EventService {
     }
   }
 
+  /// Get all archived events
+  Future<List<AlumniEvent>> getArchivedEvents() async {
+    try {
+      final snapshot = await _firestore
+          .collection('events')
+          .where('status', isEqualTo: 'Archived')
+          .get();
+
+      final events = snapshot.docs.map((doc) => AlumniEvent.fromFirestore(doc)).toList();
+      events.sort((a, b) => b.date.compareTo(a.date)); // Most recent first
+      return events;
+    } catch (e) {
+      throw Exception('Error fetching archived events: $e');
+    }
+  }
+
+  /// Get total count of all events
+  Future<int> getTotalEventsCount() async {
+    try {
+      final snapshot = await _firestore.collection('events').get();
+      return snapshot.docs.length;
+    } catch (e) {
+      throw Exception('Error fetching total events count: $e');
+    }
+  }
+
+  /// Get count of expiring events (events within 7 days)
+  Future<int> getExpiringEventsCount() async {
+    try {
+      final snapshot = await _firestore.collection('events').where('status', isEqualTo: 'Active').get();
+      
+      final now = DateTime.now();
+      final sevenDaysLater = now.add(const Duration(days: 7));
+      
+      final expiringCount = snapshot.docs.where((doc) {
+        final event = AlumniEvent.fromFirestore(doc);
+        return event.date.isAfter(now) && event.date.isBefore(sevenDaysLater);
+      }).length;
+      
+      return expiringCount;
+    } catch (e) {
+      throw Exception('Error fetching expiring events count: $e');
+    }
+  }
+
+  /// Get count of archived events
+  Future<int> getArchivedEventsCount() async {
+    try {
+      final snapshot = await _firestore
+          .collection('events')
+          .where('status', isEqualTo: 'Archived')
+          .get();
+      return snapshot.docs.length;
+    } catch (e) {
+      throw Exception('Error fetching archived events count: $e');
+    }
+  }
+
+  /// Update event details
+  Future<void> updateEvent(AlumniEvent event) async {
+    try {
+      await _firestore.collection('events').doc(event.id).update(
+            event.toFirestore(),
+          );
+    } catch (e) {
+      throw Exception('Error updating event: $e');
+    }
+  }
+
+  /// Restore archived event (change status back to Active)
+  Future<void> restoreEvent(String eventId) async {
+    try {
+      await _firestore.collection('events').doc(eventId).update({
+        'status': 'Active',
+      });
+    } catch (e) {
+      throw Exception('Error restoring event: $e');
+    }
+  }
+
   /// Stream of active events (real-time updates)
   Stream<List<AlumniEvent>> getActiveEventsStream() {
     return _firestore

@@ -963,7 +963,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                             initialTime: TimeOfDay.now(),
                           );
                           if (picked != null) {
-                            controller.text = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                            controller.text = picked.format(context);
                           }
                         },
                       )

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:alumni_system/screens/login_screen.dart';
+import 'package:alumni_system/services/audit_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -147,6 +148,20 @@ class ProfileScreen extends StatelessWidget {
                       Icons.logout,
                       'Logout',
                       () async {
+                        final user = FirebaseAuth.instance.currentUser;
+                        final auditService = AuditService();
+                        
+                        // Log the logout action
+                        if (user != null) {
+                          await auditService.logAction(
+                            action: 'LOGOUT',
+                            resource: 'User',
+                            resourceId: user.uid,
+                            description: 'User logged out: ${user.email}',
+                            status: 'SUCCESS',
+                          );
+                        }
+                        
                         await FirebaseAuth.instance.signOut();
                         if (context.mounted) {
                           Navigator.pushAndRemoveUntil(

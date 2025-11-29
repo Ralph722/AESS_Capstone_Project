@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/screens/register_screen.dart';
-import 'package:alumni_system/screens/main_navigation.dart';
-import 'package:alumni_system/screens/admin_dashboard_web.dart';
 import 'package:alumni_system/services/auth_service.dart';
+import 'package:alumni_system/services/audit_service.dart';
+import 'package:alumni_system/screens/admin_dashboard_web.dart';
+import 'package:alumni_system/screens/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _isLoading = false;
   final AuthService _authService = AuthService();
+  final AuditService _auditService = AuditService();
 
   @override
   void dispose() {
@@ -287,6 +289,15 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (user != null && mounted) {
+        // Log the login action
+        await _auditService.logAction(
+          action: 'LOGIN',
+          resource: 'User',
+          resourceId: user.uid,
+          description: 'User logged in: ${user.email}',
+          status: 'SUCCESS',
+        );
+
         // Get the user role from Firestore
         final userRole = await _authService.getUserRole(user.uid);
 
@@ -306,6 +317,15 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
+      // Log failed login attempt
+      await _auditService.logAction(
+        action: 'LOGIN',
+        resource: 'User',
+        resourceId: 'unknown',
+        description: 'Failed login attempt: ${_emailController.text}',
+        status: 'FAILED',
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),

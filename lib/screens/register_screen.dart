@@ -6,6 +6,7 @@ import 'package:alumni_system/screens/login_screen.dart';
 import 'package:alumni_system/screens/main_navigation.dart';
 import 'package:alumni_system/services/email_service.dart';
 import 'package:alumni_system/services/auth_service.dart';
+import 'package:alumni_system/services/audit_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -27,6 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _generatedOtp;
   late final EmailService _emailService;
   final AuthService _authService = AuthService();
+  final AuditService _auditService = AuditService();
 
   @override
   void initState() {
@@ -429,12 +431,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (user != null && mounted) {
+        // Log the registration action
+        await _auditService.logAction(
+          action: 'REGISTER',
+          resource: 'User',
+          resourceId: user.uid,
+          description: 'User registered: ${user.email}',
+          status: 'SUCCESS',
+        );
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MainNavigation()),
         );
       }
     } catch (e) {
+      // Log failed registration attempt
+      await _auditService.logAction(
+        action: 'REGISTER',
+        resource: 'User',
+        resourceId: 'unknown',
+        description: 'Failed registration attempt: ${_emailController.text}',
+        status: 'FAILED',
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),

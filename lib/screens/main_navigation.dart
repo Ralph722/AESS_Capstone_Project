@@ -27,6 +27,15 @@ class _MainNavigationState extends State<MainNavigation> {
     const ProfileScreen(),
   ];
 
+  final List<NavItem> _navItems = [
+    NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', index: 0),
+    NavItem(icon: Icons.event_outlined, activeIcon: Icons.event, label: 'Events', index: 1),
+    NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Community', index: 2),
+    NavItem(icon: Icons.work_outline, activeIcon: Icons.work, label: 'Jobs', index: 3),
+    NavItem(icon: Icons.search, activeIcon: Icons.search, label: 'ID Tracer', index: 4),
+    NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile', index: 5),
+  ];
+
   @override
   Widget build(BuildContext context) {
     if (_isAdminMode) {
@@ -39,6 +48,8 @@ class _MainNavigationState extends State<MainNavigation> {
               _currentIndex = 0;
             });
           },
+          backgroundColor: const Color(0xFF090A4F),
+          foregroundColor: const Color(0xFFFFD700),
           tooltip: 'Back to User Mode',
           child: const Icon(Icons.arrow_back),
         ),
@@ -47,72 +58,95 @@ class _MainNavigationState extends State<MainNavigation> {
 
     return Scaffold(
       body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF090A4F),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 4,
-              offset: Offset(0, -2),
-            ),
-          ],
+      bottomNavigationBar: _buildMinimalNavBar(),
+    );
+  }
+
+  Widget _buildMinimalNavBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home, 'Home', 0),
-                _buildNavItem(Icons.event, 'Events', 1),
-                _buildNavItem(Icons.people, 'Community', 2),
-                _buildNavItem(Icons.work, 'Job Posting', 3),
-                _buildNavItem(Icons.search, 'ID Tracer', 4),
-                GestureDetector(
-                  onLongPress: () {
-                    setState(() {
-                      _isAdminMode = true;
-                    });
-                  },
-                  child: _buildNavItem(Icons.person, 'Profile', 5),
-                ),
-              ],
-            ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: _navItems.map((navItem) {
+              return _buildMinimalNavItem(navItem);
+            }).toList(),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _currentIndex == index;
+  Widget _buildMinimalNavItem(NavItem navItem) {
+    final isSelected = _currentIndex == navItem.index;
+    
     return GestureDetector(
       onTap: () {
         setState(() {
-          _currentIndex = index;
+          _currentIndex = navItem.index;
         });
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? const Color(0xFFFFD700) : Colors.white,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? const Color(0xFFFFD700) : Colors.white,
-              fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      onLongPress: navItem.index == 5 ? () {
+        setState(() {
+          _isAdminMode = true;
+        });
+      } : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: const BoxConstraints(minWidth: 56),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon with subtle animation
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                isSelected ? navItem.activeIcon : navItem.icon,
+                size: 22,
+                color: isSelected ? const Color(0xFF090A4F) : Colors.grey.shade600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            // Label
+            Text(
+              navItem.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? const Color(0xFF090A4F) : Colors.grey.shade600,
+                height: 1.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
+
 }
 
+class NavItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final int index;
+
+  NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.index,
+  });
+}

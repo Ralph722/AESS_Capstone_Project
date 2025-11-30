@@ -4,6 +4,7 @@ import 'package:alumni_system/screens/login_screen.dart';
 import 'package:alumni_system/services/auth_service.dart';
 import 'package:alumni_system/services/event_service.dart';
 import 'package:alumni_system/models/event_model.dart';
+import 'admin_job_management.dart'; // ADD THIS IMPORT (NEW)
 
 class AdminDashboardWeb extends StatefulWidget {
   const AdminDashboardWeb({super.key});
@@ -358,6 +359,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                 _buildSidebarItem(2, Icons.people, 'Alumni Members'),
                 _buildSidebarItem(3, Icons.comment, 'Comments'),
                 _buildSidebarItem(4, Icons.archive, 'Archived Events'),
+                _buildSidebarItem(5, Icons.work, 'Job Postings'), //NEW
               ],
             ),
           ),
@@ -556,6 +558,8 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         return _buildCommentsContent();
       case 4:
         return _buildArchivedContent();
+      case 5: // ADD THIS CASE (NEW)
+        return const AdminJobManagement();
       default:
         return _buildDashboardContent();
     }
@@ -603,6 +607,12 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                 setState(() => _selectedMenuItem = 3);
               }),
             ),
+            const SizedBox(width: 16), //NEW
+            Expanded(
+              child: _buildQuickActionCard('Manage Jobs', 'Post and manage job listings', Icons.work, const Color(0xFFFF9800), () {
+                setState(() => _selectedMenuItem = 5); // UPDATED INDEX
+              }),
+            ), //NEW
           ],
         ),
       ],

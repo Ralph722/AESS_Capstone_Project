@@ -46,76 +46,18 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
       }
     } catch (e) {
       print('DEBUG: Error loading jobs: $e');
-      // Load mock data for testing
-      _loadMockJobs();
-    }
-  }
-
-  void _loadMockJobs() {
-    final mockJobs = [
-      JobPosting(
-        id: '1',
-        companyName: 'Tech Corp',
-        companyLogo: '',
-        jobTitle: 'Senior Flutter Developer',
-        jobType: 'Full-time',
-        location: 'San Francisco, CA',
-        salaryRange: '\$120k - \$160k',
-        description: 'We are looking for an experienced Flutter developer.',
-        requirements: ['5+ years experience', 'Flutter expertise', 'Mobile development'],
-        benefits: ['Health insurance', 'Remote work', '401k'],
-        postedDate: DateTime.now().subtract(const Duration(days: 2)),
-        applicationDeadline: DateTime.now().add(const Duration(days: 30)),
-        contactEmail: 'jobs@techcorp.com',
-        applicationMethod: 'email',
-        isActive: true,
-        views: 150,
-        applications: 12,
-        adminId: 'admin1',
-        isRemote: true,
-        experienceLevel: 'Senior',
-        status: 'active',
-      ),
-      JobPosting(
-        id: '2',
-        companyName: 'StartUp Inc',
-        companyLogo: '',
-        jobTitle: 'Junior Web Developer',
-        jobType: 'Part-time',
-        location: 'New York, NY',
-        salaryRange: '\$50k - \$70k',
-        description: 'Join our growing startup team.',
-        requirements: ['2+ years experience', 'React knowledge', 'JavaScript'],
-        benefits: ['Flexible hours', 'Learning budget'],
-        postedDate: DateTime.now().subtract(const Duration(days: 5)),
-        applicationDeadline: DateTime.now().add(const Duration(days: 20)),
-        contactEmail: 'hr@startupinc.com',
-        applicationMethod: 'email',
-        isActive: true,
-        views: 89,
-        applications: 5,
-        adminId: 'admin1',
-        isRemote: false,
-        experienceLevel: 'Junior',
-        status: 'active',
-      ),
-    ];
-
-    if (mounted) {
-      setState(() {
-        _jobPostings.clear();
-        _jobPostings.addAll(mockJobs);
-        _filteredJobs.clear();
-        _filteredJobs.addAll(mockJobs.where(_filterByTab));
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Loaded mock data. Check Firestore connection.'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 5),
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading jobs: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 

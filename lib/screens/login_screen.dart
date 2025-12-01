@@ -289,17 +289,19 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (user != null && mounted) {
-        // Log the login action
-        await _auditService.logAction(
-          action: 'LOGIN',
-          resource: 'User',
-          resourceId: user.uid,
-          description: 'User logged in: ${user.email}',
-          status: 'SUCCESS',
-        );
-
         // Get the user role from Firestore
         final userRole = await _authService.getUserRole(user.uid);
+        
+        // Log the login action with user role
+        final roleString = userRole == UserRole.admin ? 'admin' : 'user';
+        await _auditService.logAction(
+          action: 'LOGIN',
+          resource: roleString == 'admin' ? 'Admin' : 'User',
+          resourceId: user.uid,
+          description: '${roleString == 'admin' ? 'Admin' : 'User'} logged in: ${user.email}',
+          status: 'SUCCESS',
+          userRole: roleString,
+        );
 
         if (mounted) {
           // Navigate based on role stored in Firestore
@@ -324,6 +326,7 @@ class _LoginScreenState extends State<LoginScreen> {
         resourceId: 'unknown',
         description: 'Failed login attempt: ${_emailController.text}',
         status: 'FAILED',
+        userRole: 'user',
       );
 
       if (mounted) {

@@ -13,6 +13,7 @@ class AuditLog {
   final DateTime timestamp;
   final String? ipAddress;
   final String status;
+  final String userRole; // 'admin' or 'user'
 
   AuditLog({
     required this.id,
@@ -27,6 +28,7 @@ class AuditLog {
     required this.timestamp,
     this.ipAddress,
     required this.status,
+    this.userRole = 'user',
   });
 
   // Convert to Firestore document
@@ -44,6 +46,7 @@ class AuditLog {
       'timestamp': timestamp,
       'ipAddress': ipAddress,
       'status': status,
+      'userRole': userRole,
     };
   }
 
@@ -63,6 +66,7 @@ class AuditLog {
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       ipAddress: data['ipAddress'],
       status: data['status'] ?? 'SUCCESS',
+      userRole: data['userRole'] ?? 'user',
     );
   }
 
@@ -80,6 +84,7 @@ class AuditLog {
     DateTime? timestamp,
     String? ipAddress,
     String? status,
+    String? userRole,
   }) {
     return AuditLog(
       id: id ?? this.id,
@@ -94,6 +99,7 @@ class AuditLog {
       timestamp: timestamp ?? this.timestamp,
       ipAddress: ipAddress ?? this.ipAddress,
       status: status ?? this.status,
+      userRole: userRole ?? this.userRole,
     );
   }
 }

@@ -14,6 +14,7 @@ class AuditService {
     required String description,
     Map<String, dynamic>? changes,
     String status = 'SUCCESS',
+    String userRole = 'user',
   }) async {
     try {
       final user = _auth.currentUser;
@@ -32,6 +33,7 @@ class AuditService {
         timestamp: DateTime.now(),
         ipAddress: null,
         status: status,
+        userRole: userRole,
       );
 
       await _firestore
@@ -39,7 +41,7 @@ class AuditService {
           .doc(auditLog.id)
           .set(auditLog.toFirestore());
 
-      print('DEBUG: Audit log created - $action on $resource');
+      print('DEBUG: Audit log created - $action on $resource by $userRole');
     } catch (e) {
       print('ERROR: Failed to log action: $e');
     }
@@ -215,6 +217,36 @@ class AuditService {
     } catch (e) {
       print('ERROR: Failed to search audit logs: $e');
       return [];
+    }
+  }
+
+  // Delete a single audit log
+  Future<void> deleteAuditLog(String logId) async {
+    try {
+      await _firestore.collection('audit_logs').doc(logId).delete();
+    } catch (e) {
+      print('ERROR: Failed to delete audit log: $e');
+      rethrow;
+    }
+  }
+
+  // Delete all audit logs before a specific date
+  Future<int> deleteAuditLogsBefore(DateTime beforeDate) async {
+    try {
+      final snapshot = await _firestore
+          .collection('audit_logs')
+          .where('timestamp', isLessThan: beforeDate)
+          .get();
+
+      int deletedCount = 0;
+      for (final doc in snapshot.docs) {
+        await doc.reference.delete();
+        deletedCount++;
+      }
+      return deletedCount;
+    } catch (e) {
+      print('ERROR: Failed to delete audit logs before date: $e');
+      rethrow;
     }
   }
 }

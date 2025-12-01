@@ -3,7 +3,9 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/screens/login_screen.dart';
 import 'package:alumni_system/services/auth_service.dart';
 import 'package:alumni_system/services/event_service.dart';
+import 'package:alumni_system/services/audit_service.dart';
 import 'package:alumni_system/models/event_model.dart';
+import 'package:alumni_system/models/audit_log_model.dart';
 import 'admin_job_management.dart'; // ADD THIS IMPORT (NEW)
 
 class AdminDashboardWeb extends StatefulWidget {
@@ -24,15 +26,25 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
   final TextEditingController _searchController = TextEditingController();
   final AuthService _authService = AuthService();
   final EventService _eventService = EventService();
+  final AuditService _auditService = AuditService();
 
   int _selectedMenuItem = 0;
   List<AlumniEvent> activeEvents = [];
   List<AlumniEvent> archivedEventsList = [];
   List<AlumniEvent> filteredEvents = [];
+  List<AuditLog> auditLogs = [];
+  List<AuditLog> filteredAuditLogs = [];
   bool isLoading = true;
   int totalEvents = 0;
   int expiringEvents = 0;
   int archivedEvents = 0;
+  
+  // Activity log filters
+  String _selectedActionFilter = 'All';
+  String _selectedResourceFilter = 'All';
+  String _selectedStatusFilter = 'All';
+  DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void initState() {
@@ -359,7 +371,8 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                 _buildSidebarItem(2, Icons.people, 'Alumni Members'),
                 _buildSidebarItem(3, Icons.comment, 'Comments'),
                 _buildSidebarItem(4, Icons.archive, 'Archived Events'),
-                _buildSidebarItem(5, Icons.work, 'Job Postings'), //NEW
+                _buildSidebarItem(5, Icons.work, 'Job Postings'),
+                _buildSidebarItem(6, Icons.history, 'Activity Logs'),
               ],
             ),
           ),
@@ -541,6 +554,10 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         return 'Comments';
       case 4:
         return 'Archived Events';
+      case 5:
+        return 'Job Postings';
+      case 6:
+        return 'Activity Logs';
       default:
         return 'Dashboard';
     }
@@ -558,8 +575,10 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         return _buildCommentsContent();
       case 4:
         return _buildArchivedContent();
-      case 5: // ADD THIS CASE (NEW)
+      case 5:
         return const AdminJobManagement();
+      case 6:
+        return _buildActivityLogsContent();
       default:
         return _buildDashboardContent();
     }
@@ -607,12 +626,32 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                 setState(() => _selectedMenuItem = 3);
               }),
             ),
-            const SizedBox(width: 16), //NEW
+            const SizedBox(width: 16),
             Expanded(
               child: _buildQuickActionCard('Manage Jobs', 'Post and manage job listings', Icons.work, const Color(0xFFFF9800), () {
-                setState(() => _selectedMenuItem = 5); // UPDATED INDEX
+                setState(() => _selectedMenuItem = 5);
               }),
-            ), //NEW
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionCard('Activity Logs', 'View user activity and audit trail', Icons.history, const Color(0xFF9C27B0), () {
+                setState(() => _selectedMenuItem = 6);
+              }),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildQuickActionCard('Archived Events', 'Manage archived events', Icons.archive, const Color(0xFF607D8B), () {
+                setState(() => _selectedMenuItem = 4);
+              }),
+            ),
+            const SizedBox(width: 16),
+            Expanded(child: Container()),
+            const SizedBox(width: 16),
+            Expanded(child: Container()),
           ],
         ),
       ],
@@ -931,6 +970,446 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
               Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityLogsContent() {
+    return FutureBuilder<List<AuditLog>>(
+      future: _auditService.getAllAuditLogs(limit: 200),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        
+        final logs = snapshot.data ?? [];
+        
+        // Get unique values for filters
+        final actions = ['All', ...logs.map((l) => l.action).toSet().toList()];
+        final resources = ['All', ...logs.map((l) => l.resource).toSet().toList()];
+        final statuses = ['All', ...logs.map((l) => l.status).toSet().toList()];
+        
+        // Apply filters including date range
+        var filteredLogs = logs.where((log) {
+          final actionMatch = _selectedActionFilter == 'All' || log.action == _selectedActionFilter;
+          final resourceMatch = _selectedResourceFilter == 'All' || log.resource == _selectedResourceFilter;
+          final statusMatch = _selectedStatusFilter == 'All' || log.status == _selectedStatusFilter;
+          
+          // Date range filter
+          bool dateMatch = true;
+          if (_startDate != null) {
+            final logDate = DateTime(log.timestamp.year, log.timestamp.month, log.timestamp.day);
+            final startDate = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+            dateMatch = logDate.isAfter(startDate) || logDate.isAtSameMomentAs(startDate);
+          }
+          if (_endDate != null && dateMatch) {
+            final logDate = DateTime(log.timestamp.year, log.timestamp.month, log.timestamp.day);
+            final endDate = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+            dateMatch = logDate.isBefore(endDate.add(const Duration(days: 1))) || logDate.isAtSameMomentAs(endDate);
+          }
+          
+          return actionMatch && resourceMatch && statusMatch && dateMatch;
+        }).toList();
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Filter Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Filters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildFilterDropdown('Action', _selectedActionFilter, actions, (value) {
+                          setState(() => _selectedActionFilter = value);
+                        }),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildFilterDropdown('Resource', _selectedResourceFilter, resources, (value) {
+                          setState(() => _selectedResourceFilter = value);
+                        }),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildFilterDropdown('Status', _selectedStatusFilter, statuses, (value) {
+                          setState(() => _selectedStatusFilter = value);
+                        }),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildDatePicker('Start Date', _startDate, (date) {
+                          setState(() => _startDate = date);
+                        }),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildDatePicker('End Date', _endDate, (date) {
+                          setState(() => _endDate = date);
+                        }),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedActionFilter = 'All';
+                            _selectedResourceFilter = 'All';
+                            _selectedStatusFilter = 'All';
+                            _startDate = null;
+                            _endDate = null;
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF090A4F),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: const Text('Reset Filters', style: TextStyle(color: Colors.white)),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: () => _showDeleteLogsDialog(logs),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF6B6B),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: const Text('Delete Logs Before Date', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Activity Logs Table
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+              ),
+              child: Column(
+                children: [
+                  // Table Header
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF090A4F),
+                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), topRight: Radius.circular(8)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 2, child: _buildTableHeader('User')),
+                        Expanded(flex: 1, child: _buildTableHeader('Role')),
+                        Expanded(flex: 2, child: _buildTableHeader('Action')),
+                        Expanded(flex: 2, child: _buildTableHeader('Resource')),
+                        Expanded(flex: 2, child: _buildTableHeader('Description')),
+                        Expanded(flex: 1, child: _buildTableHeader('Status')),
+                        Expanded(flex: 2, child: _buildTableHeader('Timestamp')),
+                      ],
+                    ),
+                  ),
+                  
+                  // Table Rows
+                  if (filteredLogs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(
+                        child: Text(
+                          'No activity logs found',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filteredLogs.length,
+                      itemBuilder: (context, index) {
+                        final log = filteredLogs[index];
+                        final isAlternate = index % 2 == 0;
+                        return Container(
+                          color: isAlternate ? Colors.grey.shade50 : Colors.white,
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(log.userName, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF090A4F))),
+                                    Text(log.userEmail, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: log.userRole == 'admin' ? const Color(0xFFFFD700).withOpacity(0.2) : const Color(0xFF2196F3).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    log.userRole.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: log.userRole == 'admin' ? const Color(0xFFFFD700) : const Color(0xFF2196F3),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(log.action, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4CAF50))),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(log.resource, style: const TextStyle(fontSize: 12, color: Color(0xFF090A4F))),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(log.description, style: TextStyle(fontSize: 12, color: Colors.grey.shade700), maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: log.status == 'SUCCESS' ? const Color(0xFF4CAF50).withOpacity(0.1) : const Color(0xFFFF6B6B).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    log.status,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: log.status == 'SUCCESS' ? const Color(0xFF4CAF50) : const Color(0xFFFF6B6B),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  DateFormat('MMM d, yyyy HH:mm').format(log.timestamp),
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Total Records: ${filteredLogs.length}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterDropdown(String label, String value, List<String> items, Function(String) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF090A4F))),
+        const SizedBox(height: 8),
+        DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+          onChanged: (newValue) => onChanged(newValue ?? 'All'),
+          underline: Container(height: 1, color: Colors.grey.shade300),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableHeader(String text) {
+    return Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12));
+  }
+
+  Widget _buildDatePicker(String label, DateTime? selectedDate, Function(DateTime) onDateSelected) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF090A4F))),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: selectedDate ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) {
+              onDateSelected(picked);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today, size: 16, color: Color(0xFF090A4F)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    selectedDate != null ? DateFormat('MMM d, yyyy').format(selectedDate) : 'Select date',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: selectedDate != null ? const Color(0xFF090A4F) : Colors.grey.shade500,
+                    ),
+                  ),
+                ),
+                if (selectedDate != null)
+                  GestureDetector(
+                    onTap: () => onDateSelected(DateTime(1900)),
+                    child: const Icon(Icons.close, size: 16, color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showDeleteLogsDialog(List<AuditLog> allLogs) {
+    DateTime? deleteBeforeDate;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Delete Activity Logs'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Delete all logs created before this date:'),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () async {
+                  final DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setDialogState(() => deleteBeforeDate = picked);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 16, color: Color(0xFF090A4F)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          deleteBeforeDate != null ? DateFormat('MMM d, yyyy').format(deleteBeforeDate!) : 'Select date',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: deleteBeforeDate != null ? const Color(0xFF090A4F) : Colors.grey.shade500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (deleteBeforeDate != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF6B6B).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'This will delete ${allLogs.where((log) => log.timestamp.isBefore(deleteBeforeDate!)).length} logs created before ${DateFormat('MMM d, yyyy').format(deleteBeforeDate!)}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFFF6B6B), fontWeight: FontWeight.w600),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: deleteBeforeDate == null
+                  ? null
+                  : () async {
+                      try {
+                        final logsToDelete = allLogs.where((log) => log.timestamp.isBefore(deleteBeforeDate!)).toList();
+                        for (final log in logsToDelete) {
+                          await _auditService.deleteAuditLog(log.id);
+                        }
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Deleted ${logsToDelete.length} logs'),
+                            backgroundColor: const Color(0xFF4CAF50),
+                          ),
+                        );
+                        setState(() {});
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B6B),
+              ),
+              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
       ),
     );

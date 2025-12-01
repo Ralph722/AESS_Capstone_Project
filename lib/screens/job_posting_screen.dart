@@ -60,12 +60,20 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
     setState(() {
       _selectedFilter = filterIndex;
       if (filterIndex == 0) {
+        // All jobs
         _filteredJobs.clear();
         _filteredJobs.addAll(_jobPostings);
       } else {
         final filter = _filters[filterIndex];
         _filteredJobs.clear();
-        _filteredJobs.addAll(_jobPostings.where((job) => job.jobType == filter));
+        
+        if (filter == 'Remote') {
+          // Filter by isRemote boolean
+          _filteredJobs.addAll(_jobPostings.where((job) => job.isRemote));
+        } else {
+          // Filter by jobType (Full-time, Part-time, Internship)
+          _filteredJobs.addAll(_jobPostings.where((job) => job.jobType == filter));
+        }
       }
     });
   }

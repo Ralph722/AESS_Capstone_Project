@@ -18,53 +18,112 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   User? _currentUser;
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
+  String? _userDocId;
 
   @override
   void initState() {
     super.initState();
     _currentUser = _auth.currentUser;
-    _loadMessages();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _loadCurrentUserDocId();
+    await _loadMessages();
+  }
+
+  Future<void> _loadCurrentUserDocId() async {
+    if (_currentUser == null) return;
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .where('uid', isEqualTo: _currentUser!.uid)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        _userDocId = snapshot.docs.first.id;
+      }
+    } catch (e) {
+      // ignore doc lookup errors
+    }
   }
 
   Future<void> _loadMessages() async {
     if (_currentUser == null) return;
     try {
-      // Get all messages where current user is sender
-      final sentSnapshot = await _firestore
-          .collection('messages')
-          .where('senderId', isEqualTo: _currentUser!.uid)
-          .get();
+      setState(() => _isLoading = true);
 
-      // Get all messages where current user is recipient
-      final receivedSnapshot = await _firestore
-          .collection('messages')
-          .where('recipientId', isEqualTo: _currentUser!.uid)
-          .get();
+      final queries = <Future<QuerySnapshot<Map<String, dynamic>>>>[
+        _firestore
+            .collection('messages')
+            .where('senderId', isEqualTo: _currentUser!.uid)
+            .get(),
+        _firestore
+            .collection('messages')
+            .where('recipientId', isEqualTo: _currentUser!.uid)
+            .get(),
+      ];
 
-      final allMessages = <Map<String, dynamic>>[];
-      
-      // Add sent messages
-      for (var doc in sentSnapshot.docs) {
-        allMessages.add(doc.data());
+      if (_userDocId != null) {
+        queries.add(
+          _firestore
+              .collection('messages')
+              .where('senderId', isEqualTo: _userDocId!)
+              .get(),
+        );
+        queries.add(
+          _firestore
+              .collection('messages')
+              .where('recipientId', isEqualTo: _userDocId!)
+              .get(),
+        );
       }
-      
-      // Add received messages
-      for (var doc in receivedSnapshot.docs) {
-        allMessages.add(doc.data());
+
+      final snapshots = await Future.wait(queries);
+
+      final messagesMap = <String, Map<String, dynamic>>{};
+      for (final snapshot in snapshots) {
+        for (final doc in snapshot.docs) {
+          messagesMap[doc.id] = {
+            ...doc.data(),
+            'docId': doc.id,
+          };
+        }
       }
 
-      // Sort by timestamp (newest first)
-      allMessages.sort((a, b) {
+      final participantIds = <String>{
+        _currentUser!.uid,
+        if (_userDocId != null) _userDocId!,
+      };
+
+      final filteredMessages = messagesMap.values.where((msg) {
+        final senderCandidates = <String?>{
+          msg['senderId'] as String?,
+          msg['senderDocId'] as String?,
+        };
+        final recipientCandidates = <String?>{
+          msg['recipientId'] as String?,
+          msg['recipientDocId'] as String?,
+        };
+
+        final isParticipant = senderCandidates.any(
+                  (id) => id != null && participantIds.contains(id),
+                ) ||
+            recipientCandidates.any(
+              (id) => id != null && participantIds.contains(id),
+            );
+        return isParticipant;
+      }).toList();
+
+      filteredMessages.sort((a, b) {
         final timeA = (a['timestamp'] as Timestamp).toDate();
         final timeB = (b['timestamp'] as Timestamp).toDate();
         return timeB.compareTo(timeA);
       });
 
-      print('DEBUG: Loaded ${allMessages.length} messages');
-
       if (mounted) {
         setState(() {
-          _messages = allMessages;
+          _messages = filteredMessages;
           _isLoading = false;
         });
       }
@@ -85,7 +144,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
     _messageController.clear();
 
     try {
-      // Get all admins
+      // Get one admin user record
       final adminSnapshot = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'admin')
@@ -104,7 +163,9 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         return;
       }
 
-      final adminId = adminSnapshot.docs.first.id;
+      final adminDoc = adminSnapshot.docs.first;
+      final adminData = adminDoc.data();
+      final adminId = adminData['uid'] ?? adminDoc.id;
       final messageId = _firestore.collection('messages').doc().id;
 
       print('DEBUG: Sending message to admin: $adminId');
@@ -112,10 +173,12 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
       await _firestore.collection('messages').doc(messageId).set({
         'id': messageId,
         'senderId': _currentUser!.uid,
+        'senderDocId': _userDocId,
         'senderName': _currentUser!.displayName ?? 'User',
         'senderEmail': _currentUser!.email ?? '',
         'senderRole': 'user',
         'recipientId': adminId,
+        'recipientDocId': adminDoc.id,
         'messageText': messageText,
         'imageUrl': null,
         'timestamp': Timestamp.now(),
@@ -146,6 +209,105 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         );
       }
       print('Error sending message: $e');
+    }
+  }
+
+  Future<void> _editMessage(Map<String, dynamic> message) async {
+    final isCurrentUser = message['senderId'] == _currentUser?.uid;
+    if (!isCurrentUser) return;
+
+    final controller =
+        TextEditingController(text: message['messageText'] as String? ?? '');
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Edit message'),
+            content: TextField(
+              controller: controller,
+              maxLines: null,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+    final newText = controller.text.trim();
+    if (newText.isEmpty || newText == message['messageText']) return;
+
+    try {
+      final docId = message['docId'] as String?;
+      if (docId == null) return;
+
+      await _firestore
+          .collection('messages')
+          .doc(docId)
+          .update({'messageText': newText});
+      await _loadMessages();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating message: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteMessage(Map<String, dynamic> message) async {
+    final isCurrentUser = message['senderId'] == _currentUser?.uid;
+    if (!isCurrentUser) return;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete message'),
+            content: const Text('Do you want to delete this message?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    try {
+      final docId = message['docId'] as String?;
+      if (docId == null) return;
+
+      await _firestore.collection('messages').doc(docId).delete();
+      await _loadMessages();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting message: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -246,7 +408,12 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           final msg = _messages[index];
-                          final isCurrentUser = msg['senderId'] == _currentUser!.uid;
+                          final senderDocId = msg['senderDocId'] as String?;
+                          final isCurrentUser =
+                              msg['senderId'] == _currentUser!.uid ||
+                                  (senderDocId != null &&
+                                      _userDocId != null &&
+                                      senderDocId == _userDocId);
                           final timestamp = (msg['timestamp'] as Timestamp).toDate();
 
                           return Padding(
@@ -256,23 +423,72 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                               child: Column(
                                 crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                    constraints: BoxConstraints(
-                                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isCurrentUser
-                                          ? const Color(0xFF090A4F)
-                                          : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Text(
-                                      msg['messageText'] ?? '',
-                                      style: TextStyle(
-                                        color: isCurrentUser ? Colors.white : Colors.black87,
-                                        fontSize: 15,
-                                        height: 1.4,
+                                  GestureDetector(
+                                    onLongPress: isCurrentUser
+                                        ? () async {
+                                            final action =
+                                                await showModalBottomSheet<
+                                                    String>(
+                                              context: context,
+                                              builder: (context) =>
+                                                  SafeArea(
+                                                child: Wrap(
+                                                  children: [
+                                                    ListTile(
+                                                      leading: const Icon(
+                                                          Icons.edit),
+                                                      title: const Text(
+                                                          'Edit'),
+                                                      onTap: () => Navigator
+                                                          .pop(context,
+                                                              'edit'),
+                                                    ),
+                                                    ListTile(
+                                                      leading: const Icon(
+                                                          Icons.delete),
+                                                      title: const Text(
+                                                          'Delete'),
+                                                      onTap: () => Navigator
+                                                          .pop(context,
+                                                              'delete'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+
+                                            if (action == 'edit') {
+                                              await _editMessage(msg);
+                                            } else if (action ==
+                                                'delete') {
+                                              await _deleteMessage(msg);
+                                            }
+                                          }
+                                        : null,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 10),
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            MediaQuery.of(context).size.width *
+                                                0.75,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isCurrentUser
+                                            ? const Color(0xFF090A4F)
+                                            : Colors.grey.shade200,
+                                        borderRadius:
+                                            BorderRadius.circular(16),
+                                      ),
+                                      child: Text(
+                                        msg['messageText'] ?? '',
+                                        style: TextStyle(
+                                          color: isCurrentUser
+                                              ? Colors.white
+                                              : Colors.black87,
+                                          fontSize: 15,
+                                          height: 1.4,
+                                        ),
                                       ),
                                     ),
                                   ),

@@ -30,7 +30,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<NavItem> _navItems = [
     NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', index: 0),
     NavItem(icon: Icons.event_outlined, activeIcon: Icons.event, label: 'Events', index: 1),
-    NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Community', index: 2),
+    NavItem(icon: Icons.message_outlined, activeIcon: Icons.message, label: 'Messages', index: 2),
     NavItem(icon: Icons.work_outline, activeIcon: Icons.work, label: 'Jobs', index: 3),
     NavItem(icon: Icons.search, activeIcon: Icons.search, label: 'ID Tracer', index: 4),
     NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile', index: 5),

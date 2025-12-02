@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/screens/login_screen.dart';
+import 'package:alumni_system/screens/admin_messages_screen.dart';
 import 'package:alumni_system/services/auth_service.dart';
 import 'package:alumni_system/services/event_service.dart';
 import 'package:alumni_system/services/audit_service.dart';
@@ -38,7 +39,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
   int totalEvents = 0;
   int expiringEvents = 0;
   int archivedEvents = 0;
-  
+
   // Activity log filters
   String _selectedActionFilter = 'All';
   String _selectedResourceFilter = 'All';
@@ -60,8 +61,10 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       final expiring = await _eventService.getExpiringEventsCount();
       final archived = await _eventService.getArchivedEventsCount();
       final archivedList = await _eventService.getArchivedEvents();
-      
-      print('DEBUG: Loaded ${events.length} active events, $total total, $expiring expiring, $archived archived');
+
+      print(
+        'DEBUG: Loaded ${events.length} active events, $total total, $expiring expiring, $archived archived',
+      );
       setState(() {
         activeEvents = events;
         filteredEvents = events;
@@ -74,9 +77,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     } catch (e) {
       setState(() => isLoading = false);
       print('DEBUG: Error loading data: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading data: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
     }
   }
 
@@ -97,7 +100,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       // Fallback to default parsing
       return DateTime.parse(dateString);
     } catch (e) {
-      throw Exception('Invalid date format. Please use MM/dd/yyyy format (e.g., 12/20/2025)');
+      throw Exception(
+        'Invalid date format. Please use MM/dd/yyyy format (e.g., 12/20/2025)',
+      );
     }
   }
 
@@ -107,10 +112,12 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         filteredEvents = activeEvents;
       } else {
         filteredEvents = activeEvents
-            .where((event) =>
-                event.theme.toLowerCase().contains(query.toLowerCase()) ||
-                event.batchYear.contains(query) ||
-                event.venue.toLowerCase().contains(query.toLowerCase()))
+            .where(
+              (event) =>
+                  event.theme.toLowerCase().contains(query.toLowerCase()) ||
+                  event.batchYear.contains(query) ||
+                  event.venue.toLowerCase().contains(query.toLowerCase()),
+            )
             .toList();
       }
     });
@@ -146,7 +153,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       print('DEBUG: Adding event with ID: ${newEvent.id}');
       await _eventService.addEvent(newEvent);
       print('DEBUG: Event added successfully');
-      
+
       _themeController.clear();
       _batchYearController.clear();
       _eventDateController.clear();
@@ -155,58 +162,58 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       _endTimeController.clear();
       _descriptionController.clear();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event added successfully')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event added successfully')));
 
       await _loadEvents();
     } catch (e) {
       print('DEBUG: Error adding event: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding event: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error adding event: $e')));
     }
   }
 
   Future<void> _deleteEvent(String eventId) async {
     try {
       await _eventService.deleteEvent(eventId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event deleted')));
       await _loadEvents();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting event: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error deleting event: $e')));
     }
   }
 
   Future<void> _archiveEvent(String eventId) async {
     try {
       await _eventService.archiveEvent(eventId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event archived')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event archived')));
       await _loadEvents();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error archiving event: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error archiving event: $e')));
     }
   }
 
   Future<void> _restoreEvent(String eventId) async {
     try {
       await _eventService.restoreEvent(eventId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event restored')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event restored')));
       await _loadEvents();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error restoring event: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error restoring event: $e')));
     }
   }
 
@@ -227,19 +234,47 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildFormField('Event Theme', _themeController, 'Enter event theme'),
+              _buildFormField(
+                'Event Theme',
+                _themeController,
+                'Enter event theme',
+              ),
               const SizedBox(height: 16),
-              _buildFormField('Batch Year', _batchYearController, 'Enter batch year'),
+              _buildFormField(
+                'Batch Year',
+                _batchYearController,
+                'Enter batch year',
+              ),
               const SizedBox(height: 16),
-              _buildFormField('Event Date', _eventDateController, 'MM/DD/YYYY', isDate: true),
+              _buildFormField(
+                'Event Date',
+                _eventDateController,
+                'MM/DD/YYYY',
+                isDate: true,
+              ),
               const SizedBox(height: 16),
               _buildFormField('Venue', _venueController, 'Enter venue'),
               const SizedBox(height: 16),
-              _buildFormField('Start Time', _startTimeController, 'HH:mm', isTime: true),
+              _buildFormField(
+                'Start Time',
+                _startTimeController,
+                'HH:mm',
+                isTime: true,
+              ),
               const SizedBox(height: 16),
-              _buildFormField('End Time', _endTimeController, 'HH:mm', isTime: true),
+              _buildFormField(
+                'End Time',
+                _endTimeController,
+                'HH:mm',
+                isTime: true,
+              ),
               const SizedBox(height: 16),
-              _buildFormField('Description', _descriptionController, 'Enter event description', isMultiline: true),
+              _buildFormField(
+                'Description',
+                _descriptionController,
+                'Enter event description',
+                isMultiline: true,
+              ),
             ],
           ),
         ),
@@ -530,7 +565,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                   label,
                   style: TextStyle(
                     color: isSelected ? const Color(0xFF090A4F) : Colors.white,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     fontSize: 14,
                   ),
                 ),
@@ -595,42 +632,90 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            _buildStatCard('Total Events', totalEvents.toString(), Icons.event, const Color(0xFF1A3A52)),
-            _buildStatCard('Active Events', activeEvents.length.toString(), Icons.check_circle, const Color(0xFFFFD700)),
-            _buildStatCard('Expiring Soon', expiringEvents.toString(), Icons.warning, const Color(0xFFFF9800)),
-            _buildStatCard('Archived Events', archivedEvents.toString(), Icons.archive, const Color(0xFF1A3A52)),
+            _buildStatCard(
+              'Total Events',
+              totalEvents.toString(),
+              Icons.event,
+              const Color(0xFF1A3A52),
+            ),
+            _buildStatCard(
+              'Active Events',
+              activeEvents.length.toString(),
+              Icons.check_circle,
+              const Color(0xFFFFD700),
+            ),
+            _buildStatCard(
+              'Expiring Soon',
+              expiringEvents.toString(),
+              Icons.warning,
+              const Color(0xFFFF9800),
+            ),
+            _buildStatCard(
+              'Archived Events',
+              archivedEvents.toString(),
+              Icons.archive,
+              const Color(0xFF1A3A52),
+            ),
           ],
         ),
         const SizedBox(height: 32),
         const Text(
           'Quick Actions',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF090A4F)),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF090A4F),
+          ),
         ),
         const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
-              child: _buildQuickActionCard('Add New Event', 'Create a new alumni event', Icons.add_circle, const Color(0xFF4CAF50), () {
-                setState(() => _selectedMenuItem = 1);
-              }),
+              child: _buildQuickActionCard(
+                'Add New Event',
+                'Create a new alumni event',
+                Icons.add_circle,
+                const Color(0xFF4CAF50),
+                () {
+                  setState(() => _selectedMenuItem = 1);
+                },
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildQuickActionCard('View Members', 'Manage alumni members', Icons.people, const Color(0xFF2196F3), () {
-                setState(() => _selectedMenuItem = 2);
-              }),
+              child: _buildQuickActionCard(
+                'View Members',
+                'Manage alumni members',
+                Icons.people,
+                const Color(0xFF2196F3),
+                () {
+                  setState(() => _selectedMenuItem = 2);
+                },
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildQuickActionCard('View Comments', 'Check event comments', Icons.comment, const Color(0xFF9C27B0), () {
-                setState(() => _selectedMenuItem = 3);
-              }),
+              child: _buildQuickActionCard(
+                'View Comments',
+                'Check event comments',
+                Icons.comment,
+                const Color(0xFF9C27B0),
+                () {
+                  setState(() => _selectedMenuItem = 3);
+                },
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildQuickActionCard('Manage Jobs', 'Post and manage job listings', Icons.work, const Color(0xFFFF9800), () {
-                setState(() => _selectedMenuItem = 5);
-              }),
+              child: _buildQuickActionCard(
+                'Manage Jobs',
+                'Post and manage job listings',
+                Icons.work,
+                const Color(0xFFFF9800),
+                () {
+                  setState(() => _selectedMenuItem = 5);
+                },
+              ),
             ),
           ],
         ),
@@ -638,15 +723,31 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         Row(
           children: [
             Expanded(
-              child: _buildQuickActionCard('Activity Logs', 'View user activity and audit trail', Icons.history, const Color(0xFF9C27B0), () {
-                setState(() => _selectedMenuItem = 6);
-              }),
+              child: _buildQuickActionCard(
+                'Activity Logs',
+                'View user activity and audit trail',
+                Icons.history,
+                const Color(0xFF9C27B0),
+                () {
+                  setState(() => _selectedMenuItem = 6);
+                },
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildQuickActionCard('Archived Events', 'Manage archived events', Icons.archive, const Color(0xFF607D8B), () {
-                setState(() => _selectedMenuItem = 4);
-              }),
+              child: _buildQuickActionCard(
+                'Messages',
+                'Message individual users',
+                Icons.message,
+                const Color(0xFF2196F3),
+                () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AdminMessagesScreen(),
+                    ),
+                  );
+                },
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(child: Container()),
@@ -667,38 +768,95 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Add New Alumni Event', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
+              const Text(
+                'Add New Alumni Event',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF090A4F),
+                ),
+              ),
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: _buildFormField('Event Theme', _themeController, 'Enter event theme')),
+                  Expanded(
+                    child: _buildFormField(
+                      'Event Theme',
+                      _themeController,
+                      'Enter event theme',
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildFormField('Batch Year', _batchYearController, 'Enter batch year')),
+                  Expanded(
+                    child: _buildFormField(
+                      'Batch Year',
+                      _batchYearController,
+                      'Enter batch year',
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(child: _buildFormField('Event Date', _eventDateController, 'MM/DD/YYYY', isDate: true)),
+                  Expanded(
+                    child: _buildFormField(
+                      'Event Date',
+                      _eventDateController,
+                      'MM/DD/YYYY',
+                      isDate: true,
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildFormField('Venue', _venueController, 'Enter venue')),
+                  Expanded(
+                    child: _buildFormField(
+                      'Venue',
+                      _venueController,
+                      'Enter venue',
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(child: _buildFormField('Start Time', _startTimeController, 'HH:mm', isTime: true)),
+                  Expanded(
+                    child: _buildFormField(
+                      'Start Time',
+                      _startTimeController,
+                      'HH:mm',
+                      isTime: true,
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildFormField('End Time', _endTimeController, 'HH:mm', isTime: true)),
+                  Expanded(
+                    child: _buildFormField(
+                      'End Time',
+                      _endTimeController,
+                      'HH:mm',
+                      isTime: true,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
-              _buildFormField('Description', _descriptionController, 'Enter event description', isMultiline: true),
+              _buildFormField(
+                'Description',
+                _descriptionController,
+                'Enter event description',
+                isMultiline: true,
+              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -710,7 +868,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                     backgroundColor: const Color(0xFF090A4F),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
@@ -722,7 +882,13 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -731,12 +897,22 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                 padding: const EdgeInsets.all(20),
                 decoration: const BoxDecoration(
                   color: Color(0xFFFFD700),
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Active Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
+                    const Text(
+                      'Active Events',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF090A4F),
+                      ),
+                    ),
                     SizedBox(
                       width: 300,
                       child: TextField(
@@ -745,10 +921,16 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                         decoration: InputDecoration(
                           hintText: 'Search events...',
                           prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide.none,
+                          ),
                           filled: true,
                           fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                         ),
                       ),
                     ),
@@ -758,7 +940,15 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
               if (filteredEvents.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Center(child: Text('No active events found', style: TextStyle(color: Colors.grey.shade600, fontSize: 16))),
+                  child: Center(
+                    child: Text(
+                      'No active events found',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
                 )
               else
                 SingleChildScrollView(
@@ -778,22 +968,50 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                         cells: [
                           DataCell(Text(event.theme)),
                           DataCell(Text(event.batchYear)),
-                          DataCell(Text(DateFormat('MM/dd/yyyy').format(event.date))),
+                          DataCell(
+                            Text(DateFormat('MM/dd/yyyy').format(event.date)),
+                          ),
                           DataCell(Text(event.venue)),
-                          DataCell(Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: const Color(0xFFFFD700), borderRadius: BorderRadius.circular(4)),
-                            child: const Text('Active', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
-                          )),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFD700),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Active',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF090A4F),
+                                ),
+                              ),
+                            ),
+                          ),
                           DataCell(Text(event.comments.toString())),
-                          DataCell(PopupMenuButton(
-                            itemBuilder: (context) => [
-                              PopupMenuItem(child: const Text('Edit'), onTap: () => _editEvent(event)),
-                              PopupMenuItem(child: const Text('Archive'), onTap: () => _archiveEvent(event.id)),
-                              PopupMenuItem(child: const Text('Delete'), onTap: () => _deleteEvent(event.id)),
-                            ],
-                            child: const Icon(Icons.more_vert),
-                          )),
+                          DataCell(
+                            PopupMenuButton(
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  child: const Text('Edit'),
+                                  onTap: () => _editEvent(event),
+                                ),
+                                PopupMenuItem(
+                                  child: const Text('Archive'),
+                                  onTap: () => _archiveEvent(event.id),
+                                ),
+                                PopupMenuItem(
+                                  child: const Text('Delete'),
+                                  onTap: () => _deleteEvent(event.id),
+                                ),
+                              ],
+                              child: const Icon(Icons.more_vert),
+                            ),
+                          ),
                         ],
                       );
                     }).toList(),
@@ -812,14 +1030,32 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Alumni Members Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
+          const Text(
+            'Alumni Members Management',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF090A4F),
+            ),
+          ),
           const SizedBox(height: 20),
-          Center(child: Text('Members management feature coming soon', style: TextStyle(color: Colors.grey.shade600, fontSize: 16))),
+          Center(
+            child: Text(
+              'Members management feature coming soon',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+            ),
+          ),
         ],
       ),
     );
@@ -831,14 +1067,32 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Comments Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
+          const Text(
+            'Comments Management',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF090A4F),
+            ),
+          ),
           const SizedBox(height: 20),
-          Center(child: Text('Comments management feature coming soon', style: TextStyle(color: Colors.grey.shade600, fontSize: 16))),
+          Center(
+            child: Text(
+              'Comments management feature coming soon',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+            ),
+          ),
         ],
       ),
     );
@@ -849,7 +1103,13 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -858,20 +1118,38 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
               color: Color(0xFF1A3A52),
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Archived Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                Text('${archivedEventsList.length} events', style: const TextStyle(fontSize: 14, color: Colors.white70)),
+                const Text(
+                  'Archived Events',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  '${archivedEventsList.length} events',
+                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                ),
               ],
             ),
           ),
           if (archivedEventsList.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: Text('No archived events', style: TextStyle(color: Colors.grey.shade600, fontSize: 16))),
+              child: Center(
+                child: Text(
+                  'No archived events',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                ),
+              ),
             )
           else
             SingleChildScrollView(
@@ -891,21 +1169,46 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                     cells: [
                       DataCell(Text(event.theme)),
                       DataCell(Text(event.batchYear)),
-                      DataCell(Text(DateFormat('MM/dd/yyyy').format(event.date))),
+                      DataCell(
+                        Text(DateFormat('MM/dd/yyyy').format(event.date)),
+                      ),
                       DataCell(Text(event.venue)),
-                      DataCell(Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(4)),
-                        child: const Text('Archived', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                      )),
+                      DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade400,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Archived',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
                       DataCell(Text(event.comments.toString())),
-                      DataCell(PopupMenuButton(
-                        itemBuilder: (context) => [
-                          PopupMenuItem(child: const Text('Restore'), onTap: () => _restoreEvent(event.id)),
-                          PopupMenuItem(child: const Text('Delete'), onTap: () => _deleteEvent(event.id)),
-                        ],
-                        child: const Icon(Icons.more_vert),
-                      )),
+                      DataCell(
+                        PopupMenuButton(
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              child: const Text('Restore'),
+                              onTap: () => _restoreEvent(event.id),
+                            ),
+                            PopupMenuItem(
+                              child: const Text('Delete'),
+                              onTap: () => _deleteEvent(event.id),
+                            ),
+                          ],
+                          child: const Icon(Icons.more_vert),
+                        ),
+                      ),
                     ],
                   );
                 }).toList(),
@@ -916,13 +1219,24 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color backgroundColor) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color backgroundColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,18 +1244,38 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
               Icon(icon, color: Colors.white, size: 24),
             ],
           ),
           const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickActionCard(String title, String subtitle, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildQuickActionCard(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -953,7 +1287,13 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color.withOpacity(0.3), width: 2),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -961,13 +1301,26 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Icon(icon, color: color, size: 28),
               ),
               const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF090A4F),
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
             ],
           ),
         ),
@@ -982,40 +1335,69 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
-        
+
         final logs = snapshot.data ?? [];
-        
+
         // Get unique values for filters
         final actions = ['All', ...logs.map((l) => l.action).toSet().toList()];
-        final resources = ['All', ...logs.map((l) => l.resource).toSet().toList()];
+        final resources = [
+          'All',
+          ...logs.map((l) => l.resource).toSet().toList(),
+        ];
         final statuses = ['All', ...logs.map((l) => l.status).toSet().toList()];
-        
+
         // Apply filters including date range
         var filteredLogs = logs.where((log) {
-          final actionMatch = _selectedActionFilter == 'All' || log.action == _selectedActionFilter;
-          final resourceMatch = _selectedResourceFilter == 'All' || log.resource == _selectedResourceFilter;
-          final statusMatch = _selectedStatusFilter == 'All' || log.status == _selectedStatusFilter;
-          
+          final actionMatch =
+              _selectedActionFilter == 'All' ||
+              log.action == _selectedActionFilter;
+          final resourceMatch =
+              _selectedResourceFilter == 'All' ||
+              log.resource == _selectedResourceFilter;
+          final statusMatch =
+              _selectedStatusFilter == 'All' ||
+              log.status == _selectedStatusFilter;
+
           // Date range filter
           bool dateMatch = true;
           if (_startDate != null) {
-            final logDate = DateTime(log.timestamp.year, log.timestamp.month, log.timestamp.day);
-            final startDate = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
-            dateMatch = logDate.isAfter(startDate) || logDate.isAtSameMomentAs(startDate);
+            final logDate = DateTime(
+              log.timestamp.year,
+              log.timestamp.month,
+              log.timestamp.day,
+            );
+            final startDate = DateTime(
+              _startDate!.year,
+              _startDate!.month,
+              _startDate!.day,
+            );
+            dateMatch =
+                logDate.isAfter(startDate) ||
+                logDate.isAtSameMomentAs(startDate);
           }
           if (_endDate != null && dateMatch) {
-            final logDate = DateTime(log.timestamp.year, log.timestamp.month, log.timestamp.day);
-            final endDate = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
-            dateMatch = logDate.isBefore(endDate.add(const Duration(days: 1))) || logDate.isAtSameMomentAs(endDate);
+            final logDate = DateTime(
+              log.timestamp.year,
+              log.timestamp.month,
+              log.timestamp.day,
+            );
+            final endDate = DateTime(
+              _endDate!.year,
+              _endDate!.month,
+              _endDate!.day,
+            );
+            dateMatch =
+                logDate.isBefore(endDate.add(const Duration(days: 1))) ||
+                logDate.isAtSameMomentAs(endDate);
           }
-          
+
           return actionMatch && resourceMatch && statusMatch && dateMatch;
         }).toList();
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1025,35 +1407,64 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Filters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF090A4F))),
+                  const Text(
+                    'Filters',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF090A4F),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
-                        child: _buildFilterDropdown('Action', _selectedActionFilter, actions, (value) {
-                          setState(() => _selectedActionFilter = value);
-                        }),
+                        child: _buildFilterDropdown(
+                          'Action',
+                          _selectedActionFilter,
+                          actions,
+                          (value) {
+                            setState(() => _selectedActionFilter = value);
+                          },
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _buildFilterDropdown('Resource', _selectedResourceFilter, resources, (value) {
-                          setState(() => _selectedResourceFilter = value);
-                        }),
+                        child: _buildFilterDropdown(
+                          'Resource',
+                          _selectedResourceFilter,
+                          resources,
+                          (value) {
+                            setState(() => _selectedResourceFilter = value);
+                          },
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _buildFilterDropdown('Status', _selectedStatusFilter, statuses, (value) {
-                          setState(() => _selectedStatusFilter = value);
-                        }),
+                        child: _buildFilterDropdown(
+                          'Status',
+                          _selectedStatusFilter,
+                          statuses,
+                          (value) {
+                            setState(() => _selectedStatusFilter = value);
+                          },
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _buildDatePicker('Start Date', _startDate, (date) {
+                        child: _buildDatePicker('Start Date', _startDate, (
+                          date,
+                        ) {
                           setState(() => _startDate = date);
                         }),
                       ),
@@ -1080,18 +1491,30 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF090A4F),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
                         ),
-                        child: const Text('Reset Filters', style: TextStyle(color: Colors.white)),
+                        child: const Text(
+                          'Reset Filters',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                       const SizedBox(width: 16),
                       ElevatedButton(
                         onPressed: () => _showDeleteLogsDialog(logs),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFF6B6B),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
                         ),
-                        child: const Text('Delete Logs Before Date', style: TextStyle(color: Colors.white)),
+                        child: const Text(
+                          'Delete Logs Before Date',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                     ],
                   ),
@@ -1099,13 +1522,18 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Activity Logs Table
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
               child: Column(
                 children: [
@@ -1114,7 +1542,10 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: const Color(0xFF090A4F),
-                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), topRight: Radius.circular(8)),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        topRight: Radius.circular(8),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -1122,13 +1553,19 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                         Expanded(flex: 1, child: _buildTableHeader('Role')),
                         Expanded(flex: 2, child: _buildTableHeader('Action')),
                         Expanded(flex: 2, child: _buildTableHeader('Resource')),
-                        Expanded(flex: 2, child: _buildTableHeader('Description')),
+                        Expanded(
+                          flex: 2,
+                          child: _buildTableHeader('Description'),
+                        ),
                         Expanded(flex: 1, child: _buildTableHeader('Status')),
-                        Expanded(flex: 2, child: _buildTableHeader('Timestamp')),
+                        Expanded(
+                          flex: 2,
+                          child: _buildTableHeader('Timestamp'),
+                        ),
                       ],
                     ),
                   ),
-                  
+
                   // Table Rows
                   if (filteredLogs.isEmpty)
                     Padding(
@@ -1136,7 +1573,10 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                       child: Center(
                         child: Text(
                           'No activity logs found',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     )
@@ -1149,7 +1589,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                         final log = filteredLogs[index];
                         final isAlternate = index % 2 == 0;
                         return Container(
-                          color: isAlternate ? Colors.grey.shade50 : Colors.white,
+                          color: isAlternate
+                              ? Colors.grey.shade50
+                              : Colors.white,
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
@@ -1158,17 +1600,38 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(log.userName, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF090A4F))),
-                                    Text(log.userEmail, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                    Text(
+                                      log.userName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF090A4F),
+                                      ),
+                                    ),
+                                    Text(
+                                      log.userEmail,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
                               Expanded(
                                 flex: 1,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: log.userRole == 'admin' ? const Color(0xFFFFD700).withOpacity(0.2) : const Color(0xFF2196F3).withOpacity(0.1),
+                                    color: log.userRole == 'admin'
+                                        ? const Color(
+                                            0xFFFFD700,
+                                          ).withOpacity(0.2)
+                                        : const Color(
+                                            0xFF2196F3,
+                                          ).withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
@@ -1176,7 +1639,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: log.userRole == 'admin' ? const Color(0xFFFFD700) : const Color(0xFF2196F3),
+                                      color: log.userRole == 'admin'
+                                          ? const Color(0xFFFFD700)
+                                          : const Color(0xFF2196F3),
                                     ),
                                   ),
                                 ),
@@ -1184,36 +1649,22 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                               Expanded(
                                 flex: 2,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF4CAF50).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
                                   ),
-                                  child: Text(log.action, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4CAF50))),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(log.resource, style: const TextStyle(fontSize: 12, color: Color(0xFF090A4F))),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(log.description, style: TextStyle(fontSize: 12, color: Colors.grey.shade700), maxLines: 2, overflow: TextOverflow.ellipsis),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: log.status == 'SUCCESS' ? const Color(0xFF4CAF50).withOpacity(0.1) : const Color(0xFFFF6B6B).withOpacity(0.1),
+                                    color: const Color(
+                                      0xFF4CAF50,
+                                    ).withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    log.status,
-                                    style: TextStyle(
+                                    log.action,
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: log.status == 'SUCCESS' ? const Color(0xFF4CAF50) : const Color(0xFFFF6B6B),
+                                      color: Color(0xFF4CAF50),
                                     ),
                                   ),
                                 ),
@@ -1221,8 +1672,64 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                               Expanded(
                                 flex: 2,
                                 child: Text(
-                                  DateFormat('MMM d, yyyy HH:mm').format(log.timestamp),
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                  log.resource,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF090A4F),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  log.description,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: log.status == 'SUCCESS'
+                                        ? const Color(
+                                            0xFF4CAF50,
+                                          ).withOpacity(0.1)
+                                        : const Color(
+                                            0xFFFF6B6B,
+                                          ).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    log.status,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: log.status == 'SUCCESS'
+                                          ? const Color(0xFF4CAF50)
+                                          : const Color(0xFFFF6B6B),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  DateFormat(
+                                    'MMM d, yyyy HH:mm',
+                                  ).format(log.timestamp),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1234,23 +1741,40 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Total Records: ${filteredLogs.length}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            Text(
+              'Total Records: ${filteredLogs.length}',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _buildFilterDropdown(String label, String value, List<String> items, Function(String) onChanged) {
+  Widget _buildFilterDropdown(
+    String label,
+    String value,
+    List<String> items,
+    Function(String) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF090A4F))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF090A4F),
+          ),
+        ),
         const SizedBox(height: 8),
         DropdownButton<String>(
           value: value,
           isExpanded: true,
-          items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+          items: items
+              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+              .toList(),
           onChanged: (newValue) => onChanged(newValue ?? 'All'),
           underline: Container(height: 1, color: Colors.grey.shade300),
         ),
@@ -1259,14 +1783,32 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
   }
 
   Widget _buildTableHeader(String text) {
-    return Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12));
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+        fontSize: 12,
+      ),
+    );
   }
 
-  Widget _buildDatePicker(String label, DateTime? selectedDate, Function(DateTime) onDateSelected) {
+  Widget _buildDatePicker(
+    String label,
+    DateTime? selectedDate,
+    Function(DateTime) onDateSelected,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF090A4F))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF090A4F),
+          ),
+        ),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: () async {
@@ -1288,21 +1830,33 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16, color: Color(0xFF090A4F)),
+                const Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: Color(0xFF090A4F),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    selectedDate != null ? DateFormat('MMM d, yyyy').format(selectedDate) : 'Select date',
+                    selectedDate != null
+                        ? DateFormat('MMM d, yyyy').format(selectedDate)
+                        : 'Select date',
                     style: TextStyle(
                       fontSize: 12,
-                      color: selectedDate != null ? const Color(0xFF090A4F) : Colors.grey.shade500,
+                      color: selectedDate != null
+                          ? const Color(0xFF090A4F)
+                          : Colors.grey.shade500,
                     ),
                   ),
                 ),
                 if (selectedDate != null)
                   GestureDetector(
                     onTap: () => onDateSelected(DateTime(1900)),
-                    child: const Icon(Icons.close, size: 16, color: Colors.grey),
+                    child: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
                   ),
               ],
             ),
@@ -1314,7 +1868,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
 
   void _showDeleteLogsDialog(List<AuditLog> allLogs) {
     DateTime? deleteBeforeDate;
-    
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1339,21 +1893,34 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today, size: 16, color: Color(0xFF090A4F)),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Color(0xFF090A4F),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          deleteBeforeDate != null ? DateFormat('MMM d, yyyy').format(deleteBeforeDate!) : 'Select date',
+                          deleteBeforeDate != null
+                              ? DateFormat(
+                                  'MMM d, yyyy',
+                                ).format(deleteBeforeDate!)
+                              : 'Select date',
                           style: TextStyle(
                             fontSize: 12,
-                            color: deleteBeforeDate != null ? const Color(0xFF090A4F) : Colors.grey.shade500,
+                            color: deleteBeforeDate != null
+                                ? const Color(0xFF090A4F)
+                                : Colors.grey.shade500,
                           ),
                         ),
                       ),
@@ -1371,7 +1938,11 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                   ),
                   child: Text(
                     'This will delete ${allLogs.where((log) => log.timestamp.isBefore(deleteBeforeDate!)).length} logs created before ${DateFormat('MMM d, yyyy').format(deleteBeforeDate!)}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFFFF6B6B), fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFFF6B6B),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
             ],
@@ -1386,28 +1957,41 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                   ? null
                   : () async {
                       try {
-                        final logsToDelete = allLogs.where((log) => log.timestamp.isBefore(deleteBeforeDate!)).toList();
+                        final logsToDelete = allLogs
+                            .where(
+                              (log) =>
+                                  log.timestamp.isBefore(deleteBeforeDate!),
+                            )
+                            .toList();
                         for (final log in logsToDelete) {
                           await _auditService.deleteAuditLog(log.id);
                         }
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Deleted ${logsToDelete.length} logs'),
+                            content: Text(
+                              'Deleted ${logsToDelete.length} logs',
+                            ),
                             backgroundColor: const Color(0xFF4CAF50),
                           ),
                         );
                         setState(() {});
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                       }
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B6B),
               ),
-              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -1415,11 +1999,25 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     );
   }
 
-  Widget _buildFormField(String label, TextEditingController controller, String hint, {bool isDate = false, bool isTime = false, bool isMultiline = false}) {
+  Widget _buildFormField(
+    String label,
+    TextEditingController controller,
+    String hint, {
+    bool isDate = false,
+    bool isTime = false,
+    bool isMultiline = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF090A4F))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF090A4F),
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
@@ -1427,7 +2025,10 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
           maxLines: isMultiline ? 4 : 1,
           decoration: InputDecoration(
             hintText: hint,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
             suffixIcon: isDate
                 ? IconButton(
                     icon: const Icon(Icons.calendar_today),
@@ -1439,24 +2040,26 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                         lastDate: DateTime(2100),
                       );
                       if (picked != null) {
-                        controller.text = DateFormat('MM/dd/yyyy').format(picked);
+                        controller.text = DateFormat(
+                          'MM/dd/yyyy',
+                        ).format(picked);
                       }
                     },
                   )
                 : isTime
-                    ? IconButton(
-                        icon: const Icon(Icons.access_time),
-                        onPressed: () async {
-                          final TimeOfDay? picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.now(),
-                          );
-                          if (picked != null) {
-                            controller.text = picked.format(context);
-                          }
-                        },
-                      )
-                    : null,
+                ? IconButton(
+                    icon: const Icon(Icons.access_time),
+                    onPressed: () async {
+                      final TimeOfDay? picked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (picked != null) {
+                        controller.text = picked.format(context);
+                      }
+                    },
+                  )
+                : null,
           ),
         ),
       ],
@@ -1476,4 +2079,3 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     super.dispose();
   }
 }
-

@@ -1,5 +1,6 @@
 // admin_job_management.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' as intl;
 import 'package:alumni_system/services/job_service.dart';
 import 'job_posting_screen.dart';
 import 'add_job_dialog.dart';
@@ -215,153 +216,263 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Header with Title and Button
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Job Postings Management',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF090A4F),
+        // Header Section
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
-            ElevatedButton.icon(
-              onPressed: _showAddJobDialog,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Post New Job'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF090A4F),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF090A4F).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.work,
+                  color: Color(0xFF090A4F),
+                  size: 24,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Job Postings Management',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF090A4F),
+                  ),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _showAddJobDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text(
+                  'Post New Job',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF090A4F),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 2,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
 
-        // Stats Cards Row
+        // Stats Cards - Horizontal Scrollable
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              SizedBox(
-                width: 150,
-                child: _buildStatCard('Total Jobs', _jobPostings.length.toString(), Icons.work),
+              _buildStatCard(
+                'Total Jobs',
+                _jobPostings.length.toString(),
+                Icons.work,
+                const Color(0xFF090A4F),
               ),
-              const SizedBox(width: 16),
-              SizedBox(
-                width: 150,
-                child: _buildStatCard('Active', _jobPostings.where((j) => j.status == 'active').length.toString(), Icons.check_circle),
+              const SizedBox(width: 12),
+              _buildStatCard(
+                'Active',
+                _jobPostings.where((j) => j.status == 'active').length.toString(),
+                Icons.check_circle,
+                const Color(0xFF4CAF50),
               ),
-              const SizedBox(width: 16),
-              SizedBox(
-                width: 150,
-                child: _buildStatCard('Applications', '20', Icons.people),
+              const SizedBox(width: 12),
+              _buildStatCard(
+                'Drafts',
+                _jobPostings.where((j) => j.status == 'draft').length.toString(),
+                Icons.edit_note,
+                const Color(0xFFFF9800),
               ),
-              const SizedBox(width: 16),
-              SizedBox(
-                width: 150,
-                child: _buildStatCard('Views', '456', Icons.visibility),
+              const SizedBox(width: 12),
+              _buildStatCard(
+                'Expired',
+                _jobPostings.where((j) => j.status == 'expired').length.toString(),
+                Icons.schedule,
+                const Color(0xFFF44336),
+              ),
+              const SizedBox(width: 12),
+              _buildStatCard(
+                'Total Views',
+                _jobPostings.fold<int>(0, (sum, job) => sum + job.views).toString(),
+                Icons.visibility,
+                const Color(0xFF2196F3),
+              ),
+              const SizedBox(width: 12),
+              _buildStatCard(
+                'Applications',
+                _jobPostings.fold<int>(0, (sum, job) => sum + job.applications).toString(),
+                Icons.people,
+                const Color(0xFF9C27B0),
               ),
             ],
           ),
         ),
         const SizedBox(height: 20),
 
-        // Search Bar
+        // Main Content Card
         Container(
-          height: 50,
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.grey.shade300,
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              const SizedBox(width: 16),
-              const Icon(Icons.search, color: Colors.grey, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _searchJobs,
-                  decoration: const InputDecoration(
-                    hintText: 'Search jobs...',
-                    hintStyle: TextStyle(color: Colors.grey),
-                    border: InputBorder.none,
-                  ),
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-
-        // Tabs
-        Row(
-          children: [
-            _buildTab('Active', 0),
-            const SizedBox(width: 16),
-            _buildTab('Drafts', 1),
-            const SizedBox(width: 16),
-            _buildTab('Expired', 2),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Jobs List
-        if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.all(32),
-            child: CircularProgressIndicator(),
-          )
-        else if (_filteredJobs.isEmpty)
-          _buildEmptyState()
-        else
-          ...List.generate(
-            _filteredJobs.length,
-            (index) => _buildJobCard(_filteredJobs[index]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Search and Tabs Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF090A4F),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Search Bar
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _searchJobs,
+                        decoration: InputDecoration(
+                          hintText: 'Search jobs by title or company...',
+                          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400, size: 20),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Tabs
+                    Row(
+                      children: [
+                        _buildTab('Active', 0),
+                        const SizedBox(width: 12),
+                        _buildTab('Drafts', 1),
+                        const SizedBox(width: 12),
+                        _buildTab('Expired', 2),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Jobs List
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.all(60),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_filteredJobs.isEmpty)
+                _buildEmptyState()
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _filteredJobs.length,
+                  itemBuilder: (context, index) {
+                    return _buildJobCard(_filteredJobs[index]);
+                  },
+                ),
+            ],
           ),
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon) {
+  Widget _buildStatCard(String title, String value, IconData icon, Color backgroundColor) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: 140,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: backgroundColor.withOpacity(0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: const Color(0xFF090A4F), size: 24),
-          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(icon, color: Colors.white, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF090A4F),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
+              color: Colors.white,
+              height: 1,
             ),
           ),
         ],
@@ -371,28 +482,66 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
 
   Widget _buildTab(String title, int index) {
     final isSelected = _selectedTab == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTab = index;
-          _filteredJobs.clear();
-          _filteredJobs.addAll(_jobPostings.where(_filterByTab));
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF090A4F) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF090A4F) : Colors.grey.shade300,
+    final count = _jobPostings.where((job) {
+      switch (index) {
+        case 0:
+          return job.status == 'active';
+        case 1:
+          return job.status == 'draft';
+        case 2:
+          return job.status == 'expired';
+        default:
+          return false;
+      }
+    }).length;
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedTab = index;
+            _filteredJobs.clear();
+            _filteredJobs.addAll(_jobPostings.where(_filterByTab));
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
           ),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey.shade700,
-            fontWeight: FontWeight.w500,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFF090A4F) : Colors.white70,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF090A4F).withOpacity(0.1)
+                        : Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    count.toString(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? const Color(0xFF090A4F) : Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -400,16 +549,22 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
   }
 
   Widget _buildJobCard(JobPosting job) {
+    final statusColor = _getStatusColor(job.status);
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: statusColor.withOpacity(0.3),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
@@ -420,81 +575,133 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Company Logo
+              // Status Indicator
               Container(
-                width: 50,
-                height: 50,
+                width: 4,
+                height: 80,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF090A4F).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: statusColor,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                child: const Icon(Icons.business, color: Color(0xFF090A4F)),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               // Job Details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      job.companyName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF090A4F),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                job.jobTitle,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF090A4F),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.business, size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    job.companyName,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        _buildStatusChip(job.status),
+                      ],
                     ),
-                    Text(
-                      job.jobTitle,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF090A4F),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        _buildStatusChip(job.status),
                         _buildDetailChip(job.jobType),
                         _buildDetailChip(job.location),
-                        if (job.isRemote) _buildDetailChip('Remote'),
+                        if (job.isRemote)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.home, size: 12, color: Colors.blue.shade700),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Remote',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (job.experienceLevel.isNotEmpty)
+                          _buildDetailChip(job.experienceLevel),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Posted: ${intl.DateFormat('MMM d, yyyy').format(job.postedDate)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Icon(Icons.visibility, size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${job.views} views',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Icon(Icons.people, size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${job.applications} applications',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              // Stats
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.visibility, size: 14, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${job.views}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.people, size: 14, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${job.applications}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ],
           ),
           const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
           // Action Buttons
           Row(
             children: [
@@ -506,6 +713,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF090A4F),
                     side: const BorderSide(color: Color(0xFF090A4F)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),
@@ -526,6 +734,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.orange,
                     side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),
@@ -538,6 +747,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red,
                     side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),
@@ -547,31 +757,36 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
       ),
     );
   }
-
-  Widget _buildStatusChip(String status) {
-    Color color;
+  
+  Color _getStatusColor(String status) {
     switch (status) {
       case 'active':
-        color = Colors.green;
+        return Colors.green;
       case 'draft':
-        color = Colors.orange;
+        return Colors.orange;
       case 'expired':
-        color = Colors.red;
+        return Colors.red;
+      case 'archived':
+        return Colors.grey;
       default:
-        color = Colors.grey;
+        return Colors.grey;
     }
+  }
+
+  Widget _buildStatusChip(String status) {
+    final color = _getStatusColor(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.4), width: 1),
       ),
       child: Text(
         status.toUpperCase(),
         style: TextStyle(
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,
         ),
@@ -584,13 +799,14 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 10,
+          fontSize: 11,
           color: Colors.grey.shade700,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
@@ -598,46 +814,64 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
 
   Widget _buildEmptyState() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.work_outline,
-            size: 64,
-            color: Colors.grey.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _selectedTab == 0
-                ? 'No active job postings'
-                : _selectedTab == 1
-                    ? 'No draft job postings'
-                    : 'No expired job postings',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey.shade500,
-              fontWeight: FontWeight.w600,
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _selectedTab == 0
+                  ? Icons.work_outline
+                  : _selectedTab == 1
+                      ? Icons.edit_note
+                      : Icons.schedule,
+              size: 64,
+              color: Colors.grey.shade300,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _selectedTab == 0
-                ? 'Create your first job posting to get started'
-                : 'All your ${_selectedTab == 1 ? 'drafts' : 'expired jobs'} will appear here',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade400,
+            const SizedBox(height: 16),
+            Text(
+              _selectedTab == 0
+                  ? 'No active job postings'
+                  : _selectedTab == 1
+                      ? 'No draft job postings'
+                      : 'No expired job postings',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          if (_selectedTab == 0) ...[
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _showAddJobDialog,
-              child: const Text('Post New Job'),
+            const SizedBox(height: 8),
+            Text(
+              _selectedTab == 0
+                  ? 'Create your first job posting to get started'
+                  : 'All your ${_selectedTab == 1 ? 'drafts' : 'expired jobs'} will appear here',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
             ),
+            if (_selectedTab == 0) ...[
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _showAddJobDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Post New Job'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF090A4F),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

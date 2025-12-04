@@ -25,6 +25,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _otpSent = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String? _generatedOtp;
   late final EmailService _emailService;
   final AuthService _authService = AuthService();
@@ -54,74 +56,99 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090A4F), // Dark blue background
+      backgroundColor: const Color(0xFF090A4F),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 40),
+                // Logo
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_add,
+                    size: 60,
+                    color: Color(0xFF090A4F),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Title
+                const Text(
+                  'Create Account',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Join our alumni community',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                // Form Card
+                Container(
               width: double.infinity,
               constraints: const BoxConstraints(maxWidth: 400),
+                  padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
               ),
-              padding: const EdgeInsets.all(24),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Username Field
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
+                        TextFormField(
+                          controller: _usernameController,
+                          decoration: InputDecoration(
+                            labelText: 'Full Name',
+                            prefixIcon: const Icon(Icons.person),
+                            border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: TextFormField(
-                        controller: _usernameController,
-                        decoration: const InputDecoration(
-                          hintText: 'Username',
-                          prefixIcon: Icon(Icons.person, color: Colors.grey),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Please enter a username';
+                              return 'Please enter your full name';
                           }
                           return null;
                         },
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                     // Email Field
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: TextFormField(
+                        TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          hintText: 'Email',
-                          prefixIcon: Icon(Icons.email, color: Colors.grey),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
+                          enabled: !_otpSent,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: const Icon(Icons.email),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Please enter an email';
+                              return 'Please enter your email';
                           }
                           if (!value.contains('@')) {
                             return 'Please enter a valid email';
@@ -129,48 +156,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                     // Graduation Year Field
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: TextField(
+                        TextFormField(
                         controller: _graduationYearController,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          hintText: 'Graduation Year',
-                          prefixIcon: Icon(Icons.school, color: Colors.grey),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                        ),
+                          enabled: !_otpSent,
+                          decoration: InputDecoration(
+                            labelText: 'Graduation Year',
+                            prefixIcon: const Icon(Icons.school),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                     // Password Field
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          enabled: !_otpSent,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                            border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: TextFormField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          hintText: 'Password',
-                          prefixIcon: Icon(Icons.lock, color: Colors.grey),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -182,26 +209,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Confirmation Password Field
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
+                        const SizedBox(height: 20),
+                        // Confirm Password Field
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          obscureText: _obscureConfirmPassword,
+                          enabled: !_otpSent,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm Password',
+                            prefixIcon: const Icon(Icons.lock),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                });
+                              },
+                            ),
+                            border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          hintText: 'Confirmation Password',
-                          prefixIcon: Icon(Icons.lock, color: Colors.grey),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -210,34 +243,71 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                    ),
-                    const SizedBox(height: 24),
                     if (_otpSent) ...[
+                          const SizedBox(height: 20),
+                          // OTP Field
                       Container(
+                            padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                              color: Colors.green.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
+                              border: Border.all(color: Colors.green.shade200),
                         ),
-                        child: TextFormField(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'OTP Sent!',
+                                      style: TextStyle(
+                                        color: Colors.green.shade700,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
                           controller: _otpController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter 6-digit OTP',
-                            prefixIcon: Icon(
-                              Icons.verified,
-                              color: Colors.grey,
+                                  maxLength: 6,
+                                  decoration: InputDecoration(
+                                    labelText: 'Enter 6-digit OTP',
+                                    prefixIcon: const Icon(Icons.verified),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white,
                             ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter the OTP';
+                                    }
+                                    if (value.trim().length != 6) {
+                                      return 'OTP must be 6 digits';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () {
+                                          _otpController.clear();
+                                          _sendOtp();
+                                        },
+                                  child: const Text('Resend OTP'),
                             ),
-                          ),
+                              ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                    ],
+                        ],
+                        const SizedBox(height: 24),
                     // Register Button
                     ElevatedButton(
                       onPressed: _isLoading ? null : _handleRegister,
@@ -248,7 +318,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        disabledBackgroundColor: Colors.grey,
                       ),
                       child: _isLoading
                           ? const SizedBox(
@@ -269,19 +338,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             ),
                     ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                     // Login Link
                     Center(
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 14,
-                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const TextSpan(text: 'Already have an account? '),
-                            WidgetSpan(
-                              child: GestureDetector(
+                              const Text('Already have an account? '),
+                              GestureDetector(
                                 onTap: () {
                                   Navigator.pushReplacement(
                                     context,
@@ -298,14 +362,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                 ),
                               ),
+                            ],
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
+                const SizedBox(height: 40),
                   ],
-                ),
-              ),
             ),
           ),
         ),
@@ -421,7 +486,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      // Register user with AuthService (automatically sets role to "user")
       final user = await _authService.registerWithEmailPassword(
         _emailController.text.trim(),
         _passwordController.text,
@@ -431,7 +495,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (user != null && mounted) {
-        // Log the registration action
         await _auditService.logAction(
           action: 'REGISTER',
           resource: 'User',
@@ -446,7 +509,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
       }
     } catch (e) {
-      // Log failed registration attempt
       await _auditService.logAction(
         action: 'REGISTER',
         resource: 'User',

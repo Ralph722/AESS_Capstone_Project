@@ -3,7 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart' as intl;
 import 'dart:async';
 import 'package:alumni_system/services/event_service.dart';
+import 'package:alumni_system/services/job_service.dart';
+import 'package:alumni_system/services/message_service.dart';
 import 'package:alumni_system/models/event_model.dart';
+import 'package:alumni_system/screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,18 +17,106 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final EventService _eventService = EventService();
-  List<AlumniEvent> upcomingEvents = [];
-  bool isLoading = true;
+  final JobService _jobService = JobService();
+  final MessageService _messageService = MessageService();
   DateTime _selectedDate = DateTime.now();
   late DateTime _currentTime;
   late Timer _timer;
+  StreamSubscription<int>? _messagesCountSubscription;
+  
+  // Counts for stat cards
+  int eventsCount = 0;
+  int messagesCount = 0;
+  int jobsCount = 0;
+  
+  // Data for home screen sections
+  List<AlumniEvent> upcomingEvents = [];
+  List<dynamic> featuredJobs = [];
+  bool isLoadingEvents = true;
+  bool isLoadingJobs = true;
 
   @override
   void initState() {
     super.initState();
     _currentTime = DateTime.now();
+    _loadCounts();
     _loadUpcomingEvents();
+    _loadFeaturedJobs();
     _startTimer();
+    _startMessagesCountListener();
+  }
+  
+  Future<void> _loadUpcomingEvents() async {
+    try {
+      setState(() => isLoadingEvents = true);
+      // Use getUpcomingEvents for users - only shows future events
+      final events = await _eventService.getUpcomingEvents();
+      
+      // Sort and take top 5
+      events.sort((a, b) => a.date.compareTo(b.date));
+      
+      setState(() {
+        upcomingEvents = events.take(5).toList();
+        isLoadingEvents = false;
+      });
+    } catch (e) {
+      setState(() => isLoadingEvents = false);
+      print('Error loading upcoming events: $e');
+    }
+  }
+  
+  Future<void> _loadFeaturedJobs() async {
+    try {
+      setState(() => isLoadingJobs = true);
+      final jobs = await _jobService.getActiveJobs();
+      
+      // Get recent active jobs (last 5)
+      setState(() {
+        featuredJobs = jobs.take(5).toList();
+        isLoadingJobs = false;
+      });
+    } catch (e) {
+      setState(() => isLoadingJobs = false);
+      print('Error loading featured jobs: $e');
+    }
+  }
+  
+  void _startMessagesCountListener() {
+    // Listen to real-time updates for unread messages count
+    _messagesCountSubscription = _messageService.getUnreadMessagesCountStream().listen(
+      (count) {
+        if (mounted) {
+          setState(() {
+            messagesCount = count;
+          });
+        }
+      },
+      onError: (error) {
+        print('Error listening to messages count: $error');
+      },
+    );
+  }
+  
+  Future<void> _loadCounts() async {
+    try {
+      // Load events count (only upcoming events for users)
+      final events = await _eventService.getUpcomingEvents();
+      final eventsCountValue = events.length;
+      
+      // Load jobs count
+      final jobsCountValue = await _jobService.getTotalJobsCount();
+      
+      // Load unread messages count from admin
+      final messagesCountValue = await _messageService.getUnreadMessagesCount();
+      
+      setState(() {
+        eventsCount = eventsCountValue;
+        jobsCount = jobsCountValue;
+        messagesCount = messagesCountValue;
+      });
+    } catch (e) {
+      print('Error loading counts: $e');
+    }
   }
 
   void _startTimer() {
@@ -39,32 +130,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _timer.cancel();
+    _messagesCountSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadUpcomingEvents() async {
-    try {
-      final events = await _eventService.getActiveEvents();
-      setState(() {
-        upcomingEvents = events.take(3).toList();
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() => isLoading = false);
-      print('Error loading upcoming events: $e');
-    }
-  }
 
-  String _formatEventTime(DateTime date, String time) {
-    final now = DateTime.now();
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return 'Today, $time';
-    } else if (date.year == now.year && date.month == now.month && date.day == now.day + 1) {
-      return 'Tomorrow, $time';
-    } else {
-      return '${intl.DateFormat('MMM d').format(date)}, $time';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,18 +306,36 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  _buildStatCard('Events', '12', Icons.event, const Color(0xFF4CAF50)),
+                  _buildStatCard(
+                    'Events',
+                    eventsCount.toString(),
+                    Icons.event,
+                    const Color(0xFF4CAF50),
+                    () => _navigateToScreen(1), // Events screen index
+                  ),
                   const SizedBox(width: 12),
-                  _buildStatCard('Messages', '5', Icons.message, const Color(0xFF9C27B0)),
+                  _buildStatCard(
+                    'Messages',
+                    messagesCount.toString(),
+                    Icons.message,
+                    const Color(0xFF9C27B0),
+                    () => _navigateToScreen(2), // Messages screen index
+                  ),
                   const SizedBox(width: 12),
-                  _buildStatCard('Jobs', '8', Icons.work, const Color(0xFFFF9800)),
+                  _buildStatCard(
+                    'Jobs',
+                    jobsCount.toString(),
+                    Icons.work,
+                    const Color(0xFFFF9800),
+                    () => _navigateToScreen(3), // Jobs screen index
+                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // Event Notifications Section (Now at the top)
+            // Upcoming Events Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
@@ -257,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Event Notifications',
+                        'Upcoming Events',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -265,42 +353,212 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF090A4F),
-                        ),
+                        onPressed: () => _navigateToScreen(1),
                         child: const Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               'View All',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
+                                color: Color(0xFF090A4F),
                               ),
                             ),
                             SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_ios, size: 12),
+                            Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF090A4F)),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  if (isLoading)
-                    _buildNotificationSkeleton()
+                  const SizedBox(height: 12),
+                  if (isLoadingEvents)
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(),
+                    ))
                   else if (upcomingEvents.isEmpty)
-                    _buildEmptyNotificationState()
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.event_busy, size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No upcoming events',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   else
-                    Column(
-                      children: upcomingEvents.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final event = entry.value;
-                        return Container(
-                          margin: EdgeInsets.only(bottom: index == upcomingEvents.length - 1 ? 0 : 12),
-                          child: _buildNotificationCard(event),
-                        );
-                      }).toList(),
+                    ...upcomingEvents.map((event) => _buildEventCard(event)).toList(),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Featured Jobs Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Featured Job Opportunities',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF090A4F),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _navigateToScreen(3),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'View All',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF090A4F),
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF090A4F)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (isLoadingJobs)
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(),
+                    ))
+                  else if (featuredJobs.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.work_off, size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No job postings available',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: 200,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: featuredJobs.length,
+                        itemBuilder: (context, index) {
+                          final job = featuredJobs[index];
+                          return _buildJobCard(job);
+                        },
+                      ),
                     ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Quick Links Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quick Links',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF090A4F),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 2.5,
+                    children: [
+                      _buildQuickLinkCard(
+                        'ID Tracer',
+                        Icons.search,
+                        const Color(0xFF2196F3),
+                        () => _navigateToScreen(4),
+                      ),
+                      _buildQuickLinkCard(
+                        'Profile',
+                        Icons.person,
+                        const Color(0xFF9C27B0),
+                        () => _navigateToScreen(5),
+                      ),
+                      _buildQuickLinkCard(
+                        'Community',
+                        Icons.people,
+                        const Color(0xFF4CAF50),
+                        () => _navigateToScreen(2),
+                      ),
+                      _buildQuickLinkCard(
+                        'Help & Support',
+                        Icons.help_outline,
+                        const Color(0xFFFF9800),
+                        () {
+                          // Navigate to messages for help
+                          _navigateToScreen(2);
+                        },
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -432,51 +690,67 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  void _navigateToScreen(int index) {
+    // Navigate to MainNavigation with the selected index
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => MainNavigation(initialIndex: index),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color, VoidCallback? onTap) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF090A4F),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF090A4F),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -558,9 +832,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildNotificationCard(AlumniEvent event) {
+  Widget _buildEventCard(AlumniEvent event) {
+    final now = DateTime.now();
+    final daysUntil = event.date.difference(now).inDays;
+    final isToday = event.date.year == now.year &&
+        event.date.month == now.month &&
+        event.date.day == now.day;
+    
     return Container(
-      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -573,29 +853,46 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
         border: Border.all(
-          color: const Color(0xFFFFD700).withOpacity(0.3),
-          width: 1,
+          color: isToday ? const Color(0xFFFFD700) : Colors.grey.shade200,
+          width: isToday ? 2 : 1,
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Notification Icon
           Container(
-            width: 40,
-            height: 40,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFD700).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF090A4F), Color(0xFF1A237E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.event_available,
-              color: Color(0xFF090A4F),
-              size: 20,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  intl.DateFormat('MMM').format(event.date).toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  intl.DateFormat('d').format(event.date),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 12),
-          // Event Details
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,123 +900,85 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   event.theme,
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF090A4F),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatEventTime(event.date, event.startTime),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  event.venue,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${event.startTime} - ${event.endTime}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        event.venue,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          // Reminder Button
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none,
-              color: Color(0xFF090A4F),
-              size: 20,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isToday
+                  ? const Color(0xFFFFD700)
+                  : daysUntil <= 7
+                      ? Colors.orange.shade100
+                      : Colors.green.shade100,
+              borderRadius: BorderRadius.circular(20),
             ),
-            onPressed: () {
-              // TODO: Implement reminder functionality
-            },
+            child: Text(
+              isToday
+                  ? 'Today'
+                  : daysUntil == 1
+                      ? 'Tomorrow'
+                      : '$daysUntil days',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isToday
+                    ? const Color(0xFF090A4F)
+                    : daysUntil <= 7
+                        ? Colors.orange.shade700
+                        : Colors.green.shade700,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNotificationSkeleton() {
-    return Column(
-      children: [
-        for (var i = 0; i < 3; i++)
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: 120,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyNotificationState() {
+  Widget _buildJobCard(dynamic job) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      width: 280,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -730,34 +989,163 @@ class _HomeScreenState extends State<HomeScreen> {
             offset: const Offset(0, 2),
           ),
         ],
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.notifications_off_outlined,
-            size: 48,
-            color: Colors.grey.shade300,
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.business,
+                  color: Color(0xFFFF9800),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      job.companyName ?? 'Company',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      job.jobTitle ?? 'Job Title',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF090A4F),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
-          Text(
-            'No Event Notifications',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade500,
-              fontWeight: FontWeight.w600,
-            ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              if (job.jobType != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    job.jobType,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (job.isRemote == true)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Remote',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
+          const Spacer(),
           const SizedBox(height: 8),
-          Text(
-            'You\'ll see upcoming event notifications here',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade400,
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _navigateToScreen(3),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF090A4F),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'View Details',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
+
+  Widget _buildQuickLinkCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF090A4F),
+                ),
+              ),
+              const Spacer(),
+              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 }

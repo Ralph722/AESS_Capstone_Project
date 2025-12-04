@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:alumni_system/services/message_service.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class UserMessagesScreen extends StatefulWidget {
   const UserMessagesScreen({super.key});
@@ -14,11 +21,21 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   final TextEditingController _messageController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final MessageService _messageService = MessageService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   User? _currentUser;
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
+  bool _isUploadingImage = false;
   String? _userDocId;
+  String? _adminName = 'Admin';
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _messagesSubscription;
+  final ScrollController _scrollController = ScrollController();
+
+  // Image handling
+  File? _selectedImage;
+  Uint8List? _selectedImageBytes;
 
   @override
   void initState() {
@@ -29,7 +46,10 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
 
   Future<void> _initialize() async {
     await _loadCurrentUserDocId();
-    await _loadMessages();
+    await _loadAdminInfo();
+    // Wait a bit to ensure _userDocId is set
+    await Future.delayed(const Duration(milliseconds: 100));
+    _startMessagesListener();
   }
 
   Future<void> _loadCurrentUserDocId() async {
@@ -48,99 +68,262 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
     }
   }
 
-  Future<void> _loadMessages() async {
-    if (_currentUser == null) return;
+  Future<void> _loadAdminInfo() async {
     try {
-      setState(() => _isLoading = true);
+      final adminSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .limit(1)
+          .get();
 
-      final queries = <Future<QuerySnapshot<Map<String, dynamic>>>>[
-        _firestore
-            .collection('messages')
-            .where('senderId', isEqualTo: _currentUser!.uid)
-            .get(),
-        _firestore
-            .collection('messages')
-            .where('recipientId', isEqualTo: _currentUser!.uid)
-            .get(),
-      ];
-
-      if (_userDocId != null) {
-        queries.add(
-          _firestore
-              .collection('messages')
-              .where('senderId', isEqualTo: _userDocId!)
-              .get(),
-        );
-        queries.add(
-          _firestore
-              .collection('messages')
-              .where('recipientId', isEqualTo: _userDocId!)
-              .get(),
-        );
-      }
-
-      final snapshots = await Future.wait(queries);
-
-      final messagesMap = <String, Map<String, dynamic>>{};
-      for (final snapshot in snapshots) {
-        for (final doc in snapshot.docs) {
-          messagesMap[doc.id] = {
-            ...doc.data(),
-            'docId': doc.id,
-          };
-        }
-      }
-
-      final participantIds = <String>{
-        _currentUser!.uid,
-        if (_userDocId != null) _userDocId!,
-      };
-
-      final filteredMessages = messagesMap.values.where((msg) {
-        final senderCandidates = <String?>{
-          msg['senderId'] as String?,
-          msg['senderDocId'] as String?,
-        };
-        final recipientCandidates = <String?>{
-          msg['recipientId'] as String?,
-          msg['recipientDocId'] as String?,
-        };
-
-        final isParticipant = senderCandidates.any(
-                  (id) => id != null && participantIds.contains(id),
-                ) ||
-            recipientCandidates.any(
-              (id) => id != null && participantIds.contains(id),
-            );
-        return isParticipant;
-      }).toList();
-
-      filteredMessages.sort((a, b) {
-        final timeA = (a['timestamp'] as Timestamp).toDate();
-        final timeB = (b['timestamp'] as Timestamp).toDate();
-        return timeB.compareTo(timeA);
-      });
-
-      if (mounted) {
+      if (adminSnapshot.docs.isNotEmpty) {
+        final adminData = adminSnapshot.docs.first.data();
         setState(() {
-          _messages = filteredMessages;
-          _isLoading = false;
+          _adminName = adminData['displayName'] ?? 'Admin';
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      // ignore errors
+    }
+  }
+
+  void _startMessagesListener() {
+    if (_currentUser == null) return;
+
+    // Cancel existing subscription if any
+    _messagesSubscription?.cancel();
+
+    setState(() => _isLoading = true);
+
+    // Get admin ID first
+    _firestore
+        .collection('users')
+        .where('role', isEqualTo: 'admin')
+        .limit(1)
+        .get()
+        .then((adminSnapshot) {
+      if (adminSnapshot.docs.isEmpty || !mounted) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
       }
-      print('Error loading messages: $e');
+
+      final adminDoc = adminSnapshot.docs.first;
+      final adminData = adminDoc.data();
+      final adminId = adminData['uid'] as String?;
+      final adminDocId = adminDoc.id;
+
+      final userIds = <String>{
+        _currentUser!.uid,
+        if (_userDocId != null && _userDocId!.isNotEmpty) _userDocId!,
+      };
+
+      final adminIds = <String>{
+        if (adminId != null && adminId.isNotEmpty) adminId,
+        adminDocId,
+      };
+
+      // Listen to messages where user is sender or recipient
+      _messagesSubscription = _firestore
+          .collection('messages')
+          .snapshots()
+          .listen((snapshot) {
+        if (!mounted) return;
+
+        final messagesMap = <String, Map<String, dynamic>>{};
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final senderId = data['senderId'] as String?;
+          final senderDocId = data['senderDocId'] as String?;
+          final recipientId = data['recipientId'] as String?;
+          final recipientDocId = data['recipientDocId'] as String?;
+
+          // Check if message is between user and admin
+          // User is sender if senderId or senderDocId matches user's uid or docId
+          final isUserSender = (senderId != null && userIds.contains(senderId)) ||
+              (senderDocId != null && userIds.contains(senderDocId));
+          
+          // User is recipient if recipientId or recipientDocId matches user's uid or docId
+          final isUserRecipient = (recipientId != null && userIds.contains(recipientId)) ||
+              (recipientDocId != null && userIds.contains(recipientDocId));
+          
+          // Admin is sender if senderId or senderDocId matches admin's uid or docId
+          final isAdminSender = (senderId != null && adminIds.contains(senderId)) ||
+              (senderDocId != null && adminIds.contains(senderDocId));
+          
+          // Admin is recipient if recipientId or recipientDocId matches admin's uid or docId
+          final isAdminRecipient = (recipientId != null && adminIds.contains(recipientId)) ||
+              (recipientDocId != null && adminIds.contains(recipientDocId));
+
+          // Message is part of conversation if:
+          // - User sent to admin, OR
+          // - Admin sent to user
+          if ((isUserSender && isAdminRecipient) ||
+              (isAdminSender && isUserRecipient)) {
+            messagesMap[doc.id] = {
+              ...data,
+              'docId': doc.id,
+            };
+          }
+        }
+
+        final filteredMessages = messagesMap.values.toList();
+        filteredMessages.sort((a, b) {
+          final timeA = (a['timestamp'] as Timestamp).toDate();
+          final timeB = (b['timestamp'] as Timestamp).toDate();
+          return timeA.compareTo(timeB); // Oldest first - newest at bottom
+        });
+
+        if (mounted) {
+          final wasFirstLoad = _messages.isEmpty && _isLoading;
+          
+          setState(() {
+            _messages = filteredMessages;
+            _isLoading = false;
+          });
+
+          // Auto-scroll to bottom when new messages arrive or on first load
+          _scrollToBottom(immediate: wasFirstLoad);
+
+          // Mark all admin messages as read when user views the messages screen
+          _messageService.markAdminMessagesAsRead();
+        }
+      }, onError: (error) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          print('Error in messages stream: $error');
+        }
+      });
+    });
+  }
+
+  Future<void> _loadMessages() async {
+    // This method is kept for compatibility but _startMessagesListener is used instead
+    _startMessagesListener();
+  }
+
+  void _scrollToBottom({bool immediate = false}) {
+    // Use multiple postFrameCallbacks to ensure ListView is fully built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) {
+        // For initial load, use a longer delay to ensure ListView is fully rendered
+        final delay = immediate ? 0 : 200;
+        Future.delayed(Duration(milliseconds: delay), () {
+          if (mounted && _scrollController.hasClients) {
+            try {
+              final maxScroll = _scrollController.position.maxScrollExtent;
+              if (immediate) {
+                _scrollController.jumpTo(maxScroll);
+              } else {
+                _scrollController.animateTo(
+                  maxScroll,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              }
+            } catch (e) {
+              // Ignore scroll errors
+            }
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        if (kIsWeb) {
+          final bytes = await image.readAsBytes();
+          setState(() {
+            _selectedImageBytes = bytes;
+            _selectedImage = null;
+          });
+        } else {
+          setState(() {
+            _selectedImage = File(image.path);
+            _selectedImageBytes = null;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadImage() async {
+    if (_selectedImage == null && _selectedImageBytes == null) return null;
+
+    try {
+      setState(() => _isUploadingImage = true);
+      final storage = FirebaseStorage.instance;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'messages/${_currentUser!.uid}_$timestamp.jpg';
+      final ref = storage.ref().child(fileName);
+
+      String downloadUrl;
+      if (kIsWeb && _selectedImageBytes != null) {
+        await ref.putData(
+          _selectedImageBytes!,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else if (_selectedImage != null) {
+        await ref.putFile(_selectedImage!);
+      } else {
+        return null;
+      }
+
+      downloadUrl = await ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+          _selectedImage = null;
+          _selectedImageBytes = null;
+        });
+      }
     }
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.isEmpty || _currentUser == null) {
+    if ((_messageController.text.isEmpty && _selectedImage == null && _selectedImageBytes == null) ||
+        _currentUser == null) {
       return;
     }
 
-    final messageText = _messageController.text;
+    String? imageUrl;
+    if (_selectedImage != null || _selectedImageBytes != null) {
+      imageUrl = await _uploadImage();
+      if (imageUrl == null && _messageController.text.isEmpty) {
+        return; // Failed to upload and no text
+      }
+    }
+
+    final messageText = _messageController.text.trim();
     _messageController.clear();
 
     try {
@@ -168,8 +351,6 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
       final adminId = adminData['uid'] ?? adminDoc.id;
       final messageId = _firestore.collection('messages').doc().id;
 
-      print('DEBUG: Sending message to admin: $adminId');
-
       await _firestore.collection('messages').doc(messageId).set({
         'id': messageId,
         'senderId': _currentUser!.uid,
@@ -180,25 +361,14 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         'recipientId': adminId,
         'recipientDocId': adminDoc.id,
         'messageText': messageText,
-        'imageUrl': null,
+        'imageUrl': imageUrl,
         'timestamp': Timestamp.now(),
         'isRead': false,
+        'reactions': <String, List<String>>{}, // Initialize empty reactions
       });
 
-      print('DEBUG: Message saved to Firestore');
-
-      // Reload messages immediately
-      await _loadMessages();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Message sent to admin'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      // Auto-scroll to bottom after sending
+      _scrollToBottom();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -316,13 +486,13 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
     final difference = now.difference(dateTime);
 
     if (difference.inMinutes < 1) {
-      return 'Just now';
+      return 'Now';
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
+      return '${difference.inMinutes}m';
     } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
+      return '${difference.inHours}h';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+      return '${difference.inDays}d';
     } else {
       return intl.DateFormat('MMM d').format(dateTime);
     }
@@ -330,6 +500,8 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
 
   @override
   void dispose() {
+    _messagesSubscription?.cancel();
+    _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
   }
@@ -356,9 +528,9 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Admin Support',
-                  style: TextStyle(
+                Text(
+                  _adminName ?? 'Admin Support',
+                  style: const TextStyle(
                     color: Color(0xFF090A4F),
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
@@ -403,9 +575,11 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                         ),
                       )
                     : ListView.builder(
-                        reverse: true,
+                        controller: _scrollController,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                         itemCount: _messages.length,
+                        // Scroll to bottom when ListView is first built
+                        addAutomaticKeepAlives: false,
                         itemBuilder: (context, index) {
                           final msg = _messages[index];
                           final senderDocId = msg['senderDocId'] as String?;
@@ -415,6 +589,8 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                       _userDocId != null &&
                                       senderDocId == _userDocId);
                           final timestamp = (msg['timestamp'] as Timestamp).toDate();
+                          final imageUrl = msg['imageUrl'] as String?;
+                          final messageText = msg['messageText'] as String? ?? '';
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -480,15 +656,41 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                         borderRadius:
                                             BorderRadius.circular(16),
                                       ),
-                                      child: Text(
-                                        msg['messageText'] ?? '',
-                                        style: TextStyle(
-                                          color: isCurrentUser
-                                              ? Colors.white
-                                              : Colors.black87,
-                                          fontSize: 15,
-                                          height: 1.4,
-                                        ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (imageUrl != null)
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Image.network(
+                                                imageUrl,
+                                                width: 200,
+                                                height: 200,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Container(
+                                                    width: 200,
+                                                    height: 200,
+                                                    color: Colors.grey.shade300,
+                                                    child: const Icon(Icons.broken_image),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          if (imageUrl != null && messageText.isNotEmpty)
+                                            const SizedBox(height: 8),
+                                          if (messageText.isNotEmpty)
+                                            Text(
+                                              messageText,
+                                              style: TextStyle(
+                                                color: isCurrentUser
+                                                    ? Colors.white
+                                                    : Colors.black87,
+                                                fontSize: 15,
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -518,46 +720,100 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
               border: Border(top: BorderSide(color: Colors.grey.shade200)),
             ),
             child: SafeArea(
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
+                  if (_selectedImage != null || _selectedImageBytes != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      height: 100,
+                      child: Stack(
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _messageController,
-                              decoration: InputDecoration(
-                                hintText: 'Ask admin...',
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                hintStyle: TextStyle(color: Colors.grey.shade500),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: kIsWeb && _selectedImageBytes != null
+                                ? Image.memory(
+                                    _selectedImageBytes!,
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                  )
+                                : _selectedImage != null
+                                    ? Image.file(
+                                        _selectedImage!,
+                                        width: 100,
+                                        height: 100,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : const SizedBox(),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: CircleAvatar(
+                              radius: 12,
+                              backgroundColor: Colors.black.withOpacity(0.6),
+                              child: IconButton(
+                                icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedImage = null;
+                                    _selectedImageBytes = null;
+                                  });
+                                },
+                                padding: EdgeInsets.zero,
                               ),
-                              maxLines: null,
-                              style: const TextStyle(fontSize: 15),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF090A4F),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                      onPressed: _sendMessage,
-                      padding: const EdgeInsets.all(8),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _messageController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Ask admin...',
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    hintStyle: TextStyle(color: Colors.grey.shade500),
+                                  ),
+                                  maxLines: null,
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.attach_file, color: Colors.grey.shade600, size: 20),
+                                onPressed: _pickImage,
+                                tooltip: 'Attach image',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF090A4F),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                          onPressed: _isUploadingImage ? null : _sendMessage,
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

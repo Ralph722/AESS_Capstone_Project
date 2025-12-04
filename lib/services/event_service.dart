@@ -15,9 +15,47 @@ class EventService {
     }
   }
 
-  /// Get all active events
+  /// Auto-archive past events (events where date has passed)
+  Future<void> autoArchivePastEvents() async {
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      final snapshot = await _firestore
+          .collection('events')
+          .where('status', isEqualTo: 'Active')
+          .get();
+
+      final batch = _firestore.batch();
+      int archivedCount = 0;
+
+      for (var doc in snapshot.docs) {
+        final event = AlumniEvent.fromFirestore(doc);
+        final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+        
+        // Archive events that have passed (date is before today)
+        if (eventDate.isBefore(today)) {
+          batch.update(doc.reference, {'status': 'Archived'});
+          archivedCount++;
+        }
+      }
+
+      if (archivedCount > 0) {
+        await batch.commit();
+        print('Auto-archived $archivedCount past event(s)');
+      }
+    } catch (e) {
+      print('Error auto-archiving past events: $e');
+      // Don't throw, just log the error
+    }
+  }
+
+  /// Get all active events (for admin - includes all active events)
   Future<List<AlumniEvent>> getActiveEvents() async {
     try {
+      // Auto-archive past events first
+      await autoArchivePastEvents();
+      
       final snapshot = await _firestore
           .collection('events')
           .where('status', isEqualTo: 'Active')
@@ -29,6 +67,36 @@ class EventService {
       return events;
     } catch (e) {
       throw Exception('Error fetching events: $e');
+    }
+  }
+
+  /// Get upcoming events only (for users - excludes past events)
+  Future<List<AlumniEvent>> getUpcomingEvents() async {
+    try {
+      // Auto-archive past events first
+      await autoArchivePastEvents();
+      
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      final snapshot = await _firestore
+          .collection('events')
+          .where('status', isEqualTo: 'Active')
+          .get();
+
+      // Filter out past events and sort
+      final events = snapshot.docs
+          .map((doc) => AlumniEvent.fromFirestore(doc))
+          .where((event) {
+            final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+            return eventDate.isAtSameMomentAs(today) || eventDate.isAfter(today);
+          })
+          .toList();
+      
+      events.sort((a, b) => a.date.compareTo(b.date));
+      return events;
+    } catch (e) {
+      throw Exception('Error fetching upcoming events: $e');
     }
   }
 
@@ -175,7 +243,7 @@ class EventService {
     }
   }
 
-  /// Stream of active events (real-time updates)
+  /// Stream of active events (real-time updates) - for admin
   Stream<List<AlumniEvent>> getActiveEventsStream() {
     return _firestore
         .collection('events')
@@ -184,6 +252,27 @@ class EventService {
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => AlumniEvent.fromFirestore(doc)).toList());
+  }
+
+  /// Stream of upcoming events (real-time updates) - for users
+  Stream<List<AlumniEvent>> getUpcomingEventsStream() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    return _firestore
+        .collection('events')
+        .where('status', isEqualTo: 'Active')
+        .orderBy('date', descending: false)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => AlumniEvent.fromFirestore(doc))
+              .where((event) {
+                final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+                return eventDate.isAtSameMomentAs(today) || eventDate.isAfter(today);
+              })
+              .toList();
+        });
   }
 
   /// Add reminder for user

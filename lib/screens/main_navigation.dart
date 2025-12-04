@@ -8,15 +8,23 @@ import 'package:alumni_system/screens/profile_screen.dart';
 import 'package:alumni_system/screens/admin_dashboard.dart';
 
 class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
+  final int? initialIndex;
+  
+  const MainNavigation({super.key, this.initialIndex});
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
+  late int _currentIndex;
   bool _isAdminMode = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex ?? 0;
+  }
 
   final List<Widget> _screens = [
     const HomeScreen(),

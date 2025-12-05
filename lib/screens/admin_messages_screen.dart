@@ -1234,62 +1234,67 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                                         _addReaction(messageDocId, '👍');
                                                       }
                                                     },
-                                                    child: Container(
-                                                      constraints: BoxConstraints(
-                                                        maxWidth: MediaQuery.of(context).size.width * 0.5,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: isAdmin
-                                                            ? const Color(0xFF090A4F)
-                                                            : Colors.white,
-                                                        borderRadius: BorderRadius.circular(18),
-                                                        boxShadow: [
-                                                          BoxShadow(
-                                                            color: Colors.black.withOpacity(0.05),
-                                                            blurRadius: 4,
-                                                            offset: const Offset(0, 2),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Padding(
-                                                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                                                    child: Align(
+                                                      alignment: isAdmin ? Alignment.centerRight : Alignment.centerLeft,
+                                                      child: ConstrainedBox(
+                                                        constraints: BoxConstraints(
+                                                          maxWidth: MediaQuery.of(context).size.width * 0.65,
+                                                        ),
+                                                        child: IntrinsicWidth(
+                                                          child: Container(
+                                                            decoration: BoxDecoration(
+                                                              color: isAdmin
+                                                                  ? const Color(0xFF090A4F)
+                                                                  : Colors.white,
+                                                              borderRadius: BorderRadius.circular(18),
+                                                              boxShadow: [
+                                                                BoxShadow(
+                                                                  color: Colors.black.withOpacity(0.05),
+                                                                  blurRadius: 4,
+                                                                  offset: const Offset(0, 2),
+                                                                ),
+                                                              ],
+                                                            ),
                                                             child: Column(
                                                               crossAxisAlignment: CrossAxisAlignment.start,
                                                               mainAxisSize: MainAxisSize.min,
                                                               children: [
-                                                                if (imageUrl != null)
-                                                                  ClipRRect(
-                                                                    borderRadius: BorderRadius.circular(8),
-                                                                    child: Image.network(
-                                                                      imageUrl,
-                                                                      width: 200,
-                                                                      height: 200,
-                                                                      fit: BoxFit.cover,
-                                                                      errorBuilder: (context, error, stackTrace) {
-                                                                        return Container(
-                                                                          width: 200,
-                                                                          height: 200,
-                                                                          color: Colors.grey.shade300,
-                                                                          child: const Icon(Icons.broken_image),
-                                                                        );
-                                                                      },
-                                                                    ),
-                                                                  ),
-                                                                if (imageUrl != null && messageText.isNotEmpty)
-                                                                  const SizedBox(height: 6),
-                                                                if (messageText.isNotEmpty)
-                                                                  Text(
-                                                                    messageText,
-                                                                    style: TextStyle(
-                                                                      color: isAdmin ? Colors.white : Colors.black87,
-                                                                      fontSize: 14,
-                                                                      height: 1.3,
-                                                                    ),
-                                                                  ),
+                                                                Padding(
+                                                                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                                                                  child: Column(
+                                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                                    mainAxisSize: MainAxisSize.min,
+                                                                    children: [
+                                                                      if (imageUrl != null)
+                                                                        ClipRRect(
+                                                                          borderRadius: BorderRadius.circular(8),
+                                                                          child: Image.network(
+                                                                            imageUrl,
+                                                                            width: 200,
+                                                                            height: 200,
+                                                                            fit: BoxFit.cover,
+                                                                            errorBuilder: (context, error, stackTrace) {
+                                                                              return Container(
+                                                                                width: 200,
+                                                                                height: 200,
+                                                                                color: Colors.grey.shade300,
+                                                                                child: const Icon(Icons.broken_image),
+                                                                              );
+                                                                            },
+                                                                          ),
+                                                                        ),
+                                                                      if (imageUrl != null && messageText.isNotEmpty)
+                                                                        const SizedBox(height: 6),
+                                                                      if (messageText.isNotEmpty)
+                                                                        Text(
+                                                                          messageText,
+                                                                          style: TextStyle(
+                                                                            color: isAdmin ? Colors.white : Colors.black87,
+                                                                            fontSize: 14,
+                                                                            height: 1.3,
+                                                                          ),
+                                                                          softWrap: true,
+                                                                        ),
                                                               ],
                                                             ),
                                                           ),
@@ -1357,38 +1362,21 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                                             ),
                                                           Padding(
                                                             padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                                                            child: Row(
-                                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                              crossAxisAlignment: CrossAxisAlignment.center,
-                                                              children: [
-                                                                Text(
-                                                                  _formatTime(timestamp),
-                                                                  style: TextStyle(
-                                                                    color: isAdmin
-                                                                        ? Colors.white.withOpacity(0.7)
-                                                                        : Colors.grey.shade600,
-                                                                    fontSize: 10,
-                                                                  ),
-                                                                ),
-                                                                GestureDetector(
-                                                                  onTap: () {
-                                                                    if (messageDocId.isNotEmpty) {
-                                                                      _showReactionPicker(context, messageDocId);
-                                                                    }
-                                                                  },
-                                                                  child: Icon(
-                                                                    Icons.add_reaction,
-                                                                    size: 12,
-                                                                    color: isAdmin
-                                                                        ? Colors.white.withOpacity(0.7)
-                                                                        : Colors.grey.shade600,
-                                                                  ),
-                                                                ),
-                                                              ],
+                                                            child: Text(
+                                                              _formatTime(timestamp),
+                                                              style: TextStyle(
+                                                                color: isAdmin
+                                                                    ? Colors.white.withOpacity(0.7)
+                                                                    : Colors.grey.shade600,
+                                                                fontSize: 10,
+                                                              ),
                                                             ),
                                                           ),
                                                         ],
+                                                          ),
+                                                        ),
                                                       ),
+                                                    ),
                                                     ),
                                                   ),
                                                 ),

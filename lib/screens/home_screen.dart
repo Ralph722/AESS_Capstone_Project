@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart' as intl;
 import 'dart:async';
 import 'package:alumni_system/services/event_service.dart';
 import 'package:alumni_system/services/job_service.dart';
 import 'package:alumni_system/services/message_service.dart';
+import 'package:alumni_system/services/notification_service.dart';
+import 'package:alumni_system/services/auth_service.dart';
 import 'package:alumni_system/models/event_model.dart';
+import 'package:alumni_system/models/notification_model.dart';
 import 'package:alumni_system/screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,21 +23,32 @@ class _HomeScreenState extends State<HomeScreen> {
   final EventService _eventService = EventService();
   final JobService _jobService = JobService();
   final MessageService _messageService = MessageService();
+  final NotificationService _notificationService = NotificationService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   DateTime _selectedDate = DateTime.now();
   late DateTime _currentTime;
   late Timer _timer;
   StreamSubscription<int>? _messagesCountSubscription;
-  
+  StreamSubscription<int>? _notificationsCountSubscription;
+  StreamSubscription<List<NotificationModel>>? _notificationsStreamSubscription;
+
   // Counts for stat cards
   int eventsCount = 0;
   int messagesCount = 0;
   int jobsCount = 0;
-  
+  int unreadNotificationsCount = 0;
+
   // Data for home screen sections
   List<AlumniEvent> upcomingEvents = [];
   List<dynamic> featuredJobs = [];
+  List<NotificationModel> notifications = [];
   bool isLoadingEvents = true;
   bool isLoadingJobs = true;
+  bool isLoadingNotifications = true;
+  
+  // Profile data
+  String? _profileImageUrl;
+  String? _displayName;
 
   @override
   void initState() {
@@ -42,21 +57,42 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCounts();
     _loadUpcomingEvents();
     _loadFeaturedJobs();
+    _loadNotifications();
+    _loadUserProfile();
     _startTimer();
     _startMessagesCountListener();
+    _startNotificationsListener();
   }
-  
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists && mounted) {
+        final data = userDoc.data()!;
+        setState(() {
+          _profileImageUrl = data['profileImageUrl'];
+          _displayName = data['displayName'] ?? user.displayName;
+        });
+      }
+    } catch (e) {
+      print('Error loading user profile: $e');
+    }
+  }
+
   Future<void> _loadUpcomingEvents() async {
     try {
       setState(() => isLoadingEvents = true);
       // Use getUpcomingEvents for users - only shows future events
       final events = await _eventService.getUpcomingEvents();
-      
-      // Sort and take top 5
+
+      // Sort and take top 3
       events.sort((a, b) => a.date.compareTo(b.date));
-      
+
       setState(() {
-        upcomingEvents = events.take(5).toList();
+        upcomingEvents = events.take(3).toList();
         isLoadingEvents = false;
       });
     } catch (e) {
@@ -64,12 +100,12 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Error loading upcoming events: $e');
     }
   }
-  
+
   Future<void> _loadFeaturedJobs() async {
     try {
       setState(() => isLoadingJobs = true);
       final jobs = await _jobService.getActiveJobs();
-      
+
       // Get recent active jobs (last 5)
       setState(() {
         featuredJobs = jobs.take(5).toList();
@@ -80,35 +116,122 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Error loading featured jobs: $e');
     }
   }
-  
+
   void _startMessagesCountListener() {
     // Listen to real-time updates for unread messages count
-    _messagesCountSubscription = _messageService.getUnreadMessagesCountStream().listen(
-      (count) {
-        if (mounted) {
-          setState(() {
-            messagesCount = count;
-          });
-        }
-      },
-      onError: (error) {
-        print('Error listening to messages count: $error');
-      },
-    );
+    _messagesCountSubscription = _messageService
+        .getUnreadMessagesCountStream()
+        .listen(
+          (count) {
+            if (mounted) {
+              setState(() {
+                messagesCount = count;
+              });
+            }
+          },
+          onError: (error) {
+            print('Error listening to messages count: $error');
+          },
+        );
   }
-  
+
+  void _startNotificationsListener() {
+    // Listen to real-time updates for unread notifications count
+    _notificationsCountSubscription = _notificationService
+        .getUnreadCountStream()
+        .listen(
+          (count) {
+            if (mounted) {
+              setState(() {
+                unreadNotificationsCount = count;
+              });
+            }
+          },
+          onError: (error) {
+            print('Error listening to notifications count: $error');
+          },
+        );
+
+    // Listen to notifications stream
+    _notificationsStreamSubscription = _notificationService
+        .getNotificationsStream(limit: 20)
+        .listen(
+          (notificationsList) {
+            if (mounted) {
+              setState(() {
+                notifications = notificationsList;
+                isLoadingNotifications = false;
+              });
+            }
+          },
+          onError: (error) {
+            print('Error listening to notifications: $error');
+            if (mounted) {
+              setState(() {
+                notifications = [];
+                isLoadingNotifications = false;
+              });
+            }
+          },
+        );
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        setState(() {
+          notifications = [];
+          isLoadingNotifications = false;
+        });
+        return;
+      }
+
+      // Check if user document exists in Firestore, create if missing
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        try {
+          final authService = AuthService();
+          await authService.setUserRole(user.uid, UserRole.user);
+        } catch (e) {
+          print('Error creating user document: $e');
+        }
+      }
+
+      setState(() => isLoadingNotifications = true);
+      final notificationsList = await _notificationService.getUserNotifications(
+        limit: 20,
+      );
+      setState(() {
+        notifications = notificationsList;
+        isLoadingNotifications = false;
+      });
+    } catch (e) {
+      print('Error loading notifications: $e');
+      setState(() {
+        notifications = [];
+        isLoadingNotifications = false;
+      });
+    }
+  }
+
   Future<void> _loadCounts() async {
     try {
       // Load events count (only upcoming events for users)
       final events = await _eventService.getUpcomingEvents();
       final eventsCountValue = events.length;
-      
+
       // Load jobs count
       final jobsCountValue = await _jobService.getTotalJobsCount();
-      
+
       // Load unread messages count from admin
       final messagesCountValue = await _messageService.getUnreadMessagesCount();
-      
+
       setState(() {
         eventsCount = eventsCountValue;
         jobsCount = jobsCountValue;
@@ -131,15 +254,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _timer.cancel();
     _messagesCountSubscription?.cancel();
+    _notificationsCountSubscription?.cancel();
+    _notificationsStreamSubscription?.cancel();
     super.dispose();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final displayName = user?.displayName ?? 'JUAN DELA CRUZ';
+    final displayName = _displayName ?? user?.displayName ?? 'JUAN DELA CRUZ';
     final firstName = displayName.split(' ').first;
 
     return Scaffold(
@@ -192,20 +315,35 @@ class _HomeScreenState extends State<HomeScreen> {
                       size: 22,
                     ),
                   ),
-                  onPressed: () {},
+                  onPressed: () => _showNotificationsPanel(),
                 ),
-                Positioned(
-                  right: 12,
-                  top: 12,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF6B6B),
-                      shape: BoxShape.circle,
+                if (unreadNotificationsCount > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF6B6B),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        unreadNotificationsCount > 99
+                            ? '99+'
+                            : unreadNotificationsCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -287,15 +425,38 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(40),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
-                        width: 2,
+                        color: Colors.white.withOpacity(0.3),
+                        width: 3,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.person_outline,
-                      color: Colors.white,
-                      size: 40,
-                    ),
+                    child: _profileImageUrl != null
+                        ? ClipOval(
+                            child: Image.network(
+                              _profileImageUrl!,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.person_outline,
+                                  color: Colors.white,
+                                  size: 40,
+                                );
+                              },
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person_outline,
+                            color: Colors.white,
+                            size: 40,
+                          ),
                   ),
                 ],
               ),
@@ -366,7 +527,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF090A4F)),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 12,
+                              color: Color(0xFF090A4F),
+                            ),
                           ],
                         ),
                       ),
@@ -374,10 +539,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   if (isLoadingEvents)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(),
-                    ))
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   else if (upcomingEvents.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(24),
@@ -395,7 +562,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Center(
                         child: Column(
                           children: [
-                            Icon(Icons.event_busy, size: 48, color: Colors.grey.shade300),
+                            Icon(
+                              Icons.event_busy,
+                              size: 48,
+                              color: Colors.grey.shade300,
+                            ),
                             const SizedBox(height: 12),
                             Text(
                               'No upcoming events',
@@ -409,7 +580,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     )
                   else
-                    ...upcomingEvents.map((event) => _buildEventCard(event)).toList(),
+                    ...upcomingEvents
+                        .map((event) => _buildEventCard(event))
+                        .toList(),
                 ],
               ),
             ),
@@ -447,7 +620,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF090A4F)),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 12,
+                              color: Color(0xFF090A4F),
+                            ),
                           ],
                         ),
                       ),
@@ -455,10 +632,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   if (isLoadingJobs)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(),
-                    ))
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   else if (featuredJobs.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(24),
@@ -476,7 +655,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Center(
                         child: Column(
                           children: [
-                            Icon(Icons.work_off, size: 48, color: Colors.grey.shade300),
+                            Icon(
+                              Icons.work_off,
+                              size: 48,
+                              color: Colors.grey.shade300,
+                            ),
                             const SizedBox(height: 12),
                             Text(
                               'No job postings available',
@@ -543,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         () => _navigateToScreen(5),
                       ),
                       _buildQuickLinkCard(
-                        'Community',
+                        'Messages',
                         Icons.people,
                         const Color(0xFF4CAF50),
                         () => _navigateToScreen(2),
@@ -608,7 +791,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                intl.DateFormat('MMMM yyyy').format(_selectedDate),
+                                intl.DateFormat(
+                                  'MMMM yyyy',
+                                ).format(_selectedDate),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -618,7 +803,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               Row(
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.chevron_left, size: 20),
+                                    icon: const Icon(
+                                      Icons.chevron_left,
+                                      size: 20,
+                                    ),
                                     onPressed: () {
                                       setState(() {
                                         _selectedDate = DateTime(
@@ -629,7 +817,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                     },
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.chevron_right, size: 20),
+                                    icon: const Icon(
+                                      Icons.chevron_right,
+                                      size: 20,
+                                    ),
                                     onPressed: () {
                                       setState(() {
                                         _selectedDate = DateTime(
@@ -663,10 +854,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.access_time, size: 16, color: Color(0xFF090A4F)),
+                              const Icon(
+                                Icons.access_time,
+                                size: 16,
+                                color: Color(0xFF090A4F),
+                              ),
                               const SizedBox(width: 8),
                               Text(
-                                intl.DateFormat('EEEE, MMMM d, yyyy • hh:mm:ss a').format(_currentTime),
+                                intl.DateFormat(
+                                  'EEEE, MMMM d, yyyy • hh:mm:ss a',
+                                ).format(_currentTime),
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -699,7 +896,283 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, VoidCallback? onTap) {
+  void _showNotificationsPanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          // Ensure notifications is always a valid list
+          final currentNotifications = notifications.isNotEmpty
+              ? notifications
+              : <NotificationModel>[];
+          final currentLoadingState = isLoadingNotifications;
+          final currentUnreadCount = unreadNotificationsCount;
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF090A4F),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Notifications',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Refresh button
+                      IconButton(
+                        icon: const Icon(Icons.refresh, color: Colors.white),
+                        onPressed: () {
+                          _loadNotifications();
+                          setModalState(() {});
+                        },
+                        tooltip: 'Refresh',
+                      ),
+                      if (currentUnreadCount > 0)
+                        TextButton(
+                          onPressed: () async {
+                            await _notificationService.markAllAsRead();
+                            if (mounted) {
+                              setState(() {
+                                unreadNotificationsCount = 0;
+                              });
+                              setModalState(() {});
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'All notifications marked as read',
+                                  ),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text(
+                            'Mark all as read',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                // Notifications List
+                Expanded(
+                  child: currentLoadingState
+                      ? const Center(child: CircularProgressIndicator())
+                      : currentNotifications.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.notifications_none,
+                                size: 64,
+                                color: Colors.grey.shade300,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No notifications',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(8),
+                          itemCount: currentNotifications.length,
+                          itemBuilder: (context, index) {
+                            if (index >= currentNotifications.length) {
+                              return const SizedBox.shrink();
+                            }
+                            final notification = currentNotifications[index];
+                            return _buildNotificationItem(notification);
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem(NotificationModel notification) {
+    final dateFormat = intl.DateFormat('MMM d, yyyy • hh:mm a');
+    final isToday =
+        notification.createdAt.day == DateTime.now().day &&
+        notification.createdAt.month == DateTime.now().month &&
+        notification.createdAt.year == DateTime.now().year;
+
+    String timeText;
+    if (isToday) {
+      timeText = intl.DateFormat('hh:mm a').format(notification.createdAt);
+    } else {
+      timeText = dateFormat.format(notification.createdAt);
+    }
+
+    return InkWell(
+      onTap: () async {
+        // Mark as read when tapped
+        if (!notification.isRead) {
+          await _notificationService.markAsRead(notification.id);
+        }
+
+        // Navigate based on notification type
+        if (notification.relatedId != null) {
+          switch (notification.type) {
+            case NotificationType.event:
+              _navigateToScreen(1); // Events screen
+              break;
+            case NotificationType.job:
+              _navigateToScreen(3); // Jobs screen
+              break;
+            case NotificationType.message:
+              _navigateToScreen(2); // Messages screen
+              break;
+            default:
+              break;
+          }
+        }
+
+        Navigator.pop(context);
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: notification.isRead
+              ? Colors.white
+              : const Color(0xFF090A4F).withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: notification.isRead
+                ? Colors.grey.shade200
+                : const Color(0xFF090A4F).withOpacity(0.2),
+            width: notification.isRead ? 1 : 1.5,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Color(notification.colorValue).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _getNotificationIcon(notification.type),
+                color: Color(notification.colorValue),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notification.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: notification.isRead
+                                ? FontWeight.w500
+                                : FontWeight.bold,
+                            color: const Color(0xFF090A4F),
+                          ),
+                        ),
+                      ),
+                      if (!notification.isRead)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFF6B6B),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    notification.message,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    timeText,
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getNotificationIcon(NotificationType type) {
+    switch (type) {
+      case NotificationType.event:
+        return Icons.event;
+      case NotificationType.job:
+        return Icons.work;
+      case NotificationType.message:
+        return Icons.message;
+      case NotificationType.announcement:
+        return Icons.campaign;
+      case NotificationType.system:
+        return Icons.info;
+    }
+  }
+
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+    VoidCallback? onTap,
+  ) {
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -775,7 +1248,9 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: header == 'S' ? Colors.red.shade400 : const Color(0xFF090A4F),
+              color: header == 'S'
+                  ? Colors.red.shade400
+                  : const Color(0xFF090A4F),
             ),
           ),
         ),
@@ -790,11 +1265,18 @@ class _HomeScreenState extends State<HomeScreen> {
     // Add day cells
     final today = DateTime.now();
     for (var day = 1; day <= totalDays; day++) {
-      final currentDate = DateTime(_selectedDate.year, _selectedDate.month, day);
-      final isToday = currentDate.year == today.year &&
+      final currentDate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        day,
+      );
+      final isToday =
+          currentDate.year == today.year &&
           currentDate.month == today.month &&
           currentDate.day == today.day;
-      final isWeekend = currentDate.weekday == DateTime.sunday || currentDate.weekday == DateTime.saturday;
+      final isWeekend =
+          currentDate.weekday == DateTime.sunday ||
+          currentDate.weekday == DateTime.saturday;
 
       dayWidgets.add(
         Container(
@@ -812,8 +1294,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: isToday
                     ? Colors.white
                     : isWeekend
-                        ? Colors.red.shade400
-                        : const Color(0xFF090A4F),
+                    ? Colors.red.shade400
+                    : const Color(0xFF090A4F),
               ),
             ),
           ),
@@ -835,10 +1317,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildEventCard(AlumniEvent event) {
     final now = DateTime.now();
     final daysUntil = event.date.difference(now).inDays;
-    final isToday = event.date.year == now.year &&
+    final isToday =
+        event.date.year == now.year &&
         event.date.month == now.month &&
         event.date.day == now.day;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -910,7 +1393,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: Colors.grey.shade600,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '${event.startTime} - ${event.endTime}',
@@ -924,7 +1411,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
+                    Icon(
+                      Icons.location_on,
+                      size: 14,
+                      color: Colors.grey.shade600,
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -948,24 +1439,24 @@ class _HomeScreenState extends State<HomeScreen> {
               color: isToday
                   ? const Color(0xFFFFD700)
                   : daysUntil <= 7
-                      ? Colors.orange.shade100
-                      : Colors.green.shade100,
+                  ? Colors.orange.shade100
+                  : Colors.green.shade100,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               isToday
                   ? 'Today'
                   : daysUntil == 1
-                      ? 'Tomorrow'
-                      : '$daysUntil days',
+                  ? 'Tomorrow'
+                  : '$daysUntil days',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: isToday
                     ? const Color(0xFF090A4F)
                     : daysUntil <= 7
-                        ? Colors.orange.shade700
-                        : Colors.green.shade700,
+                    ? Colors.orange.shade700
+                    : Colors.green.shade700,
               ),
             ),
           ),
@@ -1043,7 +1534,10 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               if (job.jobType != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(4),
@@ -1059,7 +1553,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               if (job.isRemote == true)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.shade50,
                     borderRadius: BorderRadius.circular(4),
@@ -1100,7 +1597,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickLinkCard(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildQuickLinkCard(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1140,12 +1642,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const Spacer(),
-              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey.shade400),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: Colors.grey.shade400,
+              ),
             ],
           ),
         ),
       ),
     );
   }
-
 }

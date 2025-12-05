@@ -37,41 +37,38 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                 const SizedBox(height: 40),
                 // Logo
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                  child: const Icon(
-                        Icons.school,
-                        size: 60,
-                    color: Color(0xFF090A4F),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                // Title
-                    const Text(
-                      'Alumni Portal',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Welcome Back!',
-                  style: TextStyle(
-                  color: Colors.white,
-                    fontSize: 18,
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
                   ),
+                  child: const Icon(
+                    Icons.school,
+                    size: 60,
+                    color: Color(0xFF090A4F),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Title
+                const Text(
+                  'Alumni Portal',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Welcome Back!',
+                  style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 const SizedBox(height: 40),
                 // Form Card
@@ -90,8 +87,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         // Email Field
                         TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             labelText: 'Email',
                             prefixIcon: const Icon(Icons.email),
@@ -100,21 +97,21 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             filled: true,
                             fillColor: Colors.grey.shade50,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
                           ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!value.contains('@')) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
                         const SizedBox(height: 20),
                         // Password Field
                         TextFormField(
-                            controller: _passwordController,
+                          controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             labelText: 'Password',
@@ -136,14 +133,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             filled: true,
                             fillColor: Colors.grey.shade50,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              return null;
-                            },
                           ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            return null;
+                          },
+                        ),
                         const SizedBox(height: 16),
                         // Remember Me
                         Row(
@@ -163,7 +160,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Forgot password feature coming soon'),
+                                    content: Text(
+                                      'Forgot password feature coming soon',
+                                    ),
                                   ),
                                 );
                               },
@@ -210,26 +209,27 @@ class _LoginScreenState extends State<LoginScreen> {
                         Center(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
+                            children: [
                               const Text("Don't have an account? "),
                               GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                      builder: (context) => const RegisterScreen(),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text(
-                                      'Register now',
-                                      style: TextStyle(
-                                        color: Color(0xFF090A4F),
-                                        fontWeight: FontWeight.bold,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RegisterScreen(),
                                     ),
+                                  );
+                                },
+                                child: const Text(
+                                  'Register now',
+                                  style: TextStyle(
+                                    color: Color(0xFF090A4F),
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -261,14 +261,25 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (user != null && mounted) {
-        final userRole = await _authService.getUserRole(user.uid);
-        
+        // Ensure user document exists in Firestore (create if missing)
+        var userRole = await _authService.getUserRole(user.uid);
+        if (userRole == null) {
+          // User document doesn't exist, create it with default 'user' role
+          print(
+            'User document does not exist for ${user.uid}, creating one...',
+          );
+          await _authService.setUserRole(user.uid, UserRole.user);
+          // Get role again after creating
+          userRole = await _authService.getUserRole(user.uid) ?? UserRole.user;
+        }
+
         final roleString = userRole == UserRole.admin ? 'admin' : 'user';
         await _auditService.logAction(
           action: 'LOGIN',
           resource: roleString == 'admin' ? 'Admin' : 'User',
           resourceId: user.uid,
-          description: '${roleString == 'admin' ? 'Admin' : 'User'} logged in: ${user.email}',
+          description:
+              '${roleString == 'admin' ? 'Admin' : 'User'} logged in: ${user.email}',
           status: 'SUCCESS',
           userRole: roleString,
         );
@@ -277,7 +288,9 @@ class _LoginScreenState extends State<LoginScreen> {
           if (userRole == UserRole.admin) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const AdminDashboardWeb()),
+              MaterialPageRoute(
+                builder: (context) => const AdminDashboardWeb(),
+              ),
             );
           } else {
             Navigator.pushReplacement(
@@ -299,10 +312,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
         );
       }
     } finally {

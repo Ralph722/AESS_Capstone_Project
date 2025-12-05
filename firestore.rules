@@ -1,34 +1,101 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
+    // Helper function to check if user is admin
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
     function isAdmin() {
       return isSignedIn() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin';
     }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-    // Events collection - allow read for signed-in, write for admins only
-    match /events/{eventId} {
+    // Audit logs - users can create their own logs, admins can do everything
+    match /audit_logs/{logId} {
+      // All authenticated users can read audit logs
       allow read: if isSignedIn();
-      allow create: if isAdmin() &&
-        request.resource.data.keys().hasAll(['id', 'theme', 'batchYear', 'date', 'venue', 'status', 'comments']) &&
-        request.resource.data.id == eventId;
+      // Users can create audit logs for their own actions (login, logout, etc.)
+      allow create: if isSignedIn() && 
+        request.resource.data.get('userId') == request.auth.uid;
+      // Only admins can update or delete audit logs
       allow update, delete: if isAdmin();
     }
-    
-    // Users collection - allow read/write for own user data
+
+    // Events collection - read for all authenticated users, write for admins only
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Jobs collection - read for all authenticated users, write for admins only
+    match /jobs/{jobId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Messages collection - users can read their own messages and create messages
+    match /messages/{messageId} {
+      // Users can read messages where they are sender or recipient
+      allow read: if isSignedIn() && (
+        resource.data.get('senderId') == request.auth.uid ||
+        resource.data.get('recipientId') == request.auth.uid ||
+        resource.data.get('senderDocId') == request.auth.uid ||
+        resource.data.get('recipientDocId') == request.auth.uid ||
+        isAdmin()
+      );
+      // Users can create messages (to send to admin), admins can create/update/delete
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (
+        isSignedIn() && 
+        resource.data.get('senderId') == request.auth.uid
+      );
+    }
+
+    // Notifications collection (top-level if exists) - read for authenticated users, write for admins
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.get('userId') == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    // Users collection - users can read their own data and update their own profile (but not role)
     match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // Users can read their own data, admins can read all
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      
+      // Users can create their own document on signup
+      allow create: if isSignedIn() && isOwner(userId) &&
+        request.resource.data.get('role', 'user') == 'user';
+      
+      // Users can update their own data but cannot change their role
+      allow update: if isSignedIn() && isOwner(userId) &&
+        request.resource.data.get('role') == resource.data.get('role', 'user');
+      
+      // Only admins can delete users or change roles
+      allow delete: if isAdmin();
       
       // User subcollections
       match /reminders/{reminderId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isSignedIn() && isOwner(userId);
       }
       
       match /notifications/{notificationId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isSignedIn() && isOwner(userId);
       }
+    }
+
+    // Catch-all rule for any other collections - read for authenticated, write for admins
+    match /{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

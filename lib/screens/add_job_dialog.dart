@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:alumni_system/services/job_service.dart';
+import 'package:alumni_system/services/notification_service.dart';
 import 'job_posting_screen.dart';
 
 class AddJobDialog extends StatefulWidget {
@@ -9,12 +10,7 @@ class AddJobDialog extends StatefulWidget {
   final Function(JobPosting)? onJobAdded;
   final Function(JobPosting)? onJobUpdated;
 
-  const AddJobDialog({
-    super.key,
-    this.job,
-    this.onJobAdded,
-    this.onJobUpdated,
-  });
+  const AddJobDialog({super.key, this.job, this.onJobAdded, this.onJobUpdated});
 
   @override
   State<AddJobDialog> createState() => _AddJobDialogState();
@@ -41,14 +37,14 @@ class _AddJobDialogState extends State<AddJobDialog> {
     'Part-time',
     'Contract',
     'Internship',
-    'Temporary'
+    'Temporary',
   ];
 
   final List<String> _experienceLevels = [
     'Entry-level',
     'Mid-level',
     'Senior',
-    'Executive'
+    'Executive',
   ];
 
   @override
@@ -78,7 +74,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
     if (_formKey.currentState!.validate()) {
       final currentUser = FirebaseAuth.instance.currentUser;
       final jobService = JobService();
-      
+
       final job = JobPosting(
         id: widget.job?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         companyName: _companyNameController.text,
@@ -88,8 +84,14 @@ class _AddJobDialogState extends State<AddJobDialog> {
         location: _locationController.text,
         salaryRange: _salaryRangeController.text,
         description: _descriptionController.text,
-        requirements: _requirementsController.text.split('\n').where((req) => req.isNotEmpty).toList(),
-        benefits: _benefitsController.text.split('\n').where((benefit) => benefit.isNotEmpty).toList(),
+        requirements: _requirementsController.text
+            .split('\n')
+            .where((req) => req.isNotEmpty)
+            .toList(),
+        benefits: _benefitsController.text
+            .split('\n')
+            .where((benefit) => benefit.isNotEmpty)
+            .toList(),
         postedDate: widget.job?.postedDate ?? DateTime.now(),
         applicationDeadline: _applicationDeadline,
         contactEmail: _contactEmailController.text,
@@ -106,6 +108,20 @@ class _AddJobDialogState extends State<AddJobDialog> {
       try {
         if (widget.job == null) {
           await jobService.addJobPosting(job);
+
+          // Send notification to all users about new job
+          try {
+            final notificationService = NotificationService();
+            await notificationService.notifyNewJob(
+              jobId: job.id,
+              jobTitle: job.jobTitle,
+              companyName: job.companyName,
+            );
+          } catch (e) {
+            print('Error sending job notification: $e');
+            // Don't fail the job creation if notification fails
+          }
+
           widget.onJobAdded?.call(job);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -134,10 +150,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -205,9 +218,17 @@ class _AddJobDialogState extends State<AddJobDialog> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _buildTextField('Company Name', _companyNameController, 'Enter company name'),
+                        _buildTextField(
+                          'Company Name',
+                          _companyNameController,
+                          'Enter company name',
+                        ),
                         const SizedBox(height: 12),
-                        _buildTextField('Job Title', _jobTitleController, 'Enter job title'),
+                        _buildTextField(
+                          'Job Title',
+                          _jobTitleController,
+                          'Enter job title',
+                        ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -216,7 +237,8 @@ class _AddJobDialogState extends State<AddJobDialog> {
                                 'Job Type',
                                 _selectedJobType,
                                 _jobTypes,
-                                (value) => setState(() => _selectedJobType = value!),
+                                (value) =>
+                                    setState(() => _selectedJobType = value!),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -225,7 +247,9 @@ class _AddJobDialogState extends State<AddJobDialog> {
                                 'Experience Level',
                                 _selectedExperienceLevel,
                                 _experienceLevels,
-                                (value) => setState(() => _selectedExperienceLevel = value!),
+                                (value) => setState(
+                                  () => _selectedExperienceLevel = value!,
+                                ),
                               ),
                             ),
                           ],
@@ -234,11 +258,19 @@ class _AddJobDialogState extends State<AddJobDialog> {
                         Row(
                           children: [
                             Expanded(
-                              child: _buildTextField('Location', _locationController, 'Enter location'),
+                              child: _buildTextField(
+                                'Location',
+                                _locationController,
+                                'Enter location',
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _buildTextField('Salary Range', _salaryRangeController, 'e.g., ₱50,000 - ₱80,000'),
+                              child: _buildTextField(
+                                'Salary Range',
+                                _salaryRangeController,
+                                'e.g., ₱50,000 - ₱80,000',
+                              ),
                             ),
                           ],
                         ),
@@ -252,7 +284,8 @@ class _AddJobDialogState extends State<AddJobDialog> {
                                   child: _buildTextField(
                                     'Application Deadline',
                                     TextEditingController(
-                                      text: '${_applicationDeadline.day}/${_applicationDeadline.month}/${_applicationDeadline.year}'
+                                      text:
+                                          '${_applicationDeadline.day}/${_applicationDeadline.month}/${_applicationDeadline.year}',
                                     ),
                                     'Select deadline',
                                   ),
@@ -264,9 +297,11 @@ class _AddJobDialogState extends State<AddJobDialog> {
                               child: CheckboxListTile(
                                 title: const Text('Remote Work'),
                                 value: _isRemote,
-                                onChanged: (value) => setState(() => _isRemote = value ?? false),
+                                onChanged: (value) =>
+                                    setState(() => _isRemote = value ?? false),
                                 contentPadding: EdgeInsets.zero,
-                                controlAffinity: ListTileControlAffinity.leading,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
                               ),
                             ),
                           ],
@@ -286,7 +321,8 @@ class _AddJobDialogState extends State<AddJobDialog> {
                           controller: _descriptionController,
                           maxLines: 4,
                           decoration: const InputDecoration(
-                            hintText: 'Describe the job responsibilities, role, and expectations...',
+                            hintText:
+                                'Describe the job responsibilities, role, and expectations...',
                             border: OutlineInputBorder(),
                           ),
                           validator: (value) {
@@ -345,7 +381,11 @@ class _AddJobDialogState extends State<AddJobDialog> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        _buildTextField('Contact Email', _contactEmailController, 'Enter contact email'),
+                        _buildTextField(
+                          'Contact Email',
+                          _contactEmailController,
+                          'Enter contact email',
+                        ),
                       ],
                     ),
                   ),
@@ -368,7 +408,9 @@ class _AddJobDialogState extends State<AddJobDialog> {
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        child: Text(widget.job == null ? 'Post Job' : 'Update Job'),
+                        child: Text(
+                          widget.job == null ? 'Post Job' : 'Update Job',
+                        ),
                       ),
                     ),
                   ],
@@ -381,7 +423,11 @@ class _AddJobDialogState extends State<AddJobDialog> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, String hint) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    String hint,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -399,7 +445,10 @@ class _AddJobDialogState extends State<AddJobDialog> {
           decoration: InputDecoration(
             hintText: hint,
             border: const OutlineInputBorder(),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -412,7 +461,12 @@ class _AddJobDialogState extends State<AddJobDialog> {
     );
   }
 
-  Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
+  Widget _buildDropdown(
+    String label,
+    String value,
+    List<String> items,
+    Function(String?) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -428,10 +482,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
         DropdownButtonFormField<String>(
           value: value,
           items: items.map((String item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(item),
-            );
+            return DropdownMenuItem<String>(value: item, child: Text(item));
           }).toList(),
           onChanged: onChanged,
           decoration: const InputDecoration(

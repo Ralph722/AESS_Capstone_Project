@@ -931,18 +931,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color:
-                    (isLogout
-                            ? const Color(0xFFFFD700)
-                            : const Color(0xFF090A4F))
-                        .withOpacity(0.1),
+                color: (isLogout ? Colors.red : const Color(0xFF090A4F))
+                    .withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
-                color: isLogout
-                    ? const Color(0xFFFFD700)
-                    : const Color(0xFF090A4F),
+                color: isLogout ? Colors.red : const Color(0xFF090A4F),
                 size: 22,
               ),
             ),
@@ -952,16 +947,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 label,
                 style: TextStyle(
                   fontSize: 16,
-                  color: isLogout
-                      ? const Color(0xFFFFD700)
-                      : const Color(0xFF090A4F),
+                  color: isLogout ? Colors.red : const Color(0xFF090A4F),
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: isLogout ? const Color(0xFFFFD700) : Colors.grey.shade400,
+              color: isLogout ? Colors.red : Colors.grey.shade400,
               size: 16,
             ),
           ],

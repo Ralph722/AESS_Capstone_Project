@@ -1156,60 +1156,83 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         ),
         const SizedBox(height: 20),
 
-        // Statistics Cards - Horizontal Scrollable, Smaller
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildStatCard(
-                'Total Events',
-                totalEvents.toString(),
-                Icons.event,
-                const Color(0xFF1A3A52),
-                Icons.trending_up,
+        // Statistics Cards - Evenly Spaced
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _buildStatCard(
+                  'Total Events',
+                  totalEvents.toString(),
+                  Icons.event,
+                  const Color(0xFF1A3A52),
+                  Icons.trending_up,
+                ),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
-                'Active Events',
-                activeEvents.length.toString(),
-                Icons.check_circle,
-                const Color(0xFFFFD700),
-                Icons.arrow_upward,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _buildStatCard(
+                  'Active Events',
+                  activeEvents.length.toString(),
+                  Icons.check_circle,
+                  const Color(0xFFFFD700),
+                  Icons.arrow_upward,
+                ),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
-                'Total Users',
-                totalUsers.toString(),
-                Icons.people,
-                const Color(0xFF2196F3),
-                Icons.person_add,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _buildStatCard(
+                  'Total Users',
+                  totalUsers.toString(),
+                  Icons.people,
+                  const Color(0xFF2196F3),
+                  Icons.person_add,
+                ),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
-                'Job Postings',
-                totalJobs.toString(),
-                Icons.work,
-                const Color(0xFF4CAF50),
-                Icons.business_center,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _buildStatCard(
+                  'Job Postings',
+                  totalJobs.toString(),
+                  Icons.work,
+                  const Color(0xFF4CAF50),
+                  Icons.business_center,
+                ),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
-                'Unread Messages',
-                unreadMessagesCount.toString(),
-                Icons.mail,
-                const Color(0xFF9C27B0),
-                Icons.mark_email_unread,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _buildStatCard(
+                  'Unread Messages',
+                  unreadMessagesCount.toString(),
+                  Icons.mail,
+                  const Color(0xFF9C27B0),
+                  Icons.mark_email_unread,
+                ),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
-                'Archived Events',
-                archivedEvents.toString(),
-                Icons.archive,
-                const Color(0xFF607D8B),
-                Icons.folder,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _buildStatCard(
+                  'Archived Events',
+                  archivedEvents.toString(),
+                  Icons.archive,
+                  const Color(0xFF607D8B),
+                  Icons.folder,
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 24),
 
@@ -3414,7 +3437,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     IconData? trendIcon,
   ) {
     return Container(
-      width: 180,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -4901,11 +4923,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
               const SizedBox(height: 24),
 
               // Records Table
-              SizedBox(
-                height:
-                    constraints.maxHeight -
-                    400, // Adjust based on header, stats, and filters
+              Expanded(
                 child: Container(
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -4917,6 +4937,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                       ),
                     ],
                   ),
+                  clipBehavior: Clip.antiAlias,
                   child: isLoadingIdTracer
                       ? const Center(child: CircularProgressIndicator())
                       : filteredEmploymentRecords.isEmpty
@@ -4940,116 +4961,132 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                             ],
                           ),
                         )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              headingRowColor: MaterialStateProperty.all(
-                                const Color(0xFF090A4F).withOpacity(0.1),
-                              ),
+                      : LayoutBuilder(
+                          builder: (context, tableConstraints) {
+                            final availableWidth = tableConstraints.maxWidth;
+                            // Calculate spacing to evenly distribute columns
+                            // Estimate: 11 columns with minimum widths, distribute remaining space
+                            final estimatedColumnWidth = 100.0; // Estimated min width per column
+                            final totalEstimatedWidth = estimatedColumnWidth * 11;
+                            final remainingSpace = (availableWidth - totalEstimatedWidth).clamp(0, double.infinity);
+                            final columnSpacing = remainingSpace / 10; // 10 gaps between 11 columns
+                            
+                            return SizedBox(
+                              width: availableWidth,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                padding: EdgeInsets.zero,
+                                child: DataTable(
+                                  headingRowColor: MaterialStateProperty.all(
+                                    const Color(0xFF090A4F).withOpacity(0.1),
+                                  ),
+                                  columnSpacing: columnSpacing,
+                                  horizontalMargin: 0,
+                                  dataRowMinHeight: 48,
+                                  dataRowMaxHeight: 48,
+                                  dividerThickness: 1,
                               columns: [
-                                DataColumn(
-                                  label: Checkbox(
-                                    value:
-                                        _selectedRecordIds.length ==
-                                            filteredEmploymentRecords.length &&
-                                        filteredEmploymentRecords.isNotEmpty,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        if (value == true) {
-                                          _selectedRecordIds =
-                                              filteredEmploymentRecords
-                                                  .map((r) => r.id)
-                                                  .toSet();
-                                        } else {
-                                          _selectedRecordIds.clear();
-                                        }
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const DataColumn(
-                                  label: Text(
-                                    'Name',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Email',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'School ID',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Status',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Company',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Position',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Location',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Verification',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Submitted',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Actions',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                      DataColumn(
+                                        label: Checkbox(
+                                          value:
+                                              _selectedRecordIds.length ==
+                                                  filteredEmploymentRecords.length &&
+                                              filteredEmploymentRecords.isNotEmpty,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              if (value == true) {
+                                                _selectedRecordIds =
+                                                    filteredEmploymentRecords
+                                                        .map((r) => r.id)
+                                                        .toSet();
+                                              } else {
+                                                _selectedRecordIds.clear();
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const DataColumn(
+                                        label: Text(
+                                          'Name',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Email',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'School ID',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Status',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Company',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Position',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Location',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Verification',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Submitted',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          'Actions',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                               rows: filteredEmploymentRecords.map((record) {
                                 final isSelected = _selectedRecordIds.contains(
                                   record.id,
@@ -5211,12 +5248,14 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                                     ),
                                   ],
                                 );
-                              }).toList(),
-                            ),
-                          ),
+                            }).toList(),
+                                ),
+                              ),
+                            );
+                          },
                         ),
+                  ),
                 ),
-              ),
             ],
           ),
         );

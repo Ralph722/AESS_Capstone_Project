@@ -4,9 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart' as intl;
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class AdminMessagesScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -355,8 +356,44 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
   Future<void> _pickImage() async {
     try {
+      // Show dialog to choose between camera and gallery
+      final ImageSource? source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library,
+                  color: Color(0xFF090A4F),
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              if (!kIsWeb)
+                ListTile(
+                  leading: const Icon(
+                    Icons.camera_alt,
+                    color: Color(0xFF090A4F),
+                  ),
+                  title: const Text('Take a Photo'),
+                  onTap: () => Navigator.pop(context, ImageSource.camera),
+                ),
+              ListTile(
+                leading: const Icon(Icons.cancel, color: Colors.grey),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source == null) return;
+
       final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 80,
       );
 
@@ -391,27 +428,157 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
     try {
       setState(() => _isUploadingImage = true);
-      final storage = FirebaseStorage.instance;
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'messages/${_currentAdmin!.uid}_$timestamp.jpg';
-      final ref = storage.ref().child(fileName);
 
-      String downloadUrl;
-      if (kIsWeb && _selectedImageBytes != null) {
-        await ref.putData(
-          _selectedImageBytes!,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
-      } else if (_selectedImage != null) {
-        await ref.putFile(_selectedImage!);
-      } else {
+      String? imageBase64;
+      Uint8List compressedBytes;
+
+      // Compress and convert image to base64 (no Firebase Storage needed)
+      try {
+        if (kIsWeb && _selectedImageBytes != null) {
+          // For web, compress directly from bytes
+          compressedBytes = await FlutterImageCompress.compressWithList(
+            _selectedImageBytes!,
+            minHeight: 1920,
+            minWidth: 1920,
+            quality: 85,
+            format: CompressFormat.jpeg,
+          );
+        } else if (_selectedImage != null) {
+          // For mobile, compress from file
+          final filePath = _selectedImage!.absolute.path;
+          final compressedFile = await FlutterImageCompress.compressWithFile(
+            filePath,
+            minHeight: 1920,
+            minWidth: 1920,
+            quality: 85,
+            format: CompressFormat.jpeg,
+          );
+          // Fallback: read original if compression fails
+          compressedBytes = compressedFile ?? await _selectedImage!.readAsBytes();
+        } else {
+          setState(() => _isUploadingImage = false);
+          return null;
+        }
+
+        // Keep compressing until under 700KB (to leave room for base64 encoding and Firestore limits)
+        int quality = 85;
+        int maxSizeBytes = 700 * 1024; // 700KB target
+
+        while (compressedBytes.length > maxSizeBytes && quality > 30) {
+          quality -= 10;
+          Uint8List? newCompressedBytes;
+
+          if (kIsWeb && _selectedImageBytes != null) {
+            newCompressedBytes = await FlutterImageCompress.compressWithList(
+              _selectedImageBytes!,
+              minHeight: 1920,
+              minWidth: 1920,
+              quality: quality,
+              format: CompressFormat.jpeg,
+            );
+          } else if (_selectedImage != null) {
+            final filePath = _selectedImage!.absolute.path;
+            final compressedFile = await FlutterImageCompress.compressWithFile(
+              filePath,
+              minHeight: 1920,
+              minWidth: 1920,
+              quality: quality,
+              format: CompressFormat.jpeg,
+            );
+            newCompressedBytes = compressedFile;
+          }
+
+          if (newCompressedBytes != null) {
+            compressedBytes = newCompressedBytes;
+          } else {
+            break; // If compression fails, use what we have
+          }
+        }
+
+        // Final check - if still too large, resize more aggressively
+        if (compressedBytes.length > maxSizeBytes) {
+          // Resize to smaller dimensions
+          Uint8List? finalCompressedBytes;
+
+          if (kIsWeb && _selectedImageBytes != null) {
+            finalCompressedBytes = await FlutterImageCompress.compressWithList(
+              _selectedImageBytes!,
+              minHeight: 1280,
+              minWidth: 1280,
+              quality: 70,
+              format: CompressFormat.jpeg,
+            );
+          } else if (_selectedImage != null) {
+            final filePath = _selectedImage!.absolute.path;
+            final compressedFile = await FlutterImageCompress.compressWithFile(
+              filePath,
+              minHeight: 1280,
+              minWidth: 1280,
+              quality: 70,
+              format: CompressFormat.jpeg,
+            );
+            finalCompressedBytes = compressedFile;
+          }
+
+          if (finalCompressedBytes != null) {
+            compressedBytes = finalCompressedBytes;
+          }
+        }
+
+        // Convert compressed image to base64
+        imageBase64 = base64Encode(compressedBytes);
+
+        // Check final base64 size (should be under 1MB for Firestore)
+        final base64SizeMB = imageBase64.length / (1024 * 1024);
+        if (base64SizeMB > 0.95) {
+          // If still too large, show warning but try to send anyway
+          print(
+            'Warning: Base64 image size is ${base64SizeMB.toStringAsFixed(2)}MB, close to Firestore limit',
+          );
+        }
+      } catch (conversionError) {
+        String errorMessage = 'Error processing image';
+        final errorString = conversionError.toString().toLowerCase();
+
+        if (errorString.contains('too large') ||
+            errorString.contains('failed')) {
+          errorMessage =
+              'Failed to compress image. Please try a different image.';
+        } else {
+          errorMessage =
+              'Failed to process image: ${conversionError.toString()}';
+        }
+
+        if (mounted) {
+          setState(() => _isUploadingImage = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              duration: const Duration(seconds: 5),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return null;
       }
 
-      downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
+      // imageBase64 is guaranteed to have a value here since we return early on error
+      // Save base64 image as data URL (format: data:image/jpeg;base64,...)
+      final base64ImageUrl = 'data:image/jpeg;base64,$imageBase64';
+
+      // Only clear images after successful conversion
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+          _selectedImage = null;
+          _selectedImageBytes = null;
+        });
+      }
+
+      return base64ImageUrl;
     } catch (e) {
       if (mounted) {
+        setState(() => _isUploadingImage = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error uploading image: $e'),
@@ -420,14 +587,6 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
         );
       }
       return null;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploadingImage = false;
-          _selectedImage = null;
-          _selectedImageBytes = null;
-        });
-      }
     }
   }
 
@@ -438,10 +597,39 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       return;
     }
 
+    // Don't allow sending while uploading
+    if (_isUploadingImage) return;
+
     String? imageUrl;
-    if (_selectedImage != null || _selectedImageBytes != null) {
+    File? tempImage;
+    Uint8List? tempImageBytes;
+
+    // Store image references before upload (since _uploadImage clears them)
+    if (_selectedImage != null) {
+      tempImage = _selectedImage;
+    }
+    if (_selectedImageBytes != null) {
+      tempImageBytes = _selectedImageBytes;
+    }
+
+    if (tempImage != null || tempImageBytes != null) {
       imageUrl = await _uploadImage();
       if (imageUrl == null && _messageController.text.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to upload image. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        // Restore image selection if upload failed
+        if (mounted) {
+          setState(() {
+            _selectedImage = tempImage;
+            _selectedImageBytes = tempImageBytes;
+          });
+        }
         return; // Failed to upload and no text
       }
     }
@@ -470,11 +658,13 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
         'reactions': <String, List<String>>{}, // Initialize empty reactions
       });
 
-      // Clear image selection
-      setState(() {
-        _selectedImage = null;
-        _selectedImageBytes = null;
-      });
+      // Clear image selection after successful send
+      if (mounted) {
+        setState(() {
+          _selectedImage = null;
+          _selectedImageBytes = null;
+        });
+      }
 
       // Auto-scroll to bottom after sending
       _scrollToBottom();
@@ -494,6 +684,11 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
             backgroundColor: Colors.red,
           ),
         );
+        // Restore image selection if send failed
+        setState(() {
+          _selectedImage = tempImage;
+          _selectedImageBytes = tempImageBytes;
+        });
       }
     }
   }
@@ -685,16 +880,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       final docId = message['docId'] as String?;
       if (docId == null) return;
 
-      // Delete image from storage if exists
-      final imageUrl = message['imageUrl'] as String?;
-      if (imageUrl != null && imageUrl.isNotEmpty) {
-        try {
-          final ref = FirebaseStorage.instance.refFromURL(imageUrl);
-          await ref.delete();
-        } catch (e) {
-          // Ignore storage deletion errors
-        }
-      }
+      // Note: Images are now stored as base64 in Firestore, no need to delete from storage
 
       await _firestore.collection('messages').doc(docId).delete();
 
@@ -819,6 +1005,60 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showImageFullScreen(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      padding: const EdgeInsets.all(20),
+                      color: Colors.grey.shade800,
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image, color: Colors.white, size: 48),
+                          SizedBox(height: 16),
+                          Text(
+                            'Failed to load image',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withOpacity(0.5),
+                  shape: const CircleBorder(),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1266,21 +1506,26 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                                                     mainAxisSize: MainAxisSize.min,
                                                                     children: [
                                                                       if (imageUrl != null)
-                                                                        ClipRRect(
-                                                                          borderRadius: BorderRadius.circular(8),
-                                                                          child: Image.network(
-                                                                            imageUrl,
-                                                                            width: 200,
-                                                                            height: 200,
-                                                                            fit: BoxFit.cover,
-                                                                            errorBuilder: (context, error, stackTrace) {
-                                                                              return Container(
-                                                                                width: 200,
-                                                                                height: 200,
-                                                                                color: Colors.grey.shade300,
-                                                                                child: const Icon(Icons.broken_image),
-                                                                              );
-                                                                            },
+                                                                        GestureDetector(
+                                                                          onTap: () {
+                                                                            _showImageFullScreen(context, imageUrl);
+                                                                          },
+                                                                          child: ClipRRect(
+                                                                            borderRadius: BorderRadius.circular(8),
+                                                                            child: Image.network(
+                                                                              imageUrl,
+                                                                              width: 200,
+                                                                              height: 200,
+                                                                              fit: BoxFit.cover,
+                                                                              errorBuilder: (context, error, stackTrace) {
+                                                                                return Container(
+                                                                                  width: 200,
+                                                                                  height: 200,
+                                                                                  color: Colors.grey.shade300,
+                                                                                  child: const Icon(Icons.broken_image),
+                                                                                );
+                                                                              },
+                                                                            ),
                                                                           ),
                                                                         ),
                                                                       if (imageUrl != null && messageText.isNotEmpty)
@@ -1293,7 +1538,6 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                                                             fontSize: 14,
                                                                             height: 1.3,
                                                                           ),
-                                                                          softWrap: true,
                                                                         ),
                                                               ],
                                                             ),
@@ -1490,8 +1734,31 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                   onPressed: _pickImage,
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.send, color: const Color(0xFF090A4F)),
-                                  onPressed: _isUploadingImage ? null : _sendMessage,
+                                  icon: _isUploadingImage
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(
+                                              Color(0xFF090A4F),
+                                            ),
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.send,
+                                          color: (_messageController.text.isNotEmpty ||
+                                                  _selectedImage != null ||
+                                                  _selectedImageBytes != null)
+                                              ? const Color(0xFF090A4F)
+                                              : Colors.grey.shade400,
+                                        ),
+                                  onPressed: (_isUploadingImage ||
+                                          (_messageController.text.isEmpty &&
+                                              _selectedImage == null &&
+                                              _selectedImageBytes == null))
+                                      ? null
+                                      : _sendMessage,
                                 ),
                               ],
                             ),

@@ -1316,11 +1316,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildEventCard(AlumniEvent event) {
     final now = DateTime.now();
-    final daysUntil = event.date.difference(now).inDays;
-    final isToday =
-        event.date.year == now.year &&
-        event.date.month == now.month &&
-        event.date.day == now.day;
+    
+    // Normalize dates to midnight for accurate day calculation
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+    
+    // Calculate days until event (can be negative for past events)
+    final daysUntil = eventDate.difference(today).inDays;
+    
+    // Check if event is today
+    final isToday = daysUntil == 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

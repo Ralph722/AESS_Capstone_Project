@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/services/event_service.dart';
+import 'package:alumni_system/services/reminder_service.dart';
+import 'package:alumni_system/services/event_comment_service.dart';
 import 'package:alumni_system/models/event_model.dart';
+import 'package:alumni_system/models/event_comment_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -12,8 +16,11 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   int _selectedFilter = 0;
-  final List<String> _filters = ['All', 'This Week', 'This Month', 'Upcoming'];
+  final List<String> _filters = ['All', 'This Week', 'This Month', 'Newest'];
   final EventService _eventService = EventService();
+  final ReminderService _reminderService = ReminderService();
+  final EventCommentService _commentService = EventCommentService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _searchController = TextEditingController();
   List<AlumniEvent> allEvents = [];
   List<AlumniEvent> filteredEvents = [];
@@ -24,7 +31,12 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeReminders();
     _loadEvents();
+  }
+
+  Future<void> _initializeReminders() async {
+    await _reminderService.initialize();
   }
 
   @override
@@ -79,11 +91,9 @@ class _EventsScreenState extends State<EventsScreen> {
                    event.date.isBefore(monthLater);
           }).toList();
           break;
-        case 3: // Upcoming
-          filteredEvents = allEvents.where((event) {
-            return event.date.isAfter(now.subtract(const Duration(days: 1)));
-          }).toList()
-            ..sort((a, b) => a.date.compareTo(b.date));
+        case 3: // Newest
+          filteredEvents = List<AlumniEvent>.from(allEvents)
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
           break;
       }
       
@@ -116,7 +126,11 @@ class _EventsScreenState extends State<EventsScreen> {
 
   String _getTimeUntil(DateTime date) {
     final now = DateTime.now();
-    final difference = date.difference(now);
+    
+    // Normalize dates to midnight for accurate day calculation
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDate = DateTime(date.year, date.month, date.day);
+    final difference = eventDate.difference(today);
     
     if (difference.inDays < 0) {
       return 'Past';
@@ -357,10 +371,13 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Widget _buildEventCard(AlumniEvent event) {
     final now = DateTime.now();
-    final isToday = event.date.year == now.year &&
-        event.date.month == now.month &&
-        event.date.day == now.day;
-    final isPast = event.date.isBefore(now.subtract(const Duration(days: 1)));
+    
+    // Normalize dates to midnight for accurate comparison
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+    
+    final isToday = eventDate.isAtSameMomentAs(today);
+    final isPast = eventDate.isBefore(today);
 
     return Container(
       decoration: BoxDecoration(
@@ -596,10 +613,12 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Widget _buildEventCardGrid(AlumniEvent event) {
     final now = DateTime.now();
-    final isToday = event.date.year == now.year &&
-        event.date.month == now.month &&
-        event.date.day == now.day;
-    final isPast = event.date.isBefore(now.subtract(const Duration(days: 1)));
+    // Normalize dates to midnight for accurate comparison
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+    
+    final isToday = eventDate.isAtSameMomentAs(today);
+    final isPast = eventDate.isBefore(today);
 
     return GestureDetector(
       onTap: () => _showEventDetails(event),
@@ -998,15 +1017,10 @@ class _EventsScreenState extends State<EventsScreen> {
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {
-                                // TODO: Share event
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Share feature coming soon'),
-                                  ),
-                                );
+                                _showCommentsDialog(event);
                               },
-                              icon: const Icon(Icons.share),
-                              label: const Text('Share'),
+                              icon: const Icon(Icons.comment),
+                              label: Text('Comments (${event.comments})'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF090A4F),
                                 foregroundColor: Colors.white,
@@ -1078,17 +1092,757 @@ class _EventsScreenState extends State<EventsScreen> {
     );
   }
 
-  void _setReminder(AlumniEvent event) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Reminder set for ${event.theme}'),
-        backgroundColor: const Color(0xFF4CAF50),
-        action: SnackBarAction(
-          label: 'Undo',
-          textColor: Colors.white,
-          onPressed: () {},
+  Future<void> _setReminder(AlumniEvent event) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to set reminders'),
+            backgroundColor: Color(0xFFFF6B6B),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Schedule local notifications
+      await _reminderService.scheduleEventReminder(event);
+
+      // Save reminder to Firestore
+      await _eventService.addReminder(user.uid, event.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reminder set for ${event.theme}'),
+            backgroundColor: const Color(0xFF4CAF50),
+            action: SnackBarAction(
+              label: 'Undo',
+              textColor: Colors.white,
+              onPressed: () async {
+                await _cancelReminder(event, user.uid);
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error setting reminder: $e'),
+            backgroundColor: const Color(0xFFFF6B6B),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelReminder(AlumniEvent event, String userId) async {
+    try {
+      // Cancel local notifications
+      await _reminderService.cancelEventReminders(event.id);
+
+      // Remove reminder from Firestore
+      await _eventService.removeReminder(userId, event.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reminder cancelled for ${event.theme}'),
+            backgroundColor: Colors.grey,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error cancelling reminder: $e'),
+            backgroundColor: const Color(0xFFFF6B6B),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showCommentsDialog(AlumniEvent event) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CommentsDialog(
+        event: event,
+        commentService: _commentService,
+        onCommentAdded: () {
+          // Refresh event to update comment count
+          _loadEvents();
+        },
+      ),
+    );
+  }
+}
+
+// Comments Dialog Widget
+class _CommentsDialog extends StatefulWidget {
+  final AlumniEvent event;
+  final EventCommentService commentService;
+  final VoidCallback onCommentAdded;
+
+  const _CommentsDialog({
+    required this.event,
+    required this.commentService,
+    required this.onCommentAdded,
+  });
+
+  @override
+  State<_CommentsDialog> createState() => _CommentsDialogState();
+}
+
+class _CommentsDialogState extends State<_CommentsDialog> {
+  final TextEditingController _commentController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _isSubmitting = false;
+  String? _editingCommentId;
+  final TextEditingController _editController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _editController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitComment() async {
+    if (_commentController.text.trim().isEmpty) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      await widget.commentService.createComment(
+        eventId: widget.event.id,
+        comment: _commentController.text,
+      );
+
+      _commentController.clear();
+      widget.onCommentAdded();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment added successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding comment: $e'),
+            backgroundColor: const Color(0xFFFF6B6B),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _updateComment(String commentId, String currentComment) async {
+    if (_editController.text.trim().isEmpty) {
+      setState(() {
+        _editingCommentId = null;
+        _editController.clear();
+      });
+      return;
+    }
+
+    try {
+      await widget.commentService.updateComment(
+        eventId: widget.event.id,
+        commentId: commentId,
+        newComment: _editController.text,
+      );
+
+      setState(() {
+        _editingCommentId = null;
+        _editController.clear();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment updated successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating comment: $e'),
+            backgroundColor: const Color(0xFFFF6B6B),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteComment(String commentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFFF6B6B),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await widget.commentService.deleteComment(
+          eventId: widget.event.id,
+          commentId: commentId,
+        );
+
+        widget.onCommentAdded();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Comment deleted successfully'),
+              backgroundColor: Color(0xFF4CAF50),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting comment: $e'),
+              backgroundColor: const Color(0xFFFF6B6B),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  bool _canEditDelete(EventComment comment) {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    return comment.userId == user.uid;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.comment, color: Color(0xFF090A4F)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Comments',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF090A4F),
+                          ),
+                        ),
+                        Text(
+                          widget.event.theme,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // Comments List
+            Expanded(
+              child: StreamBuilder<List<EventComment>>(
+                stream: widget.commentService.getCommentsStream(widget.event.id),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    );
+                  }
+
+                  final comments = snapshot.data ?? [];
+
+                  if (comments.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.comment_outlined,
+                            size: 64,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No comments yet',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Be the first to ask a question!',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: comments.length,
+                    itemBuilder: (context, index) {
+                      final comment = comments[index];
+                      final isEditing = _editingCommentId == comment.id;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: const Color(0xFF090A4F),
+                                  child: Text(
+                                    comment.userName.isNotEmpty
+                                        ? comment.userName[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        comment.userName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        _formatDate(comment.createdAt),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (_canEditDelete(comment))
+                                  PopupMenuButton(
+                                    icon: const Icon(
+                                      Icons.more_vert,
+                                      size: 20,
+                                      color: Colors.grey,
+                                    ),
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        child: const Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('Edit'),
+                                          ],
+                                        ),
+                                        onTap: () {
+                                          Future.delayed(
+                                            const Duration(milliseconds: 100),
+                                            () {
+                                              setState(() {
+                                                _editingCommentId = comment.id;
+                                                _editController.text =
+                                                    comment.comment;
+                                              });
+                                            },
+                                          );
+                                        },
+                                      ),
+                                      PopupMenuItem(
+                                        child: const Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete,
+                                              size: 18,
+                                              color: Color(0xFFFF6B6B),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Delete',
+                                              style: TextStyle(
+                                                color: Color(0xFFFF6B6B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: () {
+                                          Future.delayed(
+                                            const Duration(milliseconds: 100),
+                                            () => _deleteComment(comment.id),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            if (isEditing)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: _editController,
+                                    maxLines: 3,
+                                    decoration: InputDecoration(
+                                      hintText: 'Edit your comment...',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      contentPadding: const EdgeInsets.all(12),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _editingCommentId = null;
+                                            _editController.clear();
+                                          });
+                                        },
+                                        child: const Text('Cancel'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton(
+                                        onPressed: () => _updateComment(
+                                          comment.id,
+                                          comment.comment,
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF090A4F),
+                                        ),
+                                        child: const Text('Save'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            else
+                              Text(
+                                comment.comment,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            if (comment.updatedAt != null &&
+                                comment.updatedAt != comment.createdAt)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  'Edited ${_formatDate(comment.updatedAt!)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+
+                            // Replies Section
+                            StreamBuilder<List<EventComment>>(
+                              stream: widget.commentService.getRepliesStream(
+                                widget.event.id,
+                                comment.id,
+                              ),
+                              builder: (context, repliesSnapshot) {
+                                final replies = repliesSnapshot.data ?? [];
+                                if (replies.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 12),
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 28),
+                                      child: Column(
+                                        children: [
+                                          ...replies.map((reply) => Container(
+                                                margin: const EdgeInsets.only(bottom: 8),
+                                                padding: const EdgeInsets.all(12),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: const Color(0xFF090A4F)
+                                                        .withOpacity(0.2),
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    CircleAvatar(
+                                                      radius: 16,
+                                                      backgroundColor:
+                                                          const Color(0xFFFFD700),
+                                                      child: Text(
+                                                        reply.userName.isNotEmpty
+                                                            ? reply.userName[0]
+                                                                .toUpperCase()
+                                                            : 'A',
+                                                        style: const TextStyle(
+                                                          color: Color(0xFF090A4F),
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Text(
+                                                                reply.userName,
+                                                                style: const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight.bold,
+                                                                  fontSize: 13,
+                                                                  color:
+                                                                      Color(0xFF090A4F),
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              Container(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .symmetric(
+                                                                  horizontal: 6,
+                                                                  vertical: 2,
+                                                                ),
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(
+                                                                          0xFFFFD700)
+                                                                      .withOpacity(0.2),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(4),
+                                                                ),
+                                                                child: const Text(
+                                                                  'Admin',
+                                                                  style: TextStyle(
+                                                                    fontSize: 10,
+                                                                    fontWeight:
+                                                                        FontWeight.bold,
+                                                                    color: Color(
+                                                                        0xFF090A4F),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 4),
+                                                          Text(
+                                                            reply.comment,
+                                                            style: const TextStyle(
+                                                              fontSize: 13,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(height: 4),
+                                                          Text(
+                                                            _formatDate(reply.createdAt),
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              color: Colors.grey.shade500,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              )),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+
+            // Comment Input
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _commentController,
+                      maxLines: null,
+                      decoration: InputDecoration(
+                        hintText: 'Ask a question or share your thoughts...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _isSubmitting ? null : _submitComment,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                    color: const Color(0xFF090A4F),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFF090A4F).withOpacity(0.1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      if (difference.inHours == 0) {
+        if (difference.inMinutes == 0) {
+          return 'Just now';
+        }
+        return '${difference.inMinutes}m ago';
+      }
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return DateFormat('MMM d, yyyy').format(date);
+    }
   }
 }

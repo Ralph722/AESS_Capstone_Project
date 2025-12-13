@@ -34,6 +34,8 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _messagesSubscription;
   final ScrollController _scrollController = ScrollController();
+  Timer? _scrollTimer;
+  double _lastMaxScrollExtent = 0;
 
   // Image handling
   File? _selectedImage;
@@ -44,6 +46,39 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
     super.initState();
     _currentUser = _auth.currentUser;
     _initialize();
+    // Add listener to detect when scroll extent changes (images loading)
+    _scrollController.addListener(_onScrollChanged);
+    // Add listener to text controller to update button state
+    _messageController.addListener(() {
+      setState(() {}); // Force rebuild when text changes
+    });
+  }
+
+  void _onScrollChanged() {
+    if (_scrollController.hasClients) {
+      final currentMax = _scrollController.position.maxScrollExtent;
+      // If max scroll extent increased, images likely loaded
+      if (currentMax > _lastMaxScrollExtent + 10) {
+        _lastMaxScrollExtent = currentMax;
+        // Auto-scroll if user is near bottom
+        final currentScroll = _scrollController.position.pixels;
+        if ((currentMax - currentScroll) < 200) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _scrollController.hasClients) {
+              try {
+                _scrollController.animateTo(
+                  _scrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                );
+              } catch (e) {
+                // Ignore errors
+              }
+            }
+          });
+        }
+      }
+    }
   }
 
   Future<void> _initialize() async {
@@ -211,29 +246,108 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   }
 
   void _scrollToBottom({bool immediate = false}) {
+    // Check if there are images in the last few messages (check last 5 messages)
+    final hasRecentImages =
+        _messages.isNotEmpty &&
+        _messages.reversed
+            .take(5)
+            .any(
+              (msg) =>
+                  msg['imageUrl'] != null &&
+                  msg['imageUrl'].toString().isNotEmpty,
+            );
+
+    // Cancel any existing scroll timer
+    _scrollTimer?.cancel();
+
     // Use multiple postFrameCallbacks to ensure ListView is fully built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _scrollController.hasClients) {
-        // For initial load, use a longer delay to ensure ListView is fully rendered
-        final delay = immediate ? 0 : 200;
-        Future.delayed(Duration(milliseconds: delay), () {
-          if (mounted && _scrollController.hasClients) {
+        // Update last max scroll extent
+        _lastMaxScrollExtent = _scrollController.position.maxScrollExtent;
+
+        // For initial load or when images are present, use continuous scrolling
+        if (hasRecentImages) {
+          // Use timer-based approach for images - scroll continuously until stable
+          int attempts = 0;
+          double lastMaxScroll = _scrollController.position.maxScrollExtent;
+
+          _scrollTimer = Timer.periodic(const Duration(milliseconds: 200), (
+            timer,
+          ) {
+            if (!mounted || !_scrollController.hasClients) {
+              timer.cancel();
+              return;
+            }
+
+            attempts++;
+            final currentMaxScroll = _scrollController.position.maxScrollExtent;
+
+            // Scroll to bottom
             try {
-              final maxScroll = _scrollController.position.maxScrollExtent;
               if (immediate) {
-                _scrollController.jumpTo(maxScroll);
+                _scrollController.jumpTo(currentMaxScroll);
               } else {
                 _scrollController.animateTo(
-                  maxScroll,
-                  duration: const Duration(milliseconds: 300),
+                  currentMaxScroll,
+                  duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
                 );
               }
             } catch (e) {
-              // Ignore scroll errors
+              // Ignore errors
             }
-          }
-        });
+
+            // Stop if scroll extent hasn't changed (images finished loading) or max attempts reached
+            if ((currentMaxScroll - lastMaxScroll).abs() < 5 ||
+                attempts >= 15) {
+              timer.cancel();
+              // Final scroll to ensure we're at the bottom
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (mounted && _scrollController.hasClients) {
+                  try {
+                    final finalMaxScroll =
+                        _scrollController.position.maxScrollExtent;
+                    if (immediate) {
+                      _scrollController.jumpTo(finalMaxScroll);
+                    } else {
+                      _scrollController.animateTo(
+                        finalMaxScroll,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    }
+                  } catch (e) {
+                    // Ignore errors
+                  }
+                }
+              });
+            } else {
+              lastMaxScroll = currentMaxScroll;
+            }
+          });
+        } else {
+          // Simple scroll for text-only messages
+          final delay = immediate ? 0 : 200;
+          Future.delayed(Duration(milliseconds: delay), () {
+            if (mounted && _scrollController.hasClients) {
+              try {
+                final maxScroll = _scrollController.position.maxScrollExtent;
+                if (immediate) {
+                  _scrollController.jumpTo(maxScroll);
+                } else {
+                  _scrollController.animateTo(
+                    maxScroll,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                }
+              } catch (e) {
+                // Ignore scroll errors
+              }
+            }
+          });
+        }
       }
     });
   }
@@ -476,7 +590,10 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if ((_messageController.text.isEmpty &&
+    // Check trimmed text to handle whitespace-only messages
+    final trimmedText = _messageController.text.trim();
+
+    if ((trimmedText.isEmpty &&
             _selectedImage == null &&
             _selectedImageBytes == null) ||
         _currentUser == null) {
@@ -500,7 +617,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
 
     if (tempImage != null || tempImageBytes != null) {
       imageUrl = await _uploadImage();
-      if (imageUrl == null && _messageController.text.isEmpty) {
+      if (imageUrl == null && trimmedText.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -520,7 +637,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
       }
     }
 
-    final messageText = _messageController.text.trim();
+    final messageText = trimmedText;
     _messageController.clear();
 
     try {
@@ -913,6 +1030,8 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   @override
   void dispose() {
     _messagesSubscription?.cancel();
+    _scrollTimer?.cancel();
+    _scrollController.removeListener(_onScrollChanged);
     _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
@@ -1141,6 +1260,56 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                                                 height: 200,
                                                                 fit: BoxFit
                                                                     .cover,
+                                                                frameBuilder:
+                                                                    (
+                                                                      context,
+                                                                      child,
+                                                                      frame,
+                                                                      wasSynchronouslyLoaded,
+                                                                    ) {
+                                                                      // Trigger scroll when image finishes loading
+                                                                      if (frame !=
+                                                                              null &&
+                                                                          !wasSynchronouslyLoaded) {
+                                                                        // Image just finished loading
+                                                                        WidgetsBinding.instance.addPostFrameCallback((
+                                                                          _,
+                                                                        ) {
+                                                                          Future.delayed(
+                                                                            const Duration(
+                                                                              milliseconds: 100,
+                                                                            ),
+                                                                            () {
+                                                                              if (mounted &&
+                                                                                  _scrollController.hasClients) {
+                                                                                try {
+                                                                                  final maxScroll = _scrollController.position.maxScrollExtent;
+                                                                                  final currentScroll = _scrollController.position.pixels;
+                                                                                  // Only scroll if we're near the bottom (within 100px)
+                                                                                  if ((maxScroll -
+                                                                                              currentScroll)
+                                                                                          .abs() <
+                                                                                      100) {
+                                                                                    _scrollController.animateTo(
+                                                                                      maxScroll,
+                                                                                      duration: const Duration(
+                                                                                        milliseconds: 200,
+                                                                                      ),
+                                                                                      curve: Curves.easeOut,
+                                                                                    );
+                                                                                  }
+                                                                                } catch (
+                                                                                  e
+                                                                                ) {
+                                                                                  // Ignore scroll errors
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                          );
+                                                                        });
+                                                                      }
+                                                                      return child;
+                                                                    },
                                                                 errorBuilder:
                                                                     (
                                                                       context,
@@ -1234,7 +1403,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                                                 padding:
                                                                     const EdgeInsets.symmetric(
                                                                       horizontal:
-                                                                          6,
+                                                                          4,
                                                                       vertical:
                                                                           2,
                                                                     ),
@@ -1278,11 +1447,15 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                                                       MainAxisAlignment
                                                                           .center,
                                                                   children: [
-                                                                    Text(
-                                                                      emoji,
-                                                                      style: const TextStyle(
-                                                                        fontSize:
-                                                                            14,
+                                                                    Flexible(
+                                                                      child: Text(
+                                                                        emoji,
+                                                                        style: const TextStyle(
+                                                                          fontSize:
+                                                                              14,
+                                                                        ),
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
                                                                       ),
                                                                     ),
                                                                     if (users
@@ -1290,23 +1463,27 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                                                         1) ...[
                                                                       const SizedBox(
                                                                         width:
-                                                                            4,
+                                                                            3,
                                                                       ),
-                                                                      Text(
-                                                                        '${users.length}',
-                                                                        style: TextStyle(
-                                                                          fontSize:
-                                                                              11,
-                                                                          color:
-                                                                              hasReacted
-                                                                              ? (isCurrentUser
-                                                                                    ? Colors.white
-                                                                                    : const Color(
-                                                                                        0xFF090A4F,
-                                                                                      ))
-                                                                              : Colors.grey.shade600,
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
+                                                                      Flexible(
+                                                                        child: Text(
+                                                                          '${users.length}',
+                                                                          style: TextStyle(
+                                                                            fontSize:
+                                                                                11,
+                                                                            color:
+                                                                                hasReacted
+                                                                                ? (isCurrentUser
+                                                                                      ? Colors.white
+                                                                                      : const Color(
+                                                                                          0xFF090A4F,
+                                                                                        ))
+                                                                                : Colors.grey.shade600,
+                                                                            fontWeight:
+                                                                                FontWeight.bold,
+                                                                          ),
+                                                                          overflow:
+                                                                              TextOverflow.ellipsis,
                                                                         ),
                                                                       ),
                                                                     ],
@@ -1485,7 +1662,9 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                             : Icon(
                                 Icons.send,
                                 color:
-                                    (_messageController.text.isNotEmpty ||
+                                    (_messageController.text
+                                            .trim()
+                                            .isNotEmpty ||
                                         _selectedImage != null ||
                                         _selectedImageBytes != null)
                                     ? const Color(0xFF090A4F)
@@ -1493,7 +1672,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                               ),
                         onPressed:
                             (_isUploadingImage ||
-                                (_messageController.text.isEmpty &&
+                                (_messageController.text.trim().isEmpty &&
                                     _selectedImage == null &&
                                     _selectedImageBytes == null))
                             ? null

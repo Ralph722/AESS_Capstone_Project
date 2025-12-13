@@ -42,9 +42,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       });
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading events: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading events: $e')));
     }
   }
 
@@ -61,7 +61,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       // Fallback to default parsing
       return DateTime.parse(dateString);
     } catch (e) {
-      throw Exception('Invalid date format. Please use MM/dd/yyyy format (e.g., 12/20/2025)');
+      throw Exception(
+        'Invalid date format. Please use MM/dd/yyyy format (e.g., 12/20/2025)',
+      );
     }
   }
 
@@ -71,10 +73,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         filteredEvents = activeEvents;
       } else {
         filteredEvents = activeEvents
-            .where((event) =>
-                event.theme.toLowerCase().contains(query.toLowerCase()) ||
-                event.batchYear.contains(query) ||
-                event.venue.toLowerCase().contains(query.toLowerCase()))
+            .where(
+              (event) =>
+                  event.theme.toLowerCase().contains(query.toLowerCase()) ||
+                  event.batchYear.contains(query) ||
+                  event.venue.toLowerCase().contains(query.toLowerCase()),
+            )
             .toList();
       }
     });
@@ -85,9 +89,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _batchYearController.text.isEmpty ||
         _eventDateController.text.isEmpty ||
         _venueController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
       return;
     }
 
@@ -103,53 +107,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
       );
 
       await _eventService.addEvent(newEvent);
-      
+
       _themeController.clear();
       _batchYearController.clear();
       _eventDateController.clear();
       _venueController.clear();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event added successfully')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event added successfully')));
 
       // Reload events to get the updated list
       await _loadEvents();
-      
+
       // Close the dialog if open
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding event: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error adding event: $e')));
     }
   }
 
   Future<void> _deleteEvent(String eventId) async {
     try {
       await _eventService.deleteEvent(eventId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event deleted')));
       await _loadEvents();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting event: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error deleting event: $e')));
     }
   }
 
   Future<void> _archiveEvent(String eventId) async {
     try {
       await _eventService.archiveEvent(eventId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event archived')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event archived')));
       await _loadEvents();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error archiving event: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error archiving event: $e')));
     }
   }
 
@@ -162,11 +166,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         elevation: 0,
         title: Row(
           children: [
-            const Icon(
-              Icons.school,
-              color: Color(0xFFFFD700),
-              size: 28,
-            ),
+            const Icon(Icons.school, color: Color(0xFFFFD700), size: 28),
             const SizedBox(width: 8),
             const Text(
               'Alumni Portal',
@@ -188,11 +188,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.people,
-                  color: Color(0xFF090A4F),
-                  size: 18,
-                ),
+                const Icon(Icons.people, color: Color(0xFF090A4F), size: 18),
                 const SizedBox(width: 8),
                 const Text(
                   'Users',
@@ -208,18 +204,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                const Icon(
-                  Icons.person,
-                  color: Color(0xFFFFD700),
-                  size: 20,
-                ),
+                const Icon(Icons.person, color: Color(0xFFFFD700), size: 20),
                 const SizedBox(width: 8),
                 const Text(
                   'Welcome, admin',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 14),
                 ),
               ],
             ),
@@ -232,153 +221,157 @@ class _AdminDashboardState extends State<AdminDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-            // Sidebar and Main Content
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Sidebar
-                Container(
-                  width: 200,
-                  color: const Color(0xFF090A4F),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSidebarItem(
-                              Icons.dashboard,
-                              'Dashboard',
-                              true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSidebarItem(
-                              Icons.archive,
-                              'Archived Events',
-                              false,
-                              badge: '1',
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSidebarItem(
-                              Icons.comment,
-                              'Comments',
-                              false,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSidebarItem(
-                              Icons.people,
-                              'Alumni Members',
-                              false,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSidebarItem(
-                              Icons.logout,
-                              'Logout',
-                              false,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Main Content
-                Expanded(
-                  child: Column(
+                  // Sidebar and Main Content
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title
-                      Padding(
-                        padding: const EdgeInsets.all(24),
+                      // Sidebar
+                      Container(
+                        width: 200,
+                        color: const Color(0xFF090A4F),
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSidebarItem(
+                                    Icons.dashboard,
+                                    'Dashboard',
+                                    true,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildSidebarItem(
+                                    Icons.comment,
+                                    'Comments',
+                                    false,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildSidebarItem(
+                                    Icons.people,
+                                    'Alumni Members',
+                                    false,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildSidebarItem(
+                                    Icons.archive,
+                                    'Archived Events',
+                                    false,
+                                    badge: '1',
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildSidebarItem(
+                                    Icons.logout,
+                                    'Logout',
+                                    false,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Main Content
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Alumni Events Dashboard',
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF090A4F),
+                            // Title
+                            Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Alumni Events Dashboard',
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF090A4F),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 4,
+                                    width: 270,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFD700),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 4,
-                              width: 270,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFD700),
-                                borderRadius: BorderRadius.circular(2),
+                            // Content Row
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Add New Event Form
+                                  Expanded(
+                                    flex: 1,
+                                    child: _buildAddEventForm(),
+                                  ),
+                                  const SizedBox(width: 24),
+                                  // Active Events Table
+                                  Expanded(
+                                    flex: 2,
+                                    child: _buildActiveEventsTable(),
+                                  ),
+                                ],
                               ),
                             ),
+                            const SizedBox(height: 32),
+                            // Stats Cards
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
+                              child: Row(
+                                children: [
+                                  _buildStatCard(
+                                    'Total Events',
+                                    totalEvents.toString(),
+                                    Icons.event,
+                                    const Color(0xFF1A3A52),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  _buildStatCard(
+                                    'Active Events',
+                                    activeEvents.length.toString(),
+                                    Icons.check_circle,
+                                    const Color(0xFFFFD700),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  _buildStatCard(
+                                    'Expiring Soon',
+                                    expiringEvents.toString(),
+                                    Icons.warning,
+                                    const Color(0xFFFFD700),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  _buildStatCard(
+                                    'Archived Events',
+                                    archivedEvents.toString(),
+                                    Icons.archive,
+                                    const Color(0xFF1A3A52),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 32),
                           ],
                         ),
                       ),
-                      // Content Row
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Add New Event Form
-                            Expanded(
-                              flex: 1,
-                              child: _buildAddEventForm(),
-                            ),
-                            const SizedBox(width: 24),
-                            // Active Events Table
-                            Expanded(
-                              flex: 2,
-                              child: _buildActiveEventsTable(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      // Stats Cards
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          children: [
-                            _buildStatCard(
-                              'Total Events',
-                              totalEvents.toString(),
-                              Icons.event,
-                              const Color(0xFF1A3A52),
-                            ),
-                            const SizedBox(width: 16),
-                            _buildStatCard(
-                              'Active Events',
-                              activeEvents.length.toString(),
-                              Icons.check_circle,
-                              const Color(0xFFFFD700),
-                            ),
-                            const SizedBox(width: 16),
-                            _buildStatCard(
-                              'Expiring Soon',
-                              expiringEvents.toString(),
-                              Icons.warning,
-                              const Color(0xFFFFD700),
-                            ),
-                            const SizedBox(width: 16),
-                            _buildStatCard(
-                              'Archived Events',
-                              archivedEvents.toString(),
-                              Icons.archive,
-                              const Color(0xFF1A3A52),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -539,8 +532,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     lastDate: DateTime(2100),
                   );
                   if (picked != null) {
-                    _eventDateController.text =
-                        DateFormat('MM/dd/yyyy').format(picked);
+                    _eventDateController.text = DateFormat(
+                      'MM/dd/yyyy',
+                    ).format(picked);
                   }
                 },
               ),
@@ -677,34 +671,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                   child: Row(
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: _buildTableHeader('Theme'),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: _buildTableHeader('Batch Year'),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: _buildTableHeader('Date'),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: _buildTableHeader('Venue'),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: _buildTableHeader('Status'),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: _buildTableHeader('Comments'),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: _buildTableHeader('Actions'),
-                      ),
+                      Expanded(flex: 2, child: _buildTableHeader('Theme')),
+                      Expanded(flex: 1, child: _buildTableHeader('Batch Year')),
+                      Expanded(flex: 2, child: _buildTableHeader('Date')),
+                      Expanded(flex: 2, child: _buildTableHeader('Venue')),
+                      Expanded(flex: 1, child: _buildTableHeader('Status')),
+                      Expanded(flex: 1, child: _buildTableHeader('Comments')),
+                      Expanded(flex: 1, child: _buildTableHeader('Actions')),
                     ],
                   ),
                 ),
@@ -878,11 +851,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     color: Colors.white,
                   ),
                 ),
-                Icon(
-                  icon,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                Icon(icon, color: Colors.white, size: 28),
               ],
             ),
             const SizedBox(height: 12),
@@ -910,4 +879,3 @@ class _AdminDashboardState extends State<AdminDashboard> {
     super.dispose();
   }
 }
-

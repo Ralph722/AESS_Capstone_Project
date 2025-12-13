@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:alumni_system/services/job_service.dart';
+import 'package:alumni_system/services/favorite_job_service.dart';
+import 'dart:async';
 
 class JobPostingScreen extends StatefulWidget {
   const JobPostingScreen({super.key});
@@ -11,16 +13,76 @@ class JobPostingScreen extends StatefulWidget {
 
 class _JobPostingScreenState extends State<JobPostingScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FavoriteJobService _favoriteJobService = FavoriteJobService();
   int _selectedFilter = 0;
   final List<String> _filters = ['All', 'Full-time', 'Part-time', 'Remote', 'Internship'];
   final List<JobPosting> _jobPostings = [];
   final List<JobPosting> _filteredJobs = [];
   bool _isLoading = true;
+  Set<String> _favoriteJobIds = {};
+  StreamSubscription<List<String>>? _favoritesSubscription;
+  String _selectedSort = 'Newest';
+  final List<String> _sortOptions = ['Newest', 'Oldest', 'Salary: High to Low', 'Salary: Low to High'];
 
   @override
   void initState() {
     super.initState();
     _loadJobs();
+    _startFavoritesListener();
+  }
+
+
+  void _startFavoritesListener() {
+    _favoritesSubscription = _favoriteJobService.getFavoriteJobIdsStream().listen(
+      (favoriteIds) {
+        if (mounted) {
+          setState(() {
+            _favoriteJobIds = favoriteIds.toSet();
+          });
+        }
+      },
+      onError: (error) {
+        print('Error listening to favorites: $error');
+      },
+    );
+  }
+
+  Future<void> _toggleFavorite(String jobId) async {
+    try {
+      final isFavorite = _favoriteJobIds.contains(jobId);
+      if (isFavorite) {
+        await _favoriteJobService.removeFromFavorites(jobId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Job removed from favorites'),
+              backgroundColor: Color(0xFF4CAF50),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        await _favoriteJobService.addToFavorites(jobId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Job saved to favorites'),
+              backgroundColor: Color(0xFF4CAF50),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadJobs() async {
@@ -36,8 +98,8 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
         setState(() {
           _jobPostings.clear();
           _jobPostings.addAll(jobs);
-          _filteredJobs.clear();
-          _filteredJobs.addAll(jobs);
+          // Apply current filter and sort
+          _filterJobs(_selectedFilter);
           _isLoading = false;
         });
       }
@@ -59,37 +121,119 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
   void _filterJobs(int filterIndex) {
     setState(() {
       _selectedFilter = filterIndex;
+      List<JobPosting> filtered = [];
+      
       if (filterIndex == 0) {
         // All jobs
-        _filteredJobs.clear();
-        _filteredJobs.addAll(_jobPostings);
+        filtered = List<JobPosting>.from(_jobPostings);
       } else {
         final filter = _filters[filterIndex];
-        _filteredJobs.clear();
         
         if (filter == 'Remote') {
           // Filter by isRemote boolean
-          _filteredJobs.addAll(_jobPostings.where((job) => job.isRemote));
+          filtered = _jobPostings.where((job) => job.isRemote).toList();
         } else {
           // Filter by jobType (Full-time, Part-time, Internship)
-          _filteredJobs.addAll(_jobPostings.where((job) => job.jobType == filter));
+          filtered = _jobPostings.where((job) => job.jobType == filter).toList();
         }
       }
+      
+      // Apply sorting
+      _filteredJobs.clear();
+      _filteredJobs.addAll(_applySort(filtered));
     });
+  }
+
+  List<JobPosting> _applySort(List<JobPosting> jobs) {
+    final sorted = List<JobPosting>.from(jobs);
+    
+    switch (_selectedSort) {
+      case 'Newest':
+        sorted.sort((a, b) => b.postedDate.compareTo(a.postedDate));
+        break;
+      case 'Oldest':
+        sorted.sort((a, b) => a.postedDate.compareTo(b.postedDate));
+        break;
+      case 'Salary: High to Low':
+        sorted.sort((a, b) {
+          final aSalary = _extractSalaryNumber(a.salaryRange);
+          final bSalary = _extractSalaryNumber(b.salaryRange);
+          return bSalary.compareTo(aSalary);
+        });
+        break;
+      case 'Salary: Low to High':
+        sorted.sort((a, b) {
+          final aSalary = _extractSalaryNumber(a.salaryRange);
+          final bSalary = _extractSalaryNumber(b.salaryRange);
+          return aSalary.compareTo(bSalary);
+        });
+        break;
+    }
+    
+    return sorted;
+  }
+
+  double _extractSalaryNumber(String salaryRange) {
+    // Extract numeric value from salary range (e.g., "$50,000 - $70,000" -> 50000)
+    // Or "$676767" -> 676767
+    final regex = RegExp(r'[\d,]+');
+    final matches = regex.allMatches(salaryRange);
+    if (matches.isNotEmpty) {
+      final firstMatch = matches.first.group(0)?.replaceAll(',', '') ?? '0';
+      return double.tryParse(firstMatch) ?? 0.0;
+    }
+    return 0.0;
+  }
+
+  void _onSortChanged(String? newValue) {
+    if (newValue != null && newValue != _selectedSort) {
+      setState(() {
+        _selectedSort = newValue;
+        // Re-apply current filter with new sort
+        _filterJobs(_selectedFilter);
+      });
+    }
   }
 
   void _searchJobs(String query) {
     setState(() {
+      List<JobPosting> searchResults = [];
+      
       if (query.isEmpty) {
-        _filteredJobs.clear();
-        _filteredJobs.addAll(_jobPostings);
+        // Apply current filter
+        if (_selectedFilter == 0) {
+          searchResults = List<JobPosting>.from(_jobPostings);
+        } else {
+          final filter = _filters[_selectedFilter];
+          if (filter == 'Remote') {
+            searchResults = _jobPostings.where((job) => job.isRemote).toList();
+          } else {
+            searchResults = _jobPostings.where((job) => job.jobType == filter).toList();
+          }
+        }
       } else {
-        _filteredJobs.clear();
-        _filteredJobs.addAll(_jobPostings.where((job) =>
+        // Apply search query
+        final matchingJobs = _jobPostings.where((job) =>
             job.jobTitle.toLowerCase().contains(query.toLowerCase()) ||
             job.companyName.toLowerCase().contains(query.toLowerCase()) ||
-            job.location.toLowerCase().contains(query.toLowerCase())));
+            job.location.toLowerCase().contains(query.toLowerCase()));
+        
+        // Apply current filter if not "All"
+        if (_selectedFilter == 0) {
+          searchResults = matchingJobs.toList();
+        } else {
+          final filter = _filters[_selectedFilter];
+          if (filter == 'Remote') {
+            searchResults = matchingJobs.where((job) => job.isRemote).toList();
+          } else {
+            searchResults = matchingJobs.where((job) => job.jobType == filter).toList();
+          }
+        }
       }
+      
+      // Apply sorting
+      _filteredJobs.clear();
+      _filteredJobs.addAll(_applySort(searchResults));
     });
   }
 
@@ -115,7 +259,11 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => JobDetailsModal(job: job),
+      builder: (context) => JobDetailsModal(
+        job: job,
+        isFavorite: _favoriteJobIds.contains(job.id),
+        onFavoriteToggle: () => _toggleFavorite(job.id),
+      ),
     );
   }
 
@@ -128,8 +276,27 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
     );
   }
 
+  void _showFavoriteJobs() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _FavoriteJobsDialog(
+        favoriteJobIds: _favoriteJobIds.toList(),
+        allJobs: _jobPostings,
+        onJobTap: (job) {
+          Navigator.pop(context);
+          _showJobDetails(job);
+        },
+        onFavoriteToggle: (jobId) => _toggleFavorite(jobId),
+        getTimeAgo: _getTimeAgo,
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _favoritesSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -169,22 +336,53 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FA),
-                borderRadius: BorderRadius.circular(12),
+          Stack(
+            children: [
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    _favoriteJobIds.isEmpty
+                        ? Icons.bookmark_border
+                        : Icons.bookmark,
+                    color: _favoriteJobIds.isEmpty
+                        ? const Color(0xFF090A4F)
+                        : const Color(0xFFFFD700),
+                    size: 22,
+                  ),
+                ),
+                onPressed: () => _showFavoriteJobs(),
               ),
-              child: const Icon(
-                Icons.bookmark_border,
-                color: Color(0xFF090A4F),
-                size: 22,
-              ),
-            ),
-            onPressed: () {
-              // TODO: Navigate to saved jobs
-            },
+              if (_favoriteJobIds.isNotEmpty)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF6B6B),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      _favoriteJobIds.length > 99 ? '99+' : '${_favoriteJobIds.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -312,30 +510,34 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                   ),
                 ),
                 const Spacer(),
-                // Sort dropdown would go here
+                // Sort dropdown
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Newest',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        color: Colors.grey.shade600,
-                        size: 16,
-                      ),
-                    ],
+                  child: DropdownButton<String>(
+                    value: _selectedSort,
+                    underline: const SizedBox(),
+                    icon: Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey.shade600,
+                      size: 20,
+                    ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    items: _sortOptions.map((String option) {
+                      return DropdownMenuItem<String>(
+                        value: option,
+                        child: Text(option),
+                      );
+                    }).toList(),
+                    onChanged: _onSortChanged,
                   ),
                 ),
               ],
@@ -360,6 +562,8 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                               onTap: () => _showJobDetails(job),
                               onApply: () => _applyToJob(job),
                               getTimeAgo: _getTimeAgo,
+                              isFavorite: _favoriteJobIds.contains(job.id),
+                              onFavoriteToggle: () => _toggleFavorite(job.id),
                             ),
                           );
                         },
@@ -411,6 +615,8 @@ class JobPostingCard extends StatelessWidget {
   final String Function(DateTime) getTimeAgo;
   final Function(JobPosting)? onEdit;
   final Function(String)? onDelete;
+  final bool isFavorite;
+  final VoidCallback onFavoriteToggle;
 
   const JobPostingCard({
     super.key,
@@ -420,6 +626,8 @@ class JobPostingCard extends StatelessWidget {
     required this.getTimeAgo,
     this.onEdit,
     this.onDelete,
+    this.isFavorite = false,
+    required this.onFavoriteToggle,
   });
 
   @override
@@ -495,15 +703,18 @@ class JobPostingCard extends StatelessWidget {
                   ),
                 ),
                 // Bookmark Button
-                IconButton(
-                  icon: const Icon(
-                    Icons.bookmark_border,
-                    color: Color(0xFF090A4F),
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    // TODO: Save job functionality
+                GestureDetector(
+                  onTap: () {
+                    onFavoriteToggle();
                   },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      isFavorite ? Icons.bookmark : Icons.bookmark_border,
+                      color: isFavorite ? const Color(0xFFFFD700) : const Color(0xFF090A4F),
+                      size: 20,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -665,8 +876,15 @@ class JobPostingCard extends StatelessWidget {
 // JobDetailsModal Widget
 class JobDetailsModal extends StatelessWidget {
   final JobPosting job;
+  final bool isFavorite;
+  final VoidCallback onFavoriteToggle;
 
-  const JobDetailsModal({super.key, required this.job});
+  const JobDetailsModal({
+    super.key,
+    required this.job,
+    this.isFavorite = false,
+    required this.onFavoriteToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -718,9 +936,21 @@ class JobDetailsModal extends StatelessWidget {
                           ],
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              isFavorite ? Icons.bookmark : Icons.bookmark_border,
+                              color: isFavorite ? const Color(0xFFFFD700) : const Color(0xFF090A4F),
+                            ),
+                            onPressed: onFavoriteToggle,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -975,6 +1205,147 @@ extension JobPostingCopyWith on JobPosting {
       isRemote: isRemote ?? this.isRemote,
       experienceLevel: experienceLevel ?? this.experienceLevel,
       status: status ?? this.status,
+    );
+  }
+}
+
+// Favorite Jobs Dialog
+class _FavoriteJobsDialog extends StatelessWidget {
+  final List<String> favoriteJobIds;
+  final List<JobPosting> allJobs;
+  final Function(JobPosting) onJobTap;
+  final Function(String) onFavoriteToggle;
+  final String Function(DateTime) getTimeAgo;
+
+  const _FavoriteJobsDialog({
+    required this.favoriteJobIds,
+    required this.allJobs,
+    required this.onJobTap,
+    required this.onFavoriteToggle,
+    required this.getTimeAgo,
+  });
+
+  List<JobPosting> get favoriteJobs {
+    return allJobs.where((job) => favoriteJobIds.contains(job.id)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF090A4F),
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bookmark, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Saved Jobs',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${favoriteJobIds.length} ${favoriteJobIds.length == 1 ? 'job' : 'jobs'}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // Favorite Jobs List
+            Expanded(
+              child: favoriteJobs.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.bookmark_border,
+                            size: 64,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No saved jobs yet',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap the bookmark icon on any job to save it',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: favoriteJobs.length,
+                      itemBuilder: (context, index) {
+                        final job = favoriteJobs[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: JobPostingCard(
+                            job: job,
+                            onTap: () => onJobTap(job),
+                            onApply: () {},
+                            getTimeAgo: getTimeAgo,
+                            isFavorite: true,
+                            onFavoriteToggle: () => onFavoriteToggle(job.id),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

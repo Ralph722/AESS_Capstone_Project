@@ -10,6 +10,8 @@ import 'package:alumni_system/services/audit_service.dart';
 import 'package:alumni_system/services/job_service.dart';
 import 'package:alumni_system/services/id_tracer_service.dart';
 import 'package:alumni_system/services/notification_service.dart';
+import 'package:alumni_system/services/event_comment_service.dart';
+import 'package:alumni_system/models/event_comment_model.dart';
 import 'package:alumni_system/models/event_model.dart';
 import 'package:alumni_system/models/audit_log_model.dart';
 import 'package:alumni_system/models/id_tracer_model.dart';
@@ -543,7 +545,17 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              // Clear all form fields when canceling edit
+              _themeController.clear();
+              _batchYearController.clear();
+              _eventDateController.clear();
+              _venueController.clear();
+              _startTimeController.clear();
+              _endTimeController.clear();
+              _descriptionController.clear();
+              Navigator.pop(context);
+            },
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -712,11 +724,11 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                 _buildSidebarItem(0, Icons.dashboard, 'Dashboard'),
                 _buildSidebarItem(1, Icons.event, 'Events'),
                 _buildSidebarItem(2, Icons.people, 'Alumni Members'),
-                _buildSidebarItem(4, Icons.archive, 'Archives'),
                 _buildSidebarItem(5, Icons.work, 'Job Postings'),
                 _buildSidebarItem(6, Icons.message, 'Messages'),
                 _buildSidebarItem(7, Icons.history, 'Activity Logs'),
                 _buildSidebarItem(8, Icons.search, 'ID Tracer'),
+                _buildSidebarItem(4, Icons.archive, 'Archives'),
               ],
             ),
           ),
@@ -2710,6 +2722,19 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
           PopupMenuButton(
             icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
             itemBuilder: (context) => [
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.comment, size: 18, color: Color(0xFF090A4F)),
+                    SizedBox(width: 8),
+                    Text('View Comments'),
+                  ],
+                ),
+                onTap: () => Future.delayed(
+                  const Duration(milliseconds: 100),
+                  () => _showEventComments(event),
+                ),
+              ),
               PopupMenuItem(
                 child: const Row(
                   children: [
@@ -6494,6 +6519,22 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         });
   }
 
+  void _showEventComments(AlumniEvent event) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AdminEventCommentsDialog(
+        event: event,
+        commentService: EventCommentService(),
+        onCommentDeleted: () {
+          // Reload events to update comment count
+          _loadEvents();
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
     // Cancel all unread messages subscriptions
@@ -6513,5 +6554,568 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     _activitySearchController.dispose();
     _idTracerSearchController.dispose();
     super.dispose();
+  }
+}
+
+// Admin Event Comments Dialog
+class _AdminEventCommentsDialog extends StatefulWidget {
+  final AlumniEvent event;
+  final EventCommentService commentService;
+  final VoidCallback onCommentDeleted;
+
+  const _AdminEventCommentsDialog({
+    required this.event,
+    required this.commentService,
+    required this.onCommentDeleted,
+  });
+
+  @override
+  State<_AdminEventCommentsDialog> createState() => _AdminEventCommentsDialogState();
+}
+
+class _AdminEventCommentsDialogState extends State<_AdminEventCommentsDialog> {
+  final Map<String, TextEditingController> _replyControllers = {};
+  final Map<String, bool> _showReplyInput = {};
+
+  @override
+  void dispose() {
+    for (var controller in _replyControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _deleteComment(EventComment comment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFFF6B6B),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await widget.commentService.deleteComment(
+          eventId: comment.eventId,
+          commentId: comment.id,
+        );
+
+        widget.onCommentDeleted();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Comment deleted successfully'),
+              backgroundColor: Color(0xFF4CAF50),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting comment: $e'),
+              backgroundColor: const Color(0xFFFF6B6B),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _submitReply(EventComment comment) async {
+    final controller = _replyControllers[comment.id];
+    if (controller == null || controller.text.trim().isEmpty) return;
+
+    try {
+      await widget.commentService.createReply(
+        eventId: comment.eventId,
+        commentId: comment.id,
+        reply: controller.text,
+        originalComment: comment,
+      );
+
+      controller.clear();
+      setState(() {
+        _showReplyInput[comment.id] = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reply sent successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending reply: $e'),
+            backgroundColor: const Color(0xFFFF6B6B),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildCommentWithReplies(EventComment comment, String eventId) {
+    if (!_replyControllers.containsKey(comment.id)) {
+      _replyControllers[comment.id] = TextEditingController();
+      _showReplyInput[comment.id] = false;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Original Comment
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF090A4F),
+                child: Text(
+                  comment.userName.isNotEmpty
+                      ? comment.userName[0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      comment.userName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      comment.userEmail,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton(
+                icon: const Icon(Icons.more_vert, color: Colors.grey),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    child: const Row(
+                      children: [
+                        Icon(Icons.reply, size: 18, color: Color(0xFF090A4F)),
+                        SizedBox(width: 8),
+                        Text('Reply'),
+                      ],
+                    ),
+                    onTap: () {
+                      Future.delayed(
+                        const Duration(milliseconds: 100),
+                        () {
+                          setState(() {
+                            _showReplyInput[comment.id] = true;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                  PopupMenuItem(
+                    child: const Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Color(0xFFFF6B6B)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Delete',
+                          style: TextStyle(color: Color(0xFFFF6B6B)),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      Future.delayed(
+                        const Duration(milliseconds: 100),
+                        () => _deleteComment(comment),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            comment.comment,
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            DateFormat('MMM d, yyyy hh:mm a').format(comment.createdAt),
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          if (comment.updatedAt != null &&
+              comment.updatedAt != comment.createdAt)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Edited ${DateFormat('MMM d, yyyy hh:mm a').format(comment.updatedAt!)}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+
+          // Replies Section
+          StreamBuilder<List<EventComment>>(
+            stream: widget.commentService.getRepliesStream(eventId, comment.id),
+            builder: (context, repliesSnapshot) {
+              final replies = repliesSnapshot.data ?? [];
+              if (replies.isEmpty && !(_showReplyInput[comment.id] ?? false)) {
+                return const SizedBox.shrink();
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (replies.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32),
+                      child: Column(
+                        children: [
+                          ...replies.map((reply) => Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(0xFF090A4F).withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: const Color(0xFFFFD700),
+                                      child: Text(
+                                        reply.userName.isNotEmpty
+                                            ? reply.userName[0].toUpperCase()
+                                            : 'A',
+                                        style: const TextStyle(
+                                          color: Color(0xFF090A4F),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                reply.userName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: Color(0xFF090A4F),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFFD700)
+                                                      .withOpacity(0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: const Text(
+                                                  'Admin',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF090A4F),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            reply.comment,
+                                            style: const TextStyle(fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            DateFormat('MMM d, hh:mm a')
+                                                .format(reply.createdAt),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Reply Input
+                  if (_showReplyInput[comment.id] ?? false) ...[
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _replyControllers[comment.id],
+                              maxLines: null,
+                              decoration: InputDecoration(
+                                hintText: 'Type your reply...',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: () => _submitReply(comment),
+                            icon: const Icon(Icons.send),
+                            color: const Color(0xFF090A4F),
+                            style: IconButton.styleFrom(
+                              backgroundColor:
+                                  const Color(0xFF090A4F).withOpacity(0.1),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _showReplyInput[comment.id] = false;
+                                _replyControllers[comment.id]?.clear();
+                              });
+                            },
+                            icon: const Icon(Icons.close),
+                            color: Colors.grey,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF090A4F),
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.comment, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Event Comments',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          widget.event.theme,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  StreamBuilder<List<EventComment>>(
+                    stream: widget.commentService.getCommentsStream(widget.event.id),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data?.length ?? widget.event.comments;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$count ${count == 1 ? 'comment' : 'comments'}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // Comments List
+            Expanded(
+              child: StreamBuilder<List<EventComment>>(
+                stream: widget.commentService.getCommentsStream(widget.event.id),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    );
+                  }
+
+                  final comments = snapshot.data ?? [];
+
+                  if (comments.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.comment_outlined,
+                            size: 64,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No comments yet',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Users can ask questions about this event',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: comments.length,
+                    itemBuilder: (context, index) {
+                      final comment = comments[index];
+                      return _buildCommentWithReplies(comment, widget.event.id);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

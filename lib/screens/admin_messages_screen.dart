@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart' as intl;
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
@@ -39,6 +40,8 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   String? _selectedUserName;
   String? _adminDocId;
   final ScrollController _messagesScrollController = ScrollController();
+  Timer? _scrollTimer;
+  double _lastMaxScrollExtent = 0;
 
   // Image handling
   File? _selectedImage;
@@ -49,6 +52,39 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
     super.initState();
     _currentAdmin = _auth.currentUser;
     _initialize();
+    // Add listener to detect when scroll extent changes (images loading)
+    _messagesScrollController.addListener(_onScrollChanged);
+    // Add listener to text controller to update button state
+    _messageController.addListener(() {
+      setState(() {}); // Force rebuild when text changes
+    });
+  }
+
+  void _onScrollChanged() {
+    if (_messagesScrollController.hasClients) {
+      final currentMax = _messagesScrollController.position.maxScrollExtent;
+      // If max scroll extent increased, images likely loaded
+      if (currentMax > _lastMaxScrollExtent + 10) {
+        _lastMaxScrollExtent = currentMax;
+        // Auto-scroll if user is near bottom
+        final currentScroll = _messagesScrollController.position.pixels;
+        if ((currentMax - currentScroll) < 200) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _messagesScrollController.hasClients) {
+              try {
+                _messagesScrollController.animateTo(
+                  _messagesScrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                );
+              } catch (e) {
+                // Ignore errors
+              }
+            }
+          });
+        }
+      }
+    }
   }
 
   Future<void> _initialize() async {
@@ -591,7 +627,10 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if ((_messageController.text.isEmpty && _selectedImage == null && _selectedImageBytes == null) ||
+    // Check trimmed text to handle whitespace-only messages
+    final trimmedText = _messageController.text.trim();
+    
+    if ((trimmedText.isEmpty && _selectedImage == null && _selectedImageBytes == null) ||
         _currentAdmin == null ||
         (_selectedUserId == null && _selectedUserDocId == null)) {
       return;
@@ -614,7 +653,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
     if (tempImage != null || tempImageBytes != null) {
       imageUrl = await _uploadImage();
-      if (imageUrl == null && _messageController.text.isEmpty) {
+      if (imageUrl == null && trimmedText.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -634,7 +673,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       }
     }
 
-    final messageText = _messageController.text.trim();
+    final messageText = trimmedText;
     _messageController.clear();
 
     final recipientId = _selectedUserId ?? _selectedUserDocId!;
@@ -694,29 +733,105 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   }
 
   void _scrollToBottom({bool immediate = false}) {
+    // Check if there are images in the last few messages (check last 5 messages)
+    final hasRecentImages =
+        _messages.isNotEmpty &&
+        _messages
+            .reversed
+            .take(5)
+            .any(
+              (msg) =>
+                  msg['imageUrl'] != null &&
+                  msg['imageUrl'].toString().isNotEmpty,
+            );
+
+    // Cancel any existing scroll timer
+    _scrollTimer?.cancel();
+
     // Use multiple postFrameCallbacks to ensure ListView is fully built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _messagesScrollController.hasClients) {
-        // For initial load, use a longer delay to ensure ListView is fully rendered
-        final delay = immediate ? 0 : 200;
-        Future.delayed(Duration(milliseconds: delay), () {
-          if (mounted && _messagesScrollController.hasClients) {
+        // Update last max scroll extent
+        _lastMaxScrollExtent = _messagesScrollController.position.maxScrollExtent;
+
+        // For initial load or when images are present, use continuous scrolling
+        if (hasRecentImages) {
+          // Use timer-based approach for images - scroll continuously until stable
+          int attempts = 0;
+          double lastMaxScroll = _messagesScrollController.position.maxScrollExtent;
+          
+          _scrollTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+            if (!mounted || !_messagesScrollController.hasClients) {
+              timer.cancel();
+              return;
+            }
+
+            attempts++;
+            final currentMaxScroll = _messagesScrollController.position.maxScrollExtent;
+
+            // Scroll to bottom
             try {
-              final maxScroll = _messagesScrollController.position.maxScrollExtent;
               if (immediate) {
-                _messagesScrollController.jumpTo(maxScroll);
+                _messagesScrollController.jumpTo(currentMaxScroll);
               } else {
                 _messagesScrollController.animateTo(
-                  maxScroll,
-                  duration: const Duration(milliseconds: 300),
+                  currentMaxScroll,
+                  duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
                 );
               }
             } catch (e) {
-              // Ignore scroll errors
+              // Ignore errors
             }
-          }
-        });
+
+            // Stop if scroll extent hasn't changed (images finished loading) or max attempts reached
+            if ((currentMaxScroll - lastMaxScroll).abs() < 5 || attempts >= 15) {
+              timer.cancel();
+              // Final scroll to ensure we're at the bottom
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (mounted && _messagesScrollController.hasClients) {
+                  try {
+                    final finalMaxScroll = _messagesScrollController.position.maxScrollExtent;
+                    if (immediate) {
+                      _messagesScrollController.jumpTo(finalMaxScroll);
+                    } else {
+                      _messagesScrollController.animateTo(
+                        finalMaxScroll,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    }
+                  } catch (e) {
+                    // Ignore errors
+                  }
+                }
+              });
+            } else {
+              lastMaxScroll = currentMaxScroll;
+            }
+          });
+        } else {
+          // Simple scroll for text-only messages
+          final delay = immediate ? 0 : 200;
+          Future.delayed(Duration(milliseconds: delay), () {
+            if (mounted && _messagesScrollController.hasClients) {
+              try {
+                final maxScroll = _messagesScrollController.position.maxScrollExtent;
+                if (immediate) {
+                  _messagesScrollController.jumpTo(maxScroll);
+                } else {
+                  _messagesScrollController.animateTo(
+                    maxScroll,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                }
+              } catch (e) {
+                // Ignore scroll errors
+              }
+            }
+          });
+        }
       }
     });
   }
@@ -1104,6 +1219,8 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   void dispose() {
     _messageController.dispose();
     _searchController.dispose();
+    _scrollTimer?.cancel();
+    _messagesScrollController.removeListener(_onScrollChanged);
     _messagesScrollController.dispose();
     super.dispose();
   }
@@ -1517,6 +1634,33 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                                                               width: 200,
                                                                               height: 200,
                                                                               fit: BoxFit.cover,
+                                                                              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                                                                                // Trigger scroll when image finishes loading
+                                                                                if (frame != null && !wasSynchronouslyLoaded) {
+                                                                                  // Image just finished loading
+                                                                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                                                    Future.delayed(const Duration(milliseconds: 100), () {
+                                                                                      if (mounted && _messagesScrollController.hasClients) {
+                                                                                        try {
+                                                                                          final maxScroll = _messagesScrollController.position.maxScrollExtent;
+                                                                                          final currentScroll = _messagesScrollController.position.pixels;
+                                                                                          // Only scroll if we're near the bottom (within 100px)
+                                                                                          if ((maxScroll - currentScroll).abs() < 100) {
+                                                                                            _messagesScrollController.animateTo(
+                                                                                              maxScroll,
+                                                                                              duration: const Duration(milliseconds: 200),
+                                                                                              curve: Curves.easeOut,
+                                                                                            );
+                                                                                          }
+                                                                                        } catch (e) {
+                                                                                          // Ignore scroll errors
+                                                                                        }
+                                                                                      }
+                                                                                    });
+                                                                                  });
+                                                                                }
+                                                                                return child;
+                                                                              },
                                                                               errorBuilder: (context, error, stackTrace) {
                                                                                 return Container(
                                                                                   width: 200,
@@ -1747,14 +1891,14 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                         )
                                       : Icon(
                                           Icons.send,
-                                          color: (_messageController.text.isNotEmpty ||
+                                          color: (_messageController.text.trim().isNotEmpty ||
                                                   _selectedImage != null ||
                                                   _selectedImageBytes != null)
                                               ? const Color(0xFF090A4F)
                                               : Colors.grey.shade400,
                                         ),
                                   onPressed: (_isUploadingImage ||
-                                          (_messageController.text.isEmpty &&
+                                          (_messageController.text.trim().isEmpty &&
                                               _selectedImage == null &&
                                               _selectedImageBytes == null))
                                       ? null

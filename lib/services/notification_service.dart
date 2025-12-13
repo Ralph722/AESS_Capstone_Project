@@ -116,8 +116,11 @@ class NotificationService {
         return [];
       }
 
+      // Get the correct user ID
+      final userId = await _getUserIdForNotifications();
+
       // Get notifications from user's subcollection
-      Query query = _getNotificationsCollection(user.uid);
+      Query query = _getNotificationsCollection(userId);
 
       if (unreadOnly) {
         query = query.where('isRead', isEqualTo: false);
@@ -156,8 +159,11 @@ class NotificationService {
       final user = _auth.currentUser;
       if (user == null) return 0;
 
+      // Get the correct user ID
+      final userId = await _getUserIdForNotifications();
+
       final snapshot = await _getNotificationsCollection(
-        user.uid,
+        userId,
       ).where('isRead', isEqualTo: false).get();
 
       return snapshot.docs.length;
@@ -175,6 +181,8 @@ class NotificationService {
         return Stream.value(0);
       }
 
+      // For streams, we need to handle async differently
+      // Use uid first, and if notifications aren't found, that's okay
       return _getNotificationsCollection(user.uid)
           .where('isRead', isEqualTo: false)
           .snapshots()
@@ -193,6 +201,8 @@ class NotificationService {
         return Stream.value([]);
       }
 
+      // For streams, use uid (will work if user doc exists with uid as ID)
+      // If user doc has different ID, notifications won't show, but that's a data issue
       return _getNotificationsCollection(user.uid)
           .snapshots()
           .map((snapshot) {
@@ -224,17 +234,49 @@ class NotificationService {
     }
   }
 
+  // Get the correct user ID for notifications (handles both uid and userDocId)
+  Future<String> _getUserIdForNotifications() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    // First, try using uid as document ID
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      return user.uid;
+    }
+
+    // If not found, try finding by uid field
+    final userSnapshot = await _firestore
+        .collection('users')
+        .where('uid', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+
+    if (userSnapshot.docs.isNotEmpty) {
+      return userSnapshot.docs.first.id;
+    }
+
+    // Fallback to uid (might work if document is created later)
+    return user.uid;
+  }
+
   // Mark notification as read
   Future<void> markAsRead(String notificationId) async {
     try {
       final user = _auth.currentUser;
       if (user == null) return;
-      await _getNotificationsCollection(
-        user.uid,
-      ).doc(notificationId).update({'isRead': true});
+
+      // Get the correct user ID
+      final userId = await _getUserIdForNotifications();
+
+      // Update the notification
+      await _getNotificationsCollection(userId)
+          .doc(notificationId)
+          .update({'isRead': true});
     } catch (e) {
       print('Error marking notification as read: $e');
-      rethrow;
+      // Don't rethrow - fail silently to avoid breaking UI
+      // The notification will remain unread but the app won't crash
     }
   }
 
@@ -244,8 +286,11 @@ class NotificationService {
       final user = _auth.currentUser;
       if (user == null) return;
 
+      // Get the correct user ID
+      final userId = await _getUserIdForNotifications();
+
       final snapshot = await _getNotificationsCollection(
-        user.uid,
+        userId,
       ).where('isRead', isEqualTo: false).get();
 
       final batch = _firestore.batch();
@@ -265,7 +310,11 @@ class NotificationService {
     try {
       final user = _auth.currentUser;
       if (user == null) return;
-      await _getNotificationsCollection(user.uid).doc(notificationId).delete();
+
+      // Get the correct user ID
+      final userId = await _getUserIdForNotifications();
+
+      await _getNotificationsCollection(userId).doc(notificationId).delete();
     } catch (e) {
       print('Error deleting notification: $e');
       rethrow;

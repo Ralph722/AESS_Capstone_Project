@@ -21,7 +21,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:excel/excel.dart' hide Border;
 import 'dart:html' as html;
-import 'admin_job_management.dart'; // ADD THIS IMPORT (NEW)
+import 'admin_job_management.dart';
+import 'admin_alumni_members_screen.dart';
 
 class AdminDashboardWeb extends StatefulWidget {
   const AdminDashboardWeb({super.key});
@@ -1039,7 +1040,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       case 1:
         return SingleChildScrollView(child: _buildEventsContent());
       case 2:
-        return SingleChildScrollView(child: _buildMembersContent());
+        return const AdminAlumniMembersScreen();
       case 4:
         return SingleChildScrollView(child: _buildArchivedContent());
       case 5:
@@ -2775,43 +2776,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMembersContent() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Alumni Members Management',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF090A4F),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Center(
-            child: Text(
-              'Members management feature coming soon',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-            ),
           ),
         ],
       ),

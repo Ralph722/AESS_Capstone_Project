@@ -282,54 +282,54 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
         ),
         const SizedBox(height: 20),
 
-        // Stats Cards - Horizontal Scrollable
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildStatCard(
+        // Stats Cards - Evenly Spaced
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
                 'Total Jobs',
                 _jobPostings.length.toString(),
                 Icons.work,
                 const Color(0xFF090A4F),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
                 'Active',
                 _jobPostings.where((j) => j.status == 'active').length.toString(),
                 Icons.check_circle,
                 const Color(0xFF4CAF50),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
                 'Drafts',
                 _jobPostings.where((j) => j.status == 'draft').length.toString(),
                 Icons.edit_note,
                 const Color(0xFFFF9800),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
                 'Expired',
                 _jobPostings.where((j) => j.status == 'expired').length.toString(),
                 Icons.schedule,
                 const Color(0xFFF44336),
               ),
-              const SizedBox(width: 12),
-              _buildStatCard(
-                'Total Views',
-                _jobPostings.fold<int>(0, (sum, job) => sum + job.views).toString(),
-                Icons.visibility,
-                const Color(0xFF2196F3),
-              ),
-              const SizedBox(width: 12),
-              _buildStatCard(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
                 'Applications',
                 _jobPostings.fold<int>(0, (sum, job) => sum + job.applications).toString(),
                 Icons.people,
                 const Color(0xFF9C27B0),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 20),
 
@@ -423,7 +423,6 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
 
   Widget _buildStatCard(String title, String value, IconData icon, Color backgroundColor) {
     return Container(
-      width: 140,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -667,16 +666,6 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
                         const SizedBox(width: 6),
                         Text(
                           'Posted: ${intl.DateFormat('MMM d, yyyy').format(job.postedDate)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Icon(Icons.visibility, size: 14, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${job.views} views',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade600,

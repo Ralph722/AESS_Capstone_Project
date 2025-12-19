@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:alumni_system/services/message_service.dart';
 
 class AdminMessagesScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -25,6 +26,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ImagePicker _imagePicker = ImagePicker();
+  final MessageService _messageService = MessageService();
 
   User? _currentAdmin;
   List<Map<String, dynamic>> _messages = [];
@@ -379,6 +381,14 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
           _messages = filteredMessages;
           _isLoadingMessages = false;
         });
+
+        // Mark messages from this user as read when admin views them
+        if (userMessagingId.isNotEmpty) {
+          _messageService.markUserMessagesAsReadForAdmin(
+            userMessagingId,
+            userDocId: userDocId,
+          );
+        }
 
         // Auto-scroll to bottom when messages are loaded
         _scrollToBottom(immediate: wasFirstLoad);
@@ -1334,15 +1344,26 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                                     },
                                   );
 
+                                  final userMessagingId = user['messagingId'] as String;
+                                  final userDocId = selectedUser['docId'] as String?;
+
                                   setState(() {
-                                    _selectedUserId = user['messagingId'] as String;
-                                    _selectedUserDocId = selectedUser['docId'] as String?;
+                                    _selectedUserId = userMessagingId;
+                                    _selectedUserDocId = userDocId;
                                     _selectedUserName = selectedUser['name'] as String;
                                   });
 
+                                  // Mark messages as read when admin opens conversation
+                                  if (userMessagingId.isNotEmpty) {
+                                    _messageService.markUserMessagesAsReadForAdmin(
+                                      userMessagingId,
+                                      userDocId: userDocId,
+                                    );
+                                  }
+
                                   _loadMessagesForUser(
-                                    user['messagingId'] as String,
-                                    userDocId: selectedUser['docId'] as String?,
+                                    userMessagingId,
+                                    userDocId: userDocId,
                                   );
                                 },
                                 child: Container(

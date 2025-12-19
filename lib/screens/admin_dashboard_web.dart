@@ -496,52 +496,55 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Event'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildFormField(
-                'Event Theme',
-                _themeController,
-                'Enter event theme',
-              ),
-              const SizedBox(height: 16),
-              _buildFormField(
-                'Batch Year',
-                _batchYearController,
-                'Enter batch year',
-              ),
-              const SizedBox(height: 16),
-              _buildFormField(
-                'Event Date',
-                _eventDateController,
-                'MM/DD/YYYY',
-                isDate: true,
-              ),
-              const SizedBox(height: 16),
-              _buildFormField('Venue', _venueController, 'Enter venue'),
-              const SizedBox(height: 16),
-              _buildFormField(
-                'Start Time',
-                _startTimeController,
-                'HH:mm',
-                isTime: true,
-              ),
-              const SizedBox(height: 16),
-              _buildFormField(
-                'End Time',
-                _endTimeController,
-                'HH:mm',
-                isTime: true,
-              ),
-              const SizedBox(height: 16),
-              _buildFormField(
-                'Description',
-                _descriptionController,
-                'Enter event description',
-                isMultiline: true,
-              ),
-            ],
+        content: SizedBox(
+          width: 600,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildFormField(
+                  'Event Theme',
+                  _themeController,
+                  'Enter event theme',
+                ),
+                const SizedBox(height: 16),
+                _buildFormField(
+                  'Batch Year',
+                  _batchYearController,
+                  'Enter batch year',
+                ),
+                const SizedBox(height: 16),
+                _buildFormField(
+                  'Event Date',
+                  _eventDateController,
+                  'MM/DD/YYYY',
+                  isDate: true,
+                ),
+                const SizedBox(height: 16),
+                _buildFormField('Venue', _venueController, 'Enter venue'),
+                const SizedBox(height: 16),
+                _buildFormField(
+                  'Start Time',
+                  _startTimeController,
+                  'HH:mm',
+                  isTime: true,
+                ),
+                const SizedBox(height: 16),
+                _buildFormField(
+                  'End Time',
+                  _endTimeController,
+                  'HH:mm',
+                  isTime: true,
+                ),
+                const SizedBox(height: 16),
+                _buildFormField(
+                  'Description',
+                  _descriptionController,
+                  'Enter event description',
+                  isMultiline: true,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

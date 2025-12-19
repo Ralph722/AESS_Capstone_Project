@@ -141,5 +141,92 @@ class MessageService {
       print('Error marking messages as read: $e');
     }
   }
+
+  /// Mark messages from a specific user as read when admin views them
+  /// This marks all unread messages from a specific user to the admin as read
+  Future<void> markUserMessagesAsReadForAdmin(String userMessagingId, {String? userDocId}) async {
+    final admin = _auth.currentUser;
+    if (admin == null) return;
+
+    try {
+      // Get admin doc ID
+      final adminSnapshot = await _firestore
+          .collection('users')
+          .where('uid', isEqualTo: admin.uid)
+          .limit(1)
+          .get();
+
+      final adminDocId = adminSnapshot.docs.isNotEmpty ? adminSnapshot.docs.first.id : null;
+
+      final adminIds = <String>{
+        admin.uid,
+        if (adminDocId != null) adminDocId,
+      };
+
+      final userIds = <String>{
+        if (userMessagingId.isNotEmpty) userMessagingId,
+        if (userDocId != null && userDocId.isNotEmpty) userDocId,
+      };
+
+      if (adminIds.isEmpty || userIds.isEmpty) return;
+
+      // Get all unread messages from this user to admin
+      final queries = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+
+      // Query by recipientId (admin uid)
+      queries.add(
+        _firestore
+            .collection('messages')
+            .where('recipientId', isEqualTo: admin.uid)
+            .where('senderRole', isEqualTo: 'user')
+            .where('isRead', isEqualTo: false)
+            .get(),
+      );
+
+      // Query by recipientDocId (admin doc ID)
+      if (adminDocId != null) {
+        queries.add(
+          _firestore
+              .collection('messages')
+              .where('recipientDocId', isEqualTo: adminDocId)
+              .where('senderRole', isEqualTo: 'user')
+              .where('isRead', isEqualTo: false)
+              .get(),
+        );
+      }
+
+      final snapshots = await Future.wait(queries);
+
+      // Update all unread messages from this user to read
+      final batch = _firestore.batch();
+      int batchCount = 0;
+
+      for (final snapshot in snapshots) {
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final senderId = data['senderId'] as String?;
+          final senderDocId = data['senderDocId'] as String?;
+
+          // Only mark messages from this specific user
+          if (userIds.contains(senderId) || userIds.contains(senderDocId)) {
+            batch.update(doc.reference, {'isRead': true});
+            batchCount++;
+            
+            // Firestore batch limit is 500
+            if (batchCount >= 500) {
+              await batch.commit();
+              batchCount = 0;
+            }
+          }
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+    } catch (e) {
+      print('Error marking user messages as read for admin: $e');
+    }
+  }
 }
 

@@ -17,7 +17,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
   final List<JobPosting> _jobPostings = [];
   final List<JobPosting> _filteredJobs = [];
   bool _isLoading = true;
-  int _selectedTab = 0; // 0: Active, 1: Drafts, 2: Expired
+  int _selectedTab = 0; // 0: Active, 1: Expired
 
   @override
   void initState() {
@@ -81,9 +81,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
     switch (_selectedTab) {
       case 0: // Active
         return job.status == 'active';
-      case 1: // Drafts
-        return job.status == 'draft';
-      case 2: // Expired
+      case 1: // Expired
         return job.status == 'expired';
       default:
         return true;
@@ -305,15 +303,6 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                'Drafts',
-                _jobPostings.where((j) => j.status == 'draft').length.toString(),
-                Icons.edit_note,
-                const Color(0xFFFF9800),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
                 'Expired',
                 _jobPostings.where((j) => j.status == 'expired').length.toString(),
                 Icons.schedule,
@@ -388,9 +377,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
                       children: [
                         _buildTab('Active', 0),
                         const SizedBox(width: 12),
-                        _buildTab('Drafts', 1),
-                        const SizedBox(width: 12),
-                        _buildTab('Expired', 2),
+                        _buildTab('Expired', 1),
                       ],
                     ),
                   ],
@@ -486,8 +473,6 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
         case 0:
           return job.status == 'active';
         case 1:
-          return job.status == 'draft';
-        case 2:
           return job.status == 'expired';
         default:
           return false;
@@ -751,8 +736,6 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
     switch (status) {
       case 'active':
         return Colors.green;
-      case 'draft':
-        return Colors.orange;
       case 'expired':
         return Colors.red;
       case 'archived':
@@ -811,9 +794,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
             Icon(
               _selectedTab == 0
                   ? Icons.work_outline
-                  : _selectedTab == 1
-                      ? Icons.edit_note
-                      : Icons.schedule,
+                  : Icons.schedule,
               size: 64,
               color: Colors.grey.shade300,
             ),
@@ -821,9 +802,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
             Text(
               _selectedTab == 0
                   ? 'No active job postings'
-                  : _selectedTab == 1
-                      ? 'No draft job postings'
-                      : 'No expired job postings',
+                  : 'No expired job postings',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey.shade600,
@@ -834,7 +813,7 @@ class _AdminJobManagementState extends State<AdminJobManagement> {
             Text(
               _selectedTab == 0
                   ? 'Create your first job posting to get started'
-                  : 'All your ${_selectedTab == 1 ? 'drafts' : 'expired jobs'} will appear here',
+                  : 'All your expired jobs will appear here',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade500,

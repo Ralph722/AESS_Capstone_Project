@@ -43,3 +43,25 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Service account / cloud keys (never commit)
+**/serviceAccountKey.json
+**/*-firebase-adminsdk-*.json
+**/*-adminsdk-*.json
+
+# Supabase service role / local secrets (never commit)
+supabase/.env
+supabase/.env.local
+.env
+.env.local
+
+# Local tooling / generated artifacts
+/tmp/
+/output/
+.codex_*.txt
+analyze*.txt
+diff.txt
+analysis.txt
+
+# Editor / agent local state
+.cursor/

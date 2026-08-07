@@ -1,0 +1,11 @@
+{
+  "name": "alumni-ensure-supabase-admin",
+  "private": true,
+  "description": "Ensure admin@gmail.com exists in Supabase Auth + public.users",
+  "scripts": {
+    "ensure-admin": "node ensure_supabase_admin.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0"
+  }
+}

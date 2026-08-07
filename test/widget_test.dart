@@ -1,30 +1,37 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:alumni_system/main.dart';
+import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('JobPosting copyWith preserves id and updates fields', () {
+    final job = JobPosting(
+      id: 'job-1',
+      companyName: 'Acme',
+      companyLogo: '',
+      jobTitle: 'Engineer',
+      jobType: 'Full-time',
+      location: 'Manila',
+      salaryRange: '50k',
+      description: 'Desc',
+      requirements: const ['Dart'],
+      benefits: const ['HMO'],
+      postedDate: DateTime(2025, 1, 1),
+      applicationDeadline: DateTime(2025, 6, 1),
+      contactEmail: 'hr@acme.com',
+      applicationMethod: 'email',
+      isActive: true,
+      views: 0,
+      applications: 0,
+      adminId: 'admin-1',
+      isRemote: false,
+      experienceLevel: 'Mid',
+      status: 'active',
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    final updated = job.copyWith(jobTitle: 'Senior Engineer', status: 'archived');
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(updated.id, 'job-1');
+    expect(updated.jobTitle, 'Senior Engineer');
+    expect(updated.status, 'archived');
+    expect(updated.companyName, 'Acme');
   });
 }

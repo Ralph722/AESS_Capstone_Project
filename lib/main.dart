@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:alumni_system/firebase_options.dart';
-import 'package:alumni_system/screens/login_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:alumni_system/core/config/supabase_config.dart';
+import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+
+  if (!SupabaseConfig.isConfigured) {
+    throw StateError(
+      'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.',
+    );
+  }
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    publishableKey: SupabaseConfig.anonKey,
   );
+
   runApp(const MyApp());
 }
+
+/// Shared Supabase client for services.
+SupabaseClient get supabase => Supabase.instance.client;
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -23,7 +34,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF090A4F)),
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      // AuthGate restores an existing Supabase session (if any) before Login.
+      home: const AuthGate(),
     );
   }
 }

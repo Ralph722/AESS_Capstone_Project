@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/config/supabase_config.dart';
@@ -5,6 +6,7 @@ import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _installWebDebugErrorGuards();
 
   if (!SupabaseConfig.isConfigured) {
     throw StateError(
@@ -17,6 +19,31 @@ void main() async {
   );
 
   runApp(const MyApp());
+}
+
+/// Flutter web debug can enter an error loop after hot restart:
+/// dumping an error via [FlutterError.dumpErrorToConsole] may itself throw
+/// `LegacyJavaScriptObject is not a subtype of DiagnosticsNode`, and a
+/// teardown race can assert `Trying to render a disposed EngineFlutterView`.
+///
+/// Present errors as plain text on web so the console stays usable.
+void _installWebDebugErrorGuards() {
+  if (!kIsWeb || !kDebugMode) return;
+
+  FlutterError.presentError = (FlutterErrorDetails details) {
+    final message = details.exceptionAsString();
+    if (message.contains('disposed EngineFlutterView') ||
+        (message.contains('LegacyJavaScriptObject') &&
+            message.contains('DiagnosticsNode'))) {
+      return;
+    }
+    debugPrint('══╡ FLUTTER ERROR ╞══');
+    debugPrint(message);
+    final stack = details.stack;
+    if (stack != null) {
+      debugPrint(stack.toString());
+    }
+  };
 }
 
 /// Shared Supabase client for services.

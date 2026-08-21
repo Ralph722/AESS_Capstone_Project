@@ -22,20 +22,37 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
   final _surveyService = SurveyService();
   int _streamGeneration = 0;
   final Map<String, Survey> _surveyById = {};
+  String? _detailsFingerprint;
+  bool _loadingDetails = false;
 
-  Future<void> _loadSurveyDetails(List<SurveyAssignment> assignments) async {
-    final ids = assignments.map((a) => a.surveyId).toSet();
-    final missing = ids.where((id) => !_surveyById.containsKey(id)).toList();
-    if (missing.isEmpty) return;
+  Future<void> _ensureSurveyDetails(List<SurveyAssignment> assignments) async {
+    final fingerprint =
+        assignments.map((a) => '${a.id}:${a.surveyId}:${a.status.name}').join('|');
+    final missing = assignments
+        .map((a) => a.surveyId)
+        .where((id) => !_surveyById.containsKey(id))
+        .toSet()
+        .toList();
+
+    if (missing.isEmpty) {
+      if (_detailsFingerprint != fingerprint && mounted) {
+        setState(() => _detailsFingerprint = fingerprint);
+      }
+      return;
+    }
+    if (_loadingDetails) return;
+    _loadingDetails = true;
 
     final loaded = <String, Survey>{};
     for (final id in missing) {
       final s = await _surveyService.getSurvey(id);
       if (s != null) loaded[id] = s;
     }
-    if (!mounted || loaded.isEmpty) return;
+    if (!mounted) return;
     setState(() {
       _surveyById.addAll(loaded);
+      _detailsFingerprint = fingerprint;
+      _loadingDetails = false;
     });
   }
 
@@ -64,11 +81,29 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
           if (snapshot.hasError) {
             return PortalErrorState(
               error: snapshot.error,
-              onRetry: () => setState(() => _streamGeneration++),
+              onRetry: () => setState(() {
+                _surveyById.clear();
+                _detailsFingerprint = null;
+                _streamGeneration++;
+              }),
             );
           }
 
-          final assignments = (snapshot.data ?? [])
+          final raw = snapshot.data ?? [];
+          final fingerprint =
+              raw.map((a) => '${a.id}:${a.surveyId}:${a.status.name}').join('|');
+          final detailsReady = raw.isEmpty ||
+              (raw.every((a) => _surveyById.containsKey(a.surveyId)) &&
+                  _detailsFingerprint == fingerprint);
+
+          if (!detailsReady) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _ensureSurveyDetails(raw);
+            });
+            return const PortalCardListSkeleton();
+          }
+
+          final assignments = raw
               .where((a) {
                 final s = _surveyById[a.surveyId];
                 // CHED GTS is handled on the Tracer tab.
@@ -76,9 +111,6 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
                 return true;
               })
               .toList();
-          if ((snapshot.data ?? []).isNotEmpty) {
-            _loadSurveyDetails(snapshot.data ?? []);
-          }
 
           if (assignments.isEmpty) {
             return const PortalEmptyState(
@@ -295,15 +327,15 @@ class _SurveyRowCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: PortalTheme.space2),
       decoration: BoxDecoration(
         color: PortalTheme.card,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-        border: Border.all(color: PortalTheme.border),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
         boxShadow: PortalTheme.softShadow,
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
         child: InkWell(
-          borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
           onTap: () => _openSurvey(context, canTake: canTake, viewOnly: status == SurveyAssignmentStatus.completed),
           child: Padding(
             padding: const EdgeInsets.all(PortalTheme.space3),

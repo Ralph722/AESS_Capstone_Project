@@ -27,23 +27,18 @@ abstract final class JobUiTheme {
   static const double radiusMd = PortalTheme.radiusMd;
   static const double radiusLg = PortalTheme.radiusLg;
   static const double radiusXl = PortalTheme.radiusXl;
+  static const double radius2xl = PortalTheme.radius2xl;
 
-  static BorderRadius get cardRadius => BorderRadius.circular(radiusXl);
+  static BorderRadius get cardRadius => BorderRadius.circular(radius2xl);
 
   /// Soft elevation kept outside the clipped card surface.
-  static List<BoxShadow> get cardShadow => const [
-        BoxShadow(
-          color: Color(0x120F172A),
-          blurRadius: 12,
-          offset: Offset(0, 4),
-        ),
-      ];
+  static List<BoxShadow> get cardShadow => PortalTheme.softShadow;
 
   /// Surface fill + border only (no shadow — avoids grey corner leftovers).
   static BoxDecoration get cardDecoration => BoxDecoration(
         color: card,
         borderRadius: cardRadius,
-        border: Border.all(color: border.withValues(alpha: 0.85)),
+        border: Border.all(color: border.withValues(alpha: 0.75)),
       );
 }
 
@@ -67,8 +62,9 @@ class JobCardShell extends StatelessWidget {
       padding: padding,
       borderRadius: JobUiTheme.cardRadius,
       color: JobUiTheme.card,
-      borderColor: JobUiTheme.border.withValues(alpha: 0.85),
-      elevation: 1.5,
+      borderColor: JobUiTheme.border.withValues(alpha: 0.75),
+      elevation: 1,
+      shadowColor: JobUiTheme.navy.withValues(alpha: 0.08),
       child: child,
     );
   }
@@ -258,18 +254,18 @@ class JobTagPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = emphasized ? JobUiTheme.navy : JobUiTheme.navy;
+    final fg = JobUiTheme.navy;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: emphasized
             ? JobUiTheme.navy.withValues(alpha: 0.08)
-            : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(10),
+            : JobUiTheme.surfaceMuted,
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: emphasized
               ? JobUiTheme.navy.withValues(alpha: 0.16)
-              : const Color(0xFFE2E8F0),
+              : JobUiTheme.border.withValues(alpha: 0.9),
         ),
       ),
       child: Row(
@@ -284,41 +280,6 @@ class JobTagPill extends StatelessWidget {
             style: PortalTheme.caption.copyWith(
               color: fg,
               fontWeight: FontWeight.w700,
-              fontSize: 11.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Green "Interested" status pill with checkmark.
-class JobInterestedPill extends StatelessWidget {
-  const JobInterestedPill({super.key});
-
-  static const Color _green = Color(0xFF059669);
-  static const Color _bg = Color(0xFFECFDF5);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: _bg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _green.withValues(alpha: 0.28)),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.check_circle_rounded, size: 14, color: _green),
-          SizedBox(width: 5),
-          Text(
-            'Interested',
-            style: TextStyle(
-              color: _green,
-              fontWeight: FontWeight.w800,
               fontSize: 11.5,
             ),
           ),
@@ -379,7 +340,7 @@ class JobHeaderPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Text(
@@ -412,16 +373,17 @@ class JobOverviewCell extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: JobUiTheme.surfaceMuted.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: JobUiTheme.border.withValues(alpha: 0.85)),
+        color: JobUiTheme.card,
+        borderRadius: BorderRadius.circular(JobUiTheme.radiusXl),
+        border: Border.all(color: JobUiTheme.border.withValues(alpha: 0.75)),
+        boxShadow: JobUiTheme.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 15, color: JobUiTheme.navyMid),
+              Icon(icon, size: 15, color: JobUiTheme.navy),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(

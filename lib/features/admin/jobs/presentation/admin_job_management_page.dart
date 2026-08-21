@@ -571,17 +571,10 @@ class _AdminJobManagementState extends State<AdminJobManagement>
     super.build(context);
     final filtered = _filtered;
     final pageCount = (filtered.length / _pageSize).ceil().clamp(1, 9999);
-    final pageInsets = AdminDensity.pageInsetsForWidth(
-      MediaQuery.sizeOf(context).width,
-    );
 
-    return ColoredBox(
-      color: AdminJobTheme.background,
-      child: Padding(
-        padding: pageInsets.copyWith(bottom: 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
             AdminPageHeader(
               title: 'Job Postings',
               subtitle: 'University career board for alumni opportunities',
@@ -683,8 +676,6 @@ class _AdminJobManagementState extends State<AdminJobManagement>
               ),
             ),
           ],
-        ),
-      ),
     );
   }
 }

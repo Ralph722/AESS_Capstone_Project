@@ -32,7 +32,8 @@ class AiAssistantService {
   }) async {
     if (!AiConfig.isConfigured) {
       throw AiNotConfiguredException(
-        'AI is not configured. Add your Gemini API key in lib/config/ai_defaults.dart '
+        'AI is not configured. Add your Gemini API key in '
+        'lib/core/config/ai_secrets.dart '
         '(get one free at aistudio.google.com/apikey).',
       );
     }

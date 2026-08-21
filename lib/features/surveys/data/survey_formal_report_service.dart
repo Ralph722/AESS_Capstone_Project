@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:alumni_system/core/config/ai_config.dart';
+import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/ai/data/ai_assistant_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -15,7 +16,7 @@ class SurveyFormalReportResult {
     required this.usedAi,
     required this.generatedAt,
     this.disclaimer =
-        'AI draft based on system survey data — review before official use.',
+        'AI draft based on system survey data - review before official use.',
   });
 
   final String body;
@@ -294,7 +295,10 @@ paragraphs with clear section titles on their own lines in Title Case.
   }) async {
     final doc = pw.Document();
     final stamp = DateFormat.yMMMd().add_jm().format(generatedAt);
-    final paragraphs = body
+    final safeTitle = PdfSafeText.sanitize(surveyTitle);
+    final safeDisclaimer = PdfSafeText.sanitize(disclaimer);
+    final safeBody = PdfSafeText.sanitize(body);
+    final paragraphs = safeBody
         .split(RegExp(r'\n\s*\n'))
         .map((p) => p.trim())
         .where((p) => p.isNotEmpty)
@@ -317,7 +321,7 @@ paragraphs with clear section titles on their own lines in Title Case.
             ),
             pw.SizedBox(height: 2),
             pw.Text(
-              surveyTitle,
+              safeTitle,
               style: const pw.TextStyle(
                 fontSize: 11,
                 color: PdfColors.blueGrey700,
@@ -325,7 +329,9 @@ paragraphs with clear section titles on their own lines in Title Case.
             ),
             pw.SizedBox(height: 2),
             pw.Text(
-              'Generated $stamp · ${usedAi ? 'AI-assisted draft' : 'Metric-based draft'}',
+              PdfSafeText.sanitize(
+                'Generated $stamp - ${usedAi ? 'AI-assisted draft' : 'Metric-based draft'}',
+              ),
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
             ),
             pw.SizedBox(height: 8),
@@ -342,7 +348,7 @@ paragraphs with clear section titles on their own lines in Title Case.
               children: [
                 pw.Expanded(
                   child: pw.Text(
-                    disclaimer,
+                    safeDisclaimer,
                     style: const pw.TextStyle(
                       fontSize: 8,
                       color: PdfColors.grey600,

@@ -3,7 +3,8 @@ import 'package:alumni_system/core/config/ai_defaults.dart';
 /// Gemini API configuration for the in-app AI assistant.
 ///
 /// 1. Get a free key: https://aistudio.google.com/apikey
-/// 2. Paste it in [AiDefaults.apiKey] below, or run with:
+/// 2. Paste it in [ai_secrets.dart] (gitignored), or run with:
+///    `--dart-define-from-file=config/dart_defines.json`
 ///    `--dart-define=GEMINI_API_KEY=your_key_here`
 class AiConfig {
   AiConfig._();

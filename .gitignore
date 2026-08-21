@@ -55,6 +55,10 @@ supabase/.env.local
 .env
 .env.local
 
+# Gemini / local AI secrets (never commit)
+lib/core/config/ai_secrets.dart
+config/dart_defines.json
+
 # Local tooling / generated artifacts
 /tmp/
 /output/

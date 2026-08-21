@@ -34,6 +34,7 @@ abstract final class AdminDirectoryTheme {
   static const space3 = AdminDensity.space3;
   static const space4 = AdminDensity.space4;
   static const buttonHeight = AdminDensity.buttonHeight;
+
   /// Search / filter / toolbar control target height (~40–44px).
   static const toolbarControlHeight = 40.0;
   static const radiusSm = 8.0;
@@ -490,11 +491,7 @@ class DirectoryToolbarCard extends StatelessWidget {
           ),
           if (activeFilterChips.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: activeFilterChips,
-            ),
+            Wrap(spacing: 6, runSpacing: 6, children: activeFilterChips),
           ],
         ],
       ),
@@ -662,7 +659,11 @@ class DirectoryDateFilterChip extends StatelessWidget {
             isExpanded: true,
             isDense: true,
             iconSize: 14,
-            icon: Icon(Icons.calendar_today_rounded, size: 14, color: iconColor),
+            icon: Icon(
+              Icons.calendar_today_rounded,
+              size: 14,
+              color: iconColor,
+            ),
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: active ? FontWeight.w600 : FontWeight.w500,
@@ -691,8 +692,9 @@ class DirectoryDateFilterChip extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
-                borderRadius:
-                    BorderRadius.circular(AdminDirectoryTheme.radiusSm),
+                borderRadius: BorderRadius.circular(
+                  AdminDirectoryTheme.radiusSm,
+                ),
               ),
             ),
           ),

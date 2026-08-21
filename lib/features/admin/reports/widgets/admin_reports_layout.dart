@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 
 /// Design tokens for Reports & Analytics — mirrors the admin portal system.
@@ -114,9 +115,10 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AdminReportsTheme.surface.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
+        color: AdminReportsTheme.card,
+        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
         border: Border.all(color: AdminReportsTheme.border),
+        boxShadow: AdminReportsTheme.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,9 +130,9 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                   ? () => setState(() => _expanded = !_expanded)
                   : null,
               borderRadius: BorderRadius.vertical(
-                top: const Radius.circular(AdminReportsTheme.radiusMd),
+                top: const Radius.circular(AdminReportsTheme.radiusLg),
                 bottom: Radius.circular(
-                  _expanded ? 0 : AdminReportsTheme.radiusMd,
+                  _expanded ? 0 : AdminReportsTheme.radiusLg,
                 ),
               ),
               child: Semantics(
@@ -141,12 +143,7 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                           '${_expanded ? 'Expanded' : 'Collapsed'}. Double tap to toggle.'
                     : '${widget.title}. ${widget.subtitle ?? ''}',
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AdminReportsTheme.space2,
-                    14,
-                    AdminReportsTheme.space2,
-                    14,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -155,9 +152,10 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: AdminReportsTheme.card,
+                            color: AdminReportsTheme.primary.withValues(
+                              alpha: 0.09,
+                            ),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AdminReportsTheme.border),
                           ),
                           child: Icon(
                             widget.icon,
@@ -174,7 +172,7 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                             Text(
                               widget.title,
                               style: const TextStyle(
-                                fontSize: 15.5,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
                                 color: AdminReportsTheme.textPrimary,
                                 letterSpacing: -0.2,
@@ -182,13 +180,13 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                             ),
                             if (widget.subtitle != null &&
                                 widget.subtitle!.trim().isNotEmpty) ...[
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 3),
                               Text(
                                 widget.subtitle!,
                                 style: const TextStyle(
-                                  fontSize: 13,
-                                  height: 1.4,
-                                  color: AdminReportsTheme.textSecondary,
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                  color: AdminReportsTheme.textMuted,
                                 ),
                               ),
                             ],
@@ -198,22 +196,22 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                       if (widget.actions.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
+                          spacing: 4,
+                          runSpacing: 4,
                           children: widget.actions,
                         ),
                       ],
                       if (widget.trailing != null) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         widget.trailing!,
                       ],
                       if (widget.collapsible) ...[
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 2),
                         AnimatedRotation(
                           turns: _expanded ? 0.5 : 0,
                           duration: const Duration(milliseconds: 180),
                           child: const Icon(
-                            Icons.expand_more,
+                            Icons.expand_more_rounded,
                             color: AdminReportsTheme.textMuted,
                           ),
                         ),
@@ -241,19 +239,12 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                             ),
                           Padding(
                             padding: widget.padded
-                                ? const EdgeInsets.fromLTRB(
-                                    AdminReportsTheme.space2,
-                                    AdminReportsTheme.space2,
-                                    AdminReportsTheme.space2,
-                                    AdminReportsTheme.space2,
-                                  )
+                                ? const EdgeInsets.fromLTRB(14, 14, 14, 14)
                                 : EdgeInsets.zero,
                             child: widget.child,
                           ),
                         ],
                       )
-                    // Omit child when collapsed so MouseRegions are not
-                    // hit-tested at zero height (web mouse_tracker spam).
                     : const SizedBox(width: double.infinity),
               ),
             )
@@ -265,18 +256,110 @@ class _ReportsSectionShellState extends State<ReportsSectionShell>
                   const Divider(height: 1, color: AdminReportsTheme.border),
                 Padding(
                   padding: widget.padded
-                      ? const EdgeInsets.fromLTRB(
-                          AdminReportsTheme.space2,
-                          AdminReportsTheme.space2,
-                          AdminReportsTheme.space2,
-                          AdminReportsTheme.space2,
-                        )
+                      ? const EdgeInsets.fromLTRB(14, 14, 14, 14)
                       : EdgeInsets.zero,
                   child: widget.child,
                 ),
               ],
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Destination tile used on Overview “Go to detail”.
+class ReportsNavTile extends StatefulWidget {
+  const ReportsNavTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.color = AdminReportsTheme.primary,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  State<ReportsNavTile> createState() => _ReportsNavTileState();
+}
+
+class _ReportsNavTileState extends State<ReportsNavTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: _hovered
+                  ? widget.color.withValues(alpha: 0.06)
+                  : AdminReportsTheme.surface,
+              borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
+              border: Border.all(
+                color: _hovered
+                    ? widget.color.withValues(alpha: 0.28)
+                    : AdminReportsTheme.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: widget.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(widget.icon, size: 18, color: widget.color),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: AdminReportsTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          height: 1.3,
+                          color: AdminReportsTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: widget.color.withValues(alpha: 0.7),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -398,6 +481,7 @@ class ReportsChartSurface extends StatelessWidget {
     required this.child,
     this.title,
     this.subtitle,
+    this.details,
     this.height,
     this.hero = false,
     this.padding = const EdgeInsets.all(AdminReportsTheme.space3),
@@ -406,12 +490,16 @@ class ReportsChartSurface extends StatelessWidget {
   final Widget child;
   final String? title;
   final String? subtitle;
+
+  /// Methodology text shown via ⓘ next to the title.
+  final String? details;
   final double? height;
   final bool hero;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
+    final detailsText = details?.trim();
     return Container(
       height: height,
       padding: padding,
@@ -453,6 +541,8 @@ class ReportsChartSurface extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (detailsText != null && detailsText.isNotEmpty)
+                  ReportsDetailsButton(title: title!, body: detailsText),
               ],
             ),
             if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
@@ -471,6 +561,87 @@ class ReportsChartSurface extends StatelessWidget {
           if (height != null) Expanded(child: child) else child,
         ],
       ),
+    );
+  }
+}
+
+/// Compact ranked list used when a chart would be sparse (small n).
+class ReportsRankedSummary extends StatelessWidget {
+  const ReportsRankedSummary({
+    super.key,
+    required this.entries,
+    this.totalLabel = 'responses',
+    this.accent,
+  });
+
+  final List<MapEntry<String, int>> entries;
+  final String totalLabel;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = entries.fold<int>(0, (s, e) => s + e.value);
+    final color = accent ?? AdminReportsTheme.primary;
+    if (entries.isEmpty || total == 0) {
+      return const ReportsChartEmptyState(
+        message: 'Not enough data yet',
+        icon: Icons.bar_chart_outlined,
+      );
+    }
+    final maxVal = entries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    // Small-sample caution belongs on [ReportsSmallNBanner] only — keep this
+    // widget to bars + a quiet count so cards stay compact.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '$total $totalLabel',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AdminReportsTheme.textMuted,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (var i = 0; i < entries.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  entries[i].key,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AdminReportsTheme.textPrimary,
+                  ),
+                ),
+              ),
+              Text(
+                '${entries[i].value}'
+                '${total > 0 ? ' · ${(entries[i].value / total * 100).toStringAsFixed(0)}%' : ''}',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: maxVal == 0 ? 0 : entries[i].value / maxVal,
+              minHeight: 6,
+              backgroundColor: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: 0.85 - (i * 0.08).clamp(0, 0.45)),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

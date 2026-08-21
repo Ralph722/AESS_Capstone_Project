@@ -39,6 +39,7 @@ enum CustomReportSectionId {
   surveySummary,
   surveyParticipation,
   surveyQuestions,
+  chedWaveComparison,
   events,
   jobPostings,
   announcements,
@@ -54,6 +55,7 @@ extension CustomReportSectionIdX on CustomReportSectionId {
         CustomReportSectionId.surveyParticipation =>
           'Survey participation & insights',
         CustomReportSectionId.surveyQuestions => 'Survey question summaries',
+        CustomReportSectionId.chedWaveComparison => 'CHED wave comparison',
         CustomReportSectionId.events => 'Events',
         CustomReportSectionId.jobPostings => 'Job postings',
         CustomReportSectionId.announcements => 'Announcements',
@@ -73,6 +75,8 @@ extension CustomReportSectionIdX on CustomReportSectionId {
           'Participation funnel plus portfolio insights and recommendations.',
         CustomReportSectionId.surveyQuestions =>
           'Question-level rollups from top published waves with responses.',
+        CustomReportSectionId.chedWaveComparison =>
+          'Cross-sectional compare of crucial CHED fields across selected tracer waves.',
         CustomReportSectionId.events => 'Alumni events with date, venue, and status.',
         CustomReportSectionId.jobPostings =>
           'Active job postings with company, type, and deadline.',
@@ -89,6 +93,7 @@ extension CustomReportSectionIdX on CustomReportSectionId {
         CustomReportSectionId.surveySummary => Icons.poll_outlined,
         CustomReportSectionId.surveyParticipation => Icons.donut_large_outlined,
         CustomReportSectionId.surveyQuestions => Icons.quiz_outlined,
+        CustomReportSectionId.chedWaveComparison => Icons.compare_arrows_outlined,
         CustomReportSectionId.events => Icons.event_outlined,
         CustomReportSectionId.jobPostings => Icons.business_center_outlined,
         CustomReportSectionId.announcements => Icons.campaign_outlined,
@@ -99,7 +104,8 @@ extension CustomReportSectionIdX on CustomReportSectionId {
   bool get supportsBatchCourse => switch (this) {
         CustomReportSectionId.alumniRoster ||
         CustomReportSectionId.events ||
-        CustomReportSectionId.announcements =>
+        CustomReportSectionId.announcements ||
+        CustomReportSectionId.chedWaveComparison =>
           true,
         _ => false,
       };

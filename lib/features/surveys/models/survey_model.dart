@@ -72,6 +72,8 @@ class Survey {
   final String? createdByDisplayName;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  /// Sticky first-publish time in `surveys.data.publishedAt` (not bumped on edits).
+  final DateTime? publishedAt;
   final int assignmentCount;
   final int responseCount;
   final String? templateId;
@@ -98,6 +100,7 @@ class Survey {
     this.createdByDisplayName,
     required this.createdAt,
     this.updatedAt,
+    this.publishedAt,
     this.assignmentCount = 0,
     this.responseCount = 0,
     this.templateId,
@@ -189,6 +192,9 @@ class Survey {
       createdAt: _parseDateTime(row['created_at']),
       updatedAt:
           row['updated_at'] != null ? _parseDateTime(row['updated_at']) : null,
+      publishedAt: data['publishedAt'] != null
+          ? _parseDateTime(data['publishedAt'])
+          : null,
       assignmentCount: row['assignment_count'] as int? ?? 0,
       responseCount: row['response_count'] as int? ?? 0,
       templateId: row['template_id']?.toString(),
@@ -214,6 +220,8 @@ class Survey {
       if (kind != null) 'kind': kind,
       if (templateKey != null) 'template_key': templateKey,
       if (schemaVersion != null) 'schema_version': schemaVersion,
+      if (publishedAt != null)
+        'publishedAt': publishedAt!.toUtc().toIso8601String(),
       // Always write so clearing rules replaces prior JSON (upsert merges data).
       'visibility_rules': rulesJson,
       'archived': archived,
@@ -256,6 +264,7 @@ class Survey {
     DateTime? closeAt,
     bool clearOpenAt = false,
     bool clearCloseAt = false,
+    DateTime? publishedAt,
     int? assignmentCount,
     int? responseCount,
     String? templateId,
@@ -280,6 +289,7 @@ class Survey {
       createdByDisplayName: createdByDisplayName ?? this.createdByDisplayName,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      publishedAt: publishedAt ?? this.publishedAt,
       assignmentCount: assignmentCount ?? this.assignmentCount,
       responseCount: responseCount ?? this.responseCount,
       templateId: templateId ?? this.templateId,

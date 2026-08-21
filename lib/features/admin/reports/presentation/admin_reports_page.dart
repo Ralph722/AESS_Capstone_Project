@@ -25,6 +25,7 @@ import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_reports_aggregate.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
+import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_coverage.dart';
 import 'package:alumni_system/features/admin/reports/models/reports_dashboard_filters.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
@@ -33,7 +34,10 @@ import 'package:alumni_system/features/admin/reports/widgets/admin_reports_kpi.d
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_insights.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_polish.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_filter_bar.dart';
+import 'package:alumni_system/features/admin/reports/widgets/ched_wave_comparison_dialog.dart';
+import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_downloads_panel.dart';
+import 'package:alumni_system/features/admin/reports/widgets/tracer_outcome_extras.dart';
 import 'package:alumni_system/features/admin/reports/data/custom_report_export_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
@@ -351,8 +355,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     if (ac == null) return;
 
     try {
-      // Hard cap: unbounded parallel response downloads caused hangs / memory spikes.
-      const maxWaves = 8;
+      // Cap only non-CHED rollups. All published/closed CHED tracers with
+      // submissions are loaded so “All tracers” can aggregate correctly.
+      const maxOtherWaves = 4;
       final published =
           surveys
               .where(
@@ -370,12 +375,37 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                   .submittedResponseCount(y)
                   .compareTo(ac.submittedResponseCount(x)),
             );
-    // Prefer CHED waves for coverage + rate charts; fill remaining with others.
-    final chedFirst = [
-      ...published.where((s) => s.isChedGtsBuiltin),
-      ...published.where((s) => !s.isChedGtsBuiltin),
-    ];
-    final take = chedFirst.take(maxWaves).toList();
+      final chedWaves = published.where((s) => s.isChedGtsBuiltin).toList();
+      final otherWaves = published.where((s) => !s.isChedGtsBuiltin).toList();
+
+      final selectedId = _dashboardFilters.surveyId;
+      final take = <Survey>[];
+      void addWave(Survey s) {
+        if (take.any((t) => t.id == s.id)) return;
+        take.add(s);
+      }
+
+      if (selectedId != null) {
+        for (final s in surveys) {
+          if (s.id == selectedId &&
+              !s.archived &&
+              s.isChedGtsBuiltin &&
+              (s.status == SurveyStatus.published ||
+                  s.status == SurveyStatus.closed)) {
+            addWave(s);
+            break;
+          }
+        }
+      }
+      for (final s in chedWaves) {
+        addWave(s);
+      }
+      for (final s in otherWaves) {
+        if (take.where((t) => !t.isChedGtsBuiltin).length >= maxOtherWaves) {
+          break;
+        }
+        addWave(s);
+      }
 
       final rollups = <SurveyReportRollup>[];
       final employmentSamples = <_TracerWaveEmploymentSample>[];
@@ -386,23 +416,24 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         final chunk = take.skip(i).take(2);
         final chunkResults = await Future.wait(
           chunk.map((s) async {
-            final responses = await _surveyService.getSurveyResponses(s.id);
-            if (responses.isEmpty) return null;
+          final responses = await _surveyService.getSurveyResponses(s.id);
+          if (responses.isEmpty) return null;
             final submitted = responses
                 .where((r) => r.status == SurveyResponseStatus.submitted)
                 .toList(growable: false);
             if (submitted.isEmpty) return null;
 
             _TracerWaveEmploymentSample? employmentSample;
-            if (s.isChedGtsBuiltin) {
+          if (s.isChedGtsBuiltin) {
               // Lightweight: only ched_16 for coverage / rate-by-wave — no full agg here.
               employmentSample = _TracerWaveEmploymentSample(
-                survey: s,
+              survey: s,
                 answers: [
                   for (final r in submitted)
                     _ChedEmploymentAnswer(
                       userId: r.userId,
                       presentlyEmployed: _chedPresentlyEmployed(r.answers),
+                      submittedAt: r.submittedAt,
                     ),
                 ],
               );
@@ -419,21 +450,21 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 ),
               );
             } else {
-              final questions = await _surveyService.getQuestions(s.id);
+          final questions = await _surveyService.getQuestions(s.id);
               if (questions.isNotEmpty) {
                 rollup = SurveyReportRollup(
-                  survey: s,
-                  aggregates: SurveyReportAnalytics.aggregateResponses(
-                    questions: questions,
+            survey: s,
+            aggregates: SurveyReportAnalytics.aggregateResponses(
+              questions: questions,
                     responses: submitted,
-                  ),
-                );
+            ),
+          );
               }
             }
 
             return (rollup: rollup, employment: employmentSample);
-          }),
-        );
+        }),
+      );
 
         for (final entry in chunkResults) {
           if (entry == null) continue;
@@ -464,6 +495,216 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final value = raw.toString().trim();
     if (value.isEmpty) return null;
     return value;
+  }
+
+  /// Loads CHED item-16 answers for [surveyId] when missing from the cache
+  /// (e.g. wave outside the top-N preload).
+  Future<void> _ensureSelectedWaveSample(String? surveyId) async {
+    if (surveyId == null || !mounted) return;
+    if (_waveEmploymentSamples.any((s) => s.survey.id == surveyId)) return;
+
+    Survey? survey;
+    for (final s in _surveys) {
+      if (s.id == surveyId) {
+        survey = s;
+        break;
+      }
+    }
+    if (survey == null || !survey.isChedGtsBuiltin || survey.archived) return;
+    if (survey.status != SurveyStatus.published &&
+        survey.status != SurveyStatus.closed) {
+      return;
+    }
+
+    try {
+      final responses = await _surveyService.getSurveyResponses(survey.id);
+      final submitted = responses
+          .where((r) => r.status == SurveyResponseStatus.submitted)
+          .toList(growable: false);
+      if (!mounted) return;
+
+      final sample = _TracerWaveEmploymentSample(
+        survey: survey,
+        answers: [
+          for (final r in submitted)
+            _ChedEmploymentAnswer(
+              userId: r.userId,
+              presentlyEmployed: _chedPresentlyEmployed(r.answers),
+              submittedAt: r.submittedAt,
+            ),
+        ],
+      );
+
+      SurveyReportRollup? rollup;
+      if (submitted.isNotEmpty) {
+        rollup = SurveyReportRollup(
+          survey: survey,
+          aggregates: SurveyReportAnalytics.aggregateChedResponses(
+            responses: submitted,
+          ),
+        );
+      }
+
+      setState(() {
+        _waveEmploymentSamples = [
+          ..._waveEmploymentSamples.where((s) => s.survey.id != surveyId),
+          sample,
+        ]..sort((a, b) => a.survey.createdAt.compareTo(b.survey.createdAt));
+        if (rollup != null) {
+          _surveyRollups = [
+            ..._surveyRollups.where((r) => r.survey.id != surveyId),
+            rollup,
+          ];
+        }
+      });
+    } catch (_) {
+      // Keep last good samples on failure.
+    }
+  }
+
+  /// Employed / not-employed from CHED item 16 for the current filter.
+  ///
+  /// - One wave selected → answers on that wave only.
+  /// - All tracers → latest wave answer per alumni (deduped across waves).
+  ({int employed, int notEmployed, int answered, int waveCount})?
+      _chedEmploymentStatusCounts(AdminReportsAnalytics a) {
+    final latest = _chedLatestStatusByUser(a);
+    if (latest.isEmpty) return null;
+
+    var employed = 0;
+    var notEmployed = 0;
+    for (final status in latest.values) {
+      if (status == ChedGtsBuiltin.yes) {
+        employed++;
+      } else {
+        notEmployed++;
+      }
+    }
+    final answered = employed + notEmployed;
+    if (answered == 0) return null;
+
+    final surveyId = _dashboardFilters.surveyId;
+    final waveCount = _waveEmploymentSamples
+        .where((s) => surveyId == null || s.survey.id == surveyId)
+        .length;
+    return (
+      employed: employed,
+      notEmployed: notEmployed,
+      answered: answered,
+      waveCount: waveCount,
+    );
+  }
+
+  /// Latest CHED presently-employed answer per alumni in the current filter.
+  Map<String, String> _chedLatestStatusByUser(AdminReportsAnalytics a) {
+    final surveyId = _dashboardFilters.surveyId;
+    final batch = _dashboardFilters.batchYear?.trim().toLowerCase();
+    final course = _dashboardFilters.course?.trim().toLowerCase();
+    final memberByAuth = <String, AlumniMember>{
+      for (final m in a.activeRoster)
+        if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+          m.authUid!.trim(): m,
+    };
+
+    final samples = [
+      for (final sample in _waveEmploymentSamples)
+        if (surveyId == null || sample.survey.id == surveyId) sample,
+    ];
+    if (samples.isEmpty) return const {};
+
+    samples.sort(
+      (a, b) => reportsSurveyDisplayDate(a.survey).compareTo(
+        reportsSurveyDisplayDate(b.survey),
+      ),
+    );
+
+    final latestStatusByUser = <String, String>{};
+    for (final sample in samples) {
+      for (final ans in sample.answers) {
+        if (!_respondentMatchesCohort(
+          userId: ans.userId,
+          batch: batch,
+          course: course,
+          memberByAuth: memberByAuth,
+        )) {
+          continue;
+        }
+        final uid = ans.userId.trim();
+        if (uid.isEmpty) continue;
+        final status = ans.presentlyEmployed;
+        if (status == null || status.isEmpty) continue;
+        latestStatusByUser[uid] = status;
+      }
+    }
+    return latestStatusByUser;
+  }
+
+  /// Alumni whose CHED answer in scope is presently employed (“Yes”).
+  Set<String> _chedEmployedUserIds(AdminReportsAnalytics a) {
+    return {
+      for (final e in _chedLatestStatusByUser(a).entries)
+        if (e.value == ChedGtsBuiltin.yes) e.key,
+    };
+  }
+
+  /// Auth UIDs who submitted tracer wave(s) in the current filter (cohort-aware).
+  Set<String> _tracerWaveSubmitterIds(AdminReportsAnalytics a) {
+    final surveyId = _dashboardFilters.surveyId;
+    final batch = _dashboardFilters.batchYear?.trim().toLowerCase();
+    final course = _dashboardFilters.course?.trim().toLowerCase();
+    final memberByAuth = <String, AlumniMember>{
+      for (final m in a.activeRoster)
+        if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+          m.authUid!.trim(): m,
+    };
+    final ids = <String>{};
+    for (final sample in _waveEmploymentSamples) {
+      if (surveyId != null && sample.survey.id != surveyId) continue;
+      for (final ans in sample.answers) {
+        final uid = ans.userId.trim();
+        if (uid.isEmpty) continue;
+        if (!_respondentMatchesCohort(
+          userId: uid,
+          batch: batch,
+          course: course,
+          memberByAuth: memberByAuth,
+        )) {
+          continue;
+        }
+        ids.add(uid);
+      }
+    }
+    return ids;
+  }
+
+  /// Employment records for alumni who submitted tracer wave(s) in scope.
+  ///
+  /// Falls back to the full analytics set only when no CHED wave samples are
+  /// loaded yet (initial load / empty).
+  List<EmploymentRecord> _scopedEmploymentRecords(AdminReportsAnalytics a) {
+    if (_waveEmploymentSamples.isEmpty) return a.reportEmploymentRecords;
+    final submitters = _tracerWaveSubmitterIds(a);
+    if (submitters.isEmpty) return const [];
+    return a.reportEmploymentRecords
+        .where((r) => submitters.contains(r.userId.trim()))
+        .toList(growable: false);
+  }
+
+  /// Employment-record details only for alumni marked employed on CHED in scope.
+  ///
+  /// Prevents “Not employed” status from still showing Self-employed / salary /
+  /// industry from a stale employment_records row.
+  List<EmploymentRecord> _scopedEmployedDetailRecords(AdminReportsAnalytics a) {
+    if (_waveEmploymentSamples.isEmpty) {
+      return a.reportEmploymentRecords
+          .where((r) => r.employmentStatus.toLowerCase() == 'employed')
+          .toList(growable: false);
+    }
+    final employedIds = _chedEmployedUserIds(a);
+    if (employedIds.isEmpty) return const [];
+    return a.reportEmploymentRecords
+        .where((r) => employedIds.contains(r.userId.trim()))
+        .toList(growable: false);
   }
 
   Future<void> _refreshSurveyReportExtras(List<Survey> surveys) async {
@@ -592,25 +833,26 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                   padding: const EdgeInsets.only(
                     top: AdminReportsTheme.space2,
                   ),
-                  child: Semantics(
+              child: Semantics(
                     label: 'Reports cohort filters',
-                    container: true,
+                container: true,
                     child: ReportsCohortFilterBar(
-                      filters: _dashboardFilters,
-                      surveys: surveyOptions,
-                      batchYears: batchOptions,
+                  filters: _dashboardFilters,
+                  surveys: surveyOptions,
+                  batchYears: batchOptions,
                       waveLabel: tabIndex == 1 ? 'Tracer wave' : 'Survey wave',
                       allWavesLabel: tabIndex == 1
                           ? 'All published tracers'
                           : 'All published surveys',
-                      onChanged: (next) {
-                        setState(() => _dashboardFilters = next);
-                      },
+                  onChanged: (next) {
+                    setState(() => _dashboardFilters = next);
+                        unawaited(_ensureSelectedWaveSample(next.surveyId));
+                  },
                     ),
-                  ),
                 ),
               ),
             ),
+          ),
           SliverToBoxAdapter(
             child: ReportsDashboardCanvas(
               child: Padding(
@@ -746,8 +988,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _buildTabBar() {
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: AdminReportsTheme.space1,
-        vertical: 4,
+        horizontal: 6,
+        vertical: 5,
       ),
       decoration: BoxDecoration(
         color: AdminReportsTheme.card,
@@ -760,11 +1002,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         isScrollable: true,
         tabAlignment: TabAlignment.start,
         dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: AdminReportsTheme.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
-        ),
+        indicatorSize: TabBarIndicatorSize.label,
+        indicatorColor: AdminReportsTheme.primary,
+        indicatorWeight: 3,
         labelColor: AdminReportsTheme.primary,
         unselectedLabelColor: AdminReportsTheme.textSecondary,
         labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
@@ -776,13 +1016,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           for (var i = 0; i < _tabLabels.length; i++)
             Tab(
               height: 40,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(_tabIcons[i], size: 18),
-                  const SizedBox(width: 8),
+                    Icon(_tabIcons[i], size: 17),
+                    const SizedBox(width: 7),
                   Text(_tabLabels[i]),
                 ],
+                ),
               ),
             ),
         ],
@@ -797,8 +1040,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ReportsSectionShell(
           icon: Icons.insights_outlined,
           title: 'At a glance',
-          subtitle:
-              'Current system status. Open Tracer or Survey for cohort detail.',
+          subtitle: 'System status across roster, tracer, and surveys.',
           actions: [
             ReportsSectionAction(
               label: 'Downloads',
@@ -806,86 +1048,119 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               onPressed: () => _selectTab(3),
             ),
           ],
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildMetricsGrid(_overviewMetrics(a)),
-              const SizedBox(height: 10),
-              Text(
-                AdminReportsAnalytics.employmentRateDefinition,
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: AdminReportsTheme.textMuted,
-                ),
-              ),
-            ],
-          ),
+          child: _buildMetricsGrid(_overviewMetrics(a)),
         ),
         ReportsSectionShell(
           icon: Icons.priority_high_outlined,
           title: 'Needs attention',
-          subtitle: 'Follow-ups the office can act on now.',
           child: _buildAttentionList(a),
         ),
-        _buildOverviewCoverageStrip(a),
         ReportsSectionShell(
           icon: Icons.grid_view_outlined,
           title: 'Go to detail',
-          subtitle: 'Jump into the right workspace.',
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _selectTab(1),
-                icon: const Icon(Icons.school_outlined, size: 16),
-                label: const Text('Tracer outcomes'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _selectTab(2),
-                icon: const Icon(Icons.poll_outlined, size: 16),
-                label: const Text('Survey portfolio'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  final open = widget.onOpenAdminMenu;
-                  if (open != null) open(10);
-                },
-                icon: const Icon(Icons.open_in_new, size: 16),
-                label: const Text('Surveys module'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _selectTab(3),
-                icon: const Icon(Icons.download_outlined, size: 16),
-                label: const Text('Downloads'),
-              ),
-            ],
+          subtitle: 'Jump into the workspace you need next.',
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final twoCol = constraints.maxWidth >= 640;
+              final tiles = [
+                ReportsNavTile(
+                  icon: Icons.school_outlined,
+                  title: 'Tracer outcomes',
+                  subtitle: 'Coverage, employment, and CHED waves',
+                  onTap: () => _selectTab(1),
+                  color: Colors.deepPurple,
+                ),
+                ReportsNavTile(
+                  icon: Icons.poll_outlined,
+                  title: 'Survey portfolio',
+                  subtitle: 'Response health and low responders',
+                  onTap: () => _selectTab(2),
+                  color: _navy,
+                ),
+                ReportsNavTile(
+                  icon: Icons.open_in_new,
+                  title: 'Surveys module',
+                  subtitle: 'Question-level charts and wave tools',
+                  onTap: () {
+                    final open = widget.onOpenAdminMenu;
+                    if (open != null) open(10);
+                  },
+                  color: Colors.teal.shade700,
+                ),
+                ReportsNavTile(
+                  icon: Icons.download_outlined,
+                  title: 'Downloads',
+                  subtitle: 'Preset packs and wave comparison',
+                  onTap: () => _selectTab(3),
+                  color: Colors.orange.shade800,
+                ),
+              ];
+              if (!twoCol) {
+                return Column(
+                  children: [
+                    for (var i = 0; i < tiles.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 8),
+                      tiles[i],
+                    ],
+                  ],
+                );
+              }
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: tiles[0]),
+                      const SizedBox(width: 8),
+                      Expanded(child: tiles[1]),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: tiles[2]),
+                      const SizedBox(width: 8),
+                      Expanded(child: tiles[3]),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
+        _buildOverviewCoverageStrip(a),
+        _buildAiInsightsSection(a),
         ReportsSectionShell(
           icon: Icons.show_chart_outlined,
           title: 'Roster growth',
-          subtitle: 'Optional context — cumulative roster over 12 months.',
+          subtitle: 'Cumulative roster over 12 months.',
           initiallyExpanded: false,
           child: _isRefreshing
               ? const ReportsChartSkeleton(height: ReportsChartHeights.hero)
               : _buildRosterGrowthLineChart(a),
         ),
-        _buildAiInsightsSection(a),
       ],
     );
   }
 
   Widget _buildTracerTab(AdminReportsAnalytics a, bool wide) {
+    final chedStatus = _chedEmploymentStatusCounts(a);
+    final waveScoped = _dashboardFilters.surveyId != null;
+    final scopeCount = chedStatus?.answered ?? 0;
+    final waveCount = chedStatus?.waveCount ?? _employmentRateByWavePoints(a).length;
+    final scopeNoun = waveScoped
+        ? 'CHED employment answers'
+        : (waveCount <= 1
+            ? 'CHED employment answers'
+            : 'alumni (latest wave across $waveCount tracers)');
     final scope = _dashboardFilters.scopeLabel(
       surveys: _surveys,
-      responseOrRecordCount: a.reportEmploymentCount,
-      countNoun: 'employment records',
+      responseOrRecordCount: scopeCount,
+      countNoun: scopeNoun,
     );
-    final empty = a.reportEmploymentCount == 0 &&
+    final empty = chedStatus == null &&
         _chedChoiceCounts('ched_24a').isEmpty &&
-        _employmentRateByWavePoints(a).isEmpty;
+        _employmentRateByWavePoints(a).isEmpty &&
+        _scopedEmploymentRecords(a).isEmpty;
 
     return ReportsSectionStack(
       children: [
@@ -893,34 +1168,97 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ReportsSectionShell(
           icon: Icons.work_outline,
           title: 'Employment outcomes',
-          subtitle:
-              'Outcomes from published tracer / CHED waves and employment data. '
-              'Not a monthly activity chart.',
+          subtitle: waveScoped
+              ? 'Status from this tracer wave (CHED presently employed).'
+              : 'Compare published tracer waves, then batch and course outcomes.',
+          trailing: ReportsDetailsButton(
+            title: 'Employment outcomes',
+            body: ReportsDetailsButton.compose(
+              definition: waveScoped
+                  ? 'Shows whether graduates on this tracer said they are '
+                      'currently employed.'
+                  : 'Shows whether graduates said they are currently employed. '
+                      'If someone answered more than one tracer, only their '
+                      'latest answer is counted here.',
+              calculation:
+                  'Employed means they answered “Yes”. Not employed means '
+                  '“No” or “Never employed”.',
+              scope: scope,
+              limitation:
+                  'When comparing all tracers, you will see answers by wave, '
+                  'batch, and course. Charts for employment type, salary, '
+                  'location, and industry include only those who said they '
+                  'are currently employed.',
+            ),
+          ),
           actions: [
-            ReportsSectionAction(
-              label: 'Download tracer',
-              icon: Icons.download_outlined,
-              onPressed: () => _selectTab(3),
+            PopupMenuButton<String>(
+              tooltip: 'Export this filtered Tracer view',
+              enabled: !_downloadBusy,
+              onSelected: (value) {
+                if (value == 'downloads') {
+                  _selectTab(3);
+                  return;
+                }
+                final format = value == 'excel'
+                    ? CustomReportFormat.excel
+                    : CustomReportFormat.pdf;
+                unawaited(_exportTracerFilteredView(a, format: format));
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'pdf',
+                  child: Text('Export PDF (this filter)'),
+                ),
+                PopupMenuItem(
+                  value: 'excel',
+                  child: Text('Export Excel (this filter)'),
+                ),
+                PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'downloads',
+                  child: Text('Open Downloads tab'),
+                ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.download_outlined,
+                      size: 14,
+                      color: _downloadBusy
+                          ? AdminReportsTheme.textMuted
+                          : AdminReportsTheme.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _downloadBusy ? 'Exporting…' : 'Export view',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _downloadBusy
+                            ? AdminReportsTheme.textMuted
+                            : AdminReportsTheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ReportsScopeCaption(text: scope),
-              Text(
-                AdminReportsAnalytics.employmentRateDefinition,
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: AdminReportsTheme.textMuted,
-                ),
-              ),
-              const SizedBox(height: 12),
               if (empty)
-                const ReportsChartEmptyState(
-                  message:
-                      'No employment or CHED outcome data for this filter yet. '
-                      'Try All batches / All courses, or wait for submissions.',
+                ReportsChartEmptyState(
+                  message: waveScoped
+                      ? 'No employment or CHED outcome data on this tracer yet. '
+                          'Publish the wave and wait for submissions.'
+                      : 'No employment or CHED outcome data for this filter yet. '
+                          'Widen batch/course filters or wait for tracer submissions.',
                   icon: Icons.work_off_outlined,
                 )
               else ...[
@@ -930,6 +1268,56 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               ],
             ],
           ),
+        ),
+        ReportsSectionShell(
+          icon: Icons.timeline_outlined,
+          title: 'Same alumni across waves',
+          subtitle:
+              'Employment status over time for people who answered more than one tracer.',
+          initiallyExpanded: false,
+          trailing: ReportsDetailsButton(
+            title: 'Same alumni across waves',
+            body: ReportsDetailsButton.compose(
+              definition:
+                  'Lists graduates who answered at least two tracer surveys, '
+                  'so you can see how their employment status changed over time.',
+              calculation:
+                  'Each chip is that person’s employment answer on that tracer '
+                  '(Yes, No, or Never employed), shown in date order.',
+              scope: scope,
+              limitation:
+                  'A person appears here if they used the same portal account '
+                  'on more than one tracer. Batch and course filters still apply.',
+            ),
+          ),
+          child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+              ReportsScopeCaption(text: scope),
+              TracerLongitudinalPanel(
+                rows: _longitudinalRows(a),
+                onOpenPerson: (row) {
+                  unawaited(
+                    showTracerRespondentsDialog(
+                      context: context,
+                      title: row.displayName,
+                      subtitle:
+                          '${row.points.length} waves · employment status over time',
+                      rows: [
+                        for (final p in row.points)
+                          TracerRespondentRow(
+                            userId: row.userId,
+                            displayName: p.waveLabel,
+                            subtitle: DateFormat.yMMMd().format(p.waveDate),
+                            status: p.status,
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+                  ],
+                ),
         ),
         ReportsSectionShell(
           icon: Icons.pie_chart_outline,
@@ -993,7 +1381,17 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     return ReportsSectionShell(
       icon: Icons.groups_outlined,
       title: 'Tracer coverage',
-      subtitle: 'Who is on the roster, registered, and who already took a tracer.',
+      subtitle: 'Roster → registered → submitted a tracer wave.',
+      initiallyExpanded: false,
+      trailing: ReportsDetailsButton(
+        title: 'Tracer coverage',
+        body: ReportsDetailsButton.compose(
+          definition: coverage.definition,
+          scope: 'System-wide (Overview ignores cohort filters).',
+          limitation:
+              'Different from “Profile complete,” which is the tracer profile flag on the roster.',
+        ),
+      ),
       actions: [
         ReportsSectionAction(
           label: 'Open Tracer',
@@ -1001,53 +1399,39 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           onPressed: () => _selectTab(1),
         ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ReportsResponsiveGrid(
-            minItemWidth: 160,
-            maxColumns: 3,
-            itemCount: 3,
-            itemBuilder: (context, i) {
-              switch (i) {
-                case 0:
-                  return _coverageKpiTile(
-                    label: 'Not registered',
-                    value: '${coverage.notRegistered}',
-                    hint: 'On roster, no portal account',
-                    color: Colors.orange.shade800,
-                    icon: Icons.person_off_outlined,
-                  );
-                case 1:
-                  return _coverageKpiTile(
-                    label: 'Registered, no tracer',
-                    value: '${coverage.registeredNoTracer}',
-                    hint: 'Has account, no CHED/tracer submit',
-                    color: Colors.deepPurple,
-                    icon: Icons.mark_email_unread_outlined,
-                  );
-                default:
-                  return _coverageKpiTile(
-                    label: 'Took a tracer',
-                    value: '${coverage.tookTracer}',
-                    hint:
-                        '${(coverage.tracerTakeRateAmongRegistered * 100).toStringAsFixed(0)}% of registered',
-                    color: Colors.green.shade700,
-                    icon: Icons.assignment_turned_in_outlined,
-                  );
-              }
-            },
-          ),
-          const SizedBox(height: 10),
-          Text(
-            coverage.definition,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.35,
-              color: AdminReportsTheme.textMuted,
-            ),
-          ),
-        ],
+      child: ReportsResponsiveGrid(
+        minItemWidth: 160,
+        maxColumns: 3,
+        itemCount: 3,
+        itemBuilder: (context, i) {
+          switch (i) {
+            case 0:
+              return _coverageKpiTile(
+                label: 'Not registered',
+                value: '${coverage.notRegistered}',
+                hint: 'Roster only',
+                color: Colors.orange.shade800,
+                icon: Icons.person_off_outlined,
+              );
+            case 1:
+              return _coverageKpiTile(
+                label: 'Registered, no tracer',
+                value: '${coverage.registeredNoTracer}',
+                hint: 'No CHED submit',
+                color: Colors.deepPurple,
+                icon: Icons.mark_email_unread_outlined,
+              );
+            default:
+              return _coverageKpiTile(
+                label: 'Took a tracer',
+                value: '${coverage.tookTracer}',
+                hint:
+                    '${(coverage.tracerTakeRateAmongRegistered * 100).toStringAsFixed(0)}% of registered',
+                color: Colors.green.shade700,
+                icon: Icons.assignment_turned_in_outlined,
+              );
+          }
+        },
       ),
     );
   }
@@ -1082,8 +1466,17 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     return ReportsSectionShell(
       icon: Icons.groups_outlined,
       title: 'Coverage',
-      subtitle:
-          'Pinpoint who still needs to register or take the tracer — then follow up.',
+      subtitle: 'Roster → registered → took tracer',
+      trailing: ReportsDetailsButton(
+        title: 'Coverage',
+        body: ReportsDetailsButton.compose(
+          definition: coverage.definition,
+          scope: scope,
+          limitation:
+              '“Took tracer” means submitted the wave — not the same as '
+              '“Profile complete” on Overview.',
+        ),
+      ),
       actions: [
         ReportsSectionAction(
           label: 'Open roster',
@@ -1106,15 +1499,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ReportsScopeCaption(text: scope),
-          Text(
-            coverage.definition,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.35,
-              color: AdminReportsTheme.textMuted,
-            ),
-          ),
-          const SizedBox(height: 12),
           ReportsResponsiveGrid(
             minItemWidth: 160,
             maxColumns: 3,
@@ -1133,7 +1517,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                   return _coverageKpiTile(
                     label: 'Registered, no tracer',
                     value: '${coverage.registeredNoTracer}',
-                    hint: 'Need reminder / follow-up',
+                    hint: 'Need follow-up',
                     color: Colors.deepPurple,
                     icon: Icons.mark_email_unread_outlined,
                   );
@@ -1191,48 +1575,66 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
-        color: AdminReportsTheme.surface,
+        color: AdminReportsTheme.card,
         borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
         border: Border.all(color: AdminReportsTheme.border),
+        boxShadow: AdminReportsTheme.cardShadow,
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AdminReportsTheme.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
+          Container(
+            width: 4,
+            height: 52,
+            decoration: BoxDecoration(
               color: color,
-              height: 1.1,
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            hint,
-            style: const TextStyle(
-              fontSize: 11.5,
-              height: 1.3,
-              color: AdminReportsTheme.textMuted,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, size: 15, color: color),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AdminReportsTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    height: 1.05,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hint,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    height: 1.3,
+                    color: AdminReportsTheme.textMuted,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1266,7 +1668,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return _chartCard(
       title: 'Coverage funnel',
-      subtitle: 'Roster → registered → took tracer (${coverage.waveLabel})',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Steps from total roster size, to registered portal accounts, '
+            'to graduates who submitted a tracer.',
+        scope: coverage.waveLabel,
+      ),
       height: ReportsChartHeights.hero,
       hero: true,
       child: Column(
@@ -1404,9 +1811,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ReportsSectionShell(
           icon: Icons.how_to_vote_outlined,
           title: 'Response health',
-          subtitle:
-              'Portfolio view of survey waves. Open the Surveys module for '
-              'question-level charts and per-survey cohort filters.',
+          subtitle: 'Portfolio view — open Surveys for question-level charts.',
           actions: [
             ReportsSectionAction(
               label: 'Open Surveys',
@@ -1439,33 +1844,31 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                       '${a.publishedSurveys} live · ${a.draftSurveys} drafts · '
                       '${a.closedSurveys} closed',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12.5,
                         color: AdminReportsTheme.textSecondary,
                       ),
                     ),
                     const SizedBox(height: AdminReportsTheme.space2),
                     if (assigned == 0)
                       const ReportsChartEmptyState(
-                        message:
-                            'No survey assignments in this filter yet. '
-                            'Publish a survey or clear filters.',
+                        message: 'No survey assignments in this filter yet.',
                         icon: Icons.poll_outlined,
                       )
                     else ...[
-                      _buildParticipationFunnel(
-                        assigned: assigned,
-                        submitted: submitted,
-                        pending: pending,
-                        responseRate: responseRate,
-                        dropOff: dropOff,
-                      ),
-                      const SizedBox(height: AdminReportsTheme.space2),
-                      _buildParticipationBySurveyChart(a),
-                      const SizedBox(height: AdminReportsTheme.space2),
-                      _buildLowResponseList(a),
-                    ],
+                    _buildParticipationFunnel(
+                      assigned: assigned,
+                      submitted: submitted,
+                      pending: pending,
+                      responseRate: responseRate,
+                      dropOff: dropOff,
+                    ),
+                    const SizedBox(height: AdminReportsTheme.space2),
+                    _buildParticipationBySurveyChart(a),
+                    const SizedBox(height: AdminReportsTheme.space2),
+                    _buildLowResponseList(a),
                   ],
-                ),
+                  ],
+          ),
         ),
       ],
     );
@@ -1493,10 +1896,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           icon: Icons.assignment_late_outlined,
           color: Colors.deepPurple,
           title:
-              '${a.registeredWithoutTracerComplete} registered alumni still need a complete tracer profile',
+              '${a.registeredWithoutTracerComplete} need a complete tracer profile',
           subtitle:
-              '${a.tracerCompleteCount} of ${a.registeredOnRoster} registered are complete.',
-          actionLabel: 'View tracer',
+              '${a.tracerCompleteCount}/${a.registeredOnRoster} registered complete',
+          actionLabel: 'Tracer',
           onAction: () => _selectTab(1),
         ),
       );
@@ -1506,11 +1909,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         _AttentionItem(
           icon: Icons.mark_email_unread_outlined,
           color: _navy,
-          title:
-              '${a.pendingSurveyAssignments} survey assignments still waiting for a response',
+          title: '${a.pendingSurveyAssignments} survey assignments waiting',
           subtitle:
-              '${a.totalSurveyResponses} of ${a.totalSurveyAssignments} assignments submitted.',
-          actionLabel: 'View surveys',
+              '${a.totalSurveyResponses}/${a.totalSurveyAssignments} submitted',
+          actionLabel: 'Survey',
           onAction: () => _selectTab(2),
         ),
       );
@@ -1520,10 +1922,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         _AttentionItem(
           icon: Icons.work_off_outlined,
           color: Colors.orange.shade800,
-          title: 'No employment tracer submissions yet',
-          subtitle:
-              'Employment charts stay empty until alumni submit employment data.',
-          actionLabel: 'View tracer',
+          title: 'No employment submissions yet',
+          subtitle: 'Employment charts stay empty until alumni submit data.',
+          actionLabel: 'Tracer',
           onAction: () => _selectTab(1),
         ),
       );
@@ -1533,10 +1934,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         _AttentionItem(
           icon: Icons.person_off_outlined,
           color: Colors.blueGrey,
-          title: '${a.unclaimedRoster} roster alumni have not registered yet',
+          title: '${a.unclaimedRoster} roster alumni not registered',
           subtitle:
-              '${a.registeredOnRoster} of ${a.rosterTotal} on the roster have portal accounts.',
-          actionLabel: 'Open roster',
+              '${a.registeredOnRoster}/${a.rosterTotal} have portal accounts',
+          actionLabel: 'Roster',
           onAction: () {
             final open = widget.onOpenAdminMenu;
             if (open != null) open(2);
@@ -1547,7 +1948,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     if (items.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(AdminReportsTheme.space3),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: AdminReportsTheme.success.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
@@ -1558,12 +1959,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         child: const Row(
           children: [
             Icon(Icons.check_circle_outline, color: AdminReportsTheme.success),
-            SizedBox(width: 12),
+            SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Nothing urgent — tracer and survey follow-ups look on track.',
+                'Nothing urgent — follow-ups look on track.',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: AdminReportsTheme.textPrimary,
                 ),
@@ -1577,7 +1978,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     return Column(
       children: [
         for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
+          if (i > 0) const SizedBox(height: 6),
           _buildAttentionCard(items[i]),
         ],
       ],
@@ -1585,26 +1986,30 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   }
 
   Widget _buildAttentionCard(_AttentionItem item) {
-    return Container(
-      padding: const EdgeInsets.all(AdminReportsTheme.space3),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onAction,
+        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: AdminReportsTheme.surface,
+            color: AdminReportsTheme.card,
         borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
         border: Border.all(color: AdminReportsTheme.border),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+                width: 34,
+                height: 34,
             decoration: BoxDecoration(
               color: item.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(item.icon, color: item.color, size: 20),
+                child: Icon(item.icon, color: item.color, size: 17),
           ),
-          const SizedBox(width: 12),
+              const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1612,27 +2017,36 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 Text(
                   item.title,
                   style: const TextStyle(
-                    fontSize: 14,
+                        fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                     color: AdminReportsTheme.textPrimary,
-                    height: 1.3,
+                        height: 1.25,
                   ),
                 ),
-                const SizedBox(height: 4),
                 Text(
                   item.subtitle,
                   style: const TextStyle(
-                    fontSize: 12.5,
-                    color: AdminReportsTheme.textSecondary,
-                    height: 1.35,
+                        fontSize: 11.5,
+                        color: AdminReportsTheme.textMuted,
+                        height: 1.3,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          TextButton(onPressed: item.onAction, child: Text(item.actionLabel)),
-        ],
+              const SizedBox(width: 6),
+              Text(
+                item.actionLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: item.color,
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 18, color: item.color),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1657,20 +2071,33 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         value: a.registeredOnRoster.toString(),
         icon: Icons.how_to_reg,
         color: Colors.blue,
-        comparisonLabel:
-            '${a.registeredOnRoster} of ${a.rosterTotal} on the roster '
-            'have portal accounts',
+        comparisonLabel: 'of ${a.rosterTotal} roster',
+        details: ReportsDetailsButton.compose(
+          definition: 'Alumni on the roster who already have a portal account.',
+          calculation:
+              '${a.registeredOnRoster} registered out of ${a.rosterTotal} on the active roster.',
+          scope: 'Overview for the whole system (cohort filters do not apply here).',
+        ),
         status: regStatus,
         statusLabel: reportsKpiStatusLabel(regStatus),
       ),
       _Metric(
-        label: 'Tracer completion',
+        label: 'Profile complete',
         value: '${(a.tracerCompletionRate * 100).toStringAsFixed(0)}%',
         icon: Icons.assignment_turned_in,
         color: Colors.deepPurple,
         comparisonLabel:
-            '${a.tracerCompleteCount} of ${a.registeredOnRoster} registered '
-            'finished their tracer profile',
+            '${a.tracerCompleteCount}/${a.registeredOnRoster} registered',
+        details: ReportsDetailsButton.compose(
+          definition:
+              'Registered alumni whose profile is marked complete in the roster.',
+          calculation:
+              '${a.tracerCompleteCount} complete out of ${a.registeredOnRoster} registered.',
+          scope: 'Based on the roster profile status — not tracer survey submission.',
+          limitation:
+              'This is different from “Took tracer”, which counts completed '
+              'tracer surveys.',
+        ),
         status: tracerStatus,
         statusLabel: reportsKpiStatusLabel(tracerStatus),
       ),
@@ -1680,8 +2107,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         icon: Icons.check_circle_outline,
         color: _navy,
         comparisonLabel:
-            '${a.totalSurveyResponses} of ${a.totalSurveyAssignments} '
-            'assignments submitted',
+            '${a.totalSurveyResponses}/${a.totalSurveyAssignments} assignments',
+        details: ReportsDetailsButton.compose(
+          definition: 'Share of survey invitations that received a submitted response.',
+          calculation:
+              '${a.totalSurveyResponses} submitted out of ${a.totalSurveyAssignments} assigned.',
+          scope: 'All survey waves included in this overview.',
+        ),
         status: surveyStatus,
         statusLabel: reportsKpiStatusLabel(surveyStatus),
       ),
@@ -1693,9 +2125,20 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         icon: Icons.work_outline,
         color: Colors.green.shade700,
         comparisonLabel: a.reportEmploymentCount == 0
-            ? 'No employment data submitted yet'
-            : '${a.employedCount} of ${a.reportEmploymentCount} with '
-                  'employment data are employed',
+            ? 'No data yet'
+            : '${a.employedCount}/${a.reportEmploymentCount} submissions',
+        details: ReportsDetailsButton.compose(
+          definition: AdminReportsAnalytics.employmentRateDefinition,
+          calculation: a.reportEmploymentCount == 0
+              ? 'No employment information is available yet.'
+              : '${a.employedCount} employed out of ${a.reportEmploymentCount} '
+                  'with employment information.',
+          scope: 'Registered alumni with employment information on file '
+              '(each person counted once).',
+          limitation:
+              'If the data set is large, results may be capped. Tracer employment '
+              'charts use survey answers instead.',
+        ),
         status: a.reportEmploymentCount == 0
             ? ReportsKpiStatus.neutral
             : employmentStatus,
@@ -1709,8 +2152,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         icon: Icons.mark_email_unread_outlined,
         color: Colors.orange.shade800,
         comparisonLabel: a.pendingSurveyAssignments == 0
-            ? 'No waiting assignments'
-            : 'Assignments still waiting for alumni to respond',
+            ? 'Clear'
+            : 'Awaiting response',
+        details: ReportsDetailsButton.compose(
+          definition: 'Assignments that still need an alumni response.',
+          calculation:
+              '${a.totalSurveyAssignments} assigned − ${a.totalSurveyResponses} submitted.',
+          scope: 'Portfolio assignments across survey waves.',
+        ),
         status: pendingStatus,
         statusLabel: a.pendingSurveyAssignments == 0
             ? 'Clear'
@@ -1788,7 +2237,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     if (series.cumulative.every((v) => v == 0)) {
       return _chartCard(
         title: 'Alumni roster growth',
-        subtitle: 'Cumulative roster entries by month added',
+        details: ReportsDetailsButton.compose(
+          definition: 'Cumulative roster entries by month the record was added.',
+        ),
         height: ReportsChartHeights.hero,
         hero: true,
         child: const ReportsChartEmptyState(
@@ -1805,8 +2256,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return _chartCard(
       title: 'Alumni roster growth',
-      subtitle:
-          'Cumulative roster vs registered alumni (by record created month)',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Cumulative roster vs registered alumni by record created month.',
+      ),
       height: ReportsChartHeights.hero,
       hero: true,
       child: _lineChart(
@@ -1963,8 +2416,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     if (points.isEmpty) {
       return _chartCard(
         title: 'Employment rate by tracer',
-        subtitle:
-            'Presently employed (CHED item 16) for each published tracer wave',
+        details: ReportsDetailsButton.compose(
+          definition:
+              'Share of graduates who said they are currently employed, '
+              'shown for each published tracer.',
+          calculation:
+              'Employed answers divided by total employment answers on that tracer.',
+          limitation:
+              'This uses tracer survey answers. It may differ from the '
+              'employment rate on the Overview tab.',
+        ),
         height: ReportsChartHeights.hero,
         hero: true,
         child: const ReportsChartEmptyState(
@@ -1976,8 +2437,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return _chartCard(
       title: 'Employment rate by tracer',
-      subtitle:
-          'Presently employed (CHED item 16) · one point per published tracer wave',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Share of graduates who said they are currently employed, '
+            'shown for each published tracer.',
+        calculation:
+            'Employed answers divided by total employment answers on that tracer.',
+        limitation:
+            'This uses tracer survey answers. It may differ from the '
+            'employment rate on the Overview tab.',
+      ),
       height: ReportsChartHeights.hero,
       hero: true,
       child: Column(
@@ -2200,7 +2669,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   }
 
   String _waveShortLabel(Survey survey) {
-    final stamp = DateFormat('MMM yy').format(survey.createdAt);
+    final stamp = DateFormat('MMM yy').format(reportsSurveyDisplayDate(survey));
     final title = survey.title.trim();
     if (title.isEmpty) return stamp;
     final short = title.length <= 14 ? title : '${title.substring(0, 12)}…';
@@ -2211,10 +2680,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     if (_isRefreshing) {
       return Column(
         children: [
-          ReportsChartGrid.twoColumn(
-            left: const ReportsChartSkeleton(),
-            right: const ReportsChartSkeleton(),
-          ),
+          const ReportsChartSkeleton(height: ReportsChartHeights.standard),
           const SizedBox(height: AdminReportsTheme.gutter),
           ReportsChartGrid.twoColumn(
             left: const ReportsChartSkeleton(),
@@ -2224,30 +2690,261 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       );
     }
 
+    final showAllComparisons = _dashboardFilters.surveyId == null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _buildEmploymentPieChart(a),
+        if (showAllComparisons) ...[
+          const SizedBox(height: AdminReportsTheme.sectionGap),
+          _buildCompareAcrossHeader(),
+          const SizedBox(height: AdminReportsTheme.gutter),
+          _buildWaveComparisonChart(a),
+          const SizedBox(height: AdminReportsTheme.gutter),
         ReportsChartGrid.twoColumn(
-          left: _buildEmploymentPieChart(a),
-          right: _buildEmploymentTypeChart(a),
+            left: _buildAnswersByBatchChart(a),
+            right: _buildAnswersByCourseChart(a),
+        ),
+        ],
+        const SizedBox(height: AdminReportsTheme.sectionGap),
+        _buildEmployedDetailsHeader(),
+        const SizedBox(height: AdminReportsTheme.gutter),
+        ReportsChartGrid.twoColumn(
+          left: _buildEmploymentTypeChart(a),
+          right: _buildSalaryRangeChart(a),
         ),
         const SizedBox(height: AdminReportsTheme.gutter),
         ReportsChartGrid.twoColumn(
-          left: _buildSalaryRangeChart(a),
-          right: _buildGraduateLocationChart(a),
+          left: _buildGraduateLocationChart(a),
+          right: _buildIndustryBarChart(a),
         ),
-        const SizedBox(height: AdminReportsTheme.gutter),
-        _buildIndustryBarChart(a),
         const SizedBox(height: AdminReportsTheme.gutter),
         ReportsChartGrid.twoColumn(
           left: _buildDegreeAlignmentChart(),
           right: _buildFurtherEducationChart(),
         ),
+        const SizedBox(height: AdminReportsTheme.sectionGap),
+        _buildChedOutcomesHeader(),
+        const SizedBox(height: AdminReportsTheme.gutter),
+        ReportsChartGrid.twoColumn(
+          left: _buildChedChoiceChart(
+            title: 'Reasons not employed',
+            questionId: 'ched_17',
+            definition:
+                'Reasons graduates gave for not being employed yet '
+                '(more than one reason may be selected).',
+            emptyMessage: 'No not-employed reason answers yet',
+            color: Colors.orange.shade800,
+            emptyIcon: Icons.person_off_outlined,
+          ),
+          right: _buildChedChoiceChart(
+            title: 'Present employment status',
+            questionId: 'ched_18',
+            definition:
+                'How graduates describe their current job status '
+                '(for example regular, temporary, casual, contractual, '
+                'or self-employed).',
+            emptyMessage: 'No present employment status answers yet',
+            color: Colors.indigo.shade700,
+          ),
+        ),
+        const SizedBox(height: AdminReportsTheme.gutter),
+        ReportsChartGrid.twoColumn(
+          left: _buildChedChoiceChart(
+            title: 'Place of work',
+            questionId: 'ched_21',
+            definition: 'Whether graduates work locally or abroad.',
+            emptyMessage: 'No place-of-work answers yet',
+            color: Colors.teal.shade700,
+          ),
+          right: _buildChedChoiceChart(
+            title: 'First job after college',
+            questionId: 'ched_22',
+            definition:
+                'Whether the current or reported job is their first job '
+                'after college.',
+            emptyMessage: 'No first-job answers yet',
+            color: Colors.blueGrey.shade700,
+          ),
+        ),
+        const SizedBox(height: AdminReportsTheme.gutter),
+        ReportsChartGrid.twoColumn(
+          left: _buildChedChoiceChart(
+            title: 'Time to first job',
+            questionId: 'ched_29',
+            definition: 'How long it took graduates to land their first job.',
+            emptyMessage: 'No time-to-first-job answers yet',
+            color: Colors.deepOrange.shade700,
+          ),
+          right: _buildChedChoiceChart(
+            title: 'Initial monthly earning',
+            questionId: 'ched_31',
+            definition:
+                'Reported initial gross monthly earnings in the first job.',
+            emptyMessage: 'No initial earning answers yet',
+            color: Colors.green.shade800,
+          ),
+        ),
+        const SizedBox(height: AdminReportsTheme.gutter),
+        _buildChedChoiceChart(
+          title: 'Curriculum relevant to first job',
+          questionId: 'ched_32',
+          definition:
+              'Whether graduates felt their college curriculum was relevant '
+              'to their first job.',
+          emptyMessage: 'No curriculum-relevance answers yet',
+          color: Colors.purple.shade700,
+          emptyIcon: Icons.school_outlined,
+        ),
       ],
     );
   }
 
-  /// Counts non-empty field values on employment records (optionally employed-only).
+  Widget _buildChedOutcomesHeader() {
+    return const Row(
+      children: [
+        Icon(
+          Icons.fact_check_outlined,
+          size: 16,
+          color: AdminReportsTheme.textMuted,
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'More CHED GTS outcomes',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: AdminReportsTheme.textPrimary,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Official tracer items beyond employment status and degree alignment.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.35,
+                  color: AdminReportsTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChedChoiceChart({
+    required String title,
+    required String questionId,
+    required String definition,
+    required String emptyMessage,
+    required Color color,
+    IconData emptyIcon = Icons.bar_chart_outlined,
+  }) {
+    return _distributionBarCard(
+      title: title,
+      details: ReportsDetailsButton.compose(
+        definition: definition,
+        scope: 'Submitted tracer answers within the filters you selected.',
+        limitation:
+            'When answers come from more than one tracer, totals are combined '
+            'and may be approximate.',
+      ),
+      entries: _chedChoiceCounts(questionId),
+      emptyMessage: emptyMessage,
+      color: color,
+      emptyIcon: emptyIcon,
+    );
+  }
+
+  Widget _buildCompareAcrossHeader() {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AdminReportsTheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.compare_arrows_outlined,
+            size: 17,
+            color: AdminReportsTheme.primary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Compare across waves',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: AdminReportsTheme.textPrimary,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Published tracers side by side, then who answered by batch and course. Tap a bar for names.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AdminReportsTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmployedDetailsHeader() {
+    return const Row(
+      children: [
+        Icon(
+          Icons.work_outline,
+          size: 16,
+          color: AdminReportsTheme.textMuted,
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Employed details',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: AdminReportsTheme.textPrimary,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Only alumni with CHED presently employed = Yes. Not a wave comparison.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.35,
+                  color: AdminReportsTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Counts non-empty field values on CHED-employed alumni employment records.
   List<MapEntry<String, int>> _employmentFieldCounts(
     AdminReportsAnalytics a,
     String? Function(EmploymentRecord r) fieldOf, {
@@ -2255,12 +2952,35 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     bool employedOnly = false,
   }) {
     final counts = <String, int>{};
-    for (final r in a.reportEmploymentRecords) {
-      if (employedOnly && r.employmentStatus.toLowerCase() != 'employed') {
+    // Detail charts must follow CHED employed status, not stale record status.
+    final records = employedOnly
+        ? _scopedEmployedDetailRecords(a)
+        : _scopedEmploymentRecords(a);
+    for (final r in records) {
+      if (employedOnly &&
+          _waveEmploymentSamples.isEmpty &&
+          r.employmentStatus.toLowerCase() != 'employed') {
         continue;
       }
       final raw = (fieldOf(r) ?? '').trim();
       final key = raw.isEmpty ? 'Not specified' : raw;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    final list = counts.entries.toList()
+      ..sort((x, y) => y.value.compareTo(x.value));
+    if (list.length <= limit) return list;
+    return list.take(limit).toList();
+  }
+
+  List<MapEntry<String, int>> _industryCounts(
+    List<EmploymentRecord> records, {
+    int limit = 10,
+  }) {
+    final counts = <String, int>{};
+    for (final r in records) {
+      final key = (r.industry ?? '').trim().isEmpty
+          ? 'Not specified'
+          : r.industry!.trim();
       counts[key] = (counts[key] ?? 0) + 1;
     }
     final list = counts.entries.toList()
@@ -2292,6 +3012,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     return list;
   }
 
+  static const _noChedEmployedDetails =
+      'No employed graduates in this filter yet. '
+      'This chart only includes alumni who said they are currently employed.';
+
   Widget _buildEmploymentTypeChart(AdminReportsAnalytics a) {
     final types = _employmentFieldCounts(
       a,
@@ -2300,9 +3024,19 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
     return _distributionBarCard(
       title: 'Employment type',
-      subtitle: 'Full-time, part-time, contract, freelance, self-employed',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'How employed graduates describe their work arrangement '
+            '(for example full-time, part-time, contract, or self-employed).',
+        scope:
+            'Only alumni who answered that they are currently employed, '
+            'within the filters you selected.',
+        limitation:
+            'Drawn from each graduate’s employment details — not from the '
+            'whole roster.',
+      ),
       entries: types,
-      emptyMessage: 'No employment type data yet',
+      emptyMessage: _noChedEmployedDetails,
       color: Colors.indigo,
     );
   }
@@ -2316,41 +3050,469 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
     return _distributionBarCard(
       title: 'Salary range',
-      subtitle: 'From tracer employment submissions (employed)',
+      details: ReportsDetailsButton.compose(
+        definition: 'Reported salary bands among currently employed graduates.',
+        scope:
+            'Only alumni who answered that they are currently employed, '
+            'within the filters you selected.',
+      ),
       entries: ranges,
-      emptyMessage: 'No salary range data yet',
+      emptyMessage: _noChedEmployedDetails,
       color: Colors.teal.shade700,
     );
   }
 
   Widget _buildGraduateLocationChart(AdminReportsAnalytics a) {
-    final locations = _employmentFieldCounts(a, (r) {
+    final locations = _employmentFieldCounts(
+      a,
+      (r) {
       final province = (r.province ?? '').trim();
       if (province.isNotEmpty) return province;
       final city = (r.city ?? '').trim();
       if (city.isNotEmpty) return city;
       return (r.country ?? '').trim();
-    }, limit: 8);
+      },
+      employedOnly: true,
+      limit: 8,
+    );
     return _distributionBarCard(
       title: 'Graduate location',
-      subtitle: 'Province / city / country from employment records',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Where employed graduates reported working or living '
+            '(province, city, or country when available).',
+        scope:
+            'Only alumni who answered that they are currently employed, '
+            'within the filters you selected.',
+      ),
       entries: locations,
-      emptyMessage: 'No location data yet',
+      emptyMessage: _noChedEmployedDetails,
       color: Colors.brown.shade600,
+    );
+  }
+
+  /// Side-by-side wave outcomes for All-tracers mode (grouped bars).
+  Widget _buildWaveComparisonChart(AdminReportsAnalytics a) {
+    final points = _employmentRateByWavePoints(a);
+    final rows = [
+      for (final p in points)
+        (
+          label: p.label,
+          shortLabel: DateFormat('MMM d').format(p.createdAt),
+          answered: p.answered,
+          employed: p.employed,
+          rate: p.rate,
+        ),
+    ];
+    return _buildGroupedComparisonChart(
+      title: 'By published tracer',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Compares each published tracer: how many answered, and how many '
+            'said they are employed.',
+        calculation:
+            'Blue bars are answers. Green bars are employed (“Yes”). '
+            'The rate is employed ÷ answers. Tap a bar to see who answered.',
+      ),
+      rows: rows,
+      emptyMessage: 'No tracer waves with employment answers yet',
+      emptyIcon: Icons.compare_arrows_outlined,
+      onBarTap: (i) {
+        if (i < 0 || i >= points.length) return;
+        unawaited(
+          _openWaveRespondentsDialog(a, surveyId: points[i].surveyId),
+        );
+      },
+    );
+  }
+
+  List<({String label, int employed, int answered, double rate})>
+      _chedEmploymentGroupRates(
+    AdminReportsAnalytics a, {
+    required String Function(AlumniMember? member, TracerProfile? profile)
+        groupOf,
+  }) {
+    final memberByAuth = <String, AlumniMember>{
+      for (final m in a.activeRoster)
+        if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+          m.authUid!.trim(): m,
+    };
+
+    final employed = <String, int>{};
+    final answered = <String, int>{};
+    final statuses = _chedLatestStatusByUser(a);
+
+    for (final e in statuses.entries) {
+      final uid = e.key;
+      final member = memberByAuth[uid];
+      final profile = _registeredProfiles[uid];
+      final label = groupOf(member, profile).trim();
+      final key = label.isEmpty ? 'Unknown' : label;
+      answered[key] = (answered[key] ?? 0) + 1;
+      if (e.value == ChedGtsBuiltin.yes) {
+        employed[key] = (employed[key] ?? 0) + 1;
+      }
+    }
+
+    final keys = answered.keys.toList()
+      ..sort((x, y) => (answered[y] ?? 0).compareTo(answered[x] ?? 0));
+    return [
+      for (final k in keys.take(8))
+        (
+          label: k,
+          employed: employed[k] ?? 0,
+          answered: answered[k] ?? 0,
+          rate: (answered[k] ?? 0) == 0
+              ? 0.0
+              : (employed[k] ?? 0) / answered[k]! * 100,
+        ),
+    ];
+  }
+
+  Widget _buildAnswersByBatchChart(AdminReportsAnalytics a) {
+    final grouped = _chedEmploymentGroupRates(
+      a,
+      groupOf: (member, profile) {
+        final memberBatch = member == null
+            ? ''
+            : (member.batchYear.trim().isNotEmpty
+                  ? member.batchYear.trim()
+                  : (member.yearGraduated ?? '').trim());
+        final profileBatch = profile == null
+            ? ''
+            : (profile.batchYear.trim().isNotEmpty
+                  ? profile.batchYear.trim()
+                  : profile.yearGraduated.trim());
+        return memberBatch.isNotEmpty ? memberBatch : profileBatch;
+      },
+    );
+    final rows = [
+      for (final r in grouped)
+        (
+          label: r.label,
+          shortLabel: r.label.length > 8 ? '${r.label.substring(0, 7)}…' : r.label,
+          answered: r.answered,
+          employed: r.employed,
+          rate: r.rate,
+        ),
+    ];
+    return _buildGroupedComparisonChart(
+      title: 'By batch',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Employment answers grouped by batch or year graduated. '
+            'When viewing all tracers, each person is counted from their latest answer.',
+        calculation:
+            'Blue bars are alumni who answered. Green bars are currently employed. '
+            'Tap a bar to see who answered.',
+      ),
+      rows: rows,
+      emptyMessage: 'No batch-linked tracer answers yet',
+      emptyIcon: Icons.calendar_today_outlined,
+      compact: true,
+      onBarTap: (i) {
+        if (i < 0 || i >= grouped.length) return;
+        unawaited(
+          _openCohortRespondentsDialog(
+            a,
+            groupLabel: grouped[i].label,
+            groupOf: (member, profile) {
+              final memberBatch = member == null
+                  ? ''
+                  : (member.batchYear.trim().isNotEmpty
+                        ? member.batchYear.trim()
+                        : (member.yearGraduated ?? '').trim());
+              final profileBatch = profile == null
+                  ? ''
+                  : (profile.batchYear.trim().isNotEmpty
+                        ? profile.batchYear.trim()
+                        : profile.yearGraduated.trim());
+              return memberBatch.isNotEmpty ? memberBatch : profileBatch;
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnswersByCourseChart(AdminReportsAnalytics a) {
+    final grouped = _chedEmploymentGroupRates(
+      a,
+      groupOf: (member, profile) {
+        if (member?.course.trim().isNotEmpty == true) return member!.course;
+        return profile?.program.trim() ?? '';
+      },
+    );
+    final rows = [
+      for (final r in grouped)
+        (
+          label: r.label,
+          shortLabel: r.label.length > 10 ? '${r.label.substring(0, 9)}…' : r.label,
+          answered: r.answered,
+          employed: r.employed,
+          rate: r.rate,
+        ),
+    ];
+    return _buildGroupedComparisonChart(
+      title: 'By course',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Employment answers grouped by program or course. '
+            'When viewing all tracers, each person is counted from their latest answer.',
+        calculation:
+            'Blue bars are alumni who answered. Green bars are currently employed. '
+            'Tap a bar to see who answered.',
+      ),
+      rows: rows,
+      emptyMessage: 'No course-linked tracer answers yet',
+      emptyIcon: Icons.school_outlined,
+      compact: true,
+      onBarTap: (i) {
+        if (i < 0 || i >= grouped.length) return;
+        unawaited(
+          _openCohortRespondentsDialog(
+            a,
+            groupLabel: grouped[i].label,
+            groupOf: (member, profile) {
+              if (member?.course.trim().isNotEmpty == true) {
+                return member!.course;
+              }
+              return profile?.program.trim() ?? '';
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// Grouped bars: answers (blue) vs employed (green) per category.
+  Widget _buildGroupedComparisonChart({
+    required String title,
+    required String details,
+    required List<
+            ({
+              String label,
+              String shortLabel,
+              int answered,
+              int employed,
+              double rate,
+            })>
+        rows,
+    required String emptyMessage,
+    IconData emptyIcon = Icons.bar_chart_outlined,
+    bool compact = false,
+    ValueChanged<int>? onBarTap,
+  }) {
+    if (rows.isEmpty) {
+      return _chartCard(
+        title: title,
+        details: details,
+        height: ReportsChartHeights.standard,
+        child: ReportsChartEmptyState(message: emptyMessage, icon: emptyIcon),
+      );
+    }
+
+    final maxY = rows
+        .map((r) => r.answered)
+        .fold<int>(0, (m, v) => v > m ? v : m)
+        .toDouble()
+        .clamp(1, double.infinity);
+    final totalAnswered = rows.fold<int>(0, (s, r) => s + r.answered);
+
+    return _chartCard(
+      title: title,
+      details: details,
+      height: compact ? ReportsChartHeights.standard : ReportsChartHeights.hero,
+      hero: !compact,
+      child: Column(
+        children: [
+          ReportsSmallNBanner(
+            n: totalAnswered,
+            noun: 'answers across categories',
+          ),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxY * 1.25,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  handleBuiltInTouches: true,
+                  touchCallback: (event, response) {
+                    if (onBarTap == null) return;
+                    // Prefer tap-down so the spot is still present (esp. on web).
+                    if (event is! FlTapDownEvent) return;
+                    final spot = response?.spot;
+                    if (spot == null) return;
+                    onBarTap(spot.touchedBarGroupIndex);
+                  },
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      if (groupIndex < 0 || groupIndex >= rows.length) {
+                        return null;
+                      }
+                      final r = rows[groupIndex];
+                      final series = rodIndex == 0 ? 'Answers' : 'Employed';
+                      final value = rodIndex == 0 ? r.answered : r.employed;
+                      return BarTooltipItem(
+                        '${r.label}\n'
+                        '$series: $value\n'
+                        'Rate: ${r.rate.toStringAsFixed(0)}%'
+                        '${onBarTap == null ? '' : '\nTap to list respondents'}',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: compact ? 28 : 36,
+                      getTitlesWidget: (value, meta) {
+                        final i = value.toInt();
+                        if (i < 0 || i >= rows.length) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            rows[i].shortLabel,
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AdminReportsTheme.textMuted,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      getTitlesWidget: (value, meta) {
+                        if (value != value.roundToDouble()) {
+                          return const SizedBox.shrink();
+                        }
+                        return Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AdminReportsTheme.textMuted,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (v) => FlLine(
+                    color: AdminReportsTheme.border,
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: [
+                  for (var i = 0; i < rows.length; i++)
+                    BarChartGroupData(
+                      x: i,
+                      barsSpace: 4,
+                      barRods: [
+                        BarChartRodData(
+                          toY: rows[i].answered.toDouble(),
+                          color: Colors.blue.shade700,
+                          width: compact ? 10 : 12,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(4),
+                          ),
+                        ),
+                        BarChartRodData(
+                          toY: rows[i].employed.toDouble(),
+                          color: Colors.green.shade600,
+                          width: compact ? 10 : 12,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+              swapAnimationDuration: Duration.zero,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 14,
+            runSpacing: 4,
+            alignment: WrapAlignment.center,
+            children: [
+              _legendItem(Colors.blue.shade700, 'Answers'),
+              _legendItem(Colors.green.shade600, 'Employed'),
+              Text(
+                rows.length == 1
+                    ? '1 category — tap the bar to list respondents'
+                    : onBarTap == null
+                        ? '${rows.length} categories compared'
+                        : '${rows.length} categories · tap a bar for names',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AdminReportsTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildDegreeAlignmentChart() {
     final entries = _chedChoiceCounts('ched_24a');
     final total = entries.fold<int>(0, (s, e) => s + e.value);
+    final details = ReportsDetailsButton.compose(
+      definition:
+          'Whether the graduate’s first job relates to their degree.',
+      scope: 'Submitted tracer answers within the filters you selected.',
+    );
     return _chartCard(
       title: 'Degree alignment',
-      subtitle: 'Graduates whose first job relates to their degree',
-      height: ReportsChartHeights.standard,
+      details: details,
+      height: total > 0 && total < _chartMinUsefulN
+          ? null
+          : ReportsChartHeights.standard,
       child: total == 0
           ? const ReportsChartEmptyState(
               message: 'No degree-alignment responses yet',
               icon: Icons.school_outlined,
+            )
+          : total < _chartMinUsefulN
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ReportsSmallNBanner(n: total, noun: 'answers'),
+                    ReportsRankedSummary(
+                      entries: entries,
+                      totalLabel: 'answers',
+                      accent: Colors.green,
+                    ),
+                  ],
             )
           : _pieWithCenter(
               total: total,
@@ -2375,7 +3537,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final entries = _chedChoiceCounts('ched_15b');
     return _distributionBarCard(
       title: 'Further studies',
-      subtitle: 'Reasons graduates pursue further studies',
+      details: ReportsDetailsButton.compose(
+        definition: 'Reasons graduates gave for pursuing further studies.',
+        scope: 'Submitted tracer answers within the filters you selected.',
+      ),
       entries: entries,
       emptyMessage: 'No further-studies responses yet',
       color: Colors.deepPurple,
@@ -2385,7 +3550,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   Widget _distributionBarCard({
     required String title,
-    required String subtitle,
+    String? details,
     required List<MapEntry<String, int>> entries,
     required String emptyMessage,
     required Color color,
@@ -2394,9 +3559,32 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     if (entries.isEmpty || entries.every((e) => e.value == 0)) {
       return _chartCard(
         title: title,
-        subtitle: subtitle,
+        details: details,
         height: ReportsChartHeights.standard,
-        child: ReportsChartEmptyState(message: emptyMessage, icon: emptyIcon),
+        child: ReportsChartEmptyState(
+          message: emptyMessage,
+          icon: emptyIcon,
+        ),
+      );
+    }
+
+    final total = entries.fold<int>(0, (s, e) => s + e.value);
+    if (total < _chartMinUsefulN) {
+      return _chartCard(
+        title: title,
+        details: details,
+        height: null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ReportsSmallNBanner(n: total, noun: 'responses'),
+            ReportsRankedSummary(
+              entries: entries,
+              totalLabel: 'responses',
+              accent: color,
+            ),
+          ],
+        ),
       );
     }
 
@@ -2404,7 +3592,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return _chartCard(
       title: title,
-      subtitle: subtitle,
+      details: details,
       height: ReportsChartHeights.standard,
       child: BarChart(
         BarChartData(
@@ -2657,7 +3845,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     if (list.isEmpty) {
       return _chartCard(
         title: 'Participation by survey',
-        subtitle: 'Completion rate per published survey wave',
+        details: ReportsDetailsButton.compose(
+          definition: 'Completion rate per published survey wave.',
+          limitation: 'Amber bars mark waves under 40% response.',
+        ),
         height: ReportsChartHeights.hero,
         hero: true,
         child: const ReportsChartEmptyState(
@@ -2673,7 +3864,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return _chartCard(
       title: 'Participation by survey',
-      subtitle: 'Completion rate per wave — amber marks low response (<40%)',
+      details: ReportsDetailsButton.compose(
+        definition: 'Completion rate per published survey wave.',
+        limitation: 'Amber bars mark waves under 40% response.',
+      ),
       height: ReportsChartHeights.hero,
       hero: true,
       child: BarChart(
@@ -2879,7 +4073,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     final submissions = <String, int>{};
     final employed = <String, int>{};
-    for (final r in a.reportEmploymentRecords) {
+    for (final r in _scopedEmploymentRecords(a)) {
       final uid = r.userId.trim();
       var course = uid.isNotEmpty ? uidCourse[uid] : null;
       course ??= sidCourse[AlumniMemberService.normalizeStudentId(r.schoolId)];
@@ -3216,14 +4410,19 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       icon: metric.icon,
       color: metric.color,
       comparisonLabel: metric.comparisonLabel,
+      details: metric.details,
       status: metric.status,
       statusLabel: metric.statusLabel,
     );
   }
 
+  /// Prefer a ranked summary when the sample is too small for a useful chart.
+  static const _chartMinUsefulN = 5;
+
   Widget _chartCard({
     required String title,
     String? subtitle,
+    String? details,
     required double? height,
     required Widget child,
     bool hero = false,
@@ -3233,6 +4432,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       child: ReportsChartSurface(
         title: title,
         subtitle: subtitle,
+        details: details,
         height: height,
         hero: hero,
         child: RepaintBoundary(child: child),
@@ -3245,7 +4445,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     if (batches.isEmpty) {
       return _chartCard(
         title: 'Roster by batch year',
-        subtitle: 'Active roster entries',
+        details: ReportsDetailsButton.compose(
+          definition: 'Alumni on the active roster grouped by batch year.',
+        ),
         height: ReportsChartHeights.hero,
         hero: true,
         child: const ReportsChartEmptyState(
@@ -3259,7 +4461,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return _chartCard(
       title: 'Roster by batch year',
-      subtitle: 'Active roster entries',
+      details: ReportsDetailsButton.compose(
+        definition: 'Alumni on the active roster grouped by batch year.',
+      ),
       height: ReportsChartHeights.hero,
       hero: true,
       child: BarChart(
@@ -3340,10 +4544,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   Widget _buildCoursePieChart(AdminReportsAnalytics a) {
     final courses = a.topCourses();
+    final details = ReportsDetailsButton.compose(
+      definition: 'Alumni on the active roster grouped by program or course.',
+    );
     if (courses.isEmpty) {
       return _chartCard(
         title: 'Roster by course',
-        subtitle: 'Program distribution',
+        details: details,
         height: ReportsChartHeights.hero,
         child: const ReportsChartEmptyState(
           message: 'No roster data yet',
@@ -3362,9 +4569,28 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     ];
     final total = courses.fold<int>(0, (s, e) => s + e.value);
 
+    if (total < _chartMinUsefulN) {
     return _chartCard(
       title: 'Roster by course',
-      subtitle: 'Program distribution',
+        details: details,
+        height: null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ReportsSmallNBanner(n: total, noun: 'alumni'),
+            ReportsRankedSummary(
+              entries: courses,
+              totalLabel: 'alumni',
+              accent: _navy,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _chartCard(
+      title: 'Roster by course',
+      details: details,
       height: ReportsChartHeights.hero,
       child: Column(
         children: [
@@ -3412,40 +4638,135 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   }
 
   Widget _buildEmploymentPieChart(AdminReportsAnalytics a) {
-    final employed = a.employedCount;
-    final unemployed = a.unemployedCount;
+    final ched = _chedEmploymentStatusCounts(a);
+    final waveScoped = _dashboardFilters.surveyId != null;
+    final int employed;
+    final int unemployed;
+    final String details;
+    final String emptyMessage;
+    final String centerLabel;
+    final String totalLabel;
+
+    if (ched != null) {
+      employed = ched.employed;
+      unemployed = ched.notEmployed;
+      centerLabel = 'Alumni';
+      totalLabel = 'alumni';
+      emptyMessage = waveScoped
+          ? 'No presently-employed answers on this tracer wave yet'
+          : 'No presently-employed answers across tracer waves yet';
+      details = ReportsDetailsButton.compose(
+        definition: waveScoped
+            ? 'Share of graduates on this tracer who said they are currently employed.'
+            : 'Share of graduates who said they are currently employed. '
+                'If someone answered more than one tracer, only their latest '
+                'answer is counted.',
+        calculation:
+            'Employed means “Yes”. Not employed means “No” or “Never employed”.',
+        scope: _dashboardFilters.scopeLabel(
+          surveys: _surveys,
+          responseOrRecordCount: ched.answered,
+          countNoun: ched.waveCount <= 1
+              ? 'employment answers'
+              : 'alumni across ${ched.waveCount} tracer waves',
+        ),
+        limitation:
+            'Based on tracer survey answers. The employment rate by wave '
+            'chart still shows each tracer separately.',
+      );
+    } else {
+      employed = a.employedCount;
+      unemployed = a.unemployedCount;
+      centerLabel = 'Alumni';
+      totalLabel = 'alumni';
+      emptyMessage = 'No employment submissions yet';
+      details = ReportsDetailsButton.compose(
+        definition:
+            'Employed versus not employed among alumni who submitted '
+            'employment information.',
+        calculation: AdminReportsAnalytics.employmentRateDefinition,
+        scope:
+            'Uses employment submissions on file while tracer answers load.',
+      );
+    }
+
     final total = employed + unemployed;
+    final entries = <MapEntry<String, int>>[
+      MapEntry('Employed', employed),
+      MapEntry('Not employed', unemployed),
+    ].where((e) => e.value > 0).toList();
 
     return _chartCard(
       title: 'Employment status',
-      subtitle: 'Registered alumni with tracer employment data',
-      height: ReportsChartHeights.standard,
+      details: details,
+      height: total > 0 && total < _chartMinUsefulN
+          ? null
+          : ReportsChartHeights.standard,
       child: total == 0
-          ? const ReportsChartEmptyState(
-              message: 'No employment submissions yet',
+          ? ReportsChartEmptyState(
+              message: emptyMessage,
               icon: Icons.work_outline,
+            )
+          : total < _chartMinUsefulN
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ReportsSmallNBanner(n: total, noun: totalLabel),
+                    ReportsRankedSummary(
+                      entries: entries,
+                      totalLabel: totalLabel,
+                      accent: Colors.green,
+                    ),
+                  ],
             )
           : _pieWithCenter(
               total: total,
-              centerLabel: 'Alumni',
+                  centerLabel: centerLabel,
               sections: [
                 _PieSlice('Employed', employed, Colors.green),
-                _PieSlice('Unemployed', unemployed, Colors.orange),
+                    _PieSlice('Not employed', unemployed, Colors.orange),
               ],
             ),
     );
   }
 
   Widget _buildIndustryBarChart(AdminReportsAnalytics a) {
-    final industries = a.topIndustries(limit: 10);
+    final industries = _industryCounts(_scopedEmployedDetailRecords(a), limit: 10);
+    final industryDetailsText = ReportsDetailsButton.compose(
+      definition:
+          'Top industries or sectors reported by currently employed graduates.',
+      scope:
+          'Only alumni who answered that they are currently employed, '
+          'within the filters you selected.',
+    );
     if (industries.isEmpty) {
       return _chartCard(
         title: 'Industry (employed)',
-        subtitle: 'From tracer employment records',
+        details: industryDetailsText,
         height: ReportsChartHeights.standard,
         child: const ReportsChartEmptyState(
-          message: 'No employed industry data yet',
+          message: _noChedEmployedDetails,
           icon: Icons.factory_outlined,
+        ),
+      );
+    }
+
+    final total = industries.fold<int>(0, (s, e) => s + e.value);
+    if (total < _chartMinUsefulN) {
+      return _chartCard(
+        title: 'Industry (employed)',
+        details: industryDetailsText,
+        height: null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ReportsSmallNBanner(n: total, noun: 'alumni'),
+            ReportsRankedSummary(
+              entries: industries,
+              totalLabel: 'alumni',
+              accent: Colors.blueGrey,
+            ),
+          ],
         ),
       );
     }
@@ -3454,7 +4775,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return _chartCard(
       title: 'Industry (employed)',
-      subtitle: 'Top sectors (deduped registered alumni)',
+      details: industryDetailsText,
       height: ReportsChartHeights.standard,
       child: BarChart(
         BarChartData(
@@ -3622,6 +4943,222 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
+  String _displayNameForUid(AdminReportsAnalytics a, String uid) {
+    final key = uid.trim();
+    for (final m in a.activeRoster) {
+      if (m.authUid?.trim() == key && m.fullName.trim().isNotEmpty) {
+        return m.fullName.trim();
+      }
+    }
+    final profile = _registeredProfiles[key];
+    if (profile != null && profile.displayName.trim().isNotEmpty) {
+      return profile.displayName.trim();
+    }
+    if (key.length <= 8) return 'Alumni $key';
+    return 'Alumni ${key.substring(0, 8)}…';
+  }
+
+  Future<void> _openWaveRespondentsDialog(
+    AdminReportsAnalytics a, {
+    required String surveyId,
+  }) async {
+    _TracerWaveEmploymentSample? sample;
+    for (final s in _waveEmploymentSamples) {
+      if (s.survey.id == surveyId) {
+        sample = s;
+        break;
+      }
+    }
+    if (sample == null) {
+      await _ensureSelectedWaveSample(surveyId);
+      for (final s in _waveEmploymentSamples) {
+        if (s.survey.id == surveyId) {
+          sample = s;
+          break;
+        }
+      }
+    }
+    if (!mounted) return;
+
+    final batch = _dashboardFilters.batchYear?.trim().toLowerCase();
+    final course = _dashboardFilters.course?.trim().toLowerCase();
+    final memberByAuth = <String, AlumniMember>{
+      for (final m in a.activeRoster)
+        if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+          m.authUid!.trim(): m,
+    };
+
+    final rows = <TracerRespondentRow>[];
+    if (sample != null) {
+      for (final ans in sample.answers) {
+        final uid = ans.userId.trim();
+        if (uid.isEmpty) continue;
+        if (!_respondentMatchesCohort(
+          userId: uid,
+          batch: batch,
+          course: course,
+          memberByAuth: memberByAuth,
+        )) {
+          continue;
+        }
+        final status = ans.presentlyEmployed;
+        if (status == null || status.isEmpty) continue;
+        rows.add(
+          TracerRespondentRow(
+            userId: uid,
+            displayName: _displayNameForUid(a, uid),
+            subtitle: ans.submittedAt == null
+                ? null
+                : 'Submitted ${DateFormat.yMMMd().format(ans.submittedAt!)}',
+            status: status,
+          ),
+        );
+      }
+    }
+    rows.sort(
+      (x, y) => x.displayName.toLowerCase().compareTo(y.displayName.toLowerCase()),
+    );
+
+    final title = sample?.survey.title.trim().isNotEmpty == true
+        ? sample!.survey.title.trim()
+        : 'Tracer wave';
+    await showTracerRespondentsDialog(
+      context: context,
+      title: title,
+      subtitle:
+          '${rows.length} respondent${rows.length == 1 ? '' : 's'} · CHED presently employed',
+      rows: rows,
+    );
+  }
+
+  Future<void> _openCohortRespondentsDialog(
+    AdminReportsAnalytics a, {
+    required String groupLabel,
+    required String Function(AlumniMember? member, TracerProfile? profile)
+        groupOf,
+  }) async {
+    final statuses = _chedLatestStatusByUser(a);
+    final memberByAuth = <String, AlumniMember>{
+      for (final m in a.activeRoster)
+        if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+          m.authUid!.trim(): m,
+    };
+    final want = groupLabel.trim().isEmpty ? 'Unknown' : groupLabel.trim();
+    final rows = <TracerRespondentRow>[];
+    for (final e in statuses.entries) {
+      final uid = e.key;
+      final member = memberByAuth[uid];
+      final profile = _registeredProfiles[uid];
+      final label = groupOf(member, profile).trim();
+      final key = label.isEmpty ? 'Unknown' : label;
+      if (key != want) continue;
+      rows.add(
+        TracerRespondentRow(
+          userId: uid,
+          displayName: _displayNameForUid(a, uid),
+          subtitle: key,
+          status: e.value,
+        ),
+      );
+    }
+    rows.sort(
+      (x, y) => x.displayName.toLowerCase().compareTo(y.displayName.toLowerCase()),
+    );
+    await showTracerRespondentsDialog(
+      context: context,
+      title: want,
+      subtitle:
+          '${rows.length} alumni · latest wave employment status in filter',
+      rows: rows,
+    );
+  }
+
+  List<TracerLongitudinalRow> _longitudinalRows(AdminReportsAnalytics a) {
+    final batch = _dashboardFilters.batchYear?.trim().toLowerCase();
+    final course = _dashboardFilters.course?.trim().toLowerCase();
+    final memberByAuth = <String, AlumniMember>{
+      for (final m in a.activeRoster)
+        if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+          m.authUid!.trim(): m,
+    };
+
+    final byUser = <String, List<TracerWaveStatusPoint>>{};
+    final samples = [..._waveEmploymentSamples]..sort(
+        (x, y) => reportsSurveyDisplayDate(x.survey).compareTo(
+          reportsSurveyDisplayDate(y.survey),
+        ),
+      );
+
+    for (final sample in samples) {
+      final waveDate = reportsSurveyDisplayDate(sample.survey);
+      final waveLabel = sample.survey.title.trim().isEmpty
+          ? DateFormat.yMMMd().format(waveDate)
+          : sample.survey.title.trim();
+      for (final ans in sample.answers) {
+        final uid = ans.userId.trim();
+        if (uid.isEmpty) continue;
+        if (!_respondentMatchesCohort(
+          userId: uid,
+          batch: batch,
+          course: course,
+          memberByAuth: memberByAuth,
+        )) {
+          continue;
+        }
+        final status = ans.presentlyEmployed;
+        if (status == null || status.isEmpty) continue;
+        byUser.putIfAbsent(uid, () => <TracerWaveStatusPoint>[]).add(
+              TracerWaveStatusPoint(
+                waveLabel: waveLabel,
+                waveDate: waveDate,
+                status: status,
+              ),
+            );
+      }
+    }
+
+    final rows = <TracerLongitudinalRow>[
+      for (final e in byUser.entries)
+        if (e.value.length >= 2)
+          TracerLongitudinalRow(
+            userId: e.key,
+            displayName: _displayNameForUid(a, e.key),
+            points: e.value,
+          ),
+    ]..sort(
+        (x, y) => x.displayName.toLowerCase().compareTo(y.displayName.toLowerCase()),
+      );
+    return rows;
+  }
+
+  /// One-click export of the currently filtered Tracer analytics view.
+  Future<void> _exportTracerFilteredView(
+    AdminReportsAnalytics a, {
+    required CustomReportFormat format,
+  }) async {
+    final waveScoped = _dashboardFilters.surveyId != null;
+    final title = waveScoped
+        ? 'Tracer filtered view'
+        : 'Tracer comparison (filtered)';
+    final preset = ReportsDownloadPreset(
+      id: 'tracer_view',
+      title: title,
+      description: 'Export of the current Tracer tab filters.',
+      icon: Icons.filter_alt_outlined,
+      sections: const [
+        CustomReportSectionId.executiveKpis,
+        CustomReportSectionId.surveySummary,
+        CustomReportSectionId.surveyQuestions,
+        CustomReportSectionId.employmentRecords,
+      ],
+    );
+    await _downloadPreset(
+      a,
+      preset,
+      format: format,
+      printPreview: false,
+    );
+  }
 
   Future<void> _downloadPreset(
     AdminReportsAnalytics a,
@@ -3630,6 +5167,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     required bool printPreview,
   }) async {
     if (!printPreview && !requireWebExport(context)) return;
+
+    if (preset.needsWavePicker || preset.id == 'ched_wave_compare') {
+      await _downloadChedWaveComparison(
+        a,
+        format: format,
+        printPreview: printPreview,
+      );
+      return;
+    }
+
     setState(() => _downloadBusy = true);
     try {
       final needsRollups = preset.sections.contains(
@@ -3662,10 +5209,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
       final doc = CustomReportExportService.buildDocument(
         template: template,
-        analytics: a,
-        events: _allEvents,
-        jobs: _jobs,
-        rollups: _surveyRollups,
+      analytics: a,
+      events: _allEvents,
+      jobs: _jobs,
+      rollups: _surveyRollups,
         profilesByAuthUid: _registeredProfiles,
       );
 
@@ -3690,6 +5237,114 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       if (ok && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Downloaded ${preset.title} (${format.label}).')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _downloadBusy = false);
+    }
+  }
+
+  Future<void> _downloadChedWaveComparison(
+    AdminReportsAnalytics a, {
+    required CustomReportFormat format,
+    required bool printPreview,
+  }) async {
+    final chedWaves = a.surveys
+        .where(
+          (s) =>
+              !s.archived &&
+              s.isChedGtsBuiltin &&
+              (s.status == SurveyStatus.published ||
+                  s.status == SurveyStatus.closed) &&
+              a.submittedResponseCount(s) > 0,
+        )
+        .toList();
+
+    final selection = await showChedWaveComparisonDialog(
+      context: context,
+      chedWaves: chedWaves,
+      batchYears: reportsFilterBatchOptions(a.members),
+      initialBatchYear: _dashboardFilters.batchYear,
+      initialCourse: _dashboardFilters.course,
+    );
+    if (selection == null || !mounted) return;
+    if (selection.surveys.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select at least two Official CHED GTS waves.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _downloadBusy = true);
+    try {
+      final batch = selection.batchYear?.trim().toLowerCase();
+      final course = selection.course?.trim().toLowerCase();
+      final memberByAuth = <String, AlumniMember>{
+        for (final m in a.activeRoster)
+          if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+            m.authUid!.trim(): m,
+      };
+
+      final responsesBySurveyId = <String, List<SurveyResponse>>{};
+      for (final survey in selection.surveys) {
+        final responses = await _surveyService.getSurveyResponses(survey.id);
+        final submitted = responses
+            .where((r) => r.status == SurveyResponseStatus.submitted)
+            .where(
+              (r) => _respondentMatchesCohort(
+                userId: r.userId,
+                batch: batch,
+                course: course,
+                memberByAuth: memberByAuth,
+              ),
+            )
+            .toList(growable: false);
+        responsesBySurveyId[survey.id] = submitted;
+    }
+    if (!mounted) return;
+
+      final report = ChedWaveComparisonReport.build(
+        selectedSurveys: selection.surveys,
+        responsesBySurveyId: responsesBySurveyId,
+        batchFilter: selection.batchYear,
+        courseFilter: selection.course,
+      );
+      final doc =
+          CustomReportExportService.buildChedWaveComparisonDocument(report);
+      final now = DateTime.now();
+
+    if (printPreview) {
+      final bytes = await CustomReportExportService.toPdf(doc);
+      await Printing.layoutPdf(onLayout: (_) async => bytes, name: doc.title);
+      return;
+    }
+
+    final bytes = await CustomReportExportService.exportBytes(
+      doc: doc,
+        format: format,
+    );
+    if (!mounted) return;
+    final ok = tryDownloadBytesOnWeb(
+      context,
+      bytes: bytes,
+        fileName:
+            'ched_wave_compare_${DateFormat('yyyyMMdd').format(now)}.${format.fileExtension}',
+        mimeType: format.mimeType,
+    );
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Downloaded CHED wave comparison (${format.label}).',
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -3802,6 +5457,7 @@ class _Metric {
     required this.icon,
     required this.color,
     this.comparisonLabel,
+    this.details,
     this.status,
     this.statusLabel,
   });
@@ -3811,6 +5467,7 @@ class _Metric {
   final IconData icon;
   final Color color;
   final String? comparisonLabel;
+  final String? details;
   final ReportsKpiStatus? status;
   final String? statusLabel;
 }
@@ -3849,10 +5506,12 @@ class _ChedEmploymentAnswer {
   const _ChedEmploymentAnswer({
     required this.userId,
     required this.presentlyEmployed,
+    this.submittedAt,
   });
 
   final String userId;
   final String? presentlyEmployed;
+  final DateTime? submittedAt;
 }
 
 class _WaveEmploymentRatePoint {

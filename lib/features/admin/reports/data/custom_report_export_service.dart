@@ -5,7 +5,9 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
+import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
@@ -14,6 +16,7 @@ import 'package:alumni_system/features/announcements/models/announcement_model.d
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_pack_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_reports_aggregate.dart';
@@ -64,6 +67,7 @@ class CustomReportExportService {
     required List<JobPosting> jobs,
     List<SurveyReportRollup> rollups = const [],
     Map<String, TracerProfile> profilesByAuthUid = const {},
+    ChedWaveComparisonReport? chedWaveComparison,
   }) {
     final filters = template.filters;
     final sections = <CustomReportSectionData>[];
@@ -94,6 +98,10 @@ class CustomReportExportService {
           sections.add(_surveyParticipation(ensurePack()));
         case CustomReportSectionId.surveyQuestions:
           sections.add(_surveyQuestions(ensurePack()));
+        case CustomReportSectionId.chedWaveComparison:
+          if (chedWaveComparison != null) {
+            sections.addAll(_chedWaveComparisonSections(chedWaveComparison));
+          }
         case CustomReportSectionId.events:
           sections.add(_events(events, filters));
         case CustomReportSectionId.jobPostings:
@@ -113,7 +121,152 @@ class CustomReportExportService {
       title: title,
       generatedAt: DateTime.now(),
       sections: sections,
-      filterSummary: _filterSummary(filters),
+      filterSummary: [
+        ..._filterSummary(filters),
+        if (chedWaveComparison != null) ...chedWaveComparison.filterSummary,
+      ],
+    );
+  }
+
+  /// Dedicated document for the Downloads "CHED wave comparison" preset.
+  static CustomReportDocument buildChedWaveComparisonDocument(
+    ChedWaveComparisonReport report,
+  ) {
+    return CustomReportDocument(
+      title: 'CHED wave comparison',
+      generatedAt: DateTime.now(),
+      sections: _chedWaveComparisonSections(report),
+      filterSummary: report.filterSummary,
+    );
+  }
+
+  static List<CustomReportSectionData> _chedWaveComparisonSections(
+    ChedWaveComparisonReport report,
+  ) {
+    if (report.waves.isEmpty) {
+      return [
+        const CustomReportSectionData(
+          id: CustomReportSectionId.chedWaveComparison,
+          title: 'Wave comparison summary',
+          headers: ['Message'],
+          rows: [
+            ['Select at least two Official CHED GTS waves to compare.'],
+          ],
+        ),
+      ];
+    }
+
+    return [
+      _chedWaveComparisonSummary(report),
+      for (final field in report.fields)
+        _chedWaveComparisonField(report, field),
+    ];
+  }
+
+  static CustomReportSectionData _chedWaveComparisonSummary(
+    ChedWaveComparisonReport report,
+  ) {
+    final waves = report.waves;
+    final headers = <String>[
+      'Metric',
+      for (final w in waves) w.shortLabel,
+      if (waves.length >= 2) 'Delta (latest - earliest)',
+    ];
+
+    String pct(double? v) => v == null ? '-' : '${v.toStringAsFixed(1)}%';
+
+    String delta(double? earliest, double? latest) {
+      if (earliest == null || latest == null) return '-';
+      final d = latest - earliest;
+      final sign = d > 0 ? '+' : '';
+      return '$sign${d.toStringAsFixed(1)} pp';
+    }
+
+    final rows = <List<String>>[
+      [
+        'Wave title',
+        for (final w in waves) w.label,
+        if (waves.length >= 2) '',
+      ],
+      [
+        'Submitted responses',
+        for (final w in waves) '${w.submittedCount}',
+        if (waves.length >= 2)
+          '${waves.last.submittedCount - waves.first.submittedCount}',
+      ],
+    ];
+
+    for (final field in report.fields) {
+      final opt = field.highlightOption;
+      if (opt == null) continue;
+      final rates = [
+        for (final w in waves) w.highlightRate(field.questionId, opt),
+      ];
+      rows.add([
+        '${field.shortLabel} (% $opt)',
+        for (final r in rates) pct(r),
+        if (waves.length >= 2) delta(rates.first, rates.last),
+      ]);
+    }
+
+    return CustomReportSectionData(
+      id: CustomReportSectionId.chedWaveComparison,
+      title: 'Wave comparison summary',
+      headers: headers,
+      rows: rows,
+    );
+  }
+
+  static CustomReportSectionData _chedWaveComparisonField(
+    ChedWaveComparisonReport report,
+    ChedWaveComparisonFieldSpec field,
+  ) {
+    final waves = report.waves;
+    final item = ChedGtsBuiltin.byId(field.questionId);
+    final options = report.optionsFor(field.questionId);
+
+    final headers = <String>[
+      'Option',
+      for (final w in waves) w.shortLabel,
+      if (waves.length >= 2) 'Delta (latest - earliest)',
+    ];
+
+    String pctOf(ChedWaveComparisonColumn w, String option) {
+      final agg = w.aggregatesByQuestionId[field.questionId];
+      if (agg == null || w.submittedCount == 0) return '-';
+      final v = agg.choicePercentages[option];
+      if (v == null) return '0.0%';
+      return '${v.toStringAsFixed(1)}%';
+    }
+
+    String deltaOf(String option) {
+      if (waves.length < 2) return '-';
+      final first = waves.first.aggregatesByQuestionId[field.questionId]
+          ?.choicePercentages[option];
+      final last = waves.last.aggregatesByQuestionId[field.questionId]
+          ?.choicePercentages[option];
+      if (first == null && last == null) return '-';
+      final d = (last ?? 0) - (first ?? 0);
+      final sign = d > 0 ? '+' : '';
+      return '$sign${d.toStringAsFixed(1)} pp';
+    }
+
+    final title = item == null
+        ? field.shortLabel
+        : '${item.chedNumber}. ${field.shortLabel}';
+
+    return CustomReportSectionData(
+      id: CustomReportSectionId.chedWaveComparison,
+      title: title.length > 40 ? field.shortLabel : title,
+      headers: headers,
+      rows: [
+        for (final option in options)
+          [
+            option,
+            for (final w in waves) pctOf(w, option),
+            if (waves.length >= 2) deltaOf(option),
+          ],
+      ],
     );
   }
 
@@ -142,6 +295,12 @@ class CustomReportExportService {
   static Future<Uint8List> toPdf(CustomReportDocument doc) async {
     final pdf = pw.Document();
     final date = DateFormat.yMMMMEEEEd().add_jm().format(doc.generatedAt);
+    final title = PdfSafeText.sanitize(doc.title);
+    final filterLine = doc.filterSummary.isEmpty
+        ? ''
+        : PdfSafeText.sanitize(
+            'Filters: ${doc.filterSummary.join(' | ')}',
+          );
 
     pdf.addPage(
       pw.MultiPage(
@@ -151,7 +310,7 @@ class CustomReportExportService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Text(
-              doc.title,
+              title,
               style: pw.TextStyle(
                 fontSize: 18,
                 fontWeight: pw.FontWeight.bold,
@@ -159,13 +318,13 @@ class CustomReportExportService {
               ),
             ),
             pw.Text(
-              'Custom report · $date',
+              PdfSafeText.sanitize('Custom report - $date'),
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
             ),
-            if (doc.filterSummary.isNotEmpty) ...[
+            if (filterLine.isNotEmpty) ...[
               pw.SizedBox(height: 4),
               pw.Text(
-                'Filters: ${doc.filterSummary.join(' · ')}',
+                filterLine,
                 style:
                     const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
               ),
@@ -189,7 +348,7 @@ class CustomReportExportService {
             if (i > 0) widgets.add(pw.SizedBox(height: 16));
             widgets.add(
               pw.Text(
-                section.title,
+                PdfSafeText.sanitize(section.title),
                 style: pw.TextStyle(
                   fontSize: 13,
                   fontWeight: pw.FontWeight.bold,
@@ -818,8 +977,8 @@ class CustomReportExportService {
 
   static pw.Widget _pdfTable(List<String> headers, List<List<String>> rows) {
     return pw.TableHelper.fromTextArray(
-      headers: headers,
-      data: rows,
+      headers: PdfSafeText.sanitizeRow(headers),
+      data: PdfSafeText.sanitizeRows(rows),
       headerStyle: pw.TextStyle(
         fontWeight: pw.FontWeight.bold,
         color: PdfColors.white,

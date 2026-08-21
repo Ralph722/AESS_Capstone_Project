@@ -20,7 +20,14 @@ class MessageSupportAppBar extends StatelessWidget
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      automaticallyImplyLeading: showBack,
+      automaticallyImplyLeading: false,
+      leading: showBack
+          ? IconButton(
+              tooltip: 'Back',
+              onPressed: () => Navigator.maybePop(context),
+              icon: const Icon(Icons.arrow_back_rounded),
+            )
+          : null,
       toolbarHeight: PortalTheme.headerHeight,
       elevation: 0,
       scrolledUnderElevation: 0,

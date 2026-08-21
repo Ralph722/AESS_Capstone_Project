@@ -480,7 +480,7 @@ class ReportsInsightsPanel extends StatelessWidget {
     return ReportsSectionShell(
       icon: Icons.auto_awesome_outlined,
       title: 'AI insights',
-      subtitle: 'Optional narrative brief — expand when you want takeaways.',
+      subtitle: 'Optional brief — expand for takeaways.',
       initiallyExpanded: false,
       actions: [
         ReportsSectionAction(
@@ -508,7 +508,8 @@ class ReportsInsightsPanel extends StatelessWidget {
               ),
               child: const Text(
                 'Gemini API key not configured. Placeholders use live KPIs. '
-                'Add a key in ai_defaults.dart to enable narrative generation.',
+                'Add a key in lib/core/config/ai_secrets.dart to enable '
+                'narrative generation.',
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.4,

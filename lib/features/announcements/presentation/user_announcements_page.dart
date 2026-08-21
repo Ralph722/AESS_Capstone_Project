@@ -50,9 +50,8 @@ class _UserAnnouncementsScreenState extends State<UserAnnouncementsScreen> {
       backgroundColor: PortalTheme.pageBg,
       appBar: widget.embeddedInHub
           ? null
-          : PortalAppBar(
+          : const PortalAppBar(
               title: 'Announcements',
-              subtitle: 'Official updates from the office',
               automaticallyImplyLeading: true,
             ),
       body: StreamBuilder<List<Announcement>>(
@@ -118,33 +117,14 @@ class _UserAnnouncementsScreenState extends State<UserAnnouncementsScreen> {
                       title: 'All updates',
                       padding: const EdgeInsets.only(bottom: PortalTheme.space2),
                     ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-                      border: Border.all(color: PortalTheme.border),
+                  for (final a in regular)
+                    _AnnouncementPreviewRow(
+                      announcement: a,
+                      expanded: _expandedId == a.id,
+                      onToggle: () => setState(() {
+                        _expandedId = _expandedId == a.id ? null : a.id;
+                      }),
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < regular.length; i++) ...[
-                          _AnnouncementPreviewRow(
-                            announcement: regular.elementAt(i),
-                            expanded: _expandedId == regular.elementAt(i).id,
-                            onToggle: () => setState(() {
-                              final id = regular.elementAt(i).id;
-                              _expandedId = _expandedId == id ? null : id;
-                            }),
-                          ),
-                          if (i < regular.length - 1)
-                            Divider(
-                              height: 1,
-                              color: PortalTheme.border.withValues(alpha: 0.7),
-                            ),
-                        ],
-                      ],
-                    ),
-                  ),
                 ],
               ],
             ),
@@ -277,85 +257,115 @@ class _AnnouncementPreviewRow extends StatelessWidget {
     final date = announcement.publishedAt ?? announcement.createdAt;
     final preview = _previewBody(announcement.body);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onToggle,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            PortalTheme.space3,
-            PortalTheme.space3,
-            PortalTheme.space3,
-            expanded ? PortalTheme.space2 : PortalTheme.space3,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: PortalTheme.navy.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PortalTheme.space2),
+      child: Material(
+        color: PortalTheme.card,
+        elevation: 1,
+        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+          side: BorderSide(color: PortalTheme.border.withValues(alpha: 0.75)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onToggle,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              PortalTheme.space3,
+              PortalTheme.space3,
+              PortalTheme.space3,
+              expanded ? PortalTheme.space3 : PortalTheme.space3,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: PortalTheme.navy.withValues(alpha: 0.08),
+                        borderRadius:
+                            BorderRadius.circular(PortalTheme.radiusMd),
+                      ),
+                      child: const Icon(
+                        Icons.campaign_outlined,
+                        color: PortalTheme.navy,
+                        size: 20,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.campaign_outlined,
-                      color: PortalTheme.navy,
-                      size: 18,
+                    const SizedBox(width: PortalTheme.space2),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            announcement.title,
+                            style: PortalTheme.cardTitle.copyWith(
+                              fontSize: 15,
+                              color: PortalTheme.navy,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: PortalTheme.surfaceMuted,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              DateFormat.yMMMd().format(date),
+                              style: PortalTheme.caption.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: PortalTheme.space2),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          announcement.title,
-                          style: PortalTheme.cardTitle.copyWith(fontSize: 15),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormat.yMMMd().format(date),
-                          style: PortalTheme.caption,
-                        ),
-                      ],
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: PortalTheme.navy.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        expanded
+                            ? Icons.expand_less_rounded
+                            : Icons.chevron_right_rounded,
+                        color: PortalTheme.navy,
+                        size: 18,
+                      ),
                     ),
-                  ),
-                  Icon(
-                    expanded
-                        ? Icons.expand_less_rounded
-                        : Icons.chevron_right_rounded,
-                    color: PortalTheme.textMuted,
-                    size: 20,
-                  ),
-                ],
-              ),
-              if (!expanded && preview.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.only(left: 44),
-                  child: Text(
+                  ],
+                ),
+                if (!expanded && preview.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
                     preview,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: PortalTheme.bodySecondary.copyWith(fontSize: 13),
                   ),
-                ),
-              ],
-              if (expanded) ...[
-                const SizedBox(height: PortalTheme.space3),
-                Padding(
-                  padding: const EdgeInsets.only(left: 44),
-                  child: Text(
+                ],
+                if (expanded) ...[
+                  const SizedBox(height: PortalTheme.space3),
+                  Text(
                     announcement.body,
                     style: PortalTheme.body.copyWith(height: 1.5),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

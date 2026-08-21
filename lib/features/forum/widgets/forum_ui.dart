@@ -29,6 +29,9 @@ abstract final class ForumTheme {
   static const needsResponse = PortalTheme.warning;
   static const needsResponseBg = Color(0xFFFFFBEB);
   static const radius = PortalTheme.radiusMd;
+  static const radiusXl = PortalTheme.radiusXl;
+  static const radius2xl = PortalTheme.radius2xl;
+  static List<BoxShadow> get softShadow => PortalTheme.softShadow;
 }
 
 class ForumStatusChip extends StatelessWidget {
@@ -155,17 +158,19 @@ class ForumTagChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: selected
             ? ForumTheme.navy.withValues(alpha: 0.1)
-            : ForumTheme.pageBg,
+            : ForumTheme.surfaceMuted,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: selected ? ForumTheme.navy : ForumTheme.border,
+          color: selected
+              ? ForumTheme.navy.withValues(alpha: 0.35)
+              : ForumTheme.border.withValues(alpha: 0.9),
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
           color: selected ? ForumTheme.navy : ForumTheme.textSecondary,
         ),
       ),
@@ -194,123 +199,181 @@ class ForumTopicCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAnnouncement = topic.isAnnouncement;
-    final isPinned = topic.isPinned && !isAnnouncement;
     final activity = topic.lastReplyAt ?? topic.createdAt;
+    final posted = DateFormat.MMMd().add_jm().format(topic.createdAt);
+    final activeLabel = DateFormat.MMMd().format(activity);
 
-    Color? accentColor;
-    if (isAnnouncement) {
-      accentColor = ForumTheme.announcement;
-    } else if (isPinned) {
-      accentColor = ForumTheme.pinned;
-    } else if (topic.isLocked) {
-      accentColor = ForumTheme.locked;
-    }
-
-    return Material(
-      color: ForumTheme.card,
-      child: InkWell(
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: ForumTheme.border.withValues(alpha: 0.8)),
-              left: accentColor != null
-                  ? BorderSide(color: accentColor, width: 3)
-                  : BorderSide.none,
-            ),
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PortalTheme.space2),
+      child: Material(
+        color: ForumTheme.card,
+        elevation: 1,
+        shadowColor: ForumTheme.navy.withValues(alpha: 0.08),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ForumTheme.radius2xl),
+          side: BorderSide(color: ForumTheme.border.withValues(alpha: 0.75)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              accentColor != null ? 13 : 16,
+              compact ? 14 : 16,
+              compact ? 14 : 16,
               compact ? 12 : 14,
-              12,
-              compact ? 12 : 14,
+              compact ? 14 : 16,
             ),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _topicAuthorAvatar(topic, radius: compact ? 18 : 22),
-                SizedBox(width: compact ? 10 : 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _topicAuthorAvatar(topic, radius: compact ? 18 : 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              topic.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: PortalTheme.cardTitle.copyWith(
-                                fontSize: compact ? 15 : 16,
-                                height: 1.25,
-                              ),
-                            ),
-                          ),
-                          if (topic.isBookmarked)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 6, top: 2),
-                              child: Icon(
-                                Icons.bookmark_rounded,
-                                size: 16,
-                                color: ForumTheme.navy,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _authorMeta(topic),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: PortalTheme.caption,
-                      ),
-                      if (!compact) ...[
-                        const SizedBox(height: 6),
-                        ForumStatusChipRow(topic: topic),
-                      ] else ...[
-                        const SizedBox(height: 6),
-                        _compactStatusRow(topic),
-                      ],
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 13,
-                            color: topic.replyCount > 0
-                                ? ForumTheme.navy
-                                : ForumTheme.textMuted,
-                          ),
-                          const SizedBox(width: 4),
                           Text(
-                            '${topic.replyCount}',
+                            topic.authorName.trim().isEmpty
+                                ? 'Alumni'
+                                : topic.authorName.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: PortalTheme.meta.copyWith(
+                              color: ForumTheme.navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _authorContext(topic),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: PortalTheme.caption.copyWith(
-                              color: topic.replyCount > 0
-                                  ? ForumTheme.navy
-                                  : ForumTheme.textMuted,
-                              fontWeight: FontWeight.w700,
+                              color: ForumTheme.textMuted,
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Active ${DateFormat.MMMd().format(activity)}',
-                              style: PortalTheme.caption,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            size: 18,
-                            color: ForumTheme.textMuted,
                           ),
                         ],
                       ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ForumTheme.surfaceMuted,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        posted,
+                        style: PortalTheme.caption.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        topic.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: PortalTheme.cardTitle.copyWith(
+                          fontSize: compact ? 16 : 17,
+                          height: 1.25,
+                          color: ForumTheme.navy,
+                        ),
+                      ),
+                    ),
+                    if (topic.isBookmarked)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 6, top: 2),
+                        child: Icon(
+                          Icons.bookmark_rounded,
+                          size: 18,
+                          color: ForumTheme.navy,
+                        ),
+                      ),
+                  ],
+                ),
+                if (_hasStatusOrTags(topic)) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ..._statusChips(topic),
+                      ...topic.tags.take(4).map(
+                            (t) => ForumTagChip(label: t.label),
+                          ),
                     ],
                   ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 14,
+                      color: topic.replyCount > 0
+                          ? ForumTheme.navy
+                          : ForumTheme.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      topic.replyCount == 1
+                          ? '1 reply'
+                          : '${topic.replyCount} replies',
+                      style: PortalTheme.caption.copyWith(
+                        color: topic.replyCount > 0
+                            ? ForumTheme.navy
+                            : ForumTheme.textMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 3,
+                      height: 3,
+                      decoration: const BoxDecoration(
+                        color: ForumTheme.textMuted,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isAnnouncement
+                            ? 'Posted $activeLabel'
+                            : 'Active $activeLabel',
+                        style: PortalTheme.caption,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: ForumTheme.navy.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: ForumTheme.navy,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -320,27 +383,33 @@ class ForumTopicCard extends StatelessWidget {
     );
   }
 
-  String _authorMeta(ForumTopic topic) {
+  String _authorContext(ForumTopic topic) {
     final parts = <String>[
-      topic.authorName,
       if (topic.authorProgram.isNotEmpty) topic.authorProgram,
       if (topic.authorBatch.isNotEmpty) 'Batch ${topic.authorBatch}',
     ];
-    return parts.join(' · ');
+    return parts.isEmpty ? 'Community member' : parts.join(' · ');
   }
 
-  Widget _compactStatusRow(ForumTopic topic) {
+  bool _hasStatusOrTags(ForumTopic topic) {
+    return topic.isAnnouncement ||
+        topic.isPinned ||
+        topic.isLocked ||
+        topic.isSolved ||
+        topic.needsResponse ||
+        topic.tags.isNotEmpty;
+  }
+
+  List<Widget> _statusChips(ForumTopic topic) {
     final chips = <Widget>[];
-    if (topic.isAnnouncement) {
-      chips.add(ForumStatusChip.announcement());
-    } else if (topic.isPinned) {
+    if (topic.isAnnouncement) chips.add(ForumStatusChip.announcement());
+    if (topic.isPinned && !topic.isAnnouncement) {
       chips.add(ForumStatusChip.pinned());
     }
     if (topic.isLocked) chips.add(ForumStatusChip.locked());
     if (topic.isSolved) chips.add(ForumStatusChip.solved());
     if (topic.needsResponse) chips.add(ForumStatusChip.needsResponse());
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 4, runSpacing: 4, children: chips);
+    return chips;
   }
 
   Widget _topicAuthorAvatar(ForumTopic topic, {required double radius}) {
@@ -356,19 +425,21 @@ class ForumTopicCard extends StatelessWidget {
         backgroundImage: provider,
       );
     }
+    final initial = topic.authorName.trim().isNotEmpty
+        ? topic.authorName.trim()[0].toUpperCase()
+        : '?';
     return CircleAvatar(
       radius: radius,
       backgroundColor: isAnnouncement
           ? ForumTheme.announcementBg
           : ForumTheme.navy.withValues(alpha: 0.08),
-      child: Icon(
-        topic.isLocked
-            ? Icons.lock_outline_rounded
-            : isAnnouncement
-                ? Icons.campaign_outlined
-                : Icons.forum_outlined,
-        color: isAnnouncement ? ForumTheme.announcement : ForumTheme.navy,
-        size: radius * 0.9,
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: isAnnouncement ? ForumTheme.announcement : ForumTheme.navy,
+          fontWeight: FontWeight.w800,
+          fontSize: radius * 0.85,
+        ),
       ),
     );
   }
@@ -395,7 +466,7 @@ class ForumEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Padding(
-      padding: EdgeInsets.all(compact ? 16 : 32),
+      padding: EdgeInsets.all(compact ? 16 : 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -404,7 +475,7 @@ class ForumEmptyState extends StatelessWidget {
             height: compact ? 56 : 72,
             decoration: BoxDecoration(
               color: ForumTheme.navy.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
             ),
             child: Icon(icon, size: compact ? 28 : 36, color: ForumTheme.navy),
           ),
@@ -412,21 +483,15 @@ class ForumEmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: PortalTheme.cardTitle.copyWith(
               fontSize: compact ? 16 : 18,
-              fontWeight: FontWeight.w700,
-              color: ForumTheme.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: ForumTheme.textSecondary,
-              height: 1.4,
-            ),
+            style: PortalTheme.bodySecondary.copyWith(height: 1.4),
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 20),
@@ -440,9 +505,20 @@ class ForumEmptyState extends StatelessWidget {
       ),
     );
 
+    final card = Container(
+      margin: compact ? EdgeInsets.zero : const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ForumTheme.card,
+        borderRadius: BorderRadius.circular(ForumTheme.radius2xl),
+        border: Border.all(color: ForumTheme.border.withValues(alpha: 0.75)),
+        boxShadow: ForumTheme.softShadow,
+      ),
+      child: content,
+    );
+
     // Avoid Center inside scrollables (unbounded height) — shrink-wrap instead.
-    if (compact) return content;
-    return Center(child: content);
+    if (compact) return card;
+    return Center(child: card);
   }
 }
 

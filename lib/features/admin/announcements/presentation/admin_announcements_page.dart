@@ -418,17 +418,10 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final filtered = _filtered;
-    final pageInsets = AdminDensity.pageInsetsForWidth(
-      MediaQuery.sizeOf(context).width,
-    );
 
-    return ColoredBox(
-      color: AdminAnnouncementTheme.background,
-      child: Padding(
-        padding: pageInsets.copyWith(bottom: 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
             AdminPageHeader(
               title: 'Announcements',
               subtitle: 'Publish notices to alumni by course and batch.',
@@ -482,8 +475,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
               ),
             ),
           ],
-        ),
-      ),
     );
   }
 }

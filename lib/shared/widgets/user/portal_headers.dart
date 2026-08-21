@@ -53,45 +53,15 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
         ? Colors.transparent
         : PortalTheme.border.withValues(alpha: 0.9);
 
-    final titleWidget = Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: subtitle == null
-          ? Text(
-              title,
-              style: (_dark
-                      ? PortalTheme.pageTitleOnDark
-                      : PortalTheme.pageTitle)
-                  .copyWith(color: fg),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )
-          : Column(
-              crossAxisAlignment: centerTitle
-                  ? CrossAxisAlignment.center
-                  : CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: (_dark
-                          ? PortalTheme.pageTitleOnDark
-                          : PortalTheme.pageTitle)
-                      .copyWith(color: fg, fontSize: 17),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle!,
-                  style: PortalTheme.caption.copyWith(
-                    color: _dark
-                        ? Colors.white.withValues(alpha: 0.72)
-                        : PortalTheme.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+    // Subtitles are intentionally omitted for a cleaner header.
+    final hasLeading = leading != null ||
+        (automaticallyImplyLeading && Navigator.canPop(context));
+    final titleWidget = Text(
+      title,
+      style: (_dark ? PortalTheme.pageTitleOnDark : PortalTheme.pageTitle)
+          .copyWith(color: fg),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
 
     final hairline = bottom ??
@@ -134,11 +104,11 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               ...actions!,
-                              const SizedBox(width: 4),
+                              const SizedBox(width: PortalTheme.headerHPad),
                             ],
                           ),
                     centerMiddle: centerTitle,
-                    middleSpacing: 4,
+                    middleSpacing: hasLeading ? 8 : PortalTheme.headerHPad,
                   ),
                 ),
               ),
@@ -164,17 +134,18 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       automaticallyImplyLeading: automaticallyImplyLeading,
       leading: leading,
-      leadingWidth: leading != null || automaticallyImplyLeading ? 56 : null,
+      leadingWidth: hasLeading ? 56 : 0,
       iconTheme: IconThemeData(color: fg, size: PortalTheme.headerIconSize),
       actionsIconTheme:
           IconThemeData(color: fg, size: PortalTheme.headerIconSize),
-      titleSpacing: 0,
+      // Keep title off the screen edge when there is no leading control.
+      titleSpacing: hasLeading ? 8 : PortalTheme.headerHPad,
       title: titleWidget,
       actions: actions == null
           ? null
           : [
               ...actions!,
-              const SizedBox(width: 4),
+              const SizedBox(width: PortalTheme.headerHPad),
             ],
       bottom: hairline,
     );
@@ -433,24 +404,26 @@ class PortalHighlightPanel extends StatelessWidget {
     final decoration = switch (variant) {
       PortalHighlightVariant.navy => BoxDecoration(
           gradient: PortalTheme.heroGradient,
-          borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
           boxShadow: PortalTheme.elevatedShadow,
         ),
       PortalHighlightVariant.soft => BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
-          border: Border.all(color: PortalTheme.border),
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+          border: Border.all(
+            color: PortalTheme.border.withValues(alpha: 0.75),
+          ),
           boxShadow: PortalTheme.softShadow,
         ),
       PortalHighlightVariant.goldEdge => BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
           border: Border.all(color: PortalTheme.gold, width: 1.5),
           boxShadow: PortalTheme.cardShadow,
         ),
       PortalHighlightVariant.attention => BoxDecoration(
           color: const Color(0xFFFFF8EB),
-          borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
           border: Border.all(color: PortalTheme.gold.withValues(alpha: 0.65)),
         ),
     };

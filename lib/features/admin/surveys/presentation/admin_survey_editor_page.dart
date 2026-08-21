@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -14,133 +13,22 @@ import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_previe
 import 'package:alumni_system/features/admin/surveys/widgets/survey_question_editor.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 
-/// Opens the survey editor as a centered modal (same pattern as Create survey).
-/// Preview opens beside the editor on wide screens instead of covering it.
-Future<void> showAdminSurveyEditorDialog(
-  BuildContext context, {
-  required String surveyId,
-}) {
-  return showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    barrierColor: const Color(0xFF0F172A).withValues(alpha: 0.45),
-    builder: (ctx) => _AdminSurveyEditorDialogHost(surveyId: surveyId),
-  );
-}
-
-class _AdminSurveyEditorDialogHost extends StatefulWidget {
-  const _AdminSurveyEditorDialogHost({required this.surveyId});
-
-  final String surveyId;
-
-  @override
-  State<_AdminSurveyEditorDialogHost> createState() =>
-      _AdminSurveyEditorDialogHostState();
-}
-
-class _AdminSurveyEditorDialogHostState
-    extends State<_AdminSurveyEditorDialogHost> {
-  bool _previewOpen = false;
-  Survey? _previewSurvey;
-  List<SurveyQuestion> _previewQuestions = const [];
-
-  static const _sideBySideMinWidth = 960.0;
-
-  void _openSidePreview(Survey survey, List<SurveyQuestion> questions) {
-    setState(() {
-      _previewOpen = true;
-      _previewSurvey = survey;
-      _previewQuestions = questions;
-    });
-  }
-
-  void _closePreview() {
-    setState(() {
-      _previewOpen = false;
-      _previewSurvey = null;
-      _previewQuestions = const [];
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final canSideBySide = size.width >= _sideBySideMinWidth;
-    final showBeside =
-        _previewOpen && _previewSurvey != null && canSideBySide;
-    final height = math.min(size.height * 0.92, 880.0);
-    final width = showBeside
-        ? math.min(size.width - 40, 1280.0)
-        : math.min(720.0, size.width - 40);
-
-    return Dialog(
-      backgroundColor: AdminSurveyTheme.background,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
-      ),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-        width: width,
-        height: height,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: showBeside ? 5 : 1,
-                child: AdminSurveyEditorScreen(
-                  surveyId: widget.surveyId,
-                  onClose: () => Navigator.pop(context),
-                  onPreviewBeside: canSideBySide ? _openSidePreview : null,
-                  previewBesideOpen: showBeside,
-                  onClosePreviewBeside: showBeside ? _closePreview : null,
-                ),
-              ),
-              if (showBeside) ...[
-                const VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: AdminSurveyTheme.border,
-                ),
-                Expanded(
-                  flex: 5,
-                  child: AdminSurveyPreviewPanel(
-                    survey: _previewSurvey!,
-                    questions: _previewQuestions,
-                    onClose: _closePreview,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
+/// Embedded survey edit / publish workspace (left edit · right live preview).
 class AdminSurveyEditorScreen extends StatefulWidget {
   const AdminSurveyEditorScreen({
     super.key,
     required this.surveyId,
     this.onClose,
-    this.onPreviewBeside,
-    this.previewBesideOpen = false,
-    this.onClosePreviewBeside,
+    this.backTooltip = 'Back to surveys',
   });
 
   final String surveyId;
-  /// When set, editor is shown as a modal/panel (closes via this callback).
+
+  /// When set, editor is shown inline in the surveys panel (closes via this).
   final VoidCallback? onClose;
-  /// When set, Preview opens beside the editor instead of a covering sheet.
-  final void Function(Survey survey, List<SurveyQuestion> questions)?
-      onPreviewBeside;
-  final bool previewBesideOpen;
-  final VoidCallback? onClosePreviewBeside;
+
+  /// Tooltip for the workspace back control.
+  final String backTooltip;
 
   @override
   State<AdminSurveyEditorScreen> createState() =>
@@ -170,11 +58,19 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
   bool _savingVisibility = false;
   bool _previewSyncScheduled = false;
 
+  /// Live preview snapshot (embedded workspace only).
+  Survey? _previewSurvey;
+  List<SurveyQuestion> _previewQuestions = const [];
+
+  bool get _embedded => widget.onClose != null;
+
+  static const _sideBySideMinWidth = 900.0;
+
   @override
   void initState() {
     super.initState();
-    _titleController.addListener(_scheduleSidePreviewSync);
-    _descController.addListener(_scheduleSidePreviewSync);
+    _titleController.addListener(_scheduleLivePreviewUpdate);
+    _descController.addListener(_scheduleLivePreviewUpdate);
     _load();
   }
 
@@ -183,25 +79,27 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
   @override
   void setState(VoidCallback fn) {
     super.setState(fn);
-    _scheduleSidePreviewSync();
+    _scheduleLivePreviewUpdate();
   }
 
-  void _scheduleSidePreviewSync() {
-    if (!widget.previewBesideOpen || widget.onPreviewBeside == null) return;
+  void _scheduleLivePreviewUpdate() {
+    if (!_embedded) return;
     if (_previewSyncScheduled) return;
     _previewSyncScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _previewSyncScheduled = false;
-      if (!mounted || !widget.previewBesideOpen) return;
+      if (!mounted) return;
       final survey = _survey;
       if (survey == null) return;
-      widget.onPreviewBeside!(
-        survey.copyWith(
-          title: _titleController.text.trim(),
-          description: _descController.text.trim(),
-        ),
-        List<SurveyQuestion>.from(_questions),
+      final next = survey.copyWith(
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
       );
+      final nextQs = List<SurveyQuestion>.from(_questions);
+      super.setState(() {
+        _previewSurvey = next;
+        _previewQuestions = nextQs;
+      });
     });
   }
 
@@ -364,12 +262,8 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
     }
   }
 
-  Future<void> _openPreview() async {
+  Future<void> _openPreviewOverlay() async {
     if (_survey == null) return;
-    if (widget.previewBesideOpen) {
-      widget.onClosePreviewBeside?.call();
-      return;
-    }
     for (final entry in _saveTimers.entries.toList()) {
       entry.value.cancel();
       await _persistQuestion(entry.key);
@@ -380,17 +274,13 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
       await _persistVisibilityRules();
     }
     if (!mounted || _survey == null) return;
-    final survey = _survey!;
-    final questions = List<SurveyQuestion>.from(_questions);
-    final beside = widget.onPreviewBeside;
-    if (beside != null) {
-      beside(survey, questions);
-      return;
-    }
     await showAdminSurveyPreview(
       context: context,
-      survey: survey,
-      questions: questions,
+      survey: _survey!.copyWith(
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+      ),
+      questions: List<SurveyQuestion>.from(_questions),
     );
   }
 
@@ -850,8 +740,7 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
     }
   }
 
-  Widget _buildActionBar() {
-    final embedded = widget.onClose != null;
+  Widget _buildActionBar({bool? constrainWidth}) {
     final isDraft = _survey?.status == SurveyStatus.draft;
     final isPublished = _survey?.status == SurveyStatus.published;
 
@@ -879,7 +768,7 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
     }
 
     return SurveyStickyActionBar(
-      constrainWidth: !embedded,
+      constrainWidth: constrainWidth ?? !_embedded,
       children: [
         saveButton,
         if (primary != null) primary,
@@ -1001,68 +890,158 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
     final titlePreview = _titleController.text.trim().isEmpty
         ? 'Edit survey'
         : _titleController.text.trim();
-    final embedded = widget.onClose != null;
+
+    if (_isLoading && _survey == null) {
+      return SurveyEditorScaffold(
+        header: _embedded
+            ? SurveyInlinePanelHeader(
+                title: titlePreview,
+                subtitle: 'Edit / publish',
+                backTooltip: widget.backTooltip,
+                onClose: widget.onClose!,
+              )
+            : null,
+        appBar: _embedded
+            ? null
+            : AppBar(
+                title: Text(titlePreview),
+                backgroundColor: AdminSurveyTheme.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+              ),
+        body: const AdminFormEditorSkeleton(),
+      );
+    }
+
+    if (_embedded) {
+      return SurveyEditorScaffold(
+        header: SurveyInlinePanelHeader(
+          title: titlePreview,
+          subtitle: 'Edit / publish',
+          backTooltip: widget.backTooltip,
+          onClose: widget.onClose!,
+        ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= _sideBySideMinWidth;
+            final editPane = _buildEditPane(scrollable: true);
+            final preview = _buildPreviewPane();
+            if (wide) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 4, child: editPane),
+                    const SizedBox(width: 14),
+                    Expanded(flex: 6, child: preview),
+                  ],
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 5, child: editPane),
+                  const SizedBox(height: 12),
+                  Expanded(flex: 5, child: preview),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     return SurveyEditorScaffold(
-      header: embedded
-          ? SurveyInlinePanelHeader(
-              title: titlePreview,
-              subtitle: 'Edit / publish',
-              onClose: widget.onClose!,
-              actions: [
-                if (_survey != null)
-                  IconButton(
-                    tooltip: widget.previewBesideOpen
-                        ? 'Close preview'
-                        : 'Preview',
-                    onPressed: _openPreview,
-                    icon: Icon(
-                      widget.previewBesideOpen
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      size: 20,
-                      color: widget.previewBesideOpen
-                          ? AdminSurveyTheme.primary
-                          : AdminSurveyTheme.textSecondary,
-                    ),
-                  ),
-                IconButton(
-                  tooltip: 'Close',
-                  onPressed: widget.onClose,
-                  icon: const Icon(
-                    Icons.close,
-                    size: 20,
-                    color: AdminSurveyTheme.textSecondary,
-                  ),
-                ),
-              ],
-            )
-          : null,
-      appBar: embedded
-          ? null
-          : AppBar(
-              title: Text(titlePreview),
-              backgroundColor: AdminSurveyTheme.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              actions: [
-                if (_survey != null)
-                  IconButton(
-                    tooltip: 'Preview',
-                    onPressed: _openPreview,
-                    icon: const Icon(Icons.visibility_outlined),
-                  ),
-              ],
+      appBar: AppBar(
+        title: Text(titlePreview),
+        backgroundColor: AdminSurveyTheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          if (_survey != null)
+            IconButton(
+              tooltip: 'Preview',
+              onPressed: _openPreviewOverlay,
+              icon: const Icon(Icons.visibility_outlined),
             ),
+        ],
+      ),
       bottomBar: _survey == null ? null : _buildActionBar(),
-      body: _isLoading && _survey == null
-          ? const AdminFormEditorSkeleton()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-              child: embedded
-                  ? _buildEditorForm()
-                  : SurveyEditorContentWidth(child: _buildEditorForm()),
-            ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+        child: SurveyEditorContentWidth(child: _buildEditorForm()),
+      ),
+    );
+  }
+
+  Widget _buildEditPane({required bool scrollable}) {
+    final form = _buildEditorForm();
+    final bar = _survey == null ? null : _buildActionBar(constrainWidth: false);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AdminSurveyTheme.card,
+        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
+        border: Border.all(color: AdminSurveyTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: scrollable
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                    child: form,
+                  )
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                    child: form,
+                  ),
+          ),
+          if (bar != null) bar,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewPane() {
+    final survey = _previewSurvey ??
+        _survey?.copyWith(
+          title: _titleController.text.trim(),
+          description: _descController.text.trim(),
+        );
+    if (survey == null) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: AdminSurveyTheme.card,
+          borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
+          border: Border.all(color: AdminSurveyTheme.border),
+        ),
+        child: const Center(
+          child: Text(
+            'Preview will appear here.',
+            style: TextStyle(color: AdminSurveyTheme.textMuted),
+          ),
+        ),
+      );
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AdminSurveyTheme.card,
+        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
+        border: Border.all(color: AdminSurveyTheme.border),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
+        child: AdminSurveyPreviewPanel(
+          survey: survey,
+          questions: _previewQuestions.isEmpty ? _questions : _previewQuestions,
+          showCloseControls: false,
+        ),
+      ),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
@@ -184,9 +186,28 @@ List<Survey> reportsFilterSurveyOptions(
     }
     if (tracerOnly) return s.isChedGtsBuiltin;
     return true;
-  }).toList()
-    ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+  }).toList();
+  if (tracerOnly) {
+    list.sort((a, b) {
+      final ad = reportsSurveyDisplayDate(a);
+      final bd = reportsSurveyDisplayDate(b);
+      return bd.compareTo(ad);
+    });
+  } else {
+    list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+  }
   return list;
+}
+
+/// Best date stamp for wave pickers (publish → open → created).
+DateTime reportsSurveyDisplayDate(Survey survey) =>
+    survey.publishedAt ?? survey.openAt ?? survey.createdAt;
+
+/// Filter / chip label: title plus date so admins can tell waves apart.
+String reportsSurveyFilterLabel(Survey survey) {
+  final title = survey.title.trim().isEmpty ? 'Untitled' : survey.title.trim();
+  final stamp = DateFormat.yMMMd().format(reportsSurveyDisplayDate(survey));
+  return '$title · $stamp';
 }
 
 /// Audience caption when a wave has publish-time targeting.

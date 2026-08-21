@@ -10,6 +10,7 @@ import 'package:alumni_system/features/jobs/presentation/job_posting_page.dart';
 import 'package:alumni_system/features/alumni/tracer/presentation/tracer_page.dart';
 import 'package:alumni_system/features/alumni/profile/presentation/profile_page.dart';
 import 'package:alumni_system/features/community/presentation/user_community_page.dart';
+import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
@@ -36,6 +37,10 @@ class MainNavigation extends StatefulWidget {
 class MainNavigationState extends State<MainNavigation> {
   late int _currentIndex;
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
+  final GlobalKey<EventsScreenState> _eventsKey =
+      GlobalKey<EventsScreenState>();
+  final GlobalKey<JobPostingScreenState> _jobsKey =
+      GlobalKey<JobPostingScreenState>();
   final GlobalKey<ProfileScreenState> _profileKey =
       GlobalKey<ProfileScreenState>();
   final Set<int> _visitedTabs = {PortalTabs.home};
@@ -71,6 +76,62 @@ class MainNavigationState extends State<MainNavigation> {
     }
   }
 
+  Future<void> _ensureTabReady(int index) async {
+    if (_currentIndex != index) {
+      await switchToTab(index);
+    } else {
+      setState(() => _visitedTabs.add(index));
+    }
+    if (!mounted) return;
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
+  /// Home deep-link: Events tab, then open the tapped event.
+  Future<void> openEvent(
+    String eventId, {
+    bool openComments = false,
+  }) async {
+    final id = eventId.trim();
+    if (id.isEmpty) return;
+    await _ensureTabReady(PortalTabs.events);
+    if (!mounted) return;
+    var state = _eventsKey.currentState;
+    if (state == null) {
+      await Future<void>.delayed(const Duration(milliseconds: 32));
+      if (!mounted) return;
+      state = _eventsKey.currentState;
+    }
+    await state?.openEventById(id, openComments: openComments);
+  }
+
+  /// Home deep-link: Jobs tab, then open the tapped job.
+  Future<void> openJob(String jobId) async {
+    final id = jobId.trim();
+    if (id.isEmpty) return;
+    await _ensureTabReady(PortalTabs.jobs);
+    if (!mounted) return;
+    var state = _jobsKey.currentState;
+    if (state == null) {
+      await Future<void>.delayed(const Duration(milliseconds: 32));
+      if (!mounted) return;
+      state = _jobsKey.currentState;
+    }
+    await state?.openJobById(id);
+  }
+
+  /// Home deep-link: Community tab, then open the tapped topic.
+  Future<void> openForumTopic(String topicId) async {
+    final id = topicId.trim();
+    if (id.isEmpty) return;
+    await _ensureTabReady(PortalTabs.community);
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ForumTopicScreen(topicId: id)),
+    );
+  }
+
   Future<void> _recordAlumniActivity() async {
     final userId = AppSession.userId;
     if (userId == null) return;
@@ -87,11 +148,11 @@ class MainNavigationState extends State<MainNavigation> {
       case PortalTabs.home:
         return HomeScreen(key: _homeKey, onSelectTab: switchToTab);
       case PortalTabs.events:
-        return const EventsScreen();
+        return EventsScreen(key: _eventsKey);
       case PortalTabs.tracer:
         return const TracerScreen(embeddedInNav: true);
       case PortalTabs.jobs:
-        return const JobPostingScreen();
+        return JobPostingScreen(key: _jobsKey);
       case PortalTabs.community:
         return const UserCommunityScreen();
       case PortalTabs.profile:
@@ -209,33 +270,38 @@ class MainNavigationState extends State<MainNavigation> {
     }
 
     return Scaffold(
+      backgroundColor: PortalTheme.pageBg,
+      extendBody: true,
       body: _buildBodyStack(),
       bottomNavigationBar: _buildMinimalNavBar(),
     );
   }
 
   Widget _buildMinimalNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: PortalTheme.border, width: 1),
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: PortalTheme.border.withValues(alpha: 0.7)),
+          boxShadow: [
+            BoxShadow(
+              color: PortalTheme.navy.withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: PortalTheme.navy.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: _navItems.map(_buildMinimalNavItem).toList(),
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: _navItems.map(_buildMinimalNavItem).toList(),
         ),
       ),
     );
@@ -243,8 +309,6 @@ class MainNavigationState extends State<MainNavigation> {
 
   Widget _buildMinimalNavItem(NavItem navItem) {
     final isSelected = _currentIndex == navItem.index;
-    // Soft indigo/slate tint for active tab (keeps navy icons).
-    const activeTint = Color(0xFFEEF2FF);
 
     return Semantics(
       button: true,
@@ -252,26 +316,34 @@ class MainNavigationState extends State<MainNavigation> {
       label: navItem.label,
       child: InkWell(
         onTap: () => switchToTab(navItem.index),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
           duration: PortalTheme.fast,
           curve: PortalTheme.ease,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          constraints: const BoxConstraints(minWidth: 52, minHeight: 48),
-          decoration: BoxDecoration(
-            color: isSelected ? activeTint : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          constraints: const BoxConstraints(minWidth: 52, minHeight: 52),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                isSelected ? navItem.activeIcon : navItem.icon,
-                size: 22,
-                color: isSelected ? PortalTheme.navy : PortalTheme.textSecondary,
+              AnimatedContainer(
+                duration: PortalTheme.fast,
+                curve: PortalTheme.ease,
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isSelected ? PortalTheme.navy : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isSelected ? navItem.activeIcon : navItem.icon,
+                  size: 20,
+                  color: isSelected
+                      ? Colors.white
+                      : PortalTheme.textSecondary,
+                ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text(
                 navItem.label,
                 style: TextStyle(

@@ -64,27 +64,23 @@ class SurveyTakeHeaderCard extends StatelessWidget {
     final estMinutes = math.max(1, (totalQuestions * 0.4).ceil());
 
     return PortalHighlightPanel(
-      variant: PortalHighlightVariant.navy,
+      variant: PortalHighlightVariant.soft,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title.trim().isEmpty ? 'Untitled survey' : title,
-            style: PortalTheme.cardTitle.copyWith(
-              color: PortalTheme.textOnNavy,
+            style: PortalTheme.sectionTitle.copyWith(
+              color: PortalTheme.navy,
               fontSize: 20,
-              fontWeight: FontWeight.w800,
             ),
           ),
           if (desc.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               desc,
-              style: PortalTheme.body.copyWith(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: 13.5,
-              ),
+              style: PortalTheme.bodySecondary.copyWith(fontSize: 13.5),
             ),
           ],
           const SizedBox(height: 14),
@@ -104,12 +100,13 @@ class SurveyTakeHeaderCard extends StatelessWidget {
           if (showProgress) ...[
             const SizedBox(height: 14),
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 7,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                valueColor: const AlwaysStoppedAnimation<Color>(PortalTheme.gold),
+                backgroundColor: PortalTheme.surfaceMuted,
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(PortalTheme.navy),
               ),
             ),
           ],
@@ -122,20 +119,20 @@ class SurveyTakeHeaderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
+        color: PortalTheme.navy.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.9)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 14, color: PortalTheme.navy),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            style: PortalTheme.caption.copyWith(
+              color: PortalTheme.navy,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -155,10 +152,10 @@ class SurveySectionBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: SurveyTakeTheme.accentSoft,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        color: PortalTheme.navy.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
         border: Border.all(
-          color: SurveyTakeTheme.accent.withValues(alpha: 0.25),
+          color: PortalTheme.border.withValues(alpha: 0.8),
         ),
       ),
       child: Row(
@@ -218,11 +215,11 @@ class SurveyQuestionCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
         color: SurveyTakeTheme.surface,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
         border: Border.all(
           color: answered
               ? SurveyTakeTheme.success.withValues(alpha: 0.45)
-              : SurveyTakeTheme.border,
+              : SurveyTakeTheme.border.withValues(alpha: 0.75),
         ),
         boxShadow: PortalTheme.softShadow,
       ),

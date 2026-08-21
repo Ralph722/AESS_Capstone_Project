@@ -94,17 +94,11 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       _eventsSub = _supabase
           .from('events')
           .stream(primaryKey: ['id'])
-          .listen(
-            (_) => softReload(),
-            onError: (_) => startPolling(),
-          );
+          .listen((_) => softReload(), onError: (_) => startPolling());
       _rsvpSub = _supabase
           .from('event_rsvps')
           .stream(primaryKey: ['id'])
-          .listen(
-            (_) => softReload(),
-            onError: (_) => startPolling(),
-          );
+          .listen((_) => softReload(), onError: (_) => startPolling());
     } catch (_) {
       startPolling();
     }
@@ -133,9 +127,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       if (!mounted) return;
       setState(() => _loading = false);
       if (showSpinner) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading events: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading events: $e')));
       }
     } finally {
       _reloadInFlight = false;
@@ -279,9 +273,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error archiving: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error archiving: $e')));
     }
   }
 
@@ -296,15 +290,15 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     try {
       await _eventService.deleteEvent(event.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event deleted')));
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error deleting: $e')));
     }
   }
 
@@ -325,15 +319,15 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         );
       } catch (_) {}
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event cancelled')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event cancelled')));
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error cancelling: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error cancelling: $e')));
     }
   }
 
@@ -356,8 +350,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
-              backgroundColor:
-                  destructive ? const Color(0xFFDC2626) : AdminEventTheme.primary,
+              backgroundColor: destructive
+                  ? const Color(0xFFDC2626)
+                  : AdminEventTheme.primary,
             ),
             child: Text(confirmLabel),
           ),
@@ -379,11 +374,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     }).length;
   }
 
-  int get _totalGoing =>
-      _counts.values.fold<int>(0, (sum, c) => sum + c.going);
+  int get _totalGoing => _counts.values.fold<int>(0, (sum, c) => sum + c.going);
 
-  int get _totalComments =>
-      _active.fold<int>(0, (sum, e) => sum + e.comments);
+  int get _totalComments => _active.fold<int>(0, (sum, e) => sum + e.comments);
 
   int _daysUntil(AlumniEvent event) {
     final today = DateTime(
@@ -391,7 +384,11 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       DateTime.now().month,
       DateTime.now().day,
     );
-    final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
+    final eventDay = DateTime(
+      event.date.year,
+      event.date.month,
+      event.date.day,
+    );
     return eventDay.difference(today).inDays;
   }
 
@@ -400,25 +397,18 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     if (daysUntil == 0) return 'Today';
     if (daysUntil == 1) return 'Tomorrow';
     if (daysUntil <= 7) return 'In $daysUntil days';
-    return DateFormat('MMM d').format(
-      DateTime.now().add(Duration(days: daysUntil)),
-    );
+    return DateFormat(
+      'MMM d',
+    ).format(DateTime.now().add(Duration(days: daysUntil)));
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final pageInsets = AdminDensity.pageInsetsForWidth(
-      MediaQuery.sizeOf(context).width,
-    );
 
-    return ColoredBox(
-      color: AdminEventTheme.background,
-      child: Padding(
-        padding: pageInsets.copyWith(bottom: 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
             AdminPageHeader(
               title: 'Events',
               subtitle: _showCalendar
@@ -448,15 +438,13 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
                 child: _loading && _filtered.isEmpty
                     ? const AdminEventsListSkeleton()
                     : _showCalendar
-                        ? _calendarView()
-                        : _filtered.isEmpty
-                            ? _empty()
-                            : _listView(),
+                    ? _calendarView()
+                    : _filtered.isEmpty
+                    ? _empty()
+                    : _listView(),
               ),
             ),
           ],
-        ),
-      ),
     );
   }
 
@@ -662,10 +650,16 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   }
 
   Widget _buildToolbar() {
-    final years = _active.map((e) => e.batchYear).where((y) => y.isNotEmpty).toSet().toList()
-      ..sort((a, b) => b.compareTo(a));
-    final venues = _active.map((e) => e.venue).where((v) => v.isNotEmpty).toSet().toList()
-      ..sort();
+    final years =
+        _active
+            .map((e) => e.batchYear)
+            .where((y) => y.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => b.compareTo(a));
+    final venues =
+        _active.map((e) => e.venue).where((v) => v.isNotEmpty).toSet().toList()
+          ..sort();
 
     return DirectoryToolbarCard(
       searchController: _searchController,
@@ -694,7 +688,10 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
             value: _category,
             width: 140,
             items: [
-              const DropdownMenuItem(value: null, child: Text('All categories')),
+              const DropdownMenuItem(
+                value: null,
+                child: Text('All categories'),
+              ),
               ...EventCategoryConstants.all.map(
                 (c) => DropdownMenuItem(value: c, child: Text(c)),
               ),
@@ -807,7 +804,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
 
   Widget _empty() {
     return DirectoryEmptyState(
-      icon: _hasAnyFilters ? Icons.search_off_rounded : Icons.event_note_rounded,
+      icon: _hasAnyFilters
+          ? Icons.search_off_rounded
+          : Icons.event_note_rounded,
       title: _hasAnyFilters ? 'No matching events' : 'No active events yet',
       subtitle: _hasAnyFilters
           ? 'Try clearing filters or searching with a different keyword.'
@@ -1055,8 +1054,10 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
                             if (event.capacity != null && event.capacity! > 0)
                               _softStat(
                                 'Seats left',
-                                (event.capacity! - counts.going)
-                                    .clamp(0, event.capacity!),
+                                (event.capacity! - counts.going).clamp(
+                                  0,
+                                  event.capacity!,
+                                ),
                                 AdminEventTheme.primary,
                               ),
                           ],
@@ -1186,10 +1187,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         PopupMenuItem(value: 'cancel', child: Text('Cancel event')),
         PopupMenuItem(
           value: 'delete',
-          child: Text(
-            'Delete',
-            style: TextStyle(color: Color(0xFFDC2626)),
-          ),
+          child: Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
         ),
       ],
     );

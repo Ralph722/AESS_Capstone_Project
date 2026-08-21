@@ -157,23 +157,26 @@ class _ForumScreenState extends State<ForumScreen> {
 
   Widget _buildFilterChips() {
     return SizedBox(
-      height: 34,
-      child: ListView(
+      height: 36,
+      width: double.infinity,
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        children: ForumListFilter.values.map((f) {
-          final selected = _filters.contains(f) ||
-              (f == ForumListFilter.all &&
-                  _filters.length == 1 &&
-                  _filters.contains(ForumListFilter.all));
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: PortalChip(
-              label: f.label,
-              selected: selected,
-              onTap: () => _toggleFilter(f),
-            ),
-          );
-        }).toList(),
+        child: Row(
+          children: ForumListFilter.values.map((f) {
+            final selected = _filters.contains(f) ||
+                (f == ForumListFilter.all &&
+                    _filters.length == 1 &&
+                    _filters.contains(ForumListFilter.all));
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: PortalChip(
+                label: f.label,
+                selected: selected,
+                onTap: () => _toggleFilter(f),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -185,8 +188,9 @@ class _ForumScreenState extends State<ForumScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-          border: Border.all(color: ForumTheme.border),
+          borderRadius: BorderRadius.circular(ForumTheme.radius2xl),
+          border: Border.all(color: ForumTheme.border.withValues(alpha: 0.75)),
+          boxShadow: ForumTheme.softShadow,
         ),
         child: ListView(
           padding: const EdgeInsets.all(PortalTheme.space3),
@@ -231,13 +235,18 @@ class _ForumScreenState extends State<ForumScreen> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openComposer,
-        backgroundColor: ForumTheme.navy,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New topic'),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: Padding(
+        // Clear the floating pill bottom nav when embedded in Community hub.
+        padding: EdgeInsets.only(bottom: widget.embeddedInHub ? 88 : 0),
+        child: FloatingActionButton.extended(
+          onPressed: _openComposer,
+          backgroundColor: ForumTheme.navy,
+          foregroundColor: Colors.white,
+          elevation: 2,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('New topic'),
+        ),
       ),
       body: RefreshIndicator(
         color: ForumTheme.navy,
@@ -247,105 +256,114 @@ class _ForumScreenState extends State<ForumScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(
-                    PortalTheme.space3,
-                    PortalTheme.space2,
-                    PortalTheme.space3,
-                    PortalTheme.space2,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        height: 44,
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: _onSearchChanged,
-                          textInputAction: TextInputAction.search,
-                          style: PortalTheme.body,
-                          decoration: InputDecoration(
-                            hintText:
-                                'Search title, content, author, program, tags…',
-                            hintStyle: PortalTheme.bodySecondary,
-                            prefixIcon: const Icon(
-                              Icons.search_rounded,
-                              size: 20,
-                              color: PortalTheme.textSecondary,
-                            ),
-                            suffixIcon: _searchController.text.isEmpty
-                                ? null
-                                : IconButton(
-                                    tooltip: 'Clear',
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _onSearchChanged('');
-                                    },
-                                    icon: const Icon(Icons.clear, size: 18),
-                                  ),
-                            filled: true,
-                            fillColor: PortalTheme.surfaceMuted,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                            border: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(PortalTheme.radiusMd),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(PortalTheme.radiusMd),
-                              borderSide: BorderSide.none,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(PortalTheme.radiusMd),
-                              borderSide: const BorderSide(
-                                color: PortalTheme.navy,
-                                width: 1.2,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.circular(ForumTheme.radius2xl),
+                      border: Border.all(
+                        color: ForumTheme.border.withValues(alpha: 0.75),
+                      ),
+                      boxShadow: ForumTheme.softShadow,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: 44,
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: _onSearchChanged,
+                            textInputAction: TextInputAction.search,
+                            style: PortalTheme.body,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Search title, content, author, program, tags…',
+                              hintStyle: PortalTheme.bodySecondary,
+                              prefixIcon: const Icon(
+                                Icons.search_rounded,
+                                size: 20,
+                                color: PortalTheme.textSecondary,
+                              ),
+                              suffixIcon: _searchController.text.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Clear',
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _onSearchChanged('');
+                                      },
+                                      icon: const Icon(Icons.clear, size: 18),
+                                    ),
+                              filled: true,
+                              fillColor: PortalTheme.surfaceMuted,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  PortalTheme.radiusMd,
+                                ),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  PortalTheme.radiusMd,
+                                ),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  PortalTheme.radiusMd,
+                                ),
+                                borderSide: const BorderSide(
+                                  color: PortalTheme.navy,
+                                  width: 1.2,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: PortalTheme.space2),
-                      if (!wide) _buildFilterChips(),
-                      if (!wide) const SizedBox(height: PortalTheme.space2),
-                      Row(
-                        children: [
-                          Text(
-                            _totalCount == 1
-                                ? '1 discussion'
-                                : '$_totalCount discussions',
-                            style: PortalTheme.meta,
-                          ),
-                          const Spacer(),
-                          DropdownButtonHideUnderline(
-                            child: DropdownButton<ForumSort>(
-                              value: _sort,
-                              style: PortalTheme.meta.copyWith(
-                                color: PortalTheme.navy,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              items: ForumSort.values
-                                  .map(
-                                    (s) => DropdownMenuItem(
-                                      value: s,
-                                      child: Text(s.label),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) {
-                                if (v == null) return;
-                                setState(() => _sort = v);
-                                _load(reset: true);
-                              },
+                        const SizedBox(height: PortalTheme.space2),
+                        if (!wide) _buildFilterChips(),
+                        if (!wide) const SizedBox(height: PortalTheme.space2),
+                        Row(
+                          children: [
+                            Text(
+                              _totalCount == 1
+                                  ? '1 discussion'
+                                  : '$_totalCount discussions',
+                              style: PortalTheme.meta,
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const Spacer(),
+                            DropdownButtonHideUnderline(
+                              child: DropdownButton<ForumSort>(
+                                value: _sort,
+                                style: PortalTheme.meta.copyWith(
+                                  color: PortalTheme.navy,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                items: ForumSort.values
+                                    .map(
+                                      (s) => DropdownMenuItem(
+                                        value: s,
+                                        child: Text(s.label),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v == null) return;
+                                  setState(() => _sort = v);
+                                  _load(reset: true);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -356,6 +374,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         Padding(
                           padding: const EdgeInsets.only(
                             left: PortalTheme.space3,
+                            top: PortalTheme.space3,
                             bottom: PortalTheme.space3,
                           ),
                           child: _buildSidebar(true),
@@ -366,10 +385,10 @@ class _ForumScreenState extends State<ForumScreen> {
                         child: PortalContentFrame(
                           child: ListView(
                             padding: EdgeInsets.fromLTRB(
-                              wide ? 0 : 0,
-                              0,
-                              0,
-                              wide ? PortalTheme.space5 : 88,
+                              16,
+                              14,
+                              16,
+                              wide ? PortalTheme.space5 : 100,
                             ),
                             children: [_buildListBody()],
                           ),
@@ -435,25 +454,32 @@ class _ForumScreenState extends State<ForumScreen> {
     final regular = _topics.where((t) => !t.isPinned || t.isAnnouncement).toList();
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (pinned.isNotEmpty) ...[
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(
-              PortalTheme.space3,
-              PortalTheme.space2,
-              PortalTheme.space3,
-              PortalTheme.space1,
-            ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: PortalTheme.space2),
             child: Row(
               children: [
-                Icon(Icons.push_pin_rounded, size: 16, color: ForumTheme.pinned),
-                const SizedBox(width: 6),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: ForumTheme.pinnedBg,
+                    borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
+                  ),
+                  child: const Icon(
+                    Icons.push_pin_rounded,
+                    size: 14,
+                    color: ForumTheme.pinned,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Text(
                   'Pinned',
-                  style: PortalTheme.meta.copyWith(
+                  style: PortalTheme.sectionTitle.copyWith(
+                    fontSize: 14,
                     color: ForumTheme.pinned,
-                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
@@ -463,17 +489,14 @@ class _ForumScreenState extends State<ForumScreen> {
             ForumTopicCard(topic: topic, onTap: () => _openTopic(topic)),
         ],
         if (regular.isNotEmpty && pinned.isNotEmpty)
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(
-              PortalTheme.space3,
-              PortalTheme.space3,
-              PortalTheme.space3,
-              PortalTheme.space1,
+          Padding(
+            padding: const EdgeInsets.only(
+              top: PortalTheme.space1,
+              bottom: PortalTheme.space2,
             ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text('All discussions', style: PortalTheme.meta),
+            child: Text(
+              'All discussions',
+              style: PortalTheme.sectionTitle.copyWith(fontSize: 14),
             ),
           ),
         for (final topic in regular)

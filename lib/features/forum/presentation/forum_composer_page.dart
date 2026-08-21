@@ -597,9 +597,11 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: ForumTheme.pageBg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: ForumTheme.border),
+              color: ForumTheme.surfaceMuted,
+              borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
+              border: Border.all(
+                color: ForumTheme.border.withValues(alpha: 0.75),
+              ),
             ),
             child: SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -629,7 +631,17 @@ class _ForumComposerPageState extends State<ForumComposerPage>
                 ? 'Announcement headline'
                 : 'Discussion title',
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+              borderSide: BorderSide(
+                color: ForumTheme.border.withValues(alpha: 0.9),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+              borderSide: const BorderSide(color: ForumTheme.navy, width: 1.4),
             ),
             filled: true,
             fillColor: Colors.white,
@@ -658,7 +670,17 @@ class _ForumComposerPageState extends State<ForumComposerPage>
             labelText: 'Message',
             alignLabelWithHint: true,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+              borderSide: BorderSide(
+                color: ForumTheme.border.withValues(alpha: 0.9),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+              borderSide: const BorderSide(color: ForumTheme.navy, width: 1.4),
             ),
             filled: true,
             fillColor: Colors.white,
@@ -735,8 +757,11 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: ForumTheme.border),
+            borderRadius: BorderRadius.circular(ForumTheme.radius2xl),
+            border: Border.all(
+              color: ForumTheme.border.withValues(alpha: 0.75),
+            ),
+            boxShadow: ForumTheme.softShadow,
           ),
           clipBehavior: Clip.antiAlias,
           child: IntrinsicHeight(

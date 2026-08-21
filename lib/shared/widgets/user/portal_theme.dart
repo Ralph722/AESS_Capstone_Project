@@ -21,7 +21,8 @@ abstract final class PortalTheme {
   static const Color amber = Color(0xFFFF9718);
 
   // —— Surfaces ——
-  static const Color pageBg = Color(0xFFF8F9FA);
+  /// Soft cool page wash (navy-tinted, not flat gray).
+  static const Color pageBg = Color(0xFFF4F6FA);
   static const Color surfaceMuted = Color(0xFFF1F3F5);
   static const Color card = Colors.white;
   static const Color border = Color(0xFFE1E5EA);
@@ -43,6 +44,7 @@ abstract final class PortalTheme {
   static const double radiusMd = 12;
   static const double radiusLg = 16;
   static const double radiusXl = 20;
+  static const double radius2xl = 24;
 
   static const double space1 = 8;
   static const double space2 = 12;

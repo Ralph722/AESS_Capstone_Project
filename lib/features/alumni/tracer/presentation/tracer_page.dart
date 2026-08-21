@@ -8,8 +8,6 @@ import 'package:alumni_system/features/alumni/tracer/data/id_tracer_service.dart
 import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_prefill.dart';
-import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
-import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_wizard.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -47,7 +45,6 @@ class _TracerScreenState extends State<TracerScreen>
   bool _inlineLoading = false;
   bool _inlineSaving = false;
   final _activeScrollController = ScrollController();
-  final _wizardAnchorKey = GlobalKey();
 
   @override
   void initState() {
@@ -137,38 +134,6 @@ class _TracerScreenState extends State<TracerScreen>
   List<SurveyAssignment> get _otherActiveAssignments => _activeAssignments
       .where((a) => _surveyById[a.surveyId]?.isChedGtsBuiltin != true)
       .toList();
-
-  int _chedOverallPercent(Map<String, dynamic> answers) {
-    final visible = ChedGtsVisibility.visibleItemIds(answers);
-    final requiredIds = ChedGtsBuiltin.items
-        .where((i) => i.required && visible.contains(i.id))
-        .map((i) => i.id)
-        .toList();
-    if (requiredIds.isEmpty) return 0;
-    final missing = ChedGtsVisibility.missingRequired(answers);
-    final done = requiredIds.length - missing.length;
-    return ((done / requiredIds.length) * 100).round().clamp(0, 100);
-  }
-
-  void _scrollToWizard() {
-    final ctx = _wizardAnchorKey.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: PortalTheme.normal,
-        curve: PortalTheme.ease,
-        alignment: 0.05,
-      );
-      return;
-    }
-    if (_activeScrollController.hasClients) {
-      _activeScrollController.animateTo(
-        220,
-        duration: PortalTheme.normal,
-        curve: PortalTheme.ease,
-      );
-    }
-  }
 
   Future<void> _prepareInlineChedForm() async {
     final assignment = _primaryChedAssignment;
@@ -304,31 +269,27 @@ class _TracerScreenState extends State<TracerScreen>
       color: PortalTheme.navy,
       child: ListView(
         controller: _activeScrollController,
-        padding: padding.copyWith(bottom: 40),
+        padding: padding.copyWith(bottom: widget.embeddedInNav ? 108 : 40),
         children: [
           if (ched != null) ...[
-            _chedStatusHero(ched),
-            const SizedBox(height: PortalTheme.space3),
             if (_inlineLoading)
               const PortalCardListSkeleton(count: 4, shrinkWrap: true)
             else
-              KeyedSubtree(
-                key: _wizardAnchorKey,
-                child: ChedGtsWizard(
-                  title: _surveyById[ched.surveyId]?.title ?? ched.surveyTitle,
-                  answers: _inlineAnswers,
-                  saving: _inlineSaving,
-                  scrollController: _activeScrollController,
-                  onChanged: (a) => setState(() => _inlineAnswers = a),
-                  onSaveDraft: () => _saveInline(submit: false),
-                  onSubmit: () => _saveInline(submit: true),
-                ),
+              ChedGtsWizard(
+                title: _surveyById[ched.surveyId]?.title ?? ched.surveyTitle,
+                answers: _inlineAnswers,
+                saving: _inlineSaving,
+                scrollController: _activeScrollController,
+                onChanged: (a) => setState(() => _inlineAnswers = a),
+                onSaveDraft: () => _saveInline(submit: false),
+                onSubmit: () => _saveInline(submit: true),
               ),
           ] else if (scheduled != null)
             _scheduledChedCard(scheduled)
           else
             _emptyActiveState(),
-          if (others.isNotEmpty) ...[
+          // Only when there is no active CHED tracer on this screen.
+          if (ched == null && others.isNotEmpty) ...[
             const SizedBox(height: PortalTheme.space4),
             _otherSurveysLinkCard(others.length),
           ],
@@ -385,166 +346,6 @@ class _TracerScreenState extends State<TracerScreen>
         ],
       ),
     );
-  }
-
-  Widget _chedStatusHero(SurveyAssignment assignment) {
-    final percent = _chedOverallPercent(_inlineAnswers);
-    final isComplete = percent >= 100;
-    final status = assignment.status;
-    final closeAt = _surveyById[assignment.surveyId]?.closeAt;
-
-    final (PortalChipTone chipTone, String chipLabel, IconData chipIcon) =
-        switch (status) {
-      SurveyAssignmentStatus.notStarted => (
-          PortalChipTone.warning,
-          'Not started',
-          Icons.flag_outlined,
-        ),
-      SurveyAssignmentStatus.inProgress => (
-          PortalChipTone.brand,
-          'In progress',
-          Icons.edit_note_outlined,
-        ),
-      SurveyAssignmentStatus.completed => (
-          PortalChipTone.success,
-          'Complete',
-          Icons.check_circle_outline,
-        ),
-    };
-
-    final headline = isComplete
-        ? 'Ready to submit'
-        : status == SurveyAssignmentStatus.notStarted
-            ? 'Your CHED tracer is waiting'
-            : 'Keep going — you\'re making progress';
-
-    final body = isComplete
-        ? 'All required items are answered. Review your responses below, then submit to finish.'
-        : 'This official questionnaire helps CHED and USTP track graduate outcomes. '
-            'Your answers are confidential and typically take 15–20 minutes.';
-
-    return PortalHighlightPanel(
-      variant: PortalHighlightVariant.navy,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              PortalChip(
-                label: chipLabel,
-                icon: chipIcon,
-                tone: chipTone,
-              ),
-              if (closeAt != null) ...[
-                const SizedBox(width: 8),
-                PortalChip(
-                  label: 'Due ${DateFormat.MMMd().format(closeAt)}',
-                  icon: Icons.event_outlined,
-                  tone: PortalChipTone.gold,
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: PortalTheme.space3),
-          Text(
-            headline,
-            style: PortalTheme.cardTitle.copyWith(color: PortalTheme.textOnNavy),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            body,
-            style: PortalTheme.body.copyWith(
-              color: Colors.white.withValues(alpha: 0.82),
-            ),
-          ),
-          const SizedBox(height: PortalTheme.space3),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '$percent% complete',
-                          style: PortalTheme.meta.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          isComplete ? 'All required done' : 'Required items',
-                          style: PortalTheme.caption.copyWith(
-                            color: Colors.white.withValues(alpha: 0.65),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(99),
-                      child: LinearProgressIndicator(
-                        value: percent / 100,
-                        minHeight: 6,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        valueColor: const AlwaysStoppedAnimation(PortalTheme.gold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: PortalTheme.space3),
-          _sectionOverviewRow(),
-          const SizedBox(height: PortalTheme.space4),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _scrollToWizard,
-              style: PortalTheme.goldAccentButton(),
-              icon: Icon(isComplete ? Icons.fact_check_outlined : Icons.arrow_forward_rounded),
-              label: Text(isComplete ? 'Review & submit' : 'Continue tracer'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionOverviewRow() {
-    const sections = ChedGtsSection.values;
-    final visible = ChedGtsVisibility.visibleItemIds(_inlineAnswers);
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final section in sections)
-          _SectionStatusChip(
-            label: _sectionShortLabel(section),
-            complete: ChedGtsVisibility
-                .missingRequiredInSection(_inlineAnswers, section)
-                .isEmpty,
-            hasItems: ChedGtsBuiltin.items
-                .any((i) => i.section == section && visible.contains(i.id)),
-          ),
-      ],
-    );
-  }
-
-  String _sectionShortLabel(ChedGtsSection section) {
-    final item = ChedGtsBuiltin.items.firstWhere(
-      (i) => i.section == section,
-      orElse: () => ChedGtsBuiltin.items.first,
-    );
-    final title = item.sectionTitle;
-    if (title.startsWith('Section ')) {
-      return title.split(' ').take(2).join(' ');
-    }
-    return title.length > 12 ? '${title.substring(0, 10)}…' : title;
   }
 
   Widget _otherSurveysLinkCard(int count) {
@@ -676,20 +477,10 @@ class _TracerScreenState extends State<TracerScreen>
       onRefresh: _load,
       color: PortalTheme.navy,
       child: ListView.builder(
-        padding: padding.copyWith(bottom: 40),
-        itemCount: chedHistory.length + 1,
+        padding: padding.copyWith(bottom: widget.embeddedInNav ? 108 : 40),
+        itemCount: chedHistory.length,
         itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: PortalTheme.space3),
-              child: PortalSectionHeader(
-                title: 'Submission history',
-                subtitle: '${chedHistory.length} CHED response${chedHistory.length == 1 ? '' : 's'} on file',
-              ),
-            );
-          }
-
-          final item = chedHistory[index - 1];
+          final item = chedHistory[index];
           final submitted = item.response.submittedAt;
           return _HistoryResponseCard(
             title: item.surveyTitle,
@@ -700,34 +491,6 @@ class _TracerScreenState extends State<TracerScreen>
           );
         },
       ),
-    );
-  }
-}
-
-class _SectionStatusChip extends StatelessWidget {
-  const _SectionStatusChip({
-    required this.label,
-    required this.complete,
-    required this.hasItems,
-  });
-
-  final String label;
-  final bool complete;
-  final bool hasItems;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!hasItems) {
-      return PortalChip(
-        label: label,
-        tone: PortalChipTone.neutral,
-        icon: Icons.remove_circle_outline,
-      );
-    }
-    return PortalChip(
-      label: label,
-      tone: complete ? PortalChipTone.success : PortalChipTone.gold,
-      icon: complete ? Icons.check : Icons.radio_button_unchecked,
     );
   }
 }
@@ -745,48 +508,64 @@ class _HistoryResponseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: PortalTheme.space2),
-      decoration: BoxDecoration(
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+      side: BorderSide(color: PortalTheme.border.withValues(alpha: 0.75)),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PortalTheme.space2),
+      child: Material(
         color: PortalTheme.card,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-        border: Border.all(color: PortalTheme.border),
-        boxShadow: PortalTheme.softShadow,
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: PortalTheme.space3,
-            vertical: 4,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+            splashColor: PortalTheme.navy.withValues(alpha: 0.06),
+            highlightColor: PortalTheme.navy.withValues(alpha: 0.04),
+            hoverColor: PortalTheme.navy.withValues(alpha: 0.03),
           ),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: PortalTheme.success.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: PortalTheme.space3,
+              vertical: 4,
             ),
-            child: const Icon(
-              Icons.verified_outlined,
-              color: PortalTheme.success,
-              size: 20,
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: PortalTheme.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
+              ),
+              child: const Icon(
+                Icons.verified_outlined,
+                color: PortalTheme.success,
+                size: 20,
+              ),
             ),
+            title: Text(
+              title,
+              style: PortalTheme.cardTitle.copyWith(fontSize: 15),
+            ),
+            subtitle: Text(
+              'Submitted $submittedLabel',
+              style: PortalTheme.meta,
+            ),
+            children: [
+              ChedGtsForm(
+                answers: answers,
+                onChanged: (_) {},
+                readOnly: true,
+                showIntro: false,
+              ),
+            ],
           ),
-          title: Text(title, style: PortalTheme.cardTitle.copyWith(fontSize: 15)),
-          subtitle: Text(
-            'Submitted $submittedLabel',
-            style: PortalTheme.meta,
-          ),
-          children: [
-            ChedGtsForm(
-              answers: answers,
-              onChanged: (_) {},
-              readOnly: true,
-              showIntro: false,
-            ),
-          ],
         ),
       ),
     );

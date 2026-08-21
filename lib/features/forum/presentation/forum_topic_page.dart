@@ -597,7 +597,6 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     required bool canModerate,
   }) {
     final meta = <String>[
-      topic.authorName,
       if (topic.authorProgram.isNotEmpty) topic.authorProgram,
       if (topic.authorBatch.isNotEmpty) 'Batch ${topic.authorBatch}',
     ].join(' · ');
@@ -607,8 +606,8 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
     return PortalHighlightPanel(
       variant: topic.isAnnouncement
-          ? PortalHighlightVariant.soft
-          : PortalHighlightVariant.navy,
+          ? PortalHighlightVariant.goldEdge
+          : PortalHighlightVariant.soft,
       padding: const EdgeInsets.all(PortalTheme.space4),
       margin: EdgeInsets.zero,
       child: Column(
@@ -619,20 +618,16 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
               padding: const EdgeInsets.only(bottom: PortalTheme.space2),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.campaign_outlined,
                     size: 16,
-                    color: topic.isAnnouncement
-                        ? ForumTheme.announcement
-                        : Colors.white.withValues(alpha: 0.9),
+                    color: ForumTheme.announcement,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     'Official announcement',
                     style: PortalTheme.caption.copyWith(
-                      color: topic.isAnnouncement
-                          ? ForumTheme.announcement
-                          : Colors.white.withValues(alpha: 0.9),
+                      color: ForumTheme.announcement,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -643,10 +638,10 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                radius: 20,
+                radius: 22,
                 backgroundColor: topic.isAnnouncement
                     ? ForumTheme.announcementBg
-                    : Colors.white.withValues(alpha: 0.15),
+                    : ForumTheme.navy.withValues(alpha: 0.08),
                 backgroundImage: () {
                   final url = topic.authorAvatarUrl?.trim() ?? '';
                   if (url.isEmpty) return null;
@@ -661,7 +656,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                         style: TextStyle(
                           color: topic.isAnnouncement
                               ? ForumTheme.announcement
-                              : Colors.white,
+                              : ForumTheme.navy,
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
                         ),
@@ -673,144 +668,146 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      topic.title,
-                      style: (topic.isAnnouncement
-                              ? PortalTheme.sectionTitle
-                              : PortalTheme.pageTitleOnDark.copyWith(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                ))
-                          .copyWith(
-                        color: topic.isAnnouncement
-                            ? ForumTheme.textPrimary
-                            : Colors.white,
+                      topic.authorName.trim().isEmpty
+                          ? 'Alumni'
+                          : topic.authorName.trim(),
+                      style: PortalTheme.meta.copyWith(
+                        color: ForumTheme.navy,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      meta,
-                      style: (topic.isAnnouncement
-                              ? PortalTheme.meta
-                              : PortalTheme.caption.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                )),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      edited ? '$timeLabel · Edited' : timeLabel,
-                      style: (topic.isAnnouncement
-                              ? PortalTheme.caption
-                              : PortalTheme.caption.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.65),
-                                )),
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(meta, style: PortalTheme.caption),
+                    ],
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ForumTheme.surfaceMuted,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        edited ? '$timeLabel · Edited' : timeLabel,
+                        style: PortalTheme.caption.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
               PopupMenuButton<String>(
-                      tooltip: 'Actions',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 36,
-                        minHeight: 36,
-                      ),
-                      onSelected: (value) async {
-                        switch (value) {
-                          case 'bookmark':
-                            await _toggleBookmark(topic);
-                          case 'copy':
-                            await copyForumTopicLink(context, topic.id);
-                          case 'report':
-                            await _report();
-                          case 'edit':
-                            await _editTopic(topic);
-                          case 'solved':
-                            await _forumService.setTopicSolved(
-                              topic.id,
-                              !topic.isSolved,
+                tooltip: 'Actions',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
+                onSelected: (value) async {
+                  switch (value) {
+                    case 'bookmark':
+                      await _toggleBookmark(topic);
+                    case 'copy':
+                      await copyForumTopicLink(context, topic.id);
+                    case 'report':
+                      await _report();
+                    case 'edit':
+                      await _editTopic(topic);
+                    case 'solved':
+                      await _forumService.setTopicSolved(
+                        topic.id,
+                        !topic.isSolved,
+                      );
+                      await _loadAll(silent: true);
+                    case 'lock':
+                      final reason = topic.isLocked
+                          ? ''
+                          : await showForumModerationReasonDialog(
+                              context,
+                              title: 'Lock topic',
+                              confirmLabel: 'Lock',
                             );
-                            await _loadAll(silent: true);
-                          case 'lock':
-                            final reason = topic.isLocked
-                                ? ''
-                                : await showForumModerationReasonDialog(
-                                    context,
-                                    title: 'Lock topic',
-                                    confirmLabel: 'Lock',
-                                  );
-                            if (reason == null && !topic.isLocked) return;
-                            await _forumService.setTopicLocked(
-                              topic.id,
-                              !topic.isLocked,
-                              reason: topic.isLocked ? null : reason,
-                            );
-                            await _loadAll(silent: true);
-                          case 'pin':
-                            await _forumService.setTopicPinned(
-                              topic.id,
-                              !topic.isPinned,
-                            );
-                            await _loadAll(silent: true);
-                          case 'delete':
-                            await _confirmDeleteTopic(topic);
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        PopupMenuItem(
-                          value: 'bookmark',
-                          child: Text(
-                            topic.isBookmarked
-                                ? 'Remove bookmark'
-                                : 'Bookmark',
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'copy',
-                          child: Text('Copy link'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'report',
-                          child: Text('Report'),
-                        ),
-                        if (canEdit)
-                          const PopupMenuItem(
-                            value: 'edit',
-                            child: Text('Edit'),
-                          ),
-                        if (canSolve)
-                          PopupMenuItem(
-                            value: 'solved',
-                            child: Text(
-                              topic.isSolved
-                                  ? 'Mark unsolved'
-                                  : 'Mark as solved',
-                            ),
-                          ),
-                        if (canModerate) ...[
-                          PopupMenuItem(
-                            value: 'lock',
-                            child: Text(
-                              topic.isLocked ? 'Unlock' : 'Lock',
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'pin',
-                            child: Text(topic.isPinned ? 'Unpin' : 'Pin'),
-                          ),
-                        ],
-                        if (canDelete)
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Text(
-                              'Delete',
-                              style: TextStyle(color: Colors.red),
-                            ),
-                          ),
-                      ],
+                      if (reason == null && !topic.isLocked) return;
+                      await _forumService.setTopicLocked(
+                        topic.id,
+                        !topic.isLocked,
+                        reason: topic.isLocked ? null : reason,
+                      );
+                      await _loadAll(silent: true);
+                    case 'pin':
+                      await _forumService.setTopicPinned(
+                        topic.id,
+                        !topic.isPinned,
+                      );
+                      await _loadAll(silent: true);
+                    case 'delete':
+                      await _confirmDeleteTopic(topic);
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'bookmark',
+                    child: Text(
+                      topic.isBookmarked ? 'Remove bookmark' : 'Bookmark',
                     ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'copy',
+                    child: Text('Copy link'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'report',
+                    child: Text('Report'),
+                  ),
+                  if (canEdit)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit'),
+                    ),
+                  if (canSolve)
+                    PopupMenuItem(
+                      value: 'solved',
+                      child: Text(
+                        topic.isSolved ? 'Unmark solved' : 'Mark solved',
+                      ),
+                    ),
+                  if (canModerate) ...[
+                    PopupMenuItem(
+                      value: 'lock',
+                      child: Text(topic.isLocked ? 'Unlock' : 'Lock'),
+                    ),
+                    PopupMenuItem(
+                      value: 'pin',
+                      child: Text(topic.isPinned ? 'Unpin' : 'Pin'),
+                    ),
+                  ],
+                  if (canDelete)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: PortalTheme.space3),
+          Text(
+            topic.title,
+            style: PortalTheme.sectionTitle.copyWith(
+              fontSize: 20,
+              color: ForumTheme.navy,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: PortalTheme.space2),
           ForumStatusChipRow(topic: topic),
           if (topic.tags.isNotEmpty) ...[
             const SizedBox(height: PortalTheme.space2),
@@ -824,23 +821,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
           const SizedBox(height: PortalTheme.space3),
           SafeLinkText(
             topic.body,
-            style: (topic.isAnnouncement
-                    ? PortalTheme.body
-                    : PortalTheme.body.copyWith(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        height: 1.5,
-                      ))
-                .copyWith(fontSize: 15),
-            linkStyle: topic.isAnnouncement
-                ? null
-                : const TextStyle(
-                    color: Color(0xFFFFE08A),
-                    decoration: TextDecoration.underline,
-                    decorationColor: Color(0xFFFFE08A),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    height: 1.5,
-                  ),
+            style: PortalTheme.body.copyWith(fontSize: 15, height: 1.5),
           ),
           const SizedBox(height: PortalTheme.space2),
           Wrap(
@@ -848,8 +829,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               IconButton(
-                tooltip:
-                    topic.isBookmarked ? 'Remove bookmark' : 'Bookmark',
+                tooltip: topic.isBookmarked ? 'Remove bookmark' : 'Bookmark',
                 visualDensity: VisualDensity.compact,
                 onPressed: () => _toggleBookmark(topic),
                 icon: Icon(
@@ -857,26 +837,22 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_border_rounded,
                   size: 20,
-                  color: topic.isAnnouncement ? ForumTheme.navy : Colors.white,
+                  color: ForumTheme.navy,
                 ),
               ),
               IconButton(
                 tooltip: 'Copy link',
                 visualDensity: VisualDensity.compact,
                 onPressed: () => copyForumTopicLink(context, topic.id),
-                icon: Icon(
+                icon: const Icon(
                   Icons.link_rounded,
                   size: 20,
-                  color: topic.isAnnouncement ? ForumTheme.navy : Colors.white,
+                  color: ForumTheme.navy,
                 ),
               ),
               if (canSolve)
                 TextButton.icon(
-                  style: PortalTheme.ghostButton(dense: true).copyWith(
-                    foregroundColor: WidgetStatePropertyAll(
-                      topic.isAnnouncement ? ForumTheme.navy : Colors.white,
-                    ),
-                  ),
+                  style: PortalTheme.ghostButton(dense: true),
                   onPressed: () async {
                     await _forumService.setTopicSolved(
                       topic.id,
@@ -909,194 +885,208 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       padding: const EdgeInsets.only(bottom: PortalTheme.space2),
       child: Material(
         color: ForumTheme.card,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
-          onTap: null,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(
-              PortalTheme.space3,
-              PortalTheme.space2,
-              PortalTheme.space2,
-              PortalTheme.space2,
-            ),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
-              border: Border.all(color: ForumTheme.border.withValues(alpha: 0.7)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: ForumTheme.navy.withValues(alpha: 0.08),
-                      backgroundImage: () {
-                        final url = post.authorAvatarUrl?.trim() ?? '';
-                        if (url.isEmpty) return null;
-                        return AppImage.provider(url);
-                      }(),
-                      child: (post.authorAvatarUrl?.trim().isNotEmpty ?? false)
-                          ? null
-                          : Text(
-                              post.authorName.isNotEmpty
-                                  ? post.authorName[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                color: ForumTheme.navy,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            post.authorName,
-                            style: PortalTheme.meta.copyWith(
-                              color: ForumTheme.textPrimary,
+        elevation: 1,
+        shadowColor: ForumTheme.navy.withValues(alpha: 0.08),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ForumTheme.radius2xl),
+          side: BorderSide(color: ForumTheme.border.withValues(alpha: 0.75)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PortalTheme.space3,
+            PortalTheme.space3,
+            PortalTheme.space2,
+            PortalTheme.space2,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: ForumTheme.navy.withValues(alpha: 0.08),
+                    backgroundImage: () {
+                      final url = post.authorAvatarUrl?.trim() ?? '';
+                      if (url.isEmpty) return null;
+                      return AppImage.provider(url);
+                    }(),
+                    child: (post.authorAvatarUrl?.trim().isNotEmpty ?? false)
+                        ? null
+                        : Text(
+                            post.authorName.isNotEmpty
+                                ? post.authorName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: ForumTheme.navy,
                               fontWeight: FontWeight.w700,
+                              fontSize: 12,
                             ),
                           ),
-                          Text(
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.authorName.trim().isEmpty
+                              ? 'Alumni'
+                              : post.authorName.trim(),
+                          style: PortalTheme.meta.copyWith(
+                            color: ForumTheme.navy,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ForumTheme.surfaceMuted,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
                             post.editedAt != null
                                 ? '$timeLabel · Edited'
                                 : timeLabel,
-                            style: PortalTheme.caption,
+                            style: PortalTheme.caption.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuButton<String>(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
-                  ),
-                  onSelected: (v) async {
-                    switch (v) {
-                      case 'quote':
-                        setState(() => _quoting = post);
-                        _replyFocus.requestFocus();
-                      case 'report':
-                        await _report(postId: post.id);
-                      case 'edit':
-                        await _editPost(post);
-                      case 'delete':
-                        await _forumService.deletePost(
-                          widget.topicId,
-                          post.id,
-                        );
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    if (!topic.isLocked)
-                      const PopupMenuItem(
-                        value: 'quote',
-                        child: Text('Quote reply'),
-                      ),
-                    const PopupMenuItem(
-                      value: 'report',
-                      child: Text('Report'),
-                    ),
-                    if (canEdit)
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit'),
-                      ),
-                    if (canDelete)
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          'Delete',
-                          style: TextStyle(color: Colors.red),
                         ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                    onSelected: (v) async {
+                      switch (v) {
+                        case 'quote':
+                          setState(() => _quoting = post);
+                          _replyFocus.requestFocus();
+                        case 'report':
+                          await _report(postId: post.id);
+                        case 'edit':
+                          await _editPost(post);
+                        case 'delete':
+                          await _forumService.deletePost(
+                            widget.topicId,
+                            post.id,
+                          );
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      if (!topic.isLocked)
+                        const PopupMenuItem(
+                          value: 'quote',
+                          child: Text('Quote reply'),
+                        ),
+                      const PopupMenuItem(
+                        value: 'report',
+                        child: Text('Report'),
                       ),
-                  ],
+                      if (canEdit)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Edit'),
+                        ),
+                      if (canDelete)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              if (post.quotedExcerpt?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: ForumTheme.surfaceMuted,
+                    borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
+                    border: const Border(
+                      left: BorderSide(color: ForumTheme.navy, width: 3),
+                    ),
+                  ),
+                  child: SafeLinkText(
+                    post.quotedExcerpt!,
+                    style: PortalTheme.caption.copyWith(height: 1.35),
+                  ),
                 ),
               ],
-            ),
-            if (post.quotedExcerpt?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: ForumTheme.pageBg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: const Border(
-                    left: BorderSide(color: ForumTheme.navy, width: 3),
-                  ),
-                ),
-                child: SafeLinkText(
-                  post.quotedExcerpt!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: ForumTheme.textSecondary,
-                    height: 1.35,
-                  ),
-                ),
+              const SizedBox(height: 10),
+              SafeLinkText(
+                post.body,
+                style: PortalTheme.body.copyWith(fontSize: 14, height: 1.45),
               ),
-            ],
-            const SizedBox(height: 6),
-            SafeLinkText(
-              post.body,
-              style: const TextStyle(fontSize: 13.5, height: 1.4),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  onPressed: () => _forumService.toggleHelpful(
-                    post.id,
-                    post.helpfulByMe,
-                  ),
-                  icon: Icon(
-                    post.helpfulByMe
-                        ? Icons.thumb_up
-                        : Icons.thumb_up_outlined,
-                    size: 15,
-                    color: post.helpfulByMe
-                        ? ForumTheme.navy
-                        : ForumTheme.textSecondary,
-                  ),
-                  label: Text(
-                    post.helpfulCount == 0
-                        ? 'Helpful'
-                        : 'Helpful · ${post.helpfulCount}',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: post.helpfulByMe
-                          ? ForumTheme.navy
-                          : ForumTheme.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                if (!topic.isLocked)
-                  TextButton(
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  TextButton.icon(
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
-                    onPressed: () {
-                      setState(() => _quoting = post);
-                      _replyFocus.requestFocus();
-                    },
-                    child: const Text('Quote', style: TextStyle(fontSize: 12.5)),
+                    onPressed: () => _forumService.toggleHelpful(
+                      post.id,
+                      post.helpfulByMe,
+                    ),
+                    icon: Icon(
+                      post.helpfulByMe
+                          ? Icons.thumb_up
+                          : Icons.thumb_up_outlined,
+                      size: 15,
+                      color: post.helpfulByMe
+                          ? ForumTheme.navy
+                          : ForumTheme.textSecondary,
+                    ),
+                    label: Text(
+                      post.helpfulCount == 0
+                          ? 'Helpful'
+                          : 'Helpful · ${post.helpfulCount}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: post.helpfulByMe
+                            ? ForumTheme.navy
+                            : ForumTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-              ],
-            ),
-              ],
-            ),
+                  if (!topic.isLocked)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: () {
+                        setState(() => _quoting = post);
+                        _replyFocus.requestFocus();
+                      },
+                      child: const Text(
+                        'Quote',
+                        style: TextStyle(fontSize: 12.5),
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -1105,7 +1095,8 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
   Widget _buildReplyBar(ForumTopic topic) {
     return Material(
-      elevation: 4,
+      elevation: 2,
+      shadowColor: ForumTheme.navy.withValues(alpha: 0.08),
       color: Colors.white,
       child: SafeArea(
         top: false,
@@ -1126,7 +1117,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                   padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
                   decoration: BoxDecoration(
                     color: ForumTheme.surfaceMuted,
-                    borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
+                    borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
                     border: const Border(
                       left: BorderSide(color: ForumTheme.navy, width: 3),
                     ),
@@ -1156,8 +1147,11 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: ForumTheme.border),
+                    borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
+                    border: Border.all(
+                      color: ForumTheme.border.withValues(alpha: 0.75),
+                    ),
+                    boxShadow: ForumTheme.softShadow,
                   ),
                   child: ListView.builder(
                     shrinkWrap: true,

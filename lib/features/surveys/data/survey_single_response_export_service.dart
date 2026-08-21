@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/features/surveys/data/classic_survey_visibility.dart';
@@ -96,7 +97,7 @@ class SurveySingleResponseExportService {
 
   static String _formatAnswer(dynamic value) {
     final text = formatSurveyAnswerValue(value);
-    return text.isEmpty ? '—' : text;
+    return text.isEmpty ? '-' : text;
   }
 
   static Future<Uint8List> toPdf({
@@ -125,7 +126,7 @@ class SurveySingleResponseExportService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Text(
-              survey.title,
+              PdfSafeText.sanitize(survey.title),
               style: pw.TextStyle(
                 fontSize: 16,
                 fontWeight: pw.FontWeight.bold,
@@ -133,7 +134,9 @@ class SurveySingleResponseExportService {
               ),
             ),
             pw.Text(
-              'Individual response export · ${fmt.format(DateTime.now())}',
+              PdfSafeText.sanitize(
+                'Individual response export - ${fmt.format(DateTime.now())}',
+              ),
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
             ),
             pw.SizedBox(height: 8),
@@ -161,11 +164,11 @@ class SurveySingleResponseExportService {
           _pdfMetaTable([
             ['Name', participant.displayName],
             ['Email', participant.email],
-            ['Student ID', participant.studentId ?? '—'],
-            ['Program', participant.program.isEmpty ? '—' : participant.program],
+            ['Student ID', participant.studentId ?? '-'],
+            ['Program', participant.program.isEmpty ? '-' : participant.program],
             [
               'Batch',
-              participant.batchYear.isEmpty ? '—' : participant.batchYear,
+              participant.batchYear.isEmpty ? '-' : participant.batchYear,
             ],
             ['Submitted', fmt.format(submitted)],
             ['Device', response.deviceSummary],
@@ -201,7 +204,7 @@ class SurveySingleResponseExportService {
               pw.Padding(
                 padding: const pw.EdgeInsets.all(6),
                 child: pw.Text(
-                  row[0],
+                  PdfSafeText.sanitize(row[0]),
                   style: pw.TextStyle(
                     fontSize: 9,
                     fontWeight: pw.FontWeight.bold,
@@ -210,7 +213,10 @@ class SurveySingleResponseExportService {
               ),
               pw.Padding(
                 padding: const pw.EdgeInsets.all(6),
-                child: pw.Text(row[1], style: const pw.TextStyle(fontSize: 9)),
+                child: pw.Text(
+                  PdfSafeText.sanitize(row[1]),
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
               ),
             ],
           ),
@@ -260,14 +266,17 @@ class SurveySingleResponseExportService {
   static pw.Widget _pdfHeaderCell(String text) => pw.Padding(
         padding: const pw.EdgeInsets.all(5),
         child: pw.Text(
-          text,
+          PdfSafeText.sanitize(text),
           style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
         ),
       );
 
   static pw.Widget _pdfBodyCell(String text) => pw.Padding(
         padding: const pw.EdgeInsets.all(5),
-        child: pw.Text(text, style: const pw.TextStyle(fontSize: 8)),
+        child: pw.Text(
+          PdfSafeText.sanitize(text),
+          style: const pw.TextStyle(fontSize: 8),
+        ),
       );
 
   static Uint8List toExcel({

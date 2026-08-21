@@ -290,34 +290,21 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final pageInsets = AdminDensity.pageInsetsForWidth(width);
-
     // Directory / Surveys pattern: replace the list workspace entirely with
     // the discussion (full available area), not a side-by-side panel.
     if (_selectedTopicId != null) {
-      return ColoredBox(
-        color: AdminForumTheme.background,
-        child: Padding(
-          padding: pageInsets.copyWith(bottom: 0),
-          child: ForumTopicScreen(
-            key: ValueKey(_selectedTopicId),
-            topicId: _selectedTopicId!,
-            embedded: true,
-            onClose: _closeTopic,
-            onChanged: () => _refresh(silent: true),
-          ),
-        ),
+      return ForumTopicScreen(
+        key: ValueKey(_selectedTopicId),
+        topicId: _selectedTopicId!,
+        embedded: true,
+        onClose: _closeTopic,
+        onChanged: () => _refresh(silent: true),
       );
     }
 
-    return ColoredBox(
-      color: AdminForumTheme.background,
-      child: Padding(
-        padding: pageInsets.copyWith(bottom: 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
             ForumPageHeader(
               title: 'Forum Moderation',
               subtitle: _mode == _AdminForumMode.reports
@@ -354,8 +341,6 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
               Expanded(child: _buildReportsPane()),
             ],
           ],
-        ),
-      ),
     );
   }
 

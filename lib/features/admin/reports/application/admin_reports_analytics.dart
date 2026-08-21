@@ -75,8 +75,8 @@ class AdminReportsAnalytics {
   /// Definition (shown under KPIs): employed among alumni who submitted
   /// employment data — not among the full roster.
   static const employmentRateDefinition =
-      'Employment rate = employed ÷ alumni with employment data submitted '
-      '(not the full roster).';
+      'Employment rate is the share of employed alumni among those who '
+      'submitted employment information — not among the entire roster.';
 
   double get employmentRateAmongSubmissions =>
       reportEmploymentCount == 0 ? 0 : employedCount / reportEmploymentCount;

@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'dart:typed_data';
 import 'package:alumni_system/core/utils/local_id.dart';
+import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/core/constants/audience_targeting.dart';
@@ -465,14 +466,28 @@ class SurveyService {
     }
 
     try {
-      await _supabase
+      final existing = await _supabase
           .from('surveys')
-          .update({
-            'status': SurveyStatus.published.name,
-            'assignment_count': matchedUserIds.length,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', surveyId);
+          .select('data, open_at')
+          .eq('id', surveyId)
+          .maybeSingle();
+      final data = Map<String, dynamic>.from(existing?['data'] as Map? ?? {});
+      final publishedAtIso = now.toUtc().toIso8601String();
+      // Sticky first-publish timestamp (survives re-publish / assignment refresh).
+      data['publishedAt'] ??= publishedAtIso;
+
+      final patch = <String, dynamic>{
+        'status': SurveyStatus.published.name,
+        'assignment_count': matchedUserIds.length,
+        'updated_at': publishedAtIso,
+        'data': data,
+      };
+      // If no schedule window was set, record open_at on first publish.
+      if (existing?['open_at'] == null && survey.openAt == null) {
+        patch['open_at'] = publishedAtIso;
+      }
+
+      await _supabase.from('surveys').update(patch).eq('id', surveyId);
     } catch (e) {
       throw Exception('Error publishing survey: $e');
     }
@@ -1064,18 +1079,40 @@ class SurveyService {
     try {
       final row = await _supabase
           .from('surveys')
-          .select('data')
+          .select('data, open_at, created_at, status')
           .eq('id', surveyId)
           .maybeSingle();
       final data = Map<String, dynamic>.from(row?['data'] as Map? ?? {});
-      data['adminLastSeenResponseCount'] = liveSubmitted;
-      data['adminLastSeenAt'] = DateTime.now().toUtc().toIso8601String();
+      var dirty = false;
+
+      final prevSeen =
+          (data['adminLastSeenResponseCount'] as num?)?.toInt() ?? 0;
+      if (prevSeen != liveSubmitted || data['adminLastSeenAt'] == null) {
+        data['adminLastSeenResponseCount'] = liveSubmitted;
+        data['adminLastSeenAt'] = DateTime.now().toUtc().toIso8601String();
+        dirty = true;
+      }
+
+      // Heal older published surveys that never stored a sticky publish time.
+      final status = row?['status'] as String?;
+      if (data['publishedAt'] == null &&
+          status != null &&
+          status != SurveyStatus.draft.name) {
+        final seed = row?['open_at'] ?? row?['created_at'];
+        if (seed != null) {
+          data['publishedAt'] = seed is DateTime
+              ? seed.toUtc().toIso8601String()
+              : seed.toString();
+          dirty = true;
+        }
+      }
+
+      if (!dirty) return;
+
+      // Update badge cursor / heal publish stamp only — do not bump updated_at.
       await _supabase
           .from('surveys')
-          .update({
-            'data': data,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
+          .update({'data': data})
           .eq('id', surveyId);
     } catch (e) {
       throw Exception('Error marking survey responses seen: $e');
@@ -1537,7 +1574,7 @@ class SurveyService {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  survey.title,
+                  PdfSafeText.sanitize(survey.title),
                   style: pw.TextStyle(
                     fontSize: 20,
                     fontWeight: pw.FontWeight.bold,
@@ -1552,7 +1589,7 @@ class SurveyService {
           ),
           if (survey.description.trim().isNotEmpty)
             pw.Text(
-              survey.description,
+              PdfSafeText.sanitize(survey.description),
               style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
             ),
           pw.SizedBox(height: 10),
@@ -1581,15 +1618,17 @@ class SurveyService {
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
             headers: const ['Name', 'Program', 'Batch', 'Submitted At'],
-            data: submitted.map((p) {
-              final ts = p.response!.submittedAt ?? p.response!.updatedAt;
-              return [
-                p.displayName,
-                p.program,
-                p.batchYear,
-                ts.toIso8601String(),
-              ];
-            }).toList(),
+            data: PdfSafeText.sanitizeRows(
+              submitted.map((p) {
+                final ts = p.response!.submittedAt ?? p.response!.updatedAt;
+                return [
+                  p.displayName,
+                  p.program,
+                  p.batchYear,
+                  ts.toIso8601String(),
+                ];
+              }).toList(),
+            ),
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.white,
@@ -1627,7 +1666,9 @@ class SurveyService {
               pw.Container(
                 margin: const pw.EdgeInsets.only(top: 8, bottom: 6),
                 child: pw.Text(
-                  'Q${q.order + 1}. ${q.prompt} (${q.type.name})',
+                  PdfSafeText.sanitize(
+                    'Q${q.order + 1}. ${q.prompt} (${q.type.name})',
+                  ),
                   style: pw.TextStyle(
                     fontSize: 11,
                     fontWeight: pw.FontWeight.bold,
@@ -1655,7 +1696,7 @@ class SurveyService {
                                 pw.SizedBox(
                                   width: 140,
                                   child: pw.Text(
-                                    entry.key,
+                                    PdfSafeText.sanitize(entry.key),
                                     style: const pw.TextStyle(fontSize: 9),
                                   ),
                                 ),
@@ -1684,14 +1725,16 @@ class SurveyService {
               pw.SizedBox(height: 4),
               pw.TableHelper.fromTextArray(
                 headers: const ['Respondent', 'Response'],
-                data: answers.map((entry) {
-                  final respondent = entry.$1.displayName;
-                  final value = entry.$2;
-                  final responseText = value is List
-                      ? value.map((e) => '$e').join(' | ')
-                      : '$value';
-                  return [respondent, responseText];
-                }).toList(),
+                data: PdfSafeText.sanitizeRows(
+                  answers.map((entry) {
+                    final respondent = entry.$1.displayName;
+                    final value = entry.$2;
+                    final responseText = value is List
+                        ? value.map((e) => '$e').join(' | ')
+                        : '$value';
+                    return [respondent, responseText];
+                  }).toList(),
+                ),
                 headerStyle: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.white,

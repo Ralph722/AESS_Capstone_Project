@@ -23,8 +23,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
     ReportsDownloadPreset(
       id: 'executive',
       title: 'Executive snapshot',
-      description:
-          'System KPIs, survey summary, and employment outcomes for a quick brief.',
+      description: 'KPIs, survey summary, and employment outcomes.',
       icon: Icons.insights_outlined,
       sections: [
         CustomReportSectionId.executiveKpis,
@@ -35,16 +34,14 @@ class ReportsDownloadsPanel extends StatelessWidget {
     ReportsDownloadPreset(
       id: 'tracer',
       title: 'Tracer outcomes',
-      description:
-          'Employment records for registered alumni (use Tracer filters first if needed).',
+      description: 'Employment records for registered alumni.',
       icon: Icons.work_outline,
       sections: [CustomReportSectionId.employmentRecords],
     ),
     ReportsDownloadPreset(
       id: 'ched',
       title: 'CHED GTS pack',
-      description:
-          'KPIs, survey waves, question summaries, and employment for GTS reporting.',
+      description: 'KPIs, waves, questions, and employment for GTS reporting.',
       icon: Icons.verified_outlined,
       sections: [
         CustomReportSectionId.executiveKpis,
@@ -54,9 +51,17 @@ class ReportsDownloadsPanel extends StatelessWidget {
       ],
     ),
     ReportsDownloadPreset(
+      id: 'ched_wave_compare',
+      title: 'CHED wave comparison',
+      description: 'Compare 2+ Official CHED GTS waves on key fields.',
+      icon: Icons.compare_arrows_outlined,
+      sections: [CustomReportSectionId.chedWaveComparison],
+      needsWavePicker: true,
+    ),
+    ReportsDownloadPreset(
       id: 'survey',
       title: 'Survey participation',
-      description: 'Survey waves with assignment and response health.',
+      description: 'Assignment and response health by wave.',
       icon: Icons.poll_outlined,
       sections: [
         CustomReportSectionId.surveySummary,
@@ -66,7 +71,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
     ReportsDownloadPreset(
       id: 'roster',
       title: 'Roster extract',
-      description: 'Active alumni roster with registration and tracer status.',
+      description: 'Active roster with registration and tracer status.',
       icon: Icons.groups_outlined,
       sections: [CustomReportSectionId.alumniRoster],
     ),
@@ -77,13 +82,12 @@ class ReportsDownloadsPanel extends StatelessWidget {
     return ReportsSectionShell(
       icon: Icons.download_outlined,
       title: 'Downloads',
-      subtitle:
-          'Pick a ready report, then download or print. No custom builder for now.',
+      subtitle: 'Pick a preset, then download or print.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < presets.length; i++) ...[
-            if (i > 0) const SizedBox(height: 10),
+            if (i > 0) const SizedBox(height: 8),
             _PresetCard(
               preset: presets[i],
               busy: busy,
@@ -103,6 +107,7 @@ class ReportsDownloadPreset {
     required this.description,
     required this.icon,
     required this.sections,
+    this.needsWavePicker = false,
   });
 
   final String id;
@@ -110,6 +115,9 @@ class ReportsDownloadPreset {
   final String description;
   final IconData icon;
   final List<CustomReportSectionId> sections;
+
+  /// When true, Downloads opens a wave picker before exporting.
+  final bool needsWavePicker;
 }
 
 class _PresetCard extends StatelessWidget {
@@ -130,10 +138,10 @@ class _PresetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
-        color: AdminReportsTheme.card,
-        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
+        color: AdminReportsTheme.surface.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
         border: Border.all(color: AdminReportsTheme.border),
       ),
       child: Column(
@@ -143,19 +151,19 @@ class _PresetCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: AdminReportsTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   preset.icon,
-                  size: 18,
+                  size: 16,
                   color: AdminReportsTheme.primary,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,18 +171,18 @@ class _PresetCard extends StatelessWidget {
                     Text(
                       preset.title,
                       style: const TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AdminReportsTheme.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       preset.description,
                       style: const TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 12,
                         height: 1.35,
-                        color: AdminReportsTheme.textSecondary,
+                        color: AdminReportsTheme.textMuted,
                       ),
                     ),
                   ],
@@ -182,10 +190,10 @@ class _PresetCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: [
               for (final format in CustomReportFormat.values)
                 OutlinedButton(
@@ -196,6 +204,10 @@ class _PresetCard extends StatelessWidget {
                             format: format,
                             printPreview: false,
                           ),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
                   child: Text(format.label),
                 ),
               TextButton.icon(
@@ -206,6 +218,9 @@ class _PresetCard extends StatelessWidget {
                           format: CustomReportFormat.pdf,
                           printPreview: true,
                         ),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
                 icon: const Icon(Icons.print_outlined, size: 16),
                 label: const Text('Print'),
               ),

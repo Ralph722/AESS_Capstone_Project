@@ -22,6 +22,8 @@ String homeGreetingForNow(DateTime now) {
 }
 
 const double _hPad = 16;
+/// Consistent vertical gap above each home section card.
+const double _sectionTop = 10;
 
 Widget _portalCard({
   required Widget child,
@@ -86,14 +88,14 @@ class HomeAlumniIdentityHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final badge = _courseBatchBadge;
     final openProfile = onTap ?? onAvatarTap;
+    final heroRadius = BorderRadius.circular(PortalTheme.radius2xl);
 
-    final heroRadius = BorderRadius.circular(PortalTheme.radiusXl);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, 12, _hPad, 4),
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
       child: Material(
         color: Colors.transparent,
         elevation: 3,
-        shadowColor: PortalTheme.navy.withValues(alpha: 0.35),
+        shadowColor: PortalTheme.navy.withValues(alpha: 0.28),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: heroRadius),
         clipBehavior: Clip.antiAlias,
@@ -102,15 +104,7 @@ class HomeAlumniIdentityHero extends StatelessWidget {
           customBorder: RoundedRectangleBorder(borderRadius: heroRadius),
           child: Ink(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1A1851),
-                  Color(0xFF2A2770),
-                  Color(0xFF1E3A6E),
-                ],
-              ),
+              gradient: PortalTheme.heroGradient,
             ),
             child: Stack(
               children: [
@@ -264,7 +258,7 @@ class _IdentityAvatar extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NEEDS ATTENTION — compact navy action banner
+// NEEDS ATTENTION — single yellow card, new pill/meta look
 // ═══════════════════════════════════════════════════════════════════════════
 
 class HomeNeedsAttentionPanel extends StatelessWidget {
@@ -300,6 +294,15 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
     if (!hasActions) return const SizedBox.shrink();
 
     final actionCount = (_hasTracer ? 1 : 0) + (_hasSurveys ? 1 : 0);
+    final badgeLabel = dueSoon ? 'DUE SOON' : 'ACTION';
+    final title = actionCount == 1
+        ? (_hasTracer
+              ? 'Graduate Tracer Survey'
+              : (pendingSurveys == 1
+                    ? 'Assigned survey waiting'
+                    : '$pendingSurveys assigned surveys waiting'))
+        : '$actionCount actions waiting for you';
+
     final gradientColors = dueSoon
         ? const [Color(0xFFFFF0E8), Color(0xFFFFB347)]
         : const [Color(0xFFFFF4D6), Color(0xFFFCB315)];
@@ -307,14 +310,14 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
         ? const Color(0xFFE88A3C)
         : const Color(0xFFE8A80C);
 
-    final needRadius = BorderRadius.circular(PortalTheme.radiusXl);
+    final needRadius = BorderRadius.circular(PortalTheme.radius2xl);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, 10, _hPad, 4),
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
       child: Material(
         color: Colors.transparent,
         elevation: 2,
         shadowColor: (dueSoon ? PortalTheme.amber : PortalTheme.gold)
-            .withValues(alpha: 0.45),
+            .withValues(alpha: 0.4),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: needRadius,
@@ -339,78 +342,110 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
                   height: 88,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: Colors.white.withValues(alpha: 0.22),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 40,
+                bottom: -28,
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: PortalTheme.navy.withValues(alpha: 0.06),
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: PortalTheme.navy.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: PortalTheme.navy.withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: dueSoon
+                                  ? PortalTheme.ember
+                                  : PortalTheme.gold,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                          child: Icon(
-                            dueSoon
-                                ? Icons.schedule_rounded
-                                : Icons.priority_high_rounded,
-                            size: 16,
-                            color: PortalTheme.gold,
+                          const SizedBox(width: 7),
+                          Text(
+                            badgeLabel,
+                            style: PortalTheme.caption.copyWith(
+                              color: Colors.white.withValues(alpha: 0.95),
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.4,
+                              fontSize: 10,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                dueSoon
-                                    ? 'Due soon — needs your attention'
-                                    : 'Needs your attention',
-                                style: PortalTheme.cardTitle.copyWith(
-                                  color: PortalTheme.navy,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                dueSoonLabel?.trim().isNotEmpty == true
-                                    ? dueSoonLabel!
-                                    : (actionCount == 1
-                                          ? '1 action waiting for you'
-                                          : '$actionCount actions waiting for you'),
-                                style: PortalTheme.meta.copyWith(
-                                  color: PortalTheme.navy.withValues(
-                                    alpha: 0.72,
-                                  ),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
+                    Text(
+                      dueSoon
+                          ? 'Due soon — needs your attention'
+                          : 'Needs attention',
+                      style: PortalTheme.meta.copyWith(
+                        color: PortalTheme.navy.withValues(alpha: 0.7),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      title,
+                      style: PortalTheme.display.copyWith(
+                        color: PortalTheme.navy,
+                        fontSize: 22,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (dueSoonLabel?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        dueSoonLabel!,
+                        style: PortalTheme.meta.copyWith(
+                          color: PortalTheme.navy.withValues(alpha: 0.72),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
                     if (_hasTracer)
-                      _AttentionBannerRow(
+                      _YellowMetaPill(
+                        name: 'Tracer',
                         icon: Icons.assignment_outlined,
                         title: 'Graduate Tracer Survey',
                         subtitle: tracerSubtitle?.trim().isNotEmpty == true
                             ? tracerSubtitle!
                             : '${tracerPercent.toStringAsFixed(0)}% complete — finish your CHED Tracer',
                         onTap: onOpenTracer,
-                        progress: (tracerPercent / 100).clamp(0.0, 1.0),
                       ),
                     if (_hasTracer && _hasSurveys) const SizedBox(height: 8),
                     if (_hasSurveys)
-                      _AttentionBannerRow(
+                      _YellowMetaPill(
+                        name: 'Survey',
                         icon: Icons.poll_outlined,
                         title: pendingSurveys == 1
                             ? 'Assigned survey waiting'
@@ -431,20 +466,20 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
   }
 }
 
-class _AttentionBannerRow extends StatelessWidget {
-  const _AttentionBannerRow({
+class _YellowMetaPill extends StatelessWidget {
+  const _YellowMetaPill({
+    required this.name,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.progress,
   });
 
+  final String name;
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final double? progress;
 
   @override
   Widget build(BuildContext context) {
@@ -452,16 +487,16 @@ class _AttentionBannerRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        borderRadius: BorderRadius.circular(14),
         child: Ink(
-          padding: const EdgeInsets.all(12),
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            color: Colors.white.withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.white),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 width: 40,
@@ -472,51 +507,57 @@ class _AttentionBannerRow extends StatelessWidget {
                 ),
                 child: Icon(icon, color: PortalTheme.navy, size: 20),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: PortalTheme.navy.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        name,
+                        style: PortalTheme.caption.copyWith(
+                          color: PortalTheme.navy,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       title,
                       style: PortalTheme.cardTitle.copyWith(
-                        color: PortalTheme.navy,
                         fontSize: 13,
+                        color: PortalTheme.navy,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
                       style: PortalTheme.meta.copyWith(
-                        color: PortalTheme.textSecondary,
                         fontSize: 11,
+                        color: PortalTheme.navy.withValues(alpha: 0.72),
+                        fontWeight: FontWeight.w600,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (progress != null) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 4,
-                          backgroundColor: PortalTheme.surfaceMuted,
-                          valueColor: const AlwaysStoppedAnimation(
-                            PortalTheme.navy,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
               const Icon(
                 Icons.chevron_right_rounded,
+                color: PortalTheme.navy,
                 size: 22,
-                color: Color(0xFF9CA3AF),
               ),
             ],
           ),
@@ -632,14 +673,14 @@ class HomeStatCardsRow extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, 8, _hPad, 4),
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
       child: Row(
         children: [
           Expanded(
             child: HomeStatCard(
               icon: Icons.campaign_outlined,
-              iconColor: PortalTheme.navyMid,
-              iconBg: PortalTheme.sky.withValues(alpha: 0.2),
+              iconColor: PortalTheme.navy,
+              iconBg: PortalTheme.navy.withValues(alpha: 0.08),
               count: announcementsCount,
               label: 'Announcements',
               onTap: onAnnouncements,
@@ -649,8 +690,8 @@ class HomeStatCardsRow extends StatelessWidget {
           Expanded(
             child: HomeStatCard(
               icon: Icons.forum_outlined,
-              iconColor: const Color(0xFF7C3AED),
-              iconBg: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+              iconColor: PortalTheme.navy,
+              iconBg: PortalTheme.navy.withValues(alpha: 0.08),
               count: communityTodayCount,
               label: 'Posts today',
               onTap: onCommunity,
@@ -660,8 +701,8 @@ class HomeStatCardsRow extends StatelessWidget {
           Expanded(
             child: HomeStatCard(
               icon: Icons.event_outlined,
-              iconColor: const Color(0xFF059669),
-              iconBg: const Color(0xFF059669).withValues(alpha: 0.12),
+              iconColor: PortalTheme.navy,
+              iconBg: PortalTheme.navy.withValues(alpha: 0.08),
               count: eventsCount,
               label: 'Events',
               onTap: onEvents,
@@ -696,7 +737,9 @@ class HomeStatCard extends StatelessWidget {
     return _portalCard(
       onTap: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      radius: PortalTheme.radiusLg,
+      radius: PortalTheme.radiusXl,
+      elevation: 1,
+      shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -705,7 +748,7 @@ class HomeStatCard extends StatelessWidget {
             height: 28,
             decoration: BoxDecoration(
               color: iconBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 15, color: iconColor),
           ),
@@ -753,7 +796,7 @@ class HomeStatCardsSkeleton extends StatelessWidget {
               height: 96,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
                 border: Border.all(
                   color: PortalTheme.border.withValues(alpha: 0.5),
                 ),
@@ -784,10 +827,9 @@ String homeEventRelativeLabel(AlumniEvent event, {DateTime? now}) {
   final today = DateTime(clock.year, clock.month, clock.day);
   final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
   final days = eventDay.difference(today).inDays;
-  if (days == 0) return 'Today';
-  if (days == 1) return 'Tomorrow';
-  if (days > 1 && days <= 14) return '$days days';
-  return intl.DateFormat('MMM d').format(event.date);
+  if (days <= 0) return 'Today';
+  if (days == 1) return '1 day to go';
+  return '$days days to go';
 }
 
 bool homeEventIsToday(AlumniEvent event, {DateTime? now}) {
@@ -797,7 +839,7 @@ bool homeEventIsToday(AlumniEvent event, {DateTime? now}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// EVENTS — compact vertical list (restored old layout)
+// EVENTS — planner-style soft list card (no trailing arrows)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class HomeUpcomingEventsList extends StatelessWidget {
@@ -805,25 +847,88 @@ class HomeUpcomingEventsList extends StatelessWidget {
     super.key,
     required this.events,
     required this.onTap,
+    this.onSeeAll,
   });
 
   final List<AlumniEvent> events;
   final ValueChanged<AlumniEvent> onTap;
+  final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: _hPad),
-      child: Column(
-        children: [
-          for (var i = 0; i < events.length; i++) ...[
-            if (i > 0) const SizedBox(height: 10),
-            HomeCompactEventCard(
-              event: events[i],
-              onTap: () => onTap(events[i]),
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      child: _portalCard(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        radius: PortalTheme.radius2xl,
+        elevation: 1,
+        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: PortalTheme.navy.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.event_rounded,
+                    size: 18,
+                    color: PortalTheme.navy,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Upcoming Events',
+                        style: PortalTheme.cardTitle.copyWith(
+                          fontSize: 15,
+                          color: PortalTheme.navy,
+                        ),
+                      ),
+                      Text(
+                        'Alumni activities coming up',
+                        style: PortalTheme.meta.copyWith(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onSeeAll != null)
+                  TextButton(
+                    onPressed: onSeeAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: PortalTheme.sky,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'See all',
+                      style: PortalTheme.meta.copyWith(
+                        color: PortalTheme.sky,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
             ),
+            const SizedBox(height: 12),
+            for (var i = 0; i < events.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              HomeCompactEventCard(
+                event: events[i],
+                onTap: () => onTap(events[i]),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -842,140 +947,128 @@ class HomeCompactEventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isToday = homeEventIsToday(event);
-    final month = intl.DateFormat('MMM').format(event.date).toUpperCase();
-    final day = intl.DateFormat('d').format(event.date);
     final timeRange = homeFormatEventTimeRange(event.startTime, event.endTime);
     final statusLabel = homeEventRelativeLabel(event);
     final venue = event.venue.trim();
+    final month = intl.DateFormat('MMM').format(event.date).toUpperCase();
+    final day = intl.DateFormat('d').format(event.date);
+    final subtitle = venue.isEmpty ? timeRange : '$timeRange · $venue';
 
-    return _portalCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(12),
-      radius: PortalTheme.radiusLg,
-      borderColor: isToday
-          ? PortalTheme.gold.withValues(alpha: 0.85)
-          : PortalTheme.border.withValues(alpha: 0.75),
-      borderWidth: isToday ? 1.5 : 1,
-      elevation: isToday ? 2.25 : 1.25,
-      shadowColor: isToday ? PortalTheme.gold.withValues(alpha: 0.45) : null,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 54,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: PortalTheme.navy,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    month,
-                    style: PortalTheme.caption.copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 9,
-                      letterSpacing: 0.4,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    day,
-                    style: PortalTheme.cardTitle.copyWith(
-                      color: Colors.white,
-                      fontSize: 18,
-                      height: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.theme,
-                    style: PortalTheme.cardTitle.copyWith(fontSize: 14),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        size: 13,
-                        color: PortalTheme.textSecondary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        child: Ink(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isToday
+                ? PortalTheme.gold.withValues(alpha: 0.12)
+                : PortalTheme.surfaceMuted.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+            border: isToday
+                ? Border.all(color: PortalTheme.gold.withValues(alpha: 0.45))
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: PortalTheme.navy,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      month,
+                      style: PortalTheme.caption.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9,
+                        letterSpacing: 0.4,
+                        height: 1,
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          timeRange,
-                          style: PortalTheme.meta.copyWith(fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      day,
+                      style: PortalTheme.cardTitle.copyWith(
+                        color: Colors.white,
+                        fontSize: 16,
+                        height: 1,
                       ),
-                    ],
-                  ),
-                  if (venue.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 13,
-                          color: PortalTheme.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            venue,
-                            style: PortalTheme.meta.copyWith(fontSize: 11),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
                     ),
                   ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isToday
-                      ? PortalTheme.gold.withValues(alpha: 0.25)
-                      : const Color(0xFFFFF7ED),
-                  borderRadius: BorderRadius.circular(20),
-                  border: isToday
-                      ? Border.all(
-                          color: PortalTheme.gold.withValues(alpha: 0.6),
-                        )
-                      : null,
-                ),
-                child: Text(
-                  statusLabel,
-                  style: PortalTheme.caption.copyWith(
-                    color: isToday ? PortalTheme.navy : const Color(0xFFC2410C),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 10,
-                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isToday
+                            ? PortalTheme.gold.withValues(alpha: 0.28)
+                            : PortalTheme.sky.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: isToday
+                              ? PortalTheme.gold.withValues(alpha: 0.55)
+                              : PortalTheme.sky.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: PortalTheme.caption.copyWith(
+                          color: isToday
+                              ? PortalTheme.navy
+                              : PortalTheme.navyMid,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      event.theme,
+                      style: PortalTheme.cardTitle.copyWith(fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: PortalTheme.meta.copyWith(
+                        fontSize: 11,
+                        color: isToday
+                            ? PortalTheme.navy.withValues(alpha: 0.75)
+                            : PortalTheme.textSecondary,
+                        fontWeight:
+                            isToday ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: PortalTheme.textMuted,
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -983,7 +1076,7 @@ class HomeCompactEventCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COMMUNITY — horizontal carousel
+// COMMUNITY — planner-style soft list card
 // ═══════════════════════════════════════════════════════════════════════════
 
 class HomeCommunityCarousel extends StatelessWidget {
@@ -991,26 +1084,88 @@ class HomeCommunityCarousel extends StatelessWidget {
     super.key,
     required this.topics,
     required this.onTapTopic,
+    this.onSeeAll,
   });
 
   final List<ForumTopic> topics;
   final ValueChanged<ForumTopic> onTapTopic;
+  final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 198,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: _hPad),
-        itemCount: topics.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, i) {
-          return HomeCommunityCard(
-            topic: topics[i],
-            onTap: () => onTapTopic(topics[i]),
-          );
-        },
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      child: _portalCard(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        radius: PortalTheme.radius2xl,
+        elevation: 1,
+        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: PortalTheme.navy.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.forum_rounded,
+                    size: 18,
+                    color: PortalTheme.navy,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Community',
+                        style: PortalTheme.cardTitle.copyWith(
+                          fontSize: 15,
+                          color: PortalTheme.navy,
+                        ),
+                      ),
+                      Text(
+                        'Recent alumni discussions',
+                        style: PortalTheme.meta.copyWith(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onSeeAll != null)
+                  TextButton(
+                    onPressed: onSeeAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: PortalTheme.sky,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'See all',
+                      style: PortalTheme.meta.copyWith(
+                        color: PortalTheme.sky,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            for (var i = 0; i < topics.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              HomeCommunityCard(
+                topic: topics[i],
+                onTap: () => onTapTopic(topics[i]),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1037,180 +1192,100 @@ class HomeCommunityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = topic.authorAvatarUrl;
-    final provider = url == null || url.isEmpty ? null : AppImage.provider(url);
     final authorName = topic.authorName.trim().isEmpty
         ? 'Alumni'
         : topic.authorName.trim();
-    final body = topic.body.trim().replaceAll(RegExp(r'\s+'), ' ');
-    final isLongBody = body.length > 72;
-    final preview = isLongBody ? '${body.substring(0, 72).trimRight()}…' : body;
+    final replies = topic.replyCount;
+    final subtitle =
+        '$authorName · ${replies == 1 ? '1 reply' : '$replies replies'} · ${_relativeTime(topic.createdAt)}';
+    final url = topic.authorAvatarUrl;
+    final provider = url == null || url.isEmpty ? null : AppImage.provider(url);
 
-    return SizedBox(
-      width: 248,
-      child: _portalCard(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: onTap,
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        radius: PortalTheme.radiusXl,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: PortalTheme.surfaceMuted,
-                    border: Border.all(
-                      color: PortalTheme.border.withValues(alpha: 0.8),
-                    ),
-                    image: provider == null
-                        ? null
-                        : DecorationImage(image: provider, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        child: Ink(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: PortalTheme.surfaceMuted.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: PortalTheme.navy.withValues(alpha: 0.08),
+                  border: Border.all(
+                    color: PortalTheme.border.withValues(alpha: 0.8),
                   ),
-                  child: provider == null
-                      ? Icon(
-                          Icons.person_rounded,
-                          size: 16,
-                          color: PortalTheme.navy.withValues(alpha: 0.45),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        authorName,
-                        style: PortalTheme.cardTitle.copyWith(
-                          fontSize: 12,
-                          color: PortalTheme.navy,
+                  image: provider == null
+                      ? null
+                      : DecorationImage(
+                          image: provider,
+                          fit: BoxFit.cover,
+                          filterQuality: FilterQuality.high,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        _relativeTime(topic.createdAt),
-                        style: PortalTheme.caption.copyWith(
-                          fontSize: 10,
-                          color: PortalTheme.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: PortalTheme.surfaceMuted,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 11,
-                        color: PortalTheme.navyMid,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${topic.replyCount}',
-                        style: PortalTheme.caption.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10,
-                          color: PortalTheme.navy,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              topic.title,
-              style: PortalTheme.cardTitle.copyWith(
-                fontSize: 14,
-                height: 1.25,
-                color: PortalTheme.navy,
+                child: provider == null
+                    ? Icon(
+                        Icons.person_rounded,
+                        size: 20,
+                        color: PortalTheme.navy.withValues(alpha: 0.45),
+                      )
+                    : null,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (preview.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text.rich(
-                TextSpan(
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextSpan(
-                      text: preview,
-                      style: PortalTheme.meta.copyWith(
-                        fontSize: 12,
-                        height: 1.4,
-                        color: const Color(0xFF5B6475),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
                       ),
-                    ),
-                    if (isLongBody)
-                      TextSpan(
-                        text: ' See more',
-                        style: PortalTheme.meta.copyWith(
-                          fontSize: 12,
-                          height: 1.4,
+                      decoration: BoxDecoration(
+                        color: PortalTheme.sky.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Discussion',
+                        style: PortalTheme.caption.copyWith(
                           color: PortalTheme.navyMid,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      topic.title,
+                      style: PortalTheme.cardTitle.copyWith(fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: PortalTheme.meta.copyWith(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: PortalTheme.textMuted,
+                size: 22,
               ),
             ],
-            const Spacer(),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: PortalTheme.navy,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Join conversation',
-                        style: PortalTheme.button.copyWith(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1225,7 +1300,7 @@ class HomeCommunityEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
       child: _portalCard(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         radius: PortalTheme.radiusXl,
@@ -1322,10 +1397,12 @@ class _HomeImportantDatesCalendarState
         : _itemsForDay(selected);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
       child: _portalCard(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-        radius: PortalTheme.radiusXl,
+        radius: PortalTheme.radius2xl,
+        elevation: 1,
+        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1818,7 +1895,7 @@ class HomeEventsEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
       child: _portalCard(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         radius: PortalTheme.radiusXl,
@@ -2075,7 +2152,7 @@ class _JobTile extends StatelessWidget {
     return _portalCard(
       onTap: onTap,
       padding: EdgeInsets.all(compact ? 12 : 14),
-      radius: PortalTheme.radiusLg,
+      radius: PortalTheme.radius2xl,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2357,12 +2434,10 @@ class HomeSupportStrip extends StatelessWidget {
   const HomeSupportStrip({
     super.key,
     required this.onSupport,
-    required this.onAiHelp,
     this.unreadMessages = 0,
   });
 
   final VoidCallback onSupport;
-  final VoidCallback onAiHelp;
   final int unreadMessages;
 
   @override
@@ -2371,32 +2446,16 @@ class HomeSupportStrip extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 0),
       child: _portalCard(
         radius: PortalTheme.radiusXl,
-        child: Column(
-          children: [
-            _SupportListTile(
-              icon: Icons.support_agent_outlined,
-              iconBg: PortalTheme.navy.withValues(alpha: 0.08),
-              iconColor: PortalTheme.navy,
-              title: 'Support',
-              subtitle: unreadMessages > 0
-                  ? '$unreadMessages unread message${unreadMessages == 1 ? '' : 's'}'
-                  : 'Message the alumni office',
-              onTap: onSupport,
-              badge: unreadMessages > 0,
-            ),
-            Divider(
-              height: 1,
-              color: PortalTheme.border.withValues(alpha: 0.8),
-            ),
-            _SupportListTile(
-              icon: Icons.auto_awesome_outlined,
-              iconBg: PortalTheme.gold.withValues(alpha: 0.2),
-              iconColor: PortalTheme.navy,
-              title: 'AI Help',
-              subtitle: 'Ask questions about the portal',
-              onTap: onAiHelp,
-            ),
-          ],
+        child: _SupportListTile(
+          icon: Icons.support_agent_outlined,
+          iconBg: PortalTheme.navy.withValues(alpha: 0.08),
+          iconColor: PortalTheme.navy,
+          title: 'Support',
+          subtitle: unreadMessages > 0
+              ? '$unreadMessages unread message${unreadMessages == 1 ? '' : 's'}'
+              : 'Message the alumni office',
+          onTap: onSupport,
+          badge: unreadMessages > 0,
         ),
       ),
     );

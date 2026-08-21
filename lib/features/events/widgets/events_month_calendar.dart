@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Simple month calendar highlighting days that have events.
 class EventsMonthCalendar extends StatelessWidget {
@@ -18,9 +19,6 @@ class EventsMonthCalendar extends StatelessWidget {
   final ValueChanged<DateTime> onMonthChanged;
   final ValueChanged<DateTime> onDaySelected;
   final DateTime? selectedDay;
-
-  static const _navy = Color(0xFF090A4F);
-  static const _gold = Color(0xFFFFD700);
 
   Map<DateTime, List<AlumniEvent>> get _byDay {
     final map = <DateTime, List<AlumniEvent>>{};
@@ -44,10 +42,13 @@ class EventsMonthCalendar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        border: Border.all(
+          color: PortalTheme.border.withValues(alpha: 0.75),
+        ),
+        boxShadow: PortalTheme.softShadow,
       ),
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
       child: Column(
         children: [
           Row(
@@ -57,17 +58,13 @@ class EventsMonthCalendar extends StatelessWidget {
                 onPressed: () => onMonthChanged(
                   DateTime(month.year, month.month - 1, 1),
                 ),
-                icon: const Icon(Icons.chevron_left, color: _navy),
+                icon: const Icon(Icons.chevron_left, color: PortalTheme.navy),
               ),
               Expanded(
                 child: Text(
                   DateFormat('MMMM yyyy').format(month),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _navy,
-                  ),
+                  style: PortalTheme.sectionTitle.copyWith(fontSize: 16),
                 ),
               ),
               IconButton(
@@ -75,7 +72,7 @@ class EventsMonthCalendar extends StatelessWidget {
                 onPressed: () => onMonthChanged(
                   DateTime(month.year, month.month + 1, 1),
                 ),
-                icon: const Icon(Icons.chevron_right, color: _navy),
+                icon: const Icon(Icons.chevron_right, color: PortalTheme.navy),
               ),
             ],
           ),
@@ -87,10 +84,9 @@ class EventsMonthCalendar extends StatelessWidget {
                     child: Center(
                       child: Text(
                         d,
-                        style: TextStyle(
-                          fontSize: 11,
+                        style: PortalTheme.caption.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade600,
+                          color: PortalTheme.textSecondary,
                         ),
                       ),
                     ),
@@ -120,20 +116,20 @@ class EventsMonthCalendar extends StatelessWidget {
 
                   return Expanded(
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       onTap: () => onDaySelected(day),
                       child: Container(
                         height: 44,
                         margin: const EdgeInsets.symmetric(horizontal: 1),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? _navy
+                              ? PortalTheme.navy
                               : (hasEvents
-                                  ? _gold.withValues(alpha: 0.18)
+                                  ? PortalTheme.gold.withValues(alpha: 0.18)
                                   : Colors.transparent),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           border: isToday && !isSelected
-                              ? Border.all(color: _navy, width: 1.2)
+                              ? Border.all(color: PortalTheme.navy, width: 1.2)
                               : null,
                         ),
                         child: Column(
@@ -146,7 +142,7 @@ class EventsMonthCalendar extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 color: isSelected
                                     ? Colors.white
-                                    : _navy,
+                                    : PortalTheme.navy,
                               ),
                             ),
                             if (hasEvents)
@@ -155,7 +151,9 @@ class EventsMonthCalendar extends StatelessWidget {
                                 height: 5,
                                 margin: const EdgeInsets.only(top: 2),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? _gold : _navy,
+                                  color: isSelected
+                                      ? PortalTheme.gold
+                                      : PortalTheme.navy,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -168,14 +166,13 @@ class EventsMonthCalendar extends StatelessWidget {
               ),
             ),
           if (selectedDay != null) ...[
-            const Divider(height: 16),
+            const Divider(height: 16, color: PortalTheme.border),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 DateFormat('EEEE, MMM d').format(selectedDay!),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _navy,
+                style: PortalTheme.cardTitle.copyWith(
+                  color: PortalTheme.navy,
                   fontSize: 13,
                 ),
               ),
@@ -192,7 +189,7 @@ class EventsMonthCalendar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'No events on this day',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  style: PortalTheme.bodySecondary.copyWith(fontSize: 13),
                 ),
               ),
           ],

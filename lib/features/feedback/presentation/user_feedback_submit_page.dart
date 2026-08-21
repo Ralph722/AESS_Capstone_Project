@@ -91,7 +91,7 @@ class _UserFeedbackSubmitScreenState extends State<UserFeedbackSubmitScreen> {
                   padding: const EdgeInsets.all(PortalTheme.space4),
                   decoration: BoxDecoration(
                     color: PortalTheme.card,
-                    borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                    borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
                     border: Border.all(color: PortalTheme.border),
                     boxShadow: PortalTheme.softShadow,
                   ),

@@ -188,29 +188,31 @@ class AlumniEventListCard extends StatelessWidget {
       heightFactor: 1,
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+        elevation: 0,
+        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
         child: InkWell(
-          borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+              borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
               border: Border.all(
                 color: isTodayEmphasis
                     ? PortalTheme.gold.withValues(alpha: 0.85)
-                    : PortalTheme.border.withValues(alpha: 0.85),
+                    : PortalTheme.border.withValues(alpha: 0.7),
                 width: isTodayEmphasis ? 1.6 : 1,
               ),
               boxShadow: isTodayEmphasis
                   ? [
                       BoxShadow(
                         color: PortalTheme.gold.withValues(alpha: 0.22),
-                        blurRadius: 14,
+                        blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),
                     ]
-                  : PortalTheme.softShadow,
+                  : PortalTheme.cardShadow,
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(

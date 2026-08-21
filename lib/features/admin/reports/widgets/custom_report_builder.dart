@@ -140,6 +140,7 @@ class _CustomReportHubPanelState extends State<CustomReportHubPanel> {
         CustomReportSectionId.surveySummary,
         CustomReportSectionId.surveyParticipation,
         CustomReportSectionId.surveyQuestions,
+        CustomReportSectionId.chedWaveComparison,
       ],
     ),
     (

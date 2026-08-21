@@ -79,10 +79,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           'To enable the assistant:\n\n'
           '1. Open https://aistudio.google.com/apikey\n'
           '2. Create a free API key\n'
-          '3. Paste it in lib/config/ai_defaults.dart (apiKey field)\n'
+          '3. Paste it in lib/core/config/ai_secrets.dart\n'
           '4. Hot restart the app\n\n'
-          'Or build with:\n'
-          '--dart-define=GEMINI_API_KEY=your_key',
+          'Or run with:\n'
+          '--dart-define-from-file=config/dart_defines.json',
         ),
         actions: [
           TextButton(
@@ -279,10 +279,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   ? PortalTheme.danger.withValues(alpha: 0.08)
                   : PortalTheme.card,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(PortalTheme.radiusLg),
-            topRight: const Radius.circular(PortalTheme.radiusLg),
-            bottomLeft: Radius.circular(isUser ? PortalTheme.radiusLg : 4),
-            bottomRight: Radius.circular(isUser ? 4 : PortalTheme.radiusLg),
+            topLeft: const Radius.circular(PortalTheme.radius2xl),
+            topRight: const Radius.circular(PortalTheme.radius2xl),
+            bottomLeft: Radius.circular(isUser ? PortalTheme.radius2xl : 8),
+            bottomRight: Radius.circular(isUser ? 8 : PortalTheme.radius2xl),
           ),
           border: message.isError
               ? Border.all(color: PortalTheme.danger.withValues(alpha: 0.3))

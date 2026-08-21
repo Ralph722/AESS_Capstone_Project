@@ -282,7 +282,6 @@ class _UserSurveyTakeScreenState extends State<UserSurveyTakeScreen> {
       backgroundColor: PortalTheme.pageBg,
       appBar: PortalAppBar(
         title: _survey?.title ?? 'Survey',
-        foreground: PortalAppBarTone.dark,
       ),
       body: _isLoading && _questions.isEmpty
           ? const SurveyFormSkeleton()

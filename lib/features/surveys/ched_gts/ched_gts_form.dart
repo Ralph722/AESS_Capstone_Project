@@ -2,9 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
-import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 typedef ChedGtsAnswersChanged = void Function(Map<String, dynamic> answers);
+
+InputDecoration _portalFieldDecoration({
+  required String label,
+  String? hint,
+  IconData? icon,
+  bool readOnly = false,
+}) {
+  final radius = BorderRadius.circular(PortalTheme.radiusMd);
+  return InputDecoration(
+    labelText: label,
+    hintText: hint,
+    prefixIcon: icon != null
+        ? Icon(icon, color: PortalTheme.navy, size: 20)
+        : null,
+    filled: true,
+    fillColor: readOnly ? PortalTheme.surfaceMuted : PortalTheme.card,
+    labelStyle: PortalTheme.meta.copyWith(color: PortalTheme.textSecondary),
+    hintStyle: PortalTheme.meta.copyWith(color: PortalTheme.textMuted),
+    border: OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: const BorderSide(color: PortalTheme.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: const BorderSide(color: PortalTheme.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: const BorderSide(color: PortalTheme.navy, width: 1.6),
+    ),
+  );
+}
 
 /// Digitized official CHED GTS form with paper-accurate skip logic.
 class ChedGtsForm extends StatefulWidget {
@@ -131,18 +163,17 @@ class _IntroBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: OnboardingTheme.navy.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: OnboardingTheme.border),
+        color: PortalTheme.navy.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+        border: Border.all(
+          color: PortalTheme.border.withValues(alpha: 0.8),
+        ),
       ),
-      child: const Text(
-        'Please complete this GTS questionnaire as accurately & frankly as '
-        'possible. Your answers will be used for research purposes to assess '
-        'graduate employability and improve course offerings. Answers are '
-        'treated with strictest confidentiality.\n\n'
-        'Items marked Optional may be skipped. For example, if you have not '
-        'passed any professional examinations, leave item 13 blank or write None / N/A.',
-        style: TextStyle(fontSize: 13, height: 1.4, color: OnboardingTheme.muted),
+      child: Text(
+        'Complete this GTS questionnaire as accurately as you can. '
+        'Answers are confidential and used to assess graduate outcomes. '
+        'Optional items may be skipped (for example, leave professional exams blank if none).',
+        style: PortalTheme.bodySecondary.copyWith(fontSize: 13, height: 1.4),
       ),
     );
   }
@@ -189,19 +220,13 @@ class _SectionHeader extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [OnboardingTheme.navy, OnboardingTheme.navyLight],
-        ),
-        borderRadius: BorderRadius.circular(12),
+        color: PortalTheme.navy.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.8)),
       ),
       child: Text(
         title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: 13,
-          letterSpacing: 0.2,
-        ),
+        style: PortalTheme.cardTitle.copyWith(fontSize: 13),
       ),
     );
   }
@@ -224,53 +249,46 @@ class _ItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 0,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: OnboardingTheme.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    '${item.chedNumber}. ${item.prompt}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: OnboardingTheme.navy,
-                      height: 1.35,
-                    ),
+    return Container(
+      padding: const EdgeInsets.all(PortalTheme.space3),
+      decoration: BoxDecoration(
+        color: PortalTheme.card,
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+        boxShadow: PortalTheme.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  '${item.chedNumber}. ${item.prompt}',
+                  style: PortalTheme.cardTitle.copyWith(
+                    fontSize: 14,
+                    height: 1.35,
                   ),
                 ),
-                const SizedBox(width: 8),
-                _RequiredBadge(required: item.required),
-              ],
-            ),
-            if (!item.required && !item.isOthersSpecify) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Optional — you may skip this item or write None / N/A if it does not apply.',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
-                ),
               ),
+              const SizedBox(width: 8),
+              _RequiredBadge(required: item.required),
             ],
-            const SizedBox(height: 12),
-            _buildField(),
+          ),
+          if (!item.required && !item.isOthersSpecify) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Optional — you may skip this item or write None / N/A if it does not apply.',
+              style: PortalTheme.meta.copyWith(
+                height: 1.35,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ],
-        ),
+          const SizedBox(height: 12),
+          _buildField(),
+        ],
       ),
     );
   }
@@ -284,9 +302,10 @@ class _ItemCard extends StatelessWidget {
           readOnly: readOnly,
           maxLines: item.type == ChedGtsFieldType.longText ? 4 : 1,
           onChanged: onChanged,
-          decoration: onboardingFieldDecoration(
+          decoration: _portalFieldDecoration(
             label: item.required ? 'Your answer *' : 'Optional — skip if N/A',
             hint: item.required ? null : 'None / N/A or leave blank',
+            readOnly: readOnly,
           ),
         );
       case ChedGtsFieldType.date:
@@ -307,10 +326,16 @@ class _ItemCard extends StatelessWidget {
               onSelected: readOnly
                   ? null
                   : (_) => onChanged(opt),
-              selectedColor: OnboardingTheme.navy.withValues(alpha: 0.12),
+              selectedColor: PortalTheme.navy.withValues(alpha: 0.12),
+              backgroundColor: PortalTheme.surfaceMuted,
+              side: BorderSide(
+                color: selected
+                    ? PortalTheme.navy.withValues(alpha: 0.35)
+                    : PortalTheme.border,
+              ),
               labelStyle: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: selected ? OnboardingTheme.navy : OnboardingTheme.muted,
+                color: selected ? PortalTheme.navy : PortalTheme.textSecondary,
                 fontSize: 12,
               ),
             );
@@ -326,7 +351,8 @@ class _ItemCard extends StatelessWidget {
             return CheckboxListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
-              title: Text(opt, style: const TextStyle(fontSize: 13)),
+              activeColor: PortalTheme.navy,
+              title: Text(opt, style: PortalTheme.body.copyWith(fontSize: 13)),
               value: checked,
               onChanged: readOnly
                   ? null
@@ -405,13 +431,14 @@ class _DateField extends StatelessWidget {
                 onChanged(DateFormat('yyyy-MM-dd').format(picked));
               }
             },
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
       child: InputDecorator(
-        decoration: onboardingFieldDecoration(
+        decoration: _portalFieldDecoration(
           label: 'Birthday',
           icon: Icons.calendar_today_outlined,
+          readOnly: readOnly,
         ),
-        child: Text(label),
+        child: Text(label, style: PortalTheme.body),
       ),
     );
   }
@@ -527,9 +554,10 @@ class _TableRowsField extends StatelessWidget {
                   next[i][col] = text;
                   onChanged(next);
                 },
-                decoration: onboardingFieldDecoration(
+                decoration: _portalFieldDecoration(
                   label: item.required ? col : '$col (optional)',
                   hint: item.required ? null : 'Leave blank or None / N/A',
+                  readOnly: readOnly,
                 ),
               ),
             );
@@ -539,6 +567,7 @@ class _TableRowsField extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
+              style: PortalTheme.ghostButton(dense: true),
               onPressed: () {
                 onChanged([
                   ...rows.map((r) => Map<String, dynamic>.from(r)),

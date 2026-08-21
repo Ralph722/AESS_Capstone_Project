@@ -31,10 +31,10 @@ class EventsScreen extends StatefulWidget {
   final bool openCommentsOnLaunch;
 
   @override
-  State<EventsScreen> createState() => _EventsScreenState();
+  State<EventsScreen> createState() => EventsScreenState();
 }
 
-class _EventsScreenState extends State<EventsScreen>
+class EventsScreenState extends State<EventsScreen>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
@@ -186,17 +186,50 @@ class _EventsScreenState extends State<EventsScreen>
     if (_handledInitialTarget) return;
     final targetEventId = widget.initialEventId?.trim();
     if (targetEventId == null || targetEventId.isEmpty) return;
-    final matches = allEvents.where((e) => e.id == targetEventId);
-    if (matches.isEmpty) return;
     _handledInitialTarget = true;
-    final event = matches.first;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _showEventDetails(
-        event,
-        openCommentsImmediately: widget.openCommentsOnLaunch,
+      openEventById(
+        targetEventId,
+        openComments: widget.openCommentsOnLaunch,
       );
     });
+  }
+
+  /// Opens event details by id (used by Home deep-links and initial route).
+  Future<void> openEventById(
+    String eventId, {
+    bool openComments = false,
+  }) async {
+    final id = eventId.trim();
+    if (id.isEmpty || !mounted) return;
+
+    AlumniEvent? event;
+    for (final e in allEvents) {
+      if (e.id == id) {
+        event = e;
+        break;
+      }
+    }
+    event ??= await _eventService.getEventById(id);
+    if (!mounted) return;
+    if (event == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event not found')),
+      );
+      return;
+    }
+
+    final exists = allEvents.any((e) => e.id == event!.id);
+    if (!exists) {
+      setState(() {
+        allEvents = [...allEvents, event!]
+          ..sort((a, b) => a.date.compareTo(b.date));
+      });
+      _recomputeFilteredEvents();
+    }
+
+    _showEventDetails(event, openCommentsImmediately: openComments);
   }
 
   void _onSearchChanged(String query) {
@@ -308,7 +341,6 @@ class _EventsScreenState extends State<EventsScreen>
       backgroundColor: PortalTheme.pageBg,
       appBar: PortalAppBar(
         title: 'Events',
-        subtitle: 'Discover alumni gatherings',
         automaticallyImplyLeading: false,
         actions: [
           PortalHeaderAction(
@@ -328,114 +360,11 @@ class _EventsScreenState extends State<EventsScreen>
       body: PortalContentFrame(
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(
-              child: Container(
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: 44,
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: _onSearchChanged,
-                        style: PortalTheme.body,
-                        decoration: InputDecoration(
-                          hintText: 'Search by title, venue, or category',
-                          hintStyle: PortalTheme.bodySecondary,
-                          prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            size: 20,
-                            color: PortalTheme.textSecondary,
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _onSearchChanged('');
-                                  },
-                                )
-                              : null,
-                          filled: true,
-                          fillColor: PortalTheme.surfaceMuted,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 0,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              PortalTheme.radiusMd,
-                            ),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              PortalTheme.radiusMd,
-                            ),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              PortalTheme.radiusMd,
-                            ),
-                            borderSide: const BorderSide(
-                              color: _navy,
-                              width: 1.2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 36,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _filters.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final selected = _selectedFilter == index;
-                          return FilterChip(
-                            selected: selected,
-                            showCheckmark: false,
-                            label: Text(_filters[index]),
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            labelPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            onSelected: (v) {
-                              if (v) _filterEvents(index);
-                            },
-                            selectedColor: PortalTheme.navy,
-                            backgroundColor: PortalTheme.surfaceMuted,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: selected
-                                  ? Colors.white
-                                  : PortalTheme.textSecondary,
-                            ),
-                            side: BorderSide(
-                              color: selected
-                                  ? PortalTheme.navy
-                                  : PortalTheme.border,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '${filteredEvents.length} ${filteredEvents.length == 1 ? 'event' : 'events'}',
-                      style: PortalTheme.meta,
-                    ),
-                  ],
-                ),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _EventsFilterHeaderDelegate(
+                child: _buildStickyFilterBar(filteredEvents.length),
+                height: 188,
               ),
             ),
 
@@ -612,6 +541,119 @@ class _EventsScreenState extends State<EventsScreen>
       constraintLabels: _constraintLabels(event),
       onTap: () => _showEventDetails(event),
       onRsvpChanged: (s) => _onRsvpChanged(event, s),
+    );
+  }
+
+  Widget _buildStickyFilterBar(int count) {
+    return ColoredBox(
+      color: PortalTheme.pageBg,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+            border: Border.all(
+              color: PortalTheme.border.withValues(alpha: 0.75),
+            ),
+            boxShadow: PortalTheme.softShadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 44,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  style: PortalTheme.body,
+                  decoration: InputDecoration(
+                    hintText: 'Search by title, venue, or category',
+                    hintStyle: PortalTheme.bodySecondary,
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      size: 20,
+                      color: PortalTheme.textSecondary,
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              _onSearchChanged('');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: PortalTheme.surfaceMuted,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 0,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                      borderSide: const BorderSide(color: _navy, width: 1.2),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _filters.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final selected = _selectedFilter == index;
+                    return FilterChip(
+                      selected: selected,
+                      showCheckmark: false,
+                      label: Text(_filters[index]),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      onSelected: (v) {
+                        if (v) _filterEvents(index);
+                      },
+                      selectedColor: PortalTheme.navy,
+                      backgroundColor: PortalTheme.surfaceMuted,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: selected
+                            ? Colors.white
+                            : PortalTheme.textSecondary,
+                      ),
+                      side: BorderSide(
+                        color: selected ? PortalTheme.navy : PortalTheme.border,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '$count ${count == 1 ? 'event' : 'events'}',
+                style: PortalTheme.meta,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1815,5 +1857,32 @@ class _CommentsDialogState extends State<_CommentsDialog> {
     if (difference.inDays == 1) return 'Yesterday';
     if (difference.inDays < 7) return '${difference.inDays}d ago';
     return DateFormat('MMM d, yyyy').format(date);
+  }
+}
+
+class _EventsFilterHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _EventsFilterHeaderDelegate({required this.child, required this.height});
+
+  final Widget child;
+  final double height;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _EventsFilterHeaderDelegate oldDelegate) {
+    return child != oldDelegate.child || height != oldDelegate.height;
   }
 }

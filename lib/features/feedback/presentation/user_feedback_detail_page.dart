@@ -147,7 +147,7 @@ class _MetaCard extends StatelessWidget {
       padding: const EdgeInsets.all(PortalTheme.space3),
       decoration: BoxDecoration(
         color: PortalTheme.card,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
         border: Border.all(color: PortalTheme.border),
         boxShadow: PortalTheme.softShadow,
       ),
@@ -210,7 +210,7 @@ class _SectionCard extends StatelessWidget {
       padding: const EdgeInsets.all(PortalTheme.space3),
       decoration: BoxDecoration(
         color: PortalTheme.card,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
         border: Border.all(color: PortalTheme.border),
       ),
       child: Column(

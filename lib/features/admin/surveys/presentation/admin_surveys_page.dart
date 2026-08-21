@@ -24,7 +24,7 @@ enum _SurveySort {
   responsesDesc,
 }
 
-enum _SurveyPanel { list, responses }
+enum _SurveyPanel { list, responses, editor }
 
 class AdminSurveysScreen extends StatefulWidget {
   const AdminSurveysScreen({super.key});
@@ -48,7 +48,12 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
   String _query = '';
 
   _SurveyPanel _panel = _SurveyPanel.list;
+  /// Survey shown in the responses workspace (Overview / Pending / Submitted).
   String? _activeSurveyId;
+  /// Survey opened in the edit/publish workspace.
+  String? _editorSurveyId;
+  /// When true, closing the editor returns to responses for [_activeSurveyId].
+  bool _editorReturnToResponses = false;
 
   @override
   void initState() {
@@ -64,22 +69,44 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
     super.dispose();
   }
 
-  Future<void> _openEditor(String surveyId) async {
-    await showAdminSurveyEditorDialog(context, surveyId: surveyId);
-    if (mounted) await _load();
+  void _openEditor(String surveyId, {bool fromResponses = false}) {
+    setState(() {
+      _editorSurveyId = surveyId;
+      _editorReturnToResponses = fromResponses;
+      if (!fromResponses) {
+        _activeSurveyId = surveyId;
+      }
+      _panel = _SurveyPanel.editor;
+    });
   }
 
   void _openResponses(String surveyId) {
     setState(() {
       _activeSurveyId = surveyId;
+      _editorSurveyId = null;
+      _editorReturnToResponses = false;
       _panel = _SurveyPanel.responses;
     });
+  }
+
+  Future<void> _closeEditor() async {
+    if (_editorReturnToResponses && _activeSurveyId != null) {
+      setState(() {
+        _panel = _SurveyPanel.responses;
+        _editorSurveyId = null;
+        _editorReturnToResponses = false;
+      });
+      return;
+    }
+    await _closePanel();
   }
 
   Future<void> _closePanel() async {
     setState(() {
       _panel = _SurveyPanel.list;
       _activeSurveyId = null;
+      _editorSurveyId = null;
+      _editorReturnToResponses = false;
     });
     await _load();
   }
@@ -787,11 +814,23 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
+    if (_panel == _SurveyPanel.editor && _editorSurveyId != null) {
+      return AdminSurveyEditorScreen(
+        key: ValueKey('editor-$_editorSurveyId'),
+        surveyId: _editorSurveyId!,
+        onClose: _closeEditor,
+        backTooltip: _editorReturnToResponses
+            ? 'Back to responses'
+            : 'Back to surveys',
+      );
+    }
+
     if (_panel == _SurveyPanel.responses && _activeSurveyId != null) {
       return AdminSurveyResponsesScreen(
         key: ValueKey('responses-$_activeSurveyId'),
         surveyId: _activeSurveyId!,
         onClose: _closePanel,
+        onOpenEditor: (id) => _openEditor(id, fromResponses: true),
       );
     }
 
@@ -800,16 +839,9 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
 
   Widget _buildSurveyList() {
     final filtered = _filtered;
-    final pageInsets = AdminDensity.pageInsetsForWidth(
-      MediaQuery.sizeOf(context).width,
-    );
-    return ColoredBox(
-      color: AdminSurveyTheme.background,
-      child: Padding(
-        padding: pageInsets.copyWith(bottom: 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
             SurveyPageHeader(
               title: 'Tracer surveys',
               subtitle: 'Create and manage tracer waves and surveys.',
@@ -858,8 +890,6 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
               ),
             ),
           ],
-        ),
-      ),
     );
   }
 }

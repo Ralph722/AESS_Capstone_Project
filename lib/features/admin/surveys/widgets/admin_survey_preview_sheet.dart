@@ -49,28 +49,34 @@ Future<void> showAdminSurveyPreview({
   );
 }
 
-/// Preview chrome used in bottom sheets and side-by-side editor dialogs.
+/// Preview chrome used beside the editor workspace (and optional overlays).
 class AdminSurveyPreviewPanel extends StatelessWidget {
   const AdminSurveyPreviewPanel({
     super.key,
     required this.survey,
     required this.questions,
-    required this.onClose,
+    this.onClose,
+    this.showCloseControls = true,
   });
 
   final Survey survey;
   final List<SurveyQuestion> questions;
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
+
+  /// When false, hides the header X and bottom “Close preview” button
+  /// (used for the always-visible editor preview pane).
+  final bool showCloseControls;
 
   @override
   Widget build(BuildContext context) {
+    final canClose = showCloseControls && onClose != null;
     return Material(
       color: AdminSurveyTheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            padding: EdgeInsets.fromLTRB(16, 12, canClose ? 8 : 16, 8),
             child: Row(
               children: [
                 Expanded(
@@ -100,11 +106,12 @@ class AdminSurveyPreviewPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Close preview',
-                  onPressed: onClose,
-                  icon: const Icon(Icons.close),
-                ),
+                if (canClose)
+                  IconButton(
+                    tooltip: 'Close preview',
+                    onPressed: onClose,
+                    icon: const Icon(Icons.close),
+                  ),
               ],
             ),
           ),
@@ -127,19 +134,21 @@ class AdminSurveyPreviewPanel extends StatelessWidget {
                     questions: questions,
                   ),
           ),
-          const Divider(height: 1, color: AdminSurveyTheme.border),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-            child: OutlinedButton(
-              onPressed: onClose,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AdminSurveyTheme.textPrimary,
-                side: const BorderSide(color: AdminSurveyTheme.border),
-                minimumSize: const Size(0, AdminSurveyTheme.buttonHeight),
+          if (canClose) ...[
+            const Divider(height: 1, color: AdminSurveyTheme.border),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+              child: OutlinedButton(
+                onPressed: onClose,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AdminSurveyTheme.textPrimary,
+                  side: const BorderSide(color: AdminSurveyTheme.border),
+                  minimumSize: const Size(0, AdminSurveyTheme.buttonHeight),
+                ),
+                child: const Text('Close preview'),
               ),
-              child: const Text('Close preview'),
             ),
-          ),
+          ],
         ],
       ),
     );

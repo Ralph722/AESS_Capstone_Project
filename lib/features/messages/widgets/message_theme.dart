@@ -22,8 +22,8 @@ class MessageTheme {
   static const Color failed = PortalTheme.danger;
   static const Color sending = textMuted;
 
-  static const double bubbleRadius = 14;
-  static const double bubbleRadiusTight = 4;
+  static const double bubbleRadius = PortalTheme.radiusXl;
+  static const double bubbleRadiusTight = 6;
   /// Fraction of the *thread pane* width (not the full window).
   static const double maxBubbleWidthFactor = 0.72;
   /// Hard cap so wide admin panes don't stretch long messages edge-to-edge.

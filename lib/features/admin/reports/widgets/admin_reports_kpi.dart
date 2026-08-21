@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 
 enum ReportsKpiStatus { positive, neutral, watch, attention }
@@ -14,6 +15,7 @@ class ReportsKpiCard extends StatefulWidget {
     required this.color,
     this.growthPercent,
     this.comparisonLabel,
+    this.details,
     this.status,
     this.statusLabel,
     this.sparkline,
@@ -28,8 +30,11 @@ class ReportsKpiCard extends StatefulWidget {
   /// Period growth when available; null means no trend chip.
   final double? growthPercent;
 
-  /// Extra context under the value (e.g. "of roster").
+  /// Short micro-context under the value (keep brief). Prefer [details].
   final String? comparisonLabel;
+
+  /// Full definition / calculation / scope shown via ⓘ.
+  final String? details;
 
   final ReportsKpiStatus? status;
   final String? statusLabel;
@@ -60,6 +65,8 @@ class _ReportsKpiCardState extends State<ReportsKpiCard> {
     final spark = (widget.sparkline != null && widget.sparkline!.length >= 2)
         ? widget.sparkline!
         : null;
+    final details = widget.details?.trim();
+    final micro = widget.comparisonLabel?.trim();
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,6 +100,8 @@ class _ReportsKpiCardState extends State<ReportsKpiCard> {
                 ),
               ),
             ),
+            if (details != null && details.isNotEmpty)
+              ReportsDetailsButton(title: widget.label, body: details),
             if (status != null && (widget.statusLabel?.isNotEmpty ?? false))
               _StatusBadge(status: status, label: widget.statusLabel!),
           ],
@@ -118,9 +127,9 @@ class _ReportsKpiCardState extends State<ReportsKpiCard> {
                     ),
                   ),
                   if (growth != null ||
-                      (widget.comparisonLabel?.isNotEmpty ?? false)) ...[
+                      (micro != null && micro.isNotEmpty)) ...[
                     const SizedBox(height: 2),
-                    _comparisonRow(growth),
+                    _comparisonRow(growth, micro),
                   ],
                 ],
               ),
@@ -179,18 +188,18 @@ class _ReportsKpiCardState extends State<ReportsKpiCard> {
     );
   }
 
-  Widget _comparisonRow(double? growth) {
-    final comparison = widget.comparisonLabel;
-
+  Widget _comparisonRow(double? growth, String? comparison) {
     return Wrap(
       spacing: 6,
       runSpacing: 2,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (growth != null) _GrowthChip(percent: growth),
-        if (comparison != null)
+        if (comparison != null && comparison.isNotEmpty)
           Text(
             comparison,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,

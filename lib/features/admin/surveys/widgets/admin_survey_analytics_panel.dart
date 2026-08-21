@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -61,7 +60,71 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
   List<SurveyParticipant> _cachedFilteredParticipants = const [];
   List<SurveyResponse> _cachedSubmitted = const [];
 
+  final _listScrollController = ScrollController();
+  /// Overlay-only flag — avoid setState on the whole analytics tree.
+  final _canScrollMore = ValueNotifier<bool>(false);
+  bool _scrollCheckScheduled = false;
+
   Survey get survey => widget.survey;
+
+  @override
+  void initState() {
+    super.initState();
+    _listScrollController.addListener(_syncScrollAffordance);
+    _scheduleScrollAffordanceCheck();
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminSurveyAnalyticsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.survey.id != widget.survey.id ||
+        oldWidget.participants.length != widget.participants.length ||
+        oldWidget.responses.length != widget.responses.length) {
+      _scheduleScrollAffordanceCheck();
+    }
+  }
+
+  @override
+  void dispose() {
+    _listScrollController.removeListener(_syncScrollAffordance);
+    _listScrollController.dispose();
+    _canScrollMore.dispose();
+    super.dispose();
+  }
+
+  void _syncScrollAffordance() {
+    if (!_listScrollController.hasClients) return;
+    final pos = _listScrollController.position;
+    final more =
+        pos.maxScrollExtent > 8 && pos.pixels < pos.maxScrollExtent - 8;
+    if (_canScrollMore.value != more) {
+      _canScrollMore.value = more;
+    }
+  }
+
+  void _scheduleScrollAffordanceCheck() {
+    if (_scrollCheckScheduled) return;
+    _scrollCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollCheckScheduled = false;
+      if (!mounted) return;
+      _syncScrollAffordance();
+    });
+  }
+
+  Future<void> _scrollAnalyticsDown() async {
+    if (!_listScrollController.hasClients) return;
+    final pos = _listScrollController.position;
+    if (pos.maxScrollExtent <= 0) return;
+    // Jump one viewport first so users see motion; if near the end, go to bottom.
+    final page = pos.viewportDimension * 0.85;
+    final target = (pos.pixels + page).clamp(0.0, pos.maxScrollExtent);
+    await _listScrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   List<String> get _batchOptions {
     final set = <String>{};
@@ -188,143 +251,90 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
         .take(4)
         .toList();
 
-    final programs = survey.targetPrograms
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    final batches = AudienceTargeting.expandBatchYearTargets(
-      survey.targetBatchYears,
-    );
-    final audienceNote = (programs.isEmpty && batches.isEmpty)
-        ? 'Audience: all eligible alumni'
-        : 'Audience: ${[
-            if (programs.isNotEmpty) programs.join(', '),
-            if (batches.isNotEmpty)
-              AudienceTargeting.formatBatchYearsForDisplay(batches),
-          ].join(' · ')}';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SurveySectionCard(
           title: 'Filters',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                audienceNote,
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: AdminSurveyTheme.textMuted,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 150,
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: 'Batch',
-                        isDense: true,
-                        filled: true,
-                        fillColor: AdminSurveyTheme.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AdminSurveyTheme.radiusMd,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 2,
-                        ),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String?>(
-                          value: _batchFilter,
-                          isExpanded: true,
-                          isDense: true,
-                          items: [
-                            const DropdownMenuItem(
-                              value: null,
-                              child: Text('All batches'),
-                            ),
-                            for (final b in _batchOptions)
-                              DropdownMenuItem(value: b, child: Text(b)),
-                          ],
-                          onChanged: (v) => setState(() => _batchFilter = v),
-                        ),
-                      ),
-                    ),
+          trailing: (_batchFilter != null || _courseFilter != null)
+              ? TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _batchFilter = null;
+                      _courseFilter = null;
+                    });
+                    _scheduleScrollAffordanceCheck();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: AdminSurveyTheme.textSecondary,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  SizedBox(
-                    width: 200,
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: 'Course',
-                        isDense: true,
-                        filled: true,
-                        fillColor: AdminSurveyTheme.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AdminSurveyTheme.radiusMd,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 2,
-                        ),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String?>(
-                          value: _courseFilter,
-                          isExpanded: true,
-                          isDense: true,
-                          items: [
-                            const DropdownMenuItem(
-                              value: null,
-                              child: Text('All courses'),
-                            ),
-                            for (final c in _courseOptions)
-                              DropdownMenuItem(
-                                value: c,
-                                child: Text(
-                                  c,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                          onChanged: (v) => setState(() => _courseFilter = v),
-                        ),
-                      ),
-                    ),
+                  child: const Text('Clear'),
+                )
+              : null,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final sideBySide = constraints.maxWidth >= 360;
+              final batchField = _FilterDropdown<String?>(
+                id: 'batch',
+                value: _batchFilter,
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('All batches'),
                   ),
-                  if (_batchFilter != null || _courseFilter != null)
-                    TextButton(
-                      onPressed: () => setState(() {
-                        _batchFilter = null;
-                        _courseFilter = null;
-                      }),
-                      child: const Text('Clear'),
+                  for (final b in _batchOptions)
+                    DropdownMenuItem(value: b, child: Text(b)),
+                ],
+                onChanged: (v) {
+                  setState(() => _batchFilter = v);
+                  _scheduleScrollAffordanceCheck();
+                },
+              );
+              final courseField = _FilterDropdown<String?>(
+                id: 'course',
+                value: _courseFilter,
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('All courses'),
+                  ),
+                  for (final c in _courseOptions)
+                    DropdownMenuItem(
+                      value: c,
+                      child: Text(
+                        c,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${_batchFilter ?? 'All batches'} · '
-                '${_courseFilter ?? 'All courses'} · '
-                '${submitted.length} submitted',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AdminSurveyTheme.textMuted,
-                ),
-              ),
-            ],
+                onChanged: (v) {
+                  setState(() => _courseFilter = v);
+                  _scheduleScrollAffordanceCheck();
+                },
+              );
+              if (!sideBySide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    batchField,
+                    const SizedBox(height: 8),
+                    courseField,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(flex: 2, child: batchField),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 3, child: courseField),
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 10),
@@ -336,67 +346,225 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
                     style: TextStyle(color: AdminSurveyTheme.textMuted),
                   ),
                 )
-              : ListView(
-                  padding: const EdgeInsets.only(bottom: 16),
+              : Stack(
                   children: [
-                    _FunnelCard(snapshot: participation),
-                    const SizedBox(height: 10),
-                    _ReminderCard(stats: reminders),
-                    const SizedBox(height: 10),
-                    _TrendCard(points: trend),
-                    const SizedBox(height: 10),
-                    if (byProgram.isNotEmpty) ...[
-                      _AudienceCard(
-                        title: 'By course / program',
-                        buckets: byProgram,
+                    Scrollbar(
+                      controller: _listScrollController,
+                      thumbVisibility: true,
+                      thickness: 6,
+                      radius: const Radius.circular(8),
+                      child: ListView(
+                        controller: _listScrollController,
+                        padding: const EdgeInsets.only(bottom: 36, right: 10),
+                        children: [
+                          _FunnelCard(snapshot: participation),
+                          const SizedBox(height: 10),
+                          _ReminderCard(stats: reminders),
+                          const SizedBox(height: 10),
+                          _TrendCard(points: trend),
+                          const SizedBox(height: 10),
+                          if (byProgram.isNotEmpty) ...[
+                            _AudienceCard(
+                              title: 'By course / program',
+                              buckets: byProgram,
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          if (byBatch.isNotEmpty) ...[
+                            _AudienceCard(
+                              title: 'By batch year',
+                              buckets: byBatch,
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          if (choiceAggs.isNotEmpty) ...[
+                            const _SectionTitle('Response distribution'),
+                            const SizedBox(height: 8),
+                            for (final a in choiceAggs) ...[
+                              _ChoiceAggregateCard(aggregate: a),
+                              const SizedBox(height: 8),
+                            ],
+                          ],
+                          if (scaleAggs.isNotEmpty) ...[
+                            const _SectionTitle('Rating / scale'),
+                            const SizedBox(height: 8),
+                            for (final a in scaleAggs) ...[
+                              _ScaleAggregateCard(aggregate: a),
+                              const SizedBox(height: 8),
+                            ],
+                          ],
+                          if (skipped.isNotEmpty) ...[
+                            const _SectionTitle('Most skipped'),
+                            const SizedBox(height: 8),
+                            for (final a in skipped) ...[
+                              _SkippedRow(aggregate: a),
+                              const SizedBox(height: 6),
+                            ],
+                          ],
+                          if (submitted.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: Text(
+                                'No submitted responses for this filter yet.',
+                                style: TextStyle(
+                                  color: AdminSurveyTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                    ],
-                    if (byBatch.isNotEmpty) ...[
-                      _AudienceCard(
-                        title: 'By batch year',
-                        buckets: byBatch,
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    if (choiceAggs.isNotEmpty) ...[
-                      const _SectionTitle('Response distribution'),
-                      const SizedBox(height: 8),
-                      for (final a in choiceAggs) ...[
-                        _ChoiceAggregateCard(aggregate: a),
-                        const SizedBox(height: 8),
-                      ],
-                    ],
-                    if (scaleAggs.isNotEmpty) ...[
-                      const _SectionTitle('Rating / scale'),
-                      const SizedBox(height: 8),
-                      for (final a in scaleAggs) ...[
-                        _ScaleAggregateCard(aggregate: a),
-                        const SizedBox(height: 8),
-                      ],
-                    ],
-                    if (skipped.isNotEmpty) ...[
-                      const _SectionTitle('Most skipped'),
-                      const SizedBox(height: 8),
-                      for (final a in skipped) ...[
-                        _SkippedRow(aggregate: a),
-                        const SizedBox(height: 6),
-                      ],
-                    ],
-                    if (submitted.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: Text(
-                          'No submitted responses for this filter yet.',
-                          style: TextStyle(
-                            color: AdminSurveyTheme.textMuted,
+                    ),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _canScrollMore,
+                      builder: (context, more, _) {
+                        if (!more) return const SizedBox.shrink();
+                        return Positioned(
+                          left: 0,
+                          right: 10,
+                          bottom: 0,
+                          child: _MoreAnalyticsBelowCue(
+                            onPressed: _scrollAnalyticsDown,
                           ),
-                        ),
-                      ),
+                        );
+                      },
+                    ),
                   ],
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _MoreAnalyticsBelowCue extends StatelessWidget {
+  const _MoreAnalyticsBelowCue({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IgnorePointer(
+          child: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AdminSurveyTheme.background.withValues(alpha: 0),
+                  AdminSurveyTheme.background.withValues(alpha: 0.92),
+                  AdminSurveyTheme.background,
+                ],
+              ),
+            ),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          color: AdminSurveyTheme.background,
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Center(
+            child: Material(
+              color: AdminSurveyTheme.card,
+              borderRadius: BorderRadius.circular(999),
+              elevation: 0,
+              child: InkWell(
+                onTap: onPressed,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AdminSurveyTheme.border),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'More analytics below',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AdminSurveyTheme.textSecondary,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AdminSurveyTheme.textMuted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterDropdown<T> extends StatelessWidget {
+  const _FilterDropdown({
+    required this.id,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String id;
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AdminSurveyTheme.radiusSm);
+    return DropdownButtonFormField<T>(
+      key: ValueKey('$id-$value'),
+      initialValue: value,
+      isExpanded: true,
+      isDense: true,
+      iconSize: 18,
+      borderRadius: radius,
+      style: const TextStyle(
+        fontSize: 13,
+        color: AdminSurveyTheme.textPrimary,
+      ),
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        size: 18,
+        color: AdminSurveyTheme.textMuted,
+      ),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: AdminSurveyTheme.background,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 10,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: AdminSurveyTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: AdminSurveyTheme.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: AdminSurveyTheme.primary),
+        ),
+      ),
+      items: items,
+      onChanged: onChanged,
     );
   }
 }

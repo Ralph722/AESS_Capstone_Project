@@ -8,13 +8,16 @@ import 'package:alumni_system/core/config/email_delivery_config.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/core/services/ched_gts_export_service.dart';
-import 'package:alumni_system/features/admin/surveys/presentation/admin_survey_editor_page.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_response_detail_sheet.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_response_timeline_sheet.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_analytics_panel.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_formal_report_dialog.dart';
+import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_export_dialog.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_pack_service.dart';
+import 'package:alumni_system/features/surveys/data/survey_ched_outcomes_summary_service.dart';
+import 'package:alumni_system/features/admin/ched_gts_pdf_export/ched_gts_pdf_export.dart';
+import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
@@ -22,19 +25,29 @@ import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_search_field.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
+import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/surveys/data/survey_single_response_export_service.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class AdminSurveyResponsesScreen extends StatefulWidget {
   const AdminSurveyResponsesScreen({
     super.key,
     required this.surveyId,
     this.onClose,
+    this.onOpenEditor,
   });
 
   final String surveyId;
 
   /// When set, responses are shown inline in the surveys panel (no route push).
   final VoidCallback? onClose;
+
+  /// Opens the edit/publish workspace for [surveyId] (or another draft id).
+  /// Parent should return here when the editor closes.
+  final ValueChanged<String>? onOpenEditor;
 
   @override
   State<AdminSurveyResponsesScreen> createState() =>
@@ -97,6 +110,11 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       _loadErrorLooksOffline = false;
     });
     try {
+      // Heal sticky publish stamp / badge cursor before reading survey for UI.
+      try {
+        await _surveyService.markSurveyResponsesSeenByAdmin(widget.surveyId);
+      } catch (_) {}
+
       final survey = await _surveyService.getSurvey(widget.surveyId);
       final questions = await _surveyService.getQuestions(widget.surveyId);
       final participants = await _surveyService.getSurveyParticipants(
@@ -119,9 +137,6 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         _isLoading = false;
         _loadError = null;
       });
-      try {
-        await _surveyService.markSurveyResponsesSeenByAdmin(widget.surveyId);
-      } catch (_) {}
     } catch (e) {
       if (!mounted) return;
       final message = '$e';
@@ -380,7 +395,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     }
   }
 
-  void _exportCsv() {
+  void _exportCsv({
+    List<SurveyParticipant>? participants,
+    int? submittedCount,
+  }) {
     if (!requireWebExport(context)) return;
     if (_survey == null) {
       ScaffoldMessenger.of(
@@ -388,7 +406,9 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       ).showSnackBar(const SnackBar(content: Text('Survey not loaded yet')));
       return;
     }
-    if (_submitted.isEmpty) {
+    final people = participants ?? _participants;
+    final submitted = submittedCount ?? _submitted.length;
+    if (submitted == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No submitted responses to export')),
       );
@@ -398,7 +418,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       final csv = _surveyService.buildResponsesCsv(
         survey: _survey!,
         questions: _questions,
-        participants: _participants,
+        participants: people,
       );
       // UTF-8 BOM so Excel opens columns correctly on Windows.
       final bytes = utf8.encode('\uFEFF$csv');
@@ -429,46 +449,150 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     }
   }
 
-  Future<void> _exportManagementPack({required String format}) async {
+  Future<void> _exportResponsesExcel({
+    List<SurveyParticipant>? participants,
+    int? submittedCount,
+  }) async {
     if (!requireWebExport(context)) return;
+    if (_survey == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Survey not loaded yet')),
+      );
+      return;
+    }
+    final people = participants ?? _participants;
+    final submittedN = submittedCount ?? _submitted.length;
+    if (submittedN == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No submitted responses to export')),
+      );
+      return;
+    }
+    setState(() => _isExportingChed = true);
+    try {
+      final book = Excel.createExcel();
+      final defaultName = book.getDefaultSheet();
+      if (defaultName != null) {
+        book.rename(defaultName, 'Responses');
+      }
+      final sheet = book['Responses'];
+      sheet.appendRow([
+        'Name',
+        'Email',
+        'Program',
+        'Batch',
+        'Status',
+        'Submitted At',
+        ..._questions.map((q) => q.prompt),
+      ]);
+      final submitted = people
+          .where((p) => !p.isPending && p.response != null)
+          .toList(growable: false);
+      for (final p in submitted) {
+        final response = p.response!;
+        sheet.appendRow([
+          p.displayName,
+          p.email,
+          p.program,
+          p.batchYear,
+          p.assignment.status.name,
+          response.submittedAt?.toIso8601String() ?? '',
+          ..._questions.map((q) => '${response.answers[q.id] ?? ''}'),
+        ]);
+      }
+      final encoded = book.encode();
+      if (encoded == null) {
+        throw StateError('Excel encode returned null');
+      }
+      if (!mounted) return;
+      final safe = _survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_');
+      tryDownloadBytesOnWeb(
+        context,
+        bytes: Uint8List.fromList(encoded),
+        fileName:
+            'survey_${safe}_responses_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx',
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Responses Excel downloaded'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingChed = false);
+    }
+  }
+
+  Future<void> _exportManagementPack({
+    required String format,
+    bool printPreview = false,
+    List<SurveyParticipant>? participants,
+    List<SurveyResponse>? responses,
+  }) async {
+    if (!printPreview && !requireWebExport(context)) return;
     if (_survey == null) return;
     setState(() => _isExportingChed = true);
     try {
       final pack = SurveyReportPackService.buildSurveyPack(
         survey: _survey!,
-        participants: _participants,
+        participants: participants ?? _participants,
         questions: _questions,
-        responses: _responses,
+        responses: responses ?? _responses,
       );
       final safe = _survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_');
       final stamp = DateFormat('yyyyMMdd').format(DateTime.now());
-      late final Uint8List bytes;
-      late final String fileName;
-      late final String mime;
-      switch (format) {
-        case 'pdf':
-          bytes = await SurveyReportPackService.toPdf(pack);
-          fileName = 'survey_${safe}_report_pack_$stamp.pdf';
-          mime = 'application/pdf';
-        case 'xlsx':
-          bytes = SurveyReportPackService.toExcel(pack);
-          fileName = 'survey_${safe}_report_pack_$stamp.xlsx';
-          mime =
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-        default:
-          bytes = Uint8List.fromList(
-            utf8.encode('\uFEFF${SurveyReportPackService.toCsv(pack)}'),
+
+      if (printPreview || format == 'pdf') {
+        final bytes = await SurveyReportPackService.toPdf(pack);
+        if (!mounted) return;
+        if (printPreview) {
+          await Printing.layoutPdf(
+            onLayout: (_) async => bytes,
+            name: '${_survey!.title} management report',
           );
-          fileName = 'survey_${safe}_report_pack_$stamp.csv';
-          mime = 'text/csv;charset=utf-8';
-      }
+          return;
+        }
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: 'survey_${safe}_report_pack_$stamp.pdf',
+          mimeType: 'application/pdf',
+        );
+      } else if (format == 'xlsx') {
+        final bytes = SurveyReportPackService.toExcel(pack);
       if (!mounted) return;
       tryDownloadBytesOnWeb(
         context,
         bytes: bytes,
-        fileName: fileName,
-        mimeType: mime,
-      );
+          fileName: 'survey_${safe}_report_pack_$stamp.xlsx',
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      } else {
+        final bytes = Uint8List.fromList(
+          utf8.encode('\uFEFF${SurveyReportPackService.toCsv(pack)}'),
+        );
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: 'survey_${safe}_report_pack_$stamp.csv',
+          mimeType: 'text/csv;charset=utf-8',
+        );
+      }
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Management report downloaded'),
@@ -489,9 +613,15 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     }
   }
 
-  Future<void> _exportChedGtsExcel() async {
+  Future<void> _exportChedGtsExcel({
+    List<SurveyParticipant>? participants,
+    int? submittedCount,
+  }) async {
     if (!requireWebExport(context)) return;
-    if (_survey == null || _submitted.isEmpty) {
+    if (_survey == null) return;
+    final people = participants ?? _participants;
+    final submitted = submittedCount ?? _submitted.length;
+    if (submitted == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No submitted responses to export')),
       );
@@ -503,7 +633,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       final bytes = await ChedGtsExportService().buildExcelBytes(
         survey: _survey!,
         questions: _questions,
-        participants: _participants,
+        participants: people,
       );
       if (!mounted) return;
       if (bytes == null) {
@@ -547,7 +677,11 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     return [
       const PopupMenuItem(
         value: 'refresh',
-        child: _ExportMenuRow(icon: Icons.refresh, title: 'Refresh'),
+        child: _ExportMenuRow(
+          icon: Icons.refresh,
+          title: 'Refresh',
+          subtitle: 'Reload the latest survey data',
+        ),
       ),
       if (_survey != null)
         const PopupMenuItem(
@@ -555,48 +689,17 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
           child: _ExportMenuRow(
             icon: Icons.auto_awesome,
             title: 'Generate formal report',
-            subtitle: 'AI draft — review before official use',
+            subtitle: 'AI-written draft — check it before official use',
           ),
         ),
       if (canExportFiles && _survey != null) ...[
         const PopupMenuDivider(),
-        if (_submitted.isNotEmpty)
           const PopupMenuItem(
-            value: 'ched',
+          value: 'export',
             child: _ExportMenuRow(
-              icon: Icons.table_chart_outlined,
-              title: 'CHED GTS Excel pack',
-              subtitle: 'Tracer A/B + employment + survey C/D sheets',
-            ),
-          ),
-        if (_submitted.isNotEmpty)
-          const PopupMenuItem(
-            value: 'csv',
-            child: _ExportMenuRow(
-              icon: Icons.description_outlined,
-              title: 'Responses CSV',
-            ),
-          ),
-        const PopupMenuItem(
-          value: 'pack_pdf',
-          child: _ExportMenuRow(
-            icon: Icons.picture_as_pdf_outlined,
-            title: 'Management report PDF',
-            subtitle: 'Executive + participation + insights pack',
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'pack_xlsx',
-          child: _ExportMenuRow(
-            icon: Icons.grid_on_outlined,
-            title: 'Management report Excel',
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'pack_csv',
-          child: _ExportMenuRow(
-            icon: Icons.summarize_outlined,
-            title: 'Management report CSV',
+            icon: Icons.download_outlined,
+            title: 'Download / export',
+            subtitle: 'Choose a report, then save or print it',
           ),
         ),
       ],
@@ -611,6 +714,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       case 'formal_report':
         _openFormalReport();
         break;
+      case 'export':
+        _showExportPicker();
+        break;
+      // Legacy values (kept for any leftover callers)
       case 'csv':
         _exportCsv();
         break;
@@ -861,7 +968,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     final dateFmt = DateFormat.yMMMd().add_jm();
 
     return LayoutBuilder(
-      builder: (context, constraints) {
+              builder: (context, constraints) {
         final wide = constraints.maxWidth >= 900;
         final left = _overviewLeftColumn(
           survey: survey,
@@ -886,48 +993,29 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         if (!wide) {
           return ListView(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-            children: [
+                    children: [
               left,
               const SizedBox(height: 12),
               SizedBox(
                 height: math.max(420, constraints.maxHeight * 0.7),
                 child: right,
               ),
-            ],
-          );
-        }
+                    ],
+                  );
+                }
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 4,
-                child: _overviewPane(child: left),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 6,
-                child: _overviewPane(child: right),
-              ),
+                  children: [
+              Expanded(flex: 4, child: left),
+              const SizedBox(width: 14),
+              Expanded(flex: 6, child: right),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _overviewPane({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AdminSurveyTheme.card,
-        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
-        border: Border.all(color: AdminSurveyTheme.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      padding: const EdgeInsets.all(10),
-      child: child,
     );
   }
 
@@ -938,9 +1026,9 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     required DateFormat dateFmt,
   }) {
     return SingleChildScrollView(
-      child: Column(
+              child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+                children: [
           SurveySectionCard(
             title: 'Quick actions',
             child: Wrap(
@@ -965,13 +1053,12 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                   _quickActionChip(
                     icon: Icons.edit_outlined,
                     label: 'View survey',
-                    onPressed: () =>
-                        showAdminSurveyEditorDialog(
-                          context,
-                          surveyId: survey.id,
-                        ).then((_) {
-                          if (mounted) _load();
-                        }),
+                    onPressed: () {
+                      final open = widget.onOpenEditor;
+                      if (open != null) {
+                        open(survey.id);
+                      }
+                    },
                   ),
                   _quickActionChip(
                     icon: Icons.copy_outlined,
@@ -981,8 +1068,8 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                 ],
                 _quickActionChip(
                   icon: Icons.download_outlined,
-                  label: 'Export responses',
-                  onPressed: !canExportFiles || completed == 0
+                  label: 'Download / export',
+                  onPressed: !canExportFiles || _survey == null
                       ? null
                       : _showExportPicker,
                 ),
@@ -991,7 +1078,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                     icon: Icons.auto_awesome,
                     label: 'Generate formal report',
                     onPressed: _openFormalReport,
-                  ),
+                ),
                 _quickActionChip(
                   icon: Icons.history_outlined,
                   label: 'Reminder history',
@@ -1195,8 +1282,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
           backgroundColor: Colors.green,
         ),
       );
-      await showAdminSurveyEditorDialog(context, surveyId: id);
-      if (mounted) await _load();
+      final open = widget.onOpenEditor;
+      if (open != null) {
+        open(id);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1206,34 +1295,610 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   }
 
   Future<void> _showExportPicker() async {
-    final choice = await showAdminOptionPicker<String>(
+    if (_survey == null) return;
+    final survey = _survey!;
+    final openAudience = survey.targetPrograms.isEmpty &&
+        survey.targetBatchYears.isEmpty;
+    final showCohortFilters = survey.isChedGtsBuiltin && openAudience;
+
+    final batchOptions = <String>{
+      for (final p in _participants)
+        if (p.batchYear.trim().isNotEmpty) p.batchYear.trim(),
+    }.toList()
+      ..sort((a, b) {
+        final an = int.tryParse(a);
+        final bn = int.tryParse(b);
+        if (an != null && bn != null) return bn.compareTo(an);
+        return b.compareTo(a);
+      });
+    final courseOptions = <String>{
+      for (final p in _participants)
+        if (p.program.trim().isNotEmpty) p.program.trim(),
+    }.toList()
+      ..sort();
+
+    final choice = await showAdminSurveyExportDialog(
       context: context,
-      title: 'Export responses',
-      options: const [
-        AdminPickerOption(
-          value: 'ched',
-          label: 'CHED GTS Excel pack',
-          icon: Icons.table_chart_outlined,
-        ),
-        AdminPickerOption(
-          value: 'csv',
-          label: 'Responses CSV',
-          icon: Icons.description_outlined,
-        ),
-        AdminPickerOption(
-          value: 'pack_pdf',
-          label: 'Management report PDF',
-          icon: Icons.picture_as_pdf_outlined,
-        ),
-        AdminPickerOption(
-          value: 'pack_xlsx',
-          label: 'Management report Excel',
-          icon: Icons.grid_on_outlined,
-        ),
-      ],
+      hasSubmitted: _submitted.isNotEmpty,
+      isChedGts: survey.isChedGtsBuiltin,
+      showCohortFilters: showCohortFilters,
+      batchOptions: batchOptions,
+      courseOptions: courseOptions,
     );
     if (choice == null || !mounted) return;
-    _onOverflowSelected(choice);
+    await _runSurveyExport(choice);
+  }
+
+  List<SurveyParticipant> _participantsForExport(SurveyExportChoice choice) {
+    var list = _participants;
+    final batch = choice.batchYear?.trim().toLowerCase();
+    final course = choice.course?.trim().toLowerCase();
+    if (batch != null && batch.isNotEmpty) {
+      list = list
+          .where((p) => p.batchYear.trim().toLowerCase() == batch)
+          .toList(growable: false);
+    }
+    if (course != null && course.isNotEmpty) {
+      list = list
+          .where((p) => p.program.trim().toLowerCase() == course)
+          .toList(growable: false);
+    }
+    return list;
+  }
+
+  List<SurveyResponse> _responsesForExport(
+    List<SurveyParticipant> participants,
+  ) {
+    final ids = {for (final p in participants) p.assignment.userId};
+    return _responses
+        .where((r) => ids.contains(r.userId))
+        .toList(growable: false);
+  }
+
+  Future<void> _runSurveyExport(SurveyExportChoice choice) async {
+    final scopedParticipants = _participantsForExport(choice);
+    final scopedResponses = _responsesForExport(scopedParticipants);
+    final scopedSubmitted =
+        scopedParticipants.where((p) => !p.isPending).toList(growable: false);
+    final scopedPending =
+        scopedParticipants.where((p) => p.isPending).toList(growable: false);
+
+    switch (choice.report) {
+      case SurveyExportReportKind.responses:
+        switch (choice.format) {
+          case SurveyExportFormat.csv:
+            _exportCsv(
+              participants: scopedParticipants,
+              submittedCount: scopedSubmitted.length,
+            );
+          case SurveyExportFormat.excel:
+            await _exportResponsesExcel(
+              participants: scopedParticipants,
+              submittedCount: scopedSubmitted.length,
+            );
+          case SurveyExportFormat.pdf:
+          case SurveyExportFormat.print:
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Submitted responses export as Excel or CSV. '
+                    'Use Management report or CHED outcomes for PDF / Print.',
+                  ),
+                ),
+              );
+            }
+        }
+      case SurveyExportReportKind.management:
+        switch (choice.format) {
+          case SurveyExportFormat.pdf:
+            await _exportManagementPack(
+              format: 'pdf',
+              participants: scopedParticipants,
+              responses: scopedResponses,
+            );
+          case SurveyExportFormat.excel:
+            await _exportManagementPack(
+              format: 'xlsx',
+              participants: scopedParticipants,
+              responses: scopedResponses,
+            );
+          case SurveyExportFormat.csv:
+            await _exportManagementPack(
+              format: 'csv',
+              participants: scopedParticipants,
+              responses: scopedResponses,
+            );
+          case SurveyExportFormat.print:
+            await _exportManagementPack(
+              format: 'pdf',
+              printPreview: true,
+              participants: scopedParticipants,
+              responses: scopedResponses,
+            );
+        }
+      case SurveyExportReportKind.ched:
+        if (choice.format != SurveyExportFormat.excel) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('CHED GTS pack is available as Excel only.'),
+              ),
+            );
+          }
+          return;
+        }
+        await _exportChedGtsExcel(
+          participants: scopedParticipants,
+          submittedCount: scopedSubmitted.length,
+        );
+      case SurveyExportReportKind.chedOutcomes:
+        await _exportChedOutcomesSummary(
+          format: choice.format,
+          printPreview: choice.format == SurveyExportFormat.print,
+          participants: scopedParticipants,
+          responses: scopedResponses,
+          submittedCount: scopedSubmitted.length,
+        );
+      case SurveyExportReportKind.pending:
+        await _exportPendingList(
+          format: choice.format,
+          printPreview: choice.format == SurveyExportFormat.print,
+          pending: scopedPending,
+        );
+      case SurveyExportReportKind.chedFillable:
+        await _exportOfficialFillableZip(submitted: scopedSubmitted);
+    }
+  }
+
+  Future<void> _exportChedOutcomesSummary({
+    required SurveyExportFormat format,
+    bool printPreview = false,
+    List<SurveyParticipant>? participants,
+    List<SurveyResponse>? responses,
+    int? submittedCount,
+  }) async {
+    if (!printPreview &&
+        format != SurveyExportFormat.print &&
+        !requireWebExport(context)) {
+      return;
+    }
+    if (_survey == null || !_survey!.isChedGtsBuiltin) return;
+    final submitted = submittedCount ?? _submitted.length;
+    if (submitted == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No submitted responses to summarize')),
+      );
+      return;
+    }
+
+    setState(() => _isExportingChed = true);
+    try {
+      final summary = SurveyChedOutcomesSummaryService.build(
+        survey: _survey!,
+        participants: participants ?? _participants,
+        responses: responses ?? _responses,
+      );
+      final safe = _survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_');
+      final stamp = DateFormat('yyyyMMdd').format(DateTime.now());
+
+      if (printPreview || format == SurveyExportFormat.pdf) {
+        final bytes = await SurveyChedOutcomesSummaryService.toPdf(summary);
+        if (!mounted) return;
+        if (printPreview || format == SurveyExportFormat.print) {
+          await Printing.layoutPdf(
+            onLayout: (_) async => bytes,
+            name: '${_survey!.title} CHED outcomes',
+          );
+          return;
+        }
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: 'ched_outcomes_${safe}_$stamp.pdf',
+          mimeType: 'application/pdf',
+        );
+      } else if (format == SurveyExportFormat.excel) {
+        final bytes = SurveyChedOutcomesSummaryService.toExcel(summary);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: 'ched_outcomes_${safe}_$stamp.xlsx',
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      } else {
+        final bytes = SurveyChedOutcomesSummaryService.toCsvBytes(summary);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: 'ched_outcomes_${safe}_$stamp.csv',
+          mimeType: 'text/csv;charset=utf-8',
+        );
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('CHED outcomes summary ready'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingChed = false);
+    }
+  }
+
+  Future<void> _exportPendingList({
+    required SurveyExportFormat format,
+    bool printPreview = false,
+    List<SurveyParticipant>? pending,
+  }) async {
+    if (!printPreview &&
+        format != SurveyExportFormat.print &&
+        !requireWebExport(context)) {
+      return;
+    }
+    final list = pending ?? _pending;
+    if (list.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pending alumni in this survey')),
+      );
+      return;
+    }
+
+    setState(() => _isExportingChed = true);
+    try {
+      final safe = (_survey?.title ?? 'survey')
+          .replaceAll(RegExp(r'[^\w\-]+'), '_');
+      final stamp = DateFormat('yyyyMMdd').format(DateTime.now());
+
+      if (printPreview ||
+          format == SurveyExportFormat.pdf ||
+          format == SurveyExportFormat.print) {
+        final bytes = await _pendingListPdfBytes(list);
+        if (!mounted) return;
+        if (printPreview || format == SurveyExportFormat.print) {
+          await Printing.layoutPdf(
+            onLayout: (_) async => bytes,
+            name: '${_survey?.title ?? 'Survey'} pending list',
+          );
+          return;
+        }
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: '${safe}_pending_$stamp.pdf',
+          mimeType: 'application/pdf',
+        );
+      } else if (format == SurveyExportFormat.excel) {
+        final book = Excel.createExcel();
+        final def = book.getDefaultSheet();
+        if (def != null) book.rename(def, 'Pending');
+        final sheet = book['Pending'];
+        sheet.appendRow([
+          'Name',
+          'Email',
+          'Program',
+          'Batch',
+          'Status',
+          'Assigned At',
+          'Last Reminder',
+          'Reminder Count',
+        ]);
+        for (final p in list) {
+          final a = p.assignment;
+          sheet.appendRow([
+            p.displayName,
+            p.email,
+            p.program,
+            p.batchYear,
+            a.status.name,
+            a.assignedAt.toIso8601String(),
+            a.lastReminderAt?.toIso8601String() ?? '',
+            a.reminderCount,
+          ]);
+        }
+        final encoded = book.encode();
+        if (encoded == null) throw StateError('Excel encode returned null');
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: Uint8List.fromList(encoded),
+          fileName: '${safe}_pending_$stamp.xlsx',
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      } else {
+        final buf = StringBuffer();
+        buf.writeln(
+          'name,email,program,batch,status,assigned_at,last_reminder_at,reminder_count',
+        );
+        String esc(String v) => '"${v.replaceAll('"', '""')}"';
+        for (final p in list) {
+          final a = p.assignment;
+          buf.writeln(
+            [
+              esc(p.displayName),
+              esc(p.email),
+              esc(p.program),
+              esc(p.batchYear),
+              a.status.name,
+              a.assignedAt.toIso8601String(),
+              a.lastReminderAt?.toIso8601String() ?? '',
+              '${a.reminderCount}',
+            ].join(','),
+          );
+        }
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: Uint8List.fromList(utf8.encode('\uFEFF${buf.toString()}')),
+          fileName: '${safe}_pending_$stamp.csv',
+          mimeType: 'text/csv;charset=utf-8',
+        );
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pending list exported (${list.length})'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingChed = false);
+    }
+  }
+
+  Future<Uint8List> _pendingListPdfBytes(List<SurveyParticipant> pending) async {
+    final doc = pw.Document();
+    final title = _survey?.title.trim().isNotEmpty == true
+        ? _survey!.title.trim()
+        : 'Survey';
+    final stamp = DateFormat.yMMMMEEEEd().add_jm().format(DateTime.now());
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        header: (ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              PdfSafeText.sanitize('Pending / non-response list'),
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue900,
+              ),
+            ),
+            pw.Text(
+              PdfSafeText.sanitize('$title · ${pending.length} pending · $stamp'),
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Divider(color: PdfColors.blue900),
+            pw.SizedBox(height: 6),
+          ],
+        ),
+        footer: (ctx) => pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text(
+            'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
+            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+          ),
+        ),
+        build: (ctx) => [
+          pw.TableHelper.fromTextArray(
+            headers: const [
+              'Name',
+              'Email',
+              'Program',
+              'Batch',
+              'Status',
+              'Reminders',
+            ].map(PdfSafeText.sanitize).toList(),
+            data: [
+              for (final p in pending)
+                [
+                  PdfSafeText.sanitize(p.displayName),
+                  PdfSafeText.sanitize(p.email),
+                  PdfSafeText.sanitize(p.program),
+                  PdfSafeText.sanitize(p.batchYear),
+                  PdfSafeText.sanitize(p.assignment.status.name),
+                  '${p.assignment.reminderCount}',
+                ],
+            ],
+            headerStyle: pw.TextStyle(
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellAlignment: pw.Alignment.centerLeft,
+            cellPadding: const pw.EdgeInsets.symmetric(
+              horizontal: 3,
+              vertical: 3,
+            ),
+          ),
+        ],
+      ),
+    );
+    return doc.save();
+  }
+
+  Future<void> _exportOfficialFillableZip({
+    List<SurveyParticipant>? submitted,
+  }) async {
+    if (!requireWebExport(context)) return;
+    final survey = _survey;
+    if (survey == null || !survey.isChedGtsBuiltin) return;
+    var targets = submitted ?? _submitted;
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No submitted responses to fill')),
+      );
+      return;
+    }
+
+    if (targets.length > ChedGtsPdfExportLimits.maxBatchSize) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Batch limit'),
+          content: Text(
+            '${ChedGtsPdfExportLimits.batchCapMessage(targets.length)}\n\n'
+                'Export the first ${ChedGtsPdfExportLimits.maxBatchSize} now?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true || !mounted) return;
+      targets = targets.take(ChedGtsPdfExportLimits.maxBatchSize).toList();
+    }
+
+    setState(() => _isExportingChed = true);
+    final progress = ValueNotifier<(int, int, String?)>((0, targets.length, null));
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Building official CHED PDFs'),
+          content: ValueListenableBuilder<(int, int, String?)>(
+            valueListenable: progress,
+            builder: (_, value, __) {
+              final (done, total, name) = value;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LinearProgressIndicator(
+                    value: total == 0 ? null : done / total,
+                  ),
+                  const SizedBox(height: 12),
+                  Text('$done / $total'),
+                  if (name != null && name.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final batch = ChedGtsPdfBatchExportService();
+    try {
+      final members = [
+        for (final p in targets)
+          AlumniMember(
+            id: p.assignment.userId,
+            fullName: p.displayName.trim().isEmpty
+                ? 'Alumni'
+                : p.displayName.trim(),
+            course: p.program,
+            studentId: p.studentId ?? '',
+            authUid: p.assignment.userId,
+            isRegisteredUser: true,
+            batchYear: p.batchYear,
+            emailAddress: p.email,
+            registeredEmail: p.email,
+          ),
+      ];
+
+      final result = await batch.buildZip(
+        members: members,
+        surveyId: survey.id,
+        fillGapsFromProfile: true,
+        allowLiveFallback: false,
+        onProgress: (done, total, name) {
+          progress.value = (done, total, name);
+        },
+      );
+
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (!mounted) return;
+
+      final ok = tryDownloadBytesOnWeb(
+        context,
+        bytes: result.zipBytes,
+        fileName: result.zipFileName,
+        mimeType: 'application/zip',
+      );
+      if (!ok) return;
+
+      await batch.logBatchSuccess(
+        result: result,
+        selectedCount: members.length,
+      );
+
+      if (!mounted) return;
+      final skipped = result.failures.length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            skipped == 0
+                ? 'Downloaded ZIP with ${result.successCount} fillable PDF(s)'
+                : 'Downloaded ZIP with ${result.successCount} PDF(s); '
+                    '$skipped skipped/failed',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      await batch.logBatchFailure(error: e, selectedCount: targets.length);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Fillable PDF export failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      progress.dispose();
+      if (mounted) setState(() => _isExportingChed = false);
+    }
   }
 
   void _showReminderHistorySheet() {
@@ -2422,22 +3087,53 @@ class _ExportMenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
       children: [
-        Icon(icon, size: 22),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AdminSurveyTheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: AdminSurveyTheme.primary,
+            ),
+          ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title),
-              if (subtitle != null)
-                Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AdminSurveyTheme.textPrimary,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                      color: AdminSurveyTheme.textMuted,
+                    ),
+                  ),
+                ],
             ],
           ),
         ),
       ],
+      ),
     );
   }
 }

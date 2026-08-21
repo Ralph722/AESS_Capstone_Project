@@ -713,16 +713,10 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final showingDetail = _selectedMember != null;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final pageInsets = AdminDensity.pageInsetsForWidth(screenWidth);
 
-    return ColoredBox(
-      color: AdminDirectoryTheme.background,
-      child: Padding(
-        padding: pageInsets,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
             if (!showingDetail) ...[
               DirectoryPageHeader(
                 onAdd: _openAddAlumniChooser,
@@ -816,8 +810,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
             ],
             Expanded(child: _buildDirectoryBody()),
           ],
-        ),
-      ),
     );
   }
 

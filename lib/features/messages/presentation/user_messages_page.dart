@@ -12,11 +12,11 @@ import 'package:alumni_system/features/messages/widgets/message_bubble.dart';
 import 'package:alumni_system/features/messages/widgets/message_composer.dart';
 import 'package:alumni_system/features/messages/widgets/message_empty_state.dart';
 import 'package:alumni_system/features/messages/widgets/message_reaction_picker.dart';
-import 'package:alumni_system/features/messages/widgets/message_support_header.dart';
 import 'package:alumni_system/features/messages/widgets/message_theme.dart';
 import 'package:alumni_system/features/messages/widgets/message_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
+import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
@@ -680,7 +680,10 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: MessageTheme.pageBg,
-      appBar: const MessageSupportAppBar(),
+      appBar: PortalAppBar(
+        title: MessageTheme.officeDisplayName,
+        automaticallyImplyLeading: Navigator.canPop(context),
+      ),
       body: PortalContentFrame(
         maxWidth: PortalBreakpoints.chatMax,
         child: Column(

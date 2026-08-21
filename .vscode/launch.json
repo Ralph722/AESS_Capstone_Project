@@ -5,12 +5,18 @@
       "name": "alumni_system (Chrome)",
       "request": "launch",
       "type": "dart",
-      "deviceId": "chrome"
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define-from-file=config/dart_defines.json"
+      ]
     },
     {
       "name": "alumni_system",
       "request": "launch",
-      "type": "dart"
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define-from-file=config/dart_defines.json"
+      ]
     }
   ]
 }

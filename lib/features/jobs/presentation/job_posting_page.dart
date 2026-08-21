@@ -26,10 +26,10 @@ class JobPostingScreen extends StatefulWidget {
   final String? initialJobId;
 
   @override
-  State<JobPostingScreen> createState() => _JobPostingScreenState();
+  State<JobPostingScreen> createState() => JobPostingScreenState();
 }
 
-class _JobPostingScreenState extends State<JobPostingScreen> {
+class JobPostingScreenState extends State<JobPostingScreen> {
   final _search = TextEditingController();
   final _jobService = JobService();
   final _favService = FavoriteJobService();
@@ -249,18 +249,39 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
     if (_handledInitialJob) return;
     final targetId = widget.initialJobId?.trim();
     if (targetId == null || targetId.isEmpty) return;
+    _handledInitialJob = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(openJobById(targetId));
+    });
+  }
+
+  /// Opens job details by id (used by Home deep-links and initial route).
+  Future<void> openJobById(String jobId) async {
+    final id = jobId.trim();
+    if (id.isEmpty || !mounted) return;
+
     JobPosting? match;
     for (final j in _jobs) {
-      if (j.id == targetId) {
+      if (j.id == id) {
         match = j;
         break;
       }
     }
-    if (match == null) return;
-    _handledInitialJob = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_openDetails(match!));
-    });
+    match ??= await _jobService.getJobPosting(id);
+    if (!mounted) return;
+    if (match == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Job not found')),
+      );
+      return;
+    }
+
+    final exists = _jobs.any((j) => j.id == match!.id);
+    if (!exists) {
+      setState(() => _jobs = [match!, ..._jobs]);
+    }
+
+    await _openDetails(match);
   }
 
   Future<void> _openDetails(JobPosting job) async {
@@ -390,7 +411,6 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                         child: _AlumniJobCard(
                           job: job,
                           isFavorite: _favoriteIds.contains(job.id),
-                          isInterested: _interestedIds.contains(job.id),
                           savedAt: _favoriteDates[job.id],
                           onOpen: () => _openDetails(job),
                           onFavorite: () => _toggleFavorite(job.id),
@@ -428,131 +448,137 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
   }
 
   Widget _filterBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: JobUiTheme.border.withValues(alpha: 0.9)),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(JobUiTheme.radius2xl),
+          border: Border.all(color: JobUiTheme.border.withValues(alpha: 0.75)),
+          boxShadow: JobUiTheme.cardShadow,
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _search,
-            onChanged: (_) => setState(() => _page = 0),
-            style: PortalTheme.body,
-            decoration: InputDecoration(
-              hintText: 'Search title, company, or location…',
-              hintStyle: PortalTheme.bodySecondary,
-              prefixIcon: const Icon(
-                Icons.search_rounded,
-                size: 20,
-                color: JobUiTheme.textSecondary,
-              ),
-              suffixIcon: _search.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: () {
-                        _search.clear();
-                        setState(() => _page = 0);
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: JobUiTheme.surfaceMuted,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: JobUiTheme.navy,
-                  width: 1.2,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _search,
+              onChanged: (_) => setState(() => _page = 0),
+              style: PortalTheme.body,
+              decoration: InputDecoration(
+                hintText: 'Search title, company, or location…',
+                hintStyle: PortalTheme.bodySecondary,
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  size: 20,
+                  color: JobUiTheme.textSecondary,
+                ),
+                suffixIcon: _search.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _search.clear();
+                          setState(() => _page = 0);
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: JobUiTheme.surfaceMuted,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
+                  borderSide: const BorderSide(
+                    color: JobUiTheme.navy,
+                    width: 1.2,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              children: [
-                _JobFilterChip(
-                  label: 'Recommended',
-                  icon: Icons.auto_awesome_rounded,
-                  selected: _showRecommendedOnly,
-                  onTap: () => setState(() {
-                    _showRecommendedOnly = !_showRecommendedOnly;
-                    _showSavedOnly = false;
-                    _page = 0;
-                  }),
-                ),
-                const SizedBox(width: 8),
-                _dropdownChip(
-                  value: _category,
-                  items: [
-                    ('all', 'Category'),
-                    ...JobCategoryConstants.all.map((c) => (c, c)),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 40,
+              width: double.infinity,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.hardEdge,
+                child: Row(
+                  children: [
+                    _JobFilterChip(
+                      label: 'Recommended',
+                      icon: Icons.auto_awesome_rounded,
+                      selected: _showRecommendedOnly,
+                      onTap: () => setState(() {
+                        _showRecommendedOnly = !_showRecommendedOnly;
+                        _showSavedOnly = false;
+                        _page = 0;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _dropdownChip(
+                      value: _category,
+                      items: [
+                        ('all', 'Category'),
+                        ...JobCategoryConstants.all.map((c) => (c, c)),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _category = v;
+                        _page = 0;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _dropdownChip(
+                      value: _type,
+                      items: [
+                        ('all', 'Type'),
+                        ...JobCategoryConstants.jobTypes.map((c) => (c, c)),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _type = v;
+                        _page = 0;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _JobFilterChip(
+                      label: 'Remote',
+                      icon: Icons.home_work_outlined,
+                      selected: _remoteOnly == true,
+                      onTap: () => setState(() {
+                        _remoteOnly = _remoteOnly == true ? null : true;
+                        _page = 0;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _dropdownChip(
+                      value: _sort,
+                      items: const [
+                        ('newest', 'Newest'),
+                        ('oldest', 'Oldest'),
+                        ('deadline', 'Deadline'),
+                        ('salary_high', 'Salary ↓'),
+                        ('salary_low', 'Salary ↑'),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _sort = v;
+                        _page = 0;
+                      }),
+                    ),
                   ],
-                  onChanged: (v) => setState(() {
-                    _category = v;
-                    _page = 0;
-                  }),
                 ),
-                const SizedBox(width: 8),
-                _dropdownChip(
-                  value: _type,
-                  items: [
-                    ('all', 'Type'),
-                    ...JobCategoryConstants.jobTypes.map((c) => (c, c)),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _type = v;
-                    _page = 0;
-                  }),
-                ),
-                const SizedBox(width: 8),
-                _JobFilterChip(
-                  label: 'Remote',
-                  icon: Icons.home_work_outlined,
-                  selected: _remoteOnly == true,
-                  onTap: () => setState(() {
-                    _remoteOnly = _remoteOnly == true ? null : true;
-                    _page = 0;
-                  }),
-                ),
-                const SizedBox(width: 8),
-                _dropdownChip(
-                  value: _sort,
-                  items: const [
-                    ('newest', 'Newest'),
-                    ('oldest', 'Oldest'),
-                    ('deadline', 'Deadline'),
-                    ('salary_high', 'Salary ↓'),
-                    ('salary_low', 'Salary ↑'),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _sort = v;
-                    _page = 0;
-                  }),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -583,10 +609,12 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
             ),
           )
           .toList(),
-      child: _JobFilterChip(
-        label: label,
-        icon: Icons.expand_more_rounded,
-        selected: isActive,
+      child: UnconstrainedBox(
+        child: _JobFilterChip(
+          label: label,
+          icon: Icons.expand_more_rounded,
+          selected: isActive,
+        ),
       ),
     );
   }
@@ -694,10 +722,12 @@ class _JobFilterChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: selected ? JobUiTheme.navy : Colors.white,
-        borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
+        color: selected ? JobUiTheme.navy : JobUiTheme.surfaceMuted,
+        borderRadius: BorderRadius.circular(JobUiTheme.radiusLg),
         border: Border.all(
-          color: selected ? JobUiTheme.navy : JobUiTheme.border,
+          color: selected
+              ? JobUiTheme.navy
+              : JobUiTheme.border.withValues(alpha: 0.9),
           width: 1,
         ),
       ),
@@ -728,7 +758,7 @@ class _JobFilterChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
+        borderRadius: BorderRadius.circular(JobUiTheme.radiusLg),
         child: child,
       ),
     );
@@ -794,7 +824,6 @@ class _AlumniJobCard extends StatelessWidget {
   const _AlumniJobCard({
     required this.job,
     required this.isFavorite,
-    required this.isInterested,
     required this.onOpen,
     required this.onFavorite,
     this.savedAt,
@@ -802,13 +831,12 @@ class _AlumniJobCard extends StatelessWidget {
 
   final JobPosting job;
   final bool isFavorite;
-  final bool isInterested;
   final VoidCallback onOpen;
   final VoidCallback onFavorite;
   final DateTime? savedAt;
 
-  static const Color _salaryGreen = Color(0xFF16A34A);
-  static const Color _levelOrange = Color(0xFFE67E22);
+  static const Color _salaryGreen = PortalTheme.success;
+  static const Color _levelOrange = PortalTheme.warning;
 
   @override
   Widget build(BuildContext context) {
@@ -869,32 +897,23 @@ class _AlumniJobCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isInterested) ...[
-                    const JobInterestedPill(),
-                    const SizedBox(width: 2),
-                  ],
-                  IconButton(
-                    tooltip: isFavorite ? 'Remove saved' : 'Save job',
-                    onPressed: onFavorite,
-                    visualDensity: VisualDensity.compact,
-                    constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
-                    ),
-                    icon: Icon(
-                      isFavorite
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_border_rounded,
-                      color: isFavorite
-                          ? JobUiTheme.gold
-                          : JobUiTheme.textMuted,
-                      size: 24,
-                    ),
-                  ),
-                ],
+              IconButton(
+                tooltip: isFavorite ? 'Remove saved' : 'Save job',
+                onPressed: onFavorite,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                icon: Icon(
+                  isFavorite
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  color: isFavorite
+                      ? JobUiTheme.gold
+                      : JobUiTheme.textMuted,
+                  size: 24,
+                ),
               ),
             ],
           ),
@@ -959,7 +978,7 @@ class _AlumniJobCard extends StatelessWidget {
                     style: PortalTheme.caption.copyWith(
                       color: deadlineHint == 'Application closed'
                           ? JobUiTheme.danger
-                          : const Color(0xFFC2410C),
+                          : PortalTheme.warning,
                       fontWeight: FontWeight.w800,
                       fontSize: 11,
                     ),
@@ -1036,7 +1055,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
 
     return Material(
       color: Colors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(JobUiTheme.radius2xl),
+      ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
@@ -1048,15 +1069,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                 Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF1A1851),
-                        Color(0xFF2A2770),
-                        Color(0xFF1E3A6E),
-                      ],
-                    ),
+                    gradient: PortalTheme.heroGradient,
                   ),
                   child: Column(
                     children: [
@@ -1078,7 +1091,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                               padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(
+                                  JobUiTheme.radiusLg,
+                                ),
                               ),
                               child: JobCompanyLogo(
                                 job: job,
@@ -1179,12 +1194,14 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                           decoration: BoxDecoration(
                             color: deadlineHint == 'Application closed'
                                 ? JobUiTheme.danger.withValues(alpha: 0.08)
-                                : const Color(0xFFFFF7ED),
-                            borderRadius: BorderRadius.circular(12),
+                                : PortalTheme.warning.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(
+                              JobUiTheme.radiusXl,
+                            ),
                             border: Border.all(
                               color: deadlineHint == 'Application closed'
                                   ? JobUiTheme.danger.withValues(alpha: 0.25)
-                                  : const Color(0xFFFFD0A8),
+                                  : PortalTheme.warning.withValues(alpha: 0.35),
                             ),
                           ),
                           child: Row(
@@ -1196,7 +1213,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                 size: 18,
                                 color: deadlineHint == 'Application closed'
                                     ? JobUiTheme.danger
-                                    : const Color(0xFFC2410C),
+                                    : PortalTheme.warning,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -1208,7 +1225,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                     fontWeight: FontWeight.w800,
                                     color: deadlineHint == 'Application closed'
                                         ? JobUiTheme.danger
-                                        : const Color(0xFFC2410C),
+                                        : PortalTheme.warning,
                                   ),
                                 ),
                               ),
@@ -1334,10 +1351,13 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: JobUiTheme.surfaceMuted.withValues(alpha: 0.7),
+                          color: JobUiTheme.card,
                           borderRadius:
-                              BorderRadius.circular(JobUiTheme.radiusLg),
-                          border: Border.all(color: JobUiTheme.border),
+                              BorderRadius.circular(JobUiTheme.radius2xl),
+                          border: Border.all(
+                            color: JobUiTheme.border.withValues(alpha: 0.75),
+                          ),
+                          boxShadow: JobUiTheme.cardShadow,
                         ),
                         child: job.contactEmail.isEmpty
                             ? Text(
@@ -1380,19 +1400,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                             size: 16,
                                           ),
                                           label: const Text('Copy Email'),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: JobUiTheme.navy,
-                                            side: const BorderSide(
-                                              color: JobUiTheme.border,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 12,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                          ),
+                                          style: PortalTheme.secondaryButton(),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -1408,17 +1416,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                             size: 16,
                                           ),
                                           label: const Text('Send Email'),
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: JobUiTheme.navy,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 12,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                          ),
+                                          style: PortalTheme.primaryButton(),
                                         ),
                                       ),
                                     ],
@@ -1462,10 +1460,10 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                   color: _favorite
                       ? JobUiTheme.navy.withValues(alpha: 0.1)
                       : JobUiTheme.surfaceMuted,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
                   child: InkWell(
                     onTap: _onFavorite,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
                     child: SizedBox(
                       width: 48,
                       height: 48,
@@ -1493,19 +1491,19 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                     label: Text(
                       _interested ? 'Interested' : 'Express Interest',
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: JobUiTheme.navy,
-                      backgroundColor: _interested
-                          ? JobUiTheme.navy.withValues(alpha: 0.08)
-                          : Colors.white,
-                      side: BorderSide(
-                        color: _interested
-                            ? JobUiTheme.navy.withValues(alpha: 0.45)
-                            : JobUiTheme.border,
-                        width: _interested ? 1.4 : 1,
+                    style: PortalTheme.secondaryButton().copyWith(
+                      backgroundColor: WidgetStatePropertyAll(
+                        _interested
+                            ? JobUiTheme.navy.withValues(alpha: 0.08)
+                            : Colors.white,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                      side: WidgetStatePropertyAll(
+                        BorderSide(
+                          color: _interested
+                              ? JobUiTheme.navy.withValues(alpha: 0.45)
+                              : JobUiTheme.border,
+                          width: _interested ? 1.4 : 1,
+                        ),
                       ),
                     ),
                   ),
@@ -1514,14 +1512,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                   height: 48,
                   child: FilledButton(
                     onPressed: _applyNow,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: JobUiTheme.navy,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                    style: PortalTheme.primaryButton(),
                     child: const Text(
                       'Apply Now',
                       style: TextStyle(

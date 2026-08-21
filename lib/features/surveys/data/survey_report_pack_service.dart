@@ -5,6 +5,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -420,7 +421,7 @@ class SurveyReportPackService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Text(
-              pack.title,
+              PdfSafeText.sanitize(pack.title),
               style: pw.TextStyle(
                 fontSize: 18,
                 fontWeight: pw.FontWeight.bold,
@@ -428,7 +429,7 @@ class SurveyReportPackService {
               ),
             ),
             pw.Text(
-              '${pack.subtitle} · $date',
+              PdfSafeText.sanitize('${pack.subtitle} - $date'),
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
             ),
             pw.SizedBox(height: 8),
@@ -448,7 +449,10 @@ class SurveyReportPackService {
           ...pack.executiveBullets.map(
             (b) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 3),
-              child: pw.Bullet(text: b, style: const pw.TextStyle(fontSize: 10)),
+              child: pw.Bullet(
+                text: PdfSafeText.sanitize(b),
+                style: const pw.TextStyle(fontSize: 10),
+              ),
             ),
           ),
           pw.SizedBox(height: 12),
@@ -478,7 +482,7 @@ class SurveyReportPackService {
           _pdfH2('3. Participation Summary'),
           if (pack.participationNote != null)
             pw.Text(
-              pack.participationNote!,
+              PdfSafeText.sanitize(pack.participationNote!),
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
             ),
           pw.SizedBox(height: 6),
@@ -618,7 +622,10 @@ class SurveyReportPackService {
           ...pack.insights.map(
             (i) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 3),
-              child: pw.Bullet(text: i, style: const pw.TextStyle(fontSize: 10)),
+              child: pw.Bullet(
+                text: PdfSafeText.sanitize(i),
+                style: const pw.TextStyle(fontSize: 10),
+              ),
             ),
           ),
           pw.SizedBox(height: 12),
@@ -626,7 +633,10 @@ class SurveyReportPackService {
           ...pack.recommendations.map(
             (i) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 3),
-              child: pw.Bullet(text: i, style: const pw.TextStyle(fontSize: 10)),
+              child: pw.Bullet(
+                text: PdfSafeText.sanitize(i),
+                style: const pw.TextStyle(fontSize: 10),
+              ),
             ),
           ),
         ],
@@ -653,11 +663,11 @@ class SurveyReportPackService {
     required List<List<String>> rows,
   }) {
     if (rows.isEmpty) {
-      return pw.Text('—', style: const pw.TextStyle(fontSize: 10));
+      return pw.Text('-', style: const pw.TextStyle(fontSize: 10));
     }
     return pw.TableHelper.fromTextArray(
-      headers: headers,
-      data: rows,
+      headers: PdfSafeText.sanitizeRow(headers),
+      data: PdfSafeText.sanitizeRows(rows),
       headerStyle: pw.TextStyle(
         fontWeight: pw.FontWeight.bold,
         color: PdfColors.white,

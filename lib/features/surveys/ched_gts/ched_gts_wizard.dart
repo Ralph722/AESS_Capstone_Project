@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
-import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
@@ -326,10 +325,7 @@ class _WizardActions extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: saving ? null : onBack,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: OnboardingTheme.navy,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
+                  style: PortalTheme.secondaryButton(),
                   child: const Text('Back'),
                 ),
               ),
@@ -346,10 +342,7 @@ class _WizardActions extends StatelessWidget {
                           onNext();
                         }
                       },
-                style: FilledButton.styleFrom(
-                  backgroundColor: OnboardingTheme.navy,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
+                style: PortalTheme.primaryButton(),
                 child: saving
                     ? const SizedBox(
                         width: 20,
@@ -367,6 +360,7 @@ class _WizardActions extends StatelessWidget {
         const SizedBox(height: 10),
         TextButton(
           onPressed: saving ? null : () => onSaveDraft(),
+          style: PortalTheme.ghostButton(),
           child: const Text('Save draft & continue later'),
         ),
       ],
@@ -392,22 +386,22 @@ class _ReviewStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(PortalTheme.space3),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: OnboardingTheme.border),
+            color: PortalTheme.card,
+            borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+            border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+            boxShadow: PortalTheme.softShadow,
           ),
           child: Text(
             missing.isEmpty
                 ? 'All required items look complete. You can still jump back to edit a section, then submit.'
                 : 'Some required items are still missing (${missing.length}). Jump to a section below to finish them.',
-            style: TextStyle(
-              fontSize: 13,
+            style: PortalTheme.body.copyWith(
               height: 1.4,
               color: missing.isEmpty
-                  ? const Color(0xFF047857)
-                  : const Color(0xFFB45309),
+                  ? PortalTheme.success
+                  : PortalTheme.warning,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -452,24 +446,26 @@ class _SectionReviewCard extends StatelessWidget {
         : section.name.toUpperCase();
 
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
       child: InkWell(
         onTap: onEdit,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(PortalTheme.space3),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: OnboardingTheme.border),
+            color: PortalTheme.card,
+            borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+            border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+            boxShadow: PortalTheme.softShadow,
           ),
           child: Row(
             children: [
               Icon(
                 missing.isEmpty ? Icons.check_circle : Icons.edit_note,
                 color: missing.isEmpty
-                    ? const Color(0xFF047857)
-                    : OnboardingTheme.navy,
+                    ? PortalTheme.success
+                    : PortalTheme.navy,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -478,27 +474,21 @@ class _SectionReviewCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: OnboardingTheme.navy,
-                      ),
+                      style: PortalTheme.cardTitle.copyWith(fontSize: 13),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       missing.isEmpty
                           ? '${items.length} visible items · ready'
                           : '${missing.length} required item(s) still needed',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
-                      ),
+                      style: PortalTheme.meta,
                     ),
                   ],
                 ),
               ),
               TextButton(
                 onPressed: onEdit,
+                style: PortalTheme.ghostButton(dense: true),
                 child: const Text('Edit'),
               ),
             ],

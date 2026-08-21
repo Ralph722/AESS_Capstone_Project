@@ -135,10 +135,12 @@ class _FeedbackCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: PortalTheme.space2),
       child: Material(
         color: PortalTheme.card,
-        elevation: 0,
+        elevation: 1,
+        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-          side: const BorderSide(color: PortalTheme.border),
+          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+          side: BorderSide(color: PortalTheme.border.withValues(alpha: 0.75)),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(

@@ -58,6 +58,22 @@ class EventService {
       ..sort((a, b) => a.date.compareTo(b.date));
   }
 
+  Future<AlumniEvent?> getEventById(String eventId) async {
+    final id = eventId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final row = await _supabase
+          .from('events')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+      if (row == null) return null;
+      return AlumniEvent.fromSupabaseRow(row);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<AlumniEvent>> getAllEvents() async {
     final events = await _fetchAllFromSupabase();
     events.sort((a, b) => a.date.compareTo(b.date));

@@ -416,11 +416,13 @@ class SurveyInlinePanelHeader extends StatelessWidget {
     required this.title,
     required this.onClose,
     this.subtitle = 'Back to surveys',
+    this.backTooltip,
     this.actions = const [],
   });
 
   final String title;
   final String subtitle;
+  final String? backTooltip;
   final VoidCallback onClose;
   final List<Widget> actions;
 
@@ -437,7 +439,7 @@ class SurveyInlinePanelHeader extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back, size: 20),
-              tooltip: 'Back to surveys',
+              tooltip: backTooltip ?? subtitle,
               onPressed: onClose,
               style: IconButton.styleFrom(
                 foregroundColor: AdminSurveyTheme.textSecondary,
@@ -497,11 +499,12 @@ class SurveyResponsesWorkspaceHeader extends StatelessWidget {
   final bool overflowEnabled;
   final bool overflowBusy;
 
-  /// Best-effort published timestamp without schema changes.
-  /// Draft → null; otherwise schedule [Survey.openAt] or [Survey.updatedAt].
+  /// Best-effort published timestamp without a dedicated column.
+  /// Prefers sticky [Survey.publishedAt], then schedule [Survey.openAt].
+  /// Never uses [Survey.updatedAt] — that moves on edits and other writes.
   static DateTime? publishedAtOf(Survey? survey) {
     if (survey == null || survey.status == SurveyStatus.draft) return null;
-    return survey.openAt ?? survey.updatedAt;
+    return survey.publishedAt ?? survey.openAt;
   }
 
   @override

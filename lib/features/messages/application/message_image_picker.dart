@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:alumni_system/features/messages/data/message_image_pipeline.dart';
-import 'package:alumni_system/features/messages/widgets/message_theme.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 
 /// Result of picking a chat attachment.
 class PickedMessageImage {
@@ -37,34 +37,25 @@ class MessageImagePicker {
       } else {
         source = await showModalBottomSheet<ImageSource>(
           context: context,
-          builder: (ctx) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.photo_library,
-                    color: MessageTheme.navy,
-                  ),
-                  title: const Text('Choose from Gallery'),
-                  onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+          builder: (ctx) => PortalOptionsSheet(
+            title: 'Add a photo',
+            children: [
+              PortalSheetOption(
+                label: 'Choose from gallery',
+                icon: Icons.photo_library_outlined,
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+              if (!kIsWeb)
+                PortalSheetOption(
+                  label: 'Take a photo',
+                  icon: Icons.photo_camera_outlined,
+                  onTap: () => Navigator.pop(ctx, ImageSource.camera),
                 ),
-                if (!kIsWeb)
-                  ListTile(
-                    leading: const Icon(
-                      Icons.camera_alt,
-                      color: MessageTheme.navy,
-                    ),
-                    title: const Text('Take a Photo'),
-                    onTap: () => Navigator.pop(ctx, ImageSource.camera),
-                  ),
-                ListTile(
-                  leading: const Icon(Icons.cancel, color: Colors.grey),
-                  title: const Text('Cancel'),
-                  onTap: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
+              PortalSheetOption(
+                label: 'Cancel',
+                onTap: () => Navigator.pop(ctx),
+              ),
+            ],
           ),
         );
       }

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
+import 'package:alumni_system/shared/widgets/aess_logo.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/auth/presentation/login_page.dart';
 import 'package:alumni_system/features/admin/dashboard/presentation/admin_dashboard_page.dart';
@@ -96,10 +98,7 @@ class _AuthGateState extends State<AuthGate> {
     try {
       // Re-validate roster / profile the same way login does.
       await _authService
-          .ensureAccountAuthorized(
-            userId: user.id,
-            email: user.email ?? '',
-          )
+          .ensureAccountAuthorized(userId: user.id, email: user.email ?? '')
           .timeout(_resolveTimeout);
       if (!mounted || _resolveToken != token) return;
 
@@ -177,11 +176,7 @@ class _AuthGateState extends State<AuthGate> {
 }
 
 class _AuthSplash extends StatelessWidget {
-  const _AuthSplash({
-    this.message,
-    this.onRetry,
-    this.onSignInInstead,
-  });
+  const _AuthSplash({this.message, this.onRetry, this.onSignInInstead});
 
   final String? message;
   final VoidCallback? onRetry;
@@ -191,7 +186,7 @@ class _AuthSplash extends StatelessWidget {
   Widget build(BuildContext context) {
     final retry = onRetry != null;
     return Scaffold(
-      backgroundColor: const Color(0xFF090A4F),
+      backgroundColor: Colors.white,
       body: Semantics(
         label: retry
             ? 'Session restore failed. ${message ?? ''}'
@@ -203,29 +198,32 @@ class _AuthSplash extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const ExcludeSemantics(child: AessLogo(height: 72)),
+                const SizedBox(height: 36),
                 if (!retry)
                   const ExcludeSemantics(
                     child: SizedBox(
-                      width: 36,
-                      height: 36,
+                      width: 28,
+                      height: 28,
                       child: CircularProgressIndicator(
                         strokeWidth: 3,
-                        color: Colors.white,
+                        color: PortalTheme.navy,
+                        backgroundColor: Color(0x1F1A1851),
                       ),
                     ),
                   )
                 else
-                  Icon(
+                  const Icon(
                     Icons.wifi_off_rounded,
-                    size: 40,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    size: 36,
+                    color: PortalTheme.textSecondary,
                   ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Text(
                   message ?? 'Loading…',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
+                  style: const TextStyle(
+                    color: PortalTheme.textSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     height: 1.4,
@@ -236,8 +234,8 @@ class _AuthSplash extends StatelessWidget {
                   FilledButton(
                     onPressed: onRetry,
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF090A4F),
+                      backgroundColor: PortalTheme.navy,
+                      foregroundColor: Colors.white,
                       minimumSize: const Size(160, 44),
                     ),
                     child: const Text('Try again'),
@@ -247,7 +245,7 @@ class _AuthSplash extends StatelessWidget {
                     TextButton(
                       onPressed: onSignInInstead,
                       style: TextButton.styleFrom(
-                        foregroundColor: Colors.white70,
+                        foregroundColor: PortalTheme.navy,
                         minimumSize: const Size(160, 44),
                       ),
                       child: const Text('Sign in instead'),

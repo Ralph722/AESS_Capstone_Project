@@ -9,6 +9,7 @@ import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_template_model.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_preview_sheet.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/survey_question_editor.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
@@ -50,6 +51,8 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
   bool _isLoading = false;
   DateTime? _openAt;
   DateTime? _closeAt;
+  bool _autoAssignNewAlumni = true;
+  bool _aiHelpEnabled = true;
 
   String? _expandedQuestionId;
   final Set<String> _savingQuestionIds = {};
@@ -130,10 +133,13 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
         survey.targetPrograms,
       );
       _targetBatches = List.from(survey.targetBatchYears);
-      _batchController.text =
-          AudienceTargeting.formatBatchYearsForDisplay(_targetBatches);
+      _batchController.text = AudienceTargeting.formatBatchYearsForDisplay(
+        _targetBatches,
+      );
       _openAt = survey.openAt;
       _closeAt = survey.closeAt;
+      _autoAssignNewAlumni = survey.autoAssignNewAlumni;
+      _aiHelpEnabled = survey.aiHelpEnabled;
     }
     setState(() {
       _survey = survey;
@@ -213,14 +219,19 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
     await _pruneVisibilityRulesForDeletedQuestion(q.id);
   }
 
-  Future<void> _pruneVisibilityRulesForDeletedQuestion(String questionId) async {
+  Future<void> _pruneVisibilityRulesForDeletedQuestion(
+    String questionId,
+  ) async {
     final survey = _survey;
     if (survey == null || survey.isChedGtsBuiltin) return;
-    final rules = Map<String, SurveyVisibilityRule>.from(survey.visibilityRules);
+    final rules = Map<String, SurveyVisibilityRule>.from(
+      survey.visibilityRules,
+    );
     final before = rules.length;
     rules.remove(questionId);
     rules.removeWhere((_, rule) => rule.sourceQuestionId == questionId);
-    if (rules.length == before && !survey.visibilityRules.containsKey(questionId)) {
+    if (rules.length == before &&
+        !survey.visibilityRules.containsKey(questionId)) {
       return;
     }
     final updated = survey.copyWith(visibilityRules: rules);
@@ -231,7 +242,9 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
   void _setVisibilityRule(String questionId, SurveyVisibilityRule? rule) {
     final survey = _survey;
     if (survey == null || survey.isChedGtsBuiltin) return;
-    final rules = Map<String, SurveyVisibilityRule>.from(survey.visibilityRules);
+    final rules = Map<String, SurveyVisibilityRule>.from(
+      survey.visibilityRules,
+    );
     if (rule == null) {
       rules.remove(questionId);
     } else {
@@ -294,7 +307,8 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
       title:
           'CHED preset: ${meta?.title ?? _survey!.templateId} '
           '(v${_survey!.templateVersion ?? "?"})',
-      body: meta?.disclaimer ??
+      body:
+          meta?.disclaimer ??
           'Review question wording with your registrar before publishing.',
     );
   }
@@ -342,9 +356,7 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
   Future<void> _saveMetadata() async {
     if (_survey == null) return;
     if (!_syncBatchFromField()) return;
-    if (_openAt != null &&
-        _closeAt != null &&
-        !_closeAt!.isAfter(_openAt!)) {
+    if (_openAt != null && _closeAt != null && !_closeAt!.isAfter(_openAt!)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -365,64 +377,40 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
         closeAt: _closeAt,
         clearOpenAt: _openAt == null,
         clearCloseAt: _closeAt == null,
+        autoAssignNewAlumni: _autoAssignNewAlumni,
+        aiHelpEnabled: _aiHelpEnabled,
       ),
     );
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Survey details saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Survey details saved')));
     }
     await _load(preserveExpanded: true);
   }
 
   Future<void> _pickOpenAt() async {
     final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _openAt ?? now,
+    final picked = await DirectoryDateTimePickers.pickDateTime(
+      context,
+      initial: _openAt ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 10),
     );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_openAt ?? now),
-    );
-    if (time == null || !mounted) return;
-    setState(() {
-      _openAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
+    if (picked == null || !mounted) return;
+    setState(() => _openAt = picked);
   }
 
   Future<void> _pickCloseAt() async {
     final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _closeAt ?? _openAt ?? now,
+    final picked = await DirectoryDateTimePickers.pickDateTime(
+      context,
+      initial: _closeAt ?? _openAt ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 10),
     );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_closeAt ?? now),
-    );
-    if (time == null || !mounted) return;
-    setState(() {
-      _closeAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
+    if (picked == null || !mounted) return;
+    setState(() => _closeAt = picked);
   }
 
   Future<void> _addQuestionInline() async {
@@ -645,8 +633,8 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
         targetPrograms: _targetPrograms,
         targetBatchYears: _targetBatches,
       );
-      final hasFilters = _targetPrograms.isNotEmpty ||
-          _batchController.text.trim().isNotEmpty;
+      final hasFilters =
+          _targetPrograms.isNotEmpty || _batchController.text.trim().isNotEmpty;
       if (hasFilters && audienceCount == 0) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -670,10 +658,10 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
           content: Text(
             notify
                 ? 'About $audienceCount alumni match the current audience'
-                    '${hasFilters ? '' : ' (all alumni)'}. '
-                    'They will be assigned${notify ? ' and notified' : ''}.'
+                      '${hasFilters ? '' : ' (all alumni)'}. '
+                      'They will be assigned${notify ? ' and notified' : ''}.'
                 : 'Refresh assignments for about $audienceCount matching alumni. '
-                    'Existing submissions are kept.',
+                      'Existing submissions are kept.',
           ),
           actions: [
             TextButton(
@@ -706,17 +694,12 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
       }
 
       await _saveMetadata();
-      final count = await _surveyService.publishSurvey(
-        widget.surveyId,
-        notify: notify,
-      );
+      final count = await _surveyService.publishSurvey(widget.surveyId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            notify
-                ? 'Published to $count alumni'
-                : 'Assigned to $count alumni',
+            notify ? 'Published to $count alumni' : 'Assigned to $count alumni',
           ),
           backgroundColor: Colors.green,
         ),
@@ -769,10 +752,7 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
 
     return SurveyStickyActionBar(
       constrainWidth: constrainWidth ?? !_embedded,
-      children: [
-        saveButton,
-        if (primary != null) primary,
-      ],
+      children: [saveButton, if (primary != null) primary],
     );
   }
 
@@ -816,7 +796,8 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
       },
       itemBuilder: (context, index) {
         final q = _questions[index];
-        final showSection = q.section != null &&
+        final showSection =
+            q.section != null &&
             q.section!.isNotEmpty &&
             (index == 0 || _questions[index - 1].section != q.section);
 
@@ -841,30 +822,31 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
               question: q,
               index: index,
               expanded: _expandedQuestionId == q.id,
-              isSaving: _savingQuestionIds.contains(q.id) ||
+              isSaving:
+                  _savingQuestionIds.contains(q.id) ||
                   (_savingVisibility &&
                       _survey?.visibilityRules.containsKey(q.id) == true),
               canMoveUp: index > 0,
               canMoveDown: index < _questions.length - 1,
               onToggleExpand: () {
                 setState(() {
-                  _expandedQuestionId =
-                      _expandedQuestionId == q.id ? null : q.id;
+                  _expandedQuestionId = _expandedQuestionId == q.id
+                      ? null
+                      : q.id;
                 });
               },
               onChanged: _updateQuestionLocal,
               onDuplicate: () => _duplicateQuestion(q),
               onDuplicateSection:
                   (q.section != null && q.section!.trim().isNotEmpty)
-                      ? () => _duplicateSection(q)
-                      : null,
+                  ? () => _duplicateSection(q)
+                  : null,
               onDelete: () => _confirmDeleteQuestion(q),
               onMoveUp: () => _moveQuestion(index, index - 1),
               onMoveDown: () => _moveQuestion(index, index + 1),
               allQuestions: _questions,
               visibilityRule: _survey?.visibilityRules[q.id],
-              onVisibilityRuleChanged: (rule) =>
-                  _setVisibilityRule(q.id, rule),
+              onVisibilityRuleChanged: (rule) => _setVisibilityRule(q.id, rule),
               dragHandle: ReorderableDragStartListener(
                 index: index,
                 child: const Padding(
@@ -1008,7 +990,8 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
   }
 
   Widget _buildPreviewPane() {
-    final survey = _previewSurvey ??
+    final survey =
+        _previewSurvey ??
         _survey?.copyWith(
           title: _titleController.text.trim(),
           description: _descController.text.trim(),
@@ -1072,9 +1055,7 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
               TextField(
                 controller: _titleController,
                 onChanged: (_) => setState(() {}),
-                decoration: AdminSurveyTheme.fieldDecoration(
-                  label: 'Title',
-                ),
+                decoration: AdminSurveyTheme.fieldDecoration(label: 'Title'),
               ),
               const SizedBox(height: AdminSurveyTheme.space2),
               TextField(
@@ -1095,64 +1076,54 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
               'Alumni cannot submit outside this window.',
           child: Column(
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Opens at'),
-                subtitle: Text(
-                  _openAt == null
-                      ? 'Immediately when published'
-                      : DateFormat.yMMMd().add_jm().format(_openAt!),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_openAt != null)
-                      IconButton(
-                        tooltip: 'Clear',
-                        onPressed: () => setState(() => _openAt = null),
-                        icon: const Icon(Icons.clear),
-                      ),
-                    IconButton(
-                      tooltip: 'Pick date',
-                      onPressed: _pickOpenAt,
-                      icon: const Icon(Icons.event_outlined),
-                    ),
-                  ],
-                ),
+              DirectoryDateFilterChip(
+                label: 'Opens at',
+                expand: true,
+                width: null,
+                displayText: _openAt == null
+                    ? 'Immediately when published'
+                    : DateFormat.yMMMd().add_jm().format(_openAt!),
+                active: _openAt != null,
+                onTap: _pickOpenAt,
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Closes at'),
-                subtitle: Text(
-                  _closeAt == null
-                      ? 'No automatic close'
-                      : DateFormat.yMMMd().add_jm().format(_closeAt!),
+              if (_openAt != null) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => setState(() => _openAt = null),
+                    child: const Text('Clear open time'),
+                  ),
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_closeAt != null)
-                      IconButton(
-                        tooltip: 'Clear',
-                        onPressed: () => setState(() => _closeAt = null),
-                        icon: const Icon(Icons.clear),
-                      ),
-                    IconButton(
-                      tooltip: 'Pick date',
-                      onPressed: _pickCloseAt,
-                      icon: const Icon(Icons.event_outlined),
-                    ),
-                  ],
-                ),
+              ],
+              const SizedBox(height: 10),
+              DirectoryDateFilterChip(
+                label: 'Closes at',
+                expand: true,
+                width: null,
+                displayText: _closeAt == null
+                    ? 'No automatic close'
+                    : DateFormat.yMMMd().add_jm().format(_closeAt!),
+                active: _closeAt != null,
+                onTap: _pickCloseAt,
               ),
+              if (_closeAt != null) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => setState(() => _closeAt = null),
+                    child: const Text('Clear close time'),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: AdminSurveyTheme.space2),
         SurveySectionCard(
           title: 'Audience',
-          subtitle:
-              'Leave courses and batches empty to include all alumni.',
+          subtitle: 'Leave courses and batches empty to include all alumni.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1201,6 +1172,46 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
                   setState(_syncBatchFromField);
                 },
               ),
+              const SizedBox(height: AdminSurveyTheme.space2),
+              SwitchListTile.adaptive(
+                value: _autoAssignNewAlumni,
+                onChanged: (v) => setState(() => _autoAssignNewAlumni = v),
+                contentPadding: EdgeInsets.zero,
+                activeTrackColor: AdminSurveyTheme.primary,
+                title: const Text(
+                  'Auto-assign new alumni',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Alumni who register or update their program/batch later '
+                  'are assigned automatically while this survey is open.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AdminSurveyTheme.textSecondary,
+                  ),
+                ),
+              ),
+              if (_survey?.isChedGtsBuiltin == true)
+                SwitchListTile.adaptive(
+                  value: _aiHelpEnabled,
+                  onChanged: (v) => setState(() => _aiHelpEnabled = v),
+                  contentPadding: EdgeInsets.zero,
+                  activeTrackColor: AdminSurveyTheme.primary,
+                  title: const Text(
+                    'AI answer helper',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Shows "Help me answer" on question 19. Alumni describe '
+                    'their job and get a suggested occupation and line of '
+                    'business; question 20 then shows the line of business '
+                    'as a recommendation (20 requests per alumnus per day).',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AdminSurveyTheme.textSecondary,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

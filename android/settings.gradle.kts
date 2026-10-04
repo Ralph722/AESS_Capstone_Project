@@ -24,6 +24,3 @@ plugins {
 }
 
 include(":app")
-
-rootProject.projectDir = java.io.File("C:/Users/ACERLA~1/alumni_system/android")
-project(":app").projectDir = java.io.File("C:/Users/ACERLA~1/alumni_system/android/app")

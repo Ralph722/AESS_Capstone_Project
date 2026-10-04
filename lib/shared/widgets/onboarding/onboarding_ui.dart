@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Onboarding visual system — aliases [PortalTheme] brand tokens for consistency.
@@ -681,10 +682,6 @@ Future<String?> showProvincePicker({
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: OnboardingTheme.card,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
     builder: (ctx) {
       return _ProvincePickerSheet(
         provinces: provinces,
@@ -749,27 +746,31 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: OnboardingTheme.border,
-                borderRadius: BorderRadius.circular(2),
+                color: PortalTheme.borderStrong,
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
               child: Row(
                 children: [
                   const Expanded(
                     child: Text(
                       'Select province',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: OnboardingTheme.navy,
-                      ),
+                      style: PortalTheme.pageTitle,
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    color: PortalTheme.textSecondary,
+                    style: IconButton.styleFrom(
+                      backgroundColor: PortalTheme.surfaceMuted,
+                      fixedSize: const Size(36, 36),
+                      minimumSize: const Size(36, 36),
+                      padding: EdgeInsets.zero,
+                    ),
                   ),
                 ],
               ),
@@ -793,29 +794,17 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
                   ? const Center(
                       child: Text(
                         'No provinces found',
-                        style: TextStyle(color: OnboardingTheme.muted),
+                        style: PortalTheme.bodySecondary,
                       ),
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 8),
                       itemCount: _filtered.length,
                       itemBuilder: (context, index) {
                         final province = _filtered[index];
-                        final selected = province == widget.selected;
-                        return ListTile(
-                          title: Text(
-                            province,
-                            style: TextStyle(
-                              fontWeight:
-                                  selected ? FontWeight.w700 : FontWeight.w500,
-                              color: OnboardingTheme.navy,
-                            ),
-                          ),
-                          trailing: selected
-                              ? const Icon(
-                                  Icons.check_circle,
-                                  color: OnboardingTheme.navy,
-                                )
-                              : null,
+                        return PortalSheetOption(
+                          label: province,
+                          selected: province == widget.selected,
                           onTap: () => Navigator.pop(context, province),
                         );
                       },

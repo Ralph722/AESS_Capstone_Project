@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/messages/widgets/message_theme.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Shared reaction picker for alumni + admin message screens.
 Future<void> showMessageReactionPicker({
@@ -16,13 +17,12 @@ Future<void> showMessageReactionPicker({
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Add Reaction',
-                    style: TextStyle(
+                    'Add reaction',
+                    style: PortalTheme.cardTitle.copyWith(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: MessageTheme.navy,
+                      color: PortalTheme.navy,
                     ),
                   ),
                 ),
@@ -52,9 +52,9 @@ Future<void> showMessageReactionPicker({
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: PortalTheme.surfaceMuted,
                           borderRadius: BorderRadius.circular(26),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: PortalTheme.border),
                         ),
                         child: Center(
                           child: Text(
@@ -82,6 +82,23 @@ Future<void> showMessageReactionPicker({
 
   return showModalBottomSheet<void>(
     context: context,
-    builder: (ctx) => SafeArea(child: body(ctx)),
+    builder: (ctx) => SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: PortalTheme.borderStrong,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          body(ctx),
+        ],
+      ),
+    ),
   );
 }

@@ -14,6 +14,7 @@ import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_analyt
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_formal_report_dialog.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_export_dialog.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_pack_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_ched_outcomes_summary_service.dart';
 import 'package:alumni_system/features/admin/ched_gts_pdf_export/ched_gts_pdf_export.dart';
@@ -1221,10 +1222,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     try {
       if (survey.status == SurveyStatus.draft ||
           survey.status == SurveyStatus.closed) {
-        final count = await _surveyService.publishSurvey(
-          survey.id,
-          notify: survey.status == SurveyStatus.draft,
-        );
+        final count = await _surveyService.publishSurvey(survey.id);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2327,17 +2325,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     required bool selected,
     required VoidCallback onTap,
   }) {
-    return FilterChip(
-      label: Text(label),
+    return DirectoryToolbarFilterChip(
+      label: label,
       selected: selected,
       onSelected: (_) => onTap(),
-      selectedColor: AdminSurveyTheme.infoBg,
-      checkmarkColor: AdminSurveyTheme.primary,
-      side: BorderSide(
-        color: selected
-            ? AdminSurveyTheme.primary.withValues(alpha: 0.35)
-            : AdminSurveyTheme.border,
-      ),
     );
   }
 

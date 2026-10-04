@@ -8,6 +8,15 @@ import 'package:alumni_system/features/notifications/models/notification_model.d
 import 'package:alumni_system/features/admin/dashboard/application/admin_dashboard_metrics.dart';
 import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/features/messages/data/message_open_bus.dart';
+import 'package:alumni_system/features/admin/events/presentation/admin_event_comments_dialog.dart';
+import 'package:alumni_system/features/admin/feedback/presentation/admin_feedback_detail_page.dart';
+import 'package:alumni_system/features/events/data/event_comment_service.dart';
+import 'package:alumni_system/features/events/data/event_service.dart';
+import 'package:alumni_system/features/events/models/event_model.dart';
+import 'package:alumni_system/features/notifications/application/notification_router.dart';
+import 'package:alumni_system/features/notifications/push/push_service.dart';
+import 'package:alumni_system/features/notifications/application/notification_target.dart';
+import 'package:alumni_system/features/notifications/presentation/notification_preferences_page.dart';
 
 /// Grouped admin navigation (indices must match dashboard page routing).
 class AdminNavItem {
@@ -131,6 +140,20 @@ const List<AdminNavSection> kAdminNavSections = [
         icon: Icons.bar_chart_outlined,
         label: 'Reports & Analytics',
         keywords: ['reports', 'analytics', 'stats', 'charts', 'insights'],
+      ),
+      AdminNavItem(
+        index: 15,
+        icon: Icons.lightbulb_outline,
+        label: 'Program Insights',
+        keywords: [
+          'dss',
+          'decision support',
+          'recommendations',
+          'flags',
+          'thresholds',
+          'unemployment',
+          'curriculum',
+        ],
       ),
     ],
   ),
@@ -925,9 +948,11 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
   final FocusNode _searchFocusNode = FocusNode();
 
   StreamSubscription<int>? _unreadCountSubscription;
+  StreamSubscription<int>? _badgeCountSubscription;
   StreamSubscription<List<NotificationModel>>? _notificationsSubscription;
 
   int _unreadCount = 0;
+  int _unreadBadgeCount = 0;
   List<NotificationModel> _notifications = [];
   bool _notificationsOpen = false;
   bool _searchOpen = false;
@@ -956,7 +981,8 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
 
   static const _navy = Color(0xFF090A4F);
 
-  int get _totalBadgeCount => widget.metrics.attentionCount + _unreadCount;
+  int get _totalBadgeCount =>
+      widget.metrics.attentionCount + _unreadBadgeCount;
 
   List<_AdminActivityAlert> get _activityAlerts {
     final m = widget.metrics;
@@ -1061,12 +1087,16 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
     _rememberRecentPage(widget.selectedMenuItem);
     _startNotificationListeners();
+    NotificationRouter.registerAdminHandler(_openNotificationTarget);
+    PushService.instance.syncForSignedInUser();
   }
 
   @override
   void dispose() {
+    NotificationRouter.unregisterAdminHandler(_openNotificationTarget);
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _unreadCountSubscription?.cancel();
+    _badgeCountSubscription?.cancel();
     _notificationsSubscription?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchFocusNode.removeListener(_onSearchFocusChanged);
@@ -1141,6 +1171,13 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
         .getUnreadCountStream()
         .listen((count) {
           if (mounted) setState(() => _unreadCount = count);
+        }, onError: (_) {});
+
+    // Unread alumni messages are already part of metrics.attentionCount.
+    _badgeCountSubscription = _notificationService
+        .getUnreadCountStream(excludeType: NotificationType.message)
+        .listen((count) {
+          if (mounted) setState(() => _unreadBadgeCount = count);
         }, onError: (_) {});
 
     _notificationsSubscription = _notificationService
@@ -1871,7 +1908,13 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               onPressed: () async {
                 await _notificationService.markAllAsRead();
                 if (mounted) {
-                  setState(() => _unreadCount = 0);
+                  setState(() {
+                    _unreadCount = 0;
+                    _unreadBadgeCount = 0;
+                    _notifications = [
+                      for (final n in _notifications) n.copyWith(isRead: true),
+                    ];
+                  });
                 }
                 _scheduleOverlayRebuild(_notificationOverlay);
               },
@@ -1892,6 +1935,25 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
             ),
           ],
           IconButton(
+            tooltip: 'Refresh',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.refresh, size: 16, color: Colors.grey.shade600),
+            onPressed: _refreshNotifications,
+          ),
+          IconButton(
+            tooltip: 'Notification settings',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.tune, size: 16, color: Colors.grey.shade600),
+            onPressed: () {
+              _closeNotifications();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const NotificationPreferencesScreen(),
+                ),
+              );
+            },
+          ),
+          IconButton(
             tooltip: 'Close',
             visualDensity: VisualDensity.compact,
             icon: Icon(Icons.close, size: 16, color: Colors.grey.shade500),
@@ -1900,6 +1962,30 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
         ],
       ),
     );
+  }
+
+  Future<void> _refreshNotifications() async {
+    try {
+      final results = await Future.wait([
+        _notificationService.fetchPage(limit: 30),
+        _notificationService.getUnreadCount(),
+        _notificationService.getUnreadCount(
+          excludeType: NotificationType.message,
+        ),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _notifications = results[0] as List<NotificationModel>;
+        _unreadCount = results[1] as int;
+        _unreadBadgeCount = results[2] as int;
+      });
+      _scheduleOverlayRebuild(_notificationOverlay);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not refresh notifications')),
+      );
+    }
   }
 
   Widget _buildNotificationFilterBar() {
@@ -2106,18 +2192,71 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
 
   Future<void> _onNotificationTap(NotificationModel notification) async {
     await _markNotificationReadIfNeeded(notification);
-    _openMessageConversationIfNeeded(notification);
-    _navigateFromNotification(notification.type);
+    await _openNotificationTarget(
+      NotificationTarget.resolve(notification, isAdmin: true),
+    );
   }
 
-  void _openMessageConversationIfNeeded(NotificationModel notification) {
-    if (notification.type != NotificationType.message) return;
-    final openId = (notification.data?['conversationUserId'] ??
-            notification.data?['senderId'])
-        ?.toString();
-    if (openId != null && openId.isNotEmpty) {
-      MessageOpenBus.openConversation(openId);
+  /// Opens the module (and, where possible, the exact item) a notification
+  /// points to. Also used for push / reminder taps via [NotificationRouter].
+  Future<void> _openNotificationTarget(NotificationTarget target) async {
+    if (!mounted) return;
+    _closeNotifications();
+    final id = target.id;
+    switch (target.destination) {
+      case NotificationDestination.adminConversation:
+        if (id != null && id.isNotEmpty) MessageOpenBus.openConversation(id);
+        widget.onMenuSelected(AdminNotificationMenu.messages);
+      case NotificationDestination.adminFeedback:
+        widget.onMenuSelected(AdminNotificationMenu.feedback);
+        if (id == null) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AdminFeedbackDetailScreen(feedbackId: id),
+          ),
+        );
+      case NotificationDestination.adminEvent:
+        widget.onMenuSelected(AdminNotificationMenu.events);
+        if (id == null) return;
+        await _openAdminEventComments(id);
+      case NotificationDestination.none:
+        return;
+      default:
+        widget.onMenuSelected(
+          target.adminMenuIndex ?? AdminNotificationMenu.dashboard,
+        );
     }
+  }
+
+  Future<void> _openAdminEventComments(String eventId) async {
+    AlumniEvent? event;
+    try {
+      event = await EventService().getEventById(eventId);
+    } catch (_) {}
+    if (!mounted) return;
+    if (event == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This event is no longer available.')),
+      );
+      return;
+    }
+    final size = MediaQuery.of(context).size;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(
+          width: size.width.clamp(320.0, 720.0),
+          height: size.height * 0.8,
+          child: AdminEventCommentsDialog(
+            event: event!,
+            commentService: EventCommentService(),
+            onCommentDeleted: () {},
+            asDialog: true,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _markNotificationReadIfNeeded(
@@ -2133,26 +2272,12 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     if (_unreadCount > 0) {
       _unreadCount = (_unreadCount - 1).clamp(0, 9999);
     }
+    if (notification.type != NotificationType.message &&
+        _unreadBadgeCount > 0) {
+      _unreadBadgeCount = (_unreadBadgeCount - 1).clamp(0, 9999);
+    }
     if (mounted) setState(() {});
     _scheduleOverlayRebuild(_notificationOverlay);
-  }
-
-  void _navigateFromNotification(NotificationType type) {
-    _closeNotifications();
-    widget.onMenuSelected(_menuIndexForNotificationType(type));
-  }
-
-  int _menuIndexForNotificationType(NotificationType type) {
-    return switch (type) {
-      NotificationType.event => 1,
-      NotificationType.job => 5,
-      NotificationType.message => 6,
-      NotificationType.announcement => 11,
-      NotificationType.survey => 10,
-      NotificationType.feedback => 14,
-      NotificationType.forum => 12,
-      NotificationType.system => 0,
-    };
   }
 
   /// Primary CTA label for a notification type — navigates to the owning module.

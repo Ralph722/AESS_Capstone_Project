@@ -5,6 +5,7 @@ import 'package:alumni_system/features/admin/reports/data/custom_report_export_s
 import 'package:alumni_system/features/admin/reports/data/custom_report_template_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
@@ -433,8 +434,8 @@ class _CustomReportHubPanelState extends State<CustomReportHubPanel> {
 
   Future<void> _pickDateRange() async {
     final now = DateTime.now();
-    final picked = await showDateRangePicker(
-      context: context,
+    final picked = await DirectoryDateTimePickers.pickDateRange(
+      context,
       firstDate: DateTime(now.year - 25),
       lastDate: DateTime(now.year + 2),
       initialDateRange:
@@ -443,20 +444,8 @@ class _CustomReportHubPanelState extends State<CustomReportHubPanel> {
               start: _draft.filters.dateStart!,
               end: _draft.filters.dateEnd!,
             )
-          : DateTimeRange(
-              start: DateTime(now.year, now.month - 3, now.day),
-              end: now,
-            ),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(
-              context,
-            ).colorScheme.copyWith(primary: AdminReportsTheme.primary),
-          ),
-          child: child!,
-        );
-      },
+          : null,
+      helpText: 'Filter by date range',
     );
     if (picked == null || !mounted) return;
     _updateFilters(
@@ -1270,32 +1259,34 @@ class _CustomReportHubPanelState extends State<CustomReportHubPanel> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _pickDateRange,
-                icon: const Icon(Icons.date_range, size: 16),
-                label: Text(
-                  _draft.filters.hasDateRange
-                      ? '${DateFormat.yMMMd().format(_draft.filters.dateStart!)}'
-                            ' – '
-                            '${DateFormat.yMMMd().format(_draft.filters.dateEnd!)}'
-                      : 'Date range (optional)',
-                ),
-              ),
-              if (_draft.filters.hasDateRange) ...[
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => _updateFilters(
-                          _draft.filters.copyWith(clearDateRange: true),
-                        ),
-                  child: const Text('Clear dates'),
-                ),
-              ],
-            ],
+          DirectoryDateRangeFilterChip(
+            label: 'Date range',
+            expand: true,
+            width: null,
+            enabled: !_busy,
+            displayText: _draft.filters.hasDateRange
+                ? DirectoryDateTimePickers.formatDateRange(
+                    _draft.filters.dateStart!,
+                    _draft.filters.dateEnd!,
+                  )
+                : 'Any dates',
+            active: _draft.filters.hasDateRange,
+            onTap: _busy ? () {} : _pickDateRange,
           ),
+          if (_draft.filters.hasDateRange) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _updateFilters(
+                        _draft.filters.copyWith(clearDateRange: true),
+                      ),
+                child: const Text('Clear dates'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1308,33 +1299,18 @@ class _CustomReportHubPanelState extends State<CustomReportHubPanel> {
     required String Function(T) labelOf,
     required ValueChanged<T> onChanged,
   }) {
-    return SizedBox(
+    return DirectoryFilterField<T>(
+      label: label,
+      value: value,
       width: 220,
-      child: DropdownButtonFormField<T>(
-        key: ValueKey('$label-${value.name}'),
-        initialValue: value,
-        decoration: InputDecoration(
-          labelText: label,
-          filled: true,
-          fillColor: AdminReportsTheme.surface,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
-        ),
-        items: [
-          for (final v in values)
-            DropdownMenuItem(value: v, child: Text(labelOf(v))),
-        ],
-        onChanged: _busy
-            ? null
-            : (v) {
-                if (v != null) onChanged(v);
-              },
-      ),
+      enabled: !_busy,
+      items: [
+        for (final v in values)
+          DropdownMenuItem(value: v, child: Text(labelOf(v))),
+      ],
+      onChanged: (v) {
+        if (v != null) onChanged(v);
+      },
     );
   }
 

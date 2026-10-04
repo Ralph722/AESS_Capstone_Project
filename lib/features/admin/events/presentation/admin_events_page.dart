@@ -12,7 +12,6 @@ import 'package:alumni_system/features/events/models/event_rsvp_model.dart';
 import 'package:alumni_system/features/events/widgets/event_cover.dart';
 import 'package:alumni_system/features/events/widgets/event_status_badge.dart';
 import 'package:alumni_system/features/events/widgets/events_month_calendar.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/core/constants/event_category_constants.dart';
 import 'package:alumni_system/features/admin/events/widgets/admin_event_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
@@ -35,7 +34,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
 
   final _eventService = EventService();
   final _rsvpService = EventRsvpService();
-  final _notificationService = NotificationService();
   final _searchController = TextEditingController();
   final _supabase = Supabase.instance.client;
 
@@ -311,13 +309,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     );
     if (ok != true) return;
     try {
+      // Alumni are notified by the events table trigger.
       await _eventService.cancelEvent(event.id);
-      try {
-        await _notificationService.notifyEventCancelled(
-          eventId: event.id,
-          eventTitle: event.theme,
-        );
-      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -736,38 +729,43 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
             label: 'From',
             displayText: _from == null
                 ? 'Any date'
-                : DateFormat('MMM d').format(_from!),
+                : DirectoryDateTimePickers.formatDate(_from!, includeYear: false),
             active: _from != null,
             onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
+              final picked = await DirectoryDateTimePickers.pickDate(
+                context,
                 initialDate: _from ?? DateTime.now(),
                 firstDate: DateTime(2020),
                 lastDate: DateTime(2100),
+                helpText: 'From date',
               );
-              if (picked != null) {
-                setState(() => _from = picked);
-                _applyFilters();
-              }
+              if (picked == null || !mounted) return;
+              setState(() {
+                _from = picked;
+                if (_to != null && _to!.isBefore(picked)) {
+                  _to = picked;
+                }
+              });
+              _applyFilters();
             },
           ),
           DirectoryDateFilterChip(
             label: 'To',
             displayText: _to == null
                 ? 'Any date'
-                : DateFormat('MMM d').format(_to!),
+                : DirectoryDateTimePickers.formatDate(_to!, includeYear: false),
             active: _to != null,
             onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
+              final picked = await DirectoryDateTimePickers.pickDate(
+                context,
                 initialDate: _to ?? DateTime.now(),
                 firstDate: _from ?? DateTime(2020),
                 lastDate: DateTime(2100),
+                helpText: 'To date',
               );
-              if (picked != null) {
-                setState(() => _to = picked);
-                _applyFilters();
-              }
+              if (picked == null || !mounted) return;
+              setState(() => _to = picked);
+              _applyFilters();
             },
           ),
           for (final chip in const [
@@ -776,22 +774,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
             ('Soon', 2),
             ('Newest', 3),
           ])
-            FilterChip(
-              label: Text(chip.$1),
+            DirectoryToolbarFilterChip(
+              label: chip.$1,
               selected: _quickFilter == chip.$2,
-              showCheckmark: false,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-              selectedColor: AdminEventTheme.infoBg,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                color: _quickFilter == chip.$2
-                    ? AdminEventTheme.primary
-                    : AdminEventTheme.textSecondary,
-              ),
-              side: const BorderSide(color: AdminEventTheme.border),
               onSelected: (_) {
                 setState(() => _quickFilter = chip.$2);
                 _applyFilters();
@@ -933,6 +918,14 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     final soon = daysUntil >= 0 && daysUntil <= 7;
     final today = daysUntil == 0;
 
+    final metaParts = <String>[
+      if (event.batchYear.isNotEmpty) 'Batch ${event.batchYear}',
+      '${DateFormat('MMM d, yyyy').format(event.date)} · ${event.startTime}–${event.endTime}',
+      if (event.venue.trim().isNotEmpty) event.venue.trim(),
+      '${counts.going} going',
+    ];
+    final metaLine = metaParts.join(' · ');
+
     return AdminHoverShell(
       builder: (context, hovered) => Container(
         margin: const EdgeInsets.only(bottom: AdminDensity.listItemGap),
@@ -967,104 +960,58 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
                   Stack(
                     children: [
                       SizedBox(
-                        width: compact ? 96 : 120,
+                        width: compact ? 72 : 80,
                         child: EventCover(
                           event: event,
-                          height: compact ? 64 : 76,
+                          height: compact ? 48 : 56,
                           borderRadius: AdminEventTheme.radiusSm,
                         ),
                       ),
                       if (soon)
                         Positioned(
-                          left: 6,
-                          top: 6,
+                          left: 4,
+                          top: 4,
                           child: _countdownPill(daysUntil),
                         ),
                     ],
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                event.theme,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AdminEventTheme.textPrimary,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _actionsMenu(event),
-                          ],
+                        Text(
+                          event.theme,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: AdminEventTheme.textPrimary,
+                            letterSpacing: -0.2,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 4,
                           runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             EventCategoryChip(category: event.category),
-                            if (event.batchYear.isNotEmpty)
-                              _metaPill(
-                                Icons.groups_outlined,
-                                'Batch ${event.batchYear}',
-                              ),
-                            _metaPill(
-                              Icons.schedule_rounded,
-                              '${DateFormat('MMM d, yyyy').format(event.date)} · ${event.startTime}–${event.endTime}',
-                            ),
-                            _metaPill(Icons.location_on_outlined, event.venue),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            _softStat(
-                              'Going',
-                              counts.going,
-                              AdminEventTheme.success,
-                            ),
-                            _softStat(
-                              'Interested',
-                              counts.interested,
-                              AdminEventTheme.warning,
-                            ),
-                            _softStat(
-                              "Can't",
-                              counts.cantAttend,
-                              AdminEventTheme.danger,
-                            ),
-                            _softStat(
-                              'Comments',
-                              event.comments,
-                              AdminEventTheme.info,
-                            ),
-                            if (event.capacity != null && event.capacity! > 0)
-                              _softStat(
-                                'Seats left',
-                                (event.capacity! - counts.going).clamp(
-                                  0,
-                                  event.capacity!,
-                                ),
-                                AdminEventTheme.primary,
-                              ),
-                          ],
+                        const SizedBox(height: 4),
+                        Text(
+                          metaLine,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: AdminEventTheme.textSecondary,
+                          ),
                         ),
                       ],
                     ),
                   ),
+                  _actionsMenu(event),
                 ],
               ),
             ),
@@ -1096,68 +1043,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
           color: hot ? Colors.white : AdminEventTheme.gold,
           fontSize: 10,
           fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-
-  Widget _metaPill(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AdminEventTheme.surface,
-        borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AdminEventTheme.textSecondary),
-          const SizedBox(width: 4),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 220),
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: AdminEventTheme.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _softStat(String label, int value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-      ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '$value',
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            TextSpan(
-              text: ' $label',
-              style: TextStyle(
-                color: color.withValues(alpha: 0.9),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
         ),
       ),
     );

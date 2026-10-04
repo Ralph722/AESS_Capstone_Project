@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// User-facing empty / error / network helpers for the alumni portal.
@@ -47,11 +48,12 @@ Future<bool> confirmDiscardChanges(BuildContext context) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
+          style: PortalTheme.ghostButton(dense: true),
           child: const Text('Keep editing'),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(backgroundColor: PortalTheme.navy),
+          style: PortalMenu.dangerButton(dense: true),
           child: const Text('Discard'),
         ),
       ],

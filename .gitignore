@@ -69,3 +69,7 @@ analysis.txt
 
 # Editor / agent local state
 .cursor/
+
+# Android build output
+android/build/
+android/app/build/

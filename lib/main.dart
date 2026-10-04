@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/config/supabase_config.dart';
+import 'package:alumni_system/core/navigation/app_navigator.dart';
 import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
+import 'package:alumni_system/features/notifications/push/push_service.dart';
+import 'package:alumni_system/shared/widgets/user/portal_overlay_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +20,7 @@ void main() async {
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.anonKey,
   );
+  PushService.instance.initialize();
 
   runApp(const MyApp());
 }
@@ -57,9 +61,22 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Alumni Portal',
       debugShowCheckedModeBanner: false,
+      navigatorKey: AppNavigator.navigatorKey,
+      scaffoldMessengerKey: AppNavigator.messengerKey,
+      navigatorObservers: [AppNavigator.routeObserver],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF090A4F)),
         useMaterial3: true,
+      ),
+      builder: (context, child) => ValueListenableBuilder<bool>(
+        valueListenable: PortalOverlayTheme.suspended,
+        child: child,
+        builder: (context, suspended, child) => Theme(
+          data: suspended
+              ? Theme.of(context)
+              : PortalOverlayTheme.apply(Theme.of(context)),
+          child: child!,
+        ),
       ),
       // AuthGate restores an existing Supabase session (if any) before Login.
       home: const AuthGate(),

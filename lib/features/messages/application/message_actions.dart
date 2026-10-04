@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/messages/data/message_service.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Shared edit / delete / react actions for message screens (Part 11).
 abstract final class MessageActions {
@@ -31,10 +33,12 @@ abstract final class MessageActions {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
+                style: PortalTheme.ghostButton(dense: true),
                 child: const Text('Cancel'),
               ),
-              ElevatedButton(
+              FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
+                style: PortalTheme.primaryButton(dense: true),
                 child: const Text('Save'),
               ),
             ],
@@ -82,7 +86,7 @@ abstract final class MessageActions {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Delete message'),
+            title: const Text('Delete message?'),
             content: const Text(
               'Are you sure you want to delete this message? '
               'This action cannot be undone.',
@@ -90,11 +94,12 @@ abstract final class MessageActions {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
+                style: PortalTheme.ghostButton(dense: true),
                 child: const Text('Cancel'),
               ),
-              ElevatedButton(
+              FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style: PortalMenu.dangerButton(dense: true),
                 child: const Text('Delete'),
               ),
             ],

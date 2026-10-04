@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -278,8 +279,8 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final sideBySide = constraints.maxWidth >= 360;
-              final batchField = _FilterDropdown<String?>(
-                id: 'batch',
+              final batchField = DirectoryFilterField<String?>(
+                label: 'Batch',
                 value: _batchFilter,
                 items: [
                   const DropdownMenuItem(
@@ -294,8 +295,8 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
                   _scheduleScrollAffordanceCheck();
                 },
               );
-              final courseField = _FilterDropdown<String?>(
-                id: 'course',
+              final courseField = DirectoryFilterField<String?>(
+                label: 'Course',
                 value: _courseFilter,
                 items: [
                   const DropdownMenuItem(
@@ -506,65 +507,6 @@ class _MoreAnalyticsBelowCue extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FilterDropdown<T> extends StatelessWidget {
-  const _FilterDropdown({
-    required this.id,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String id;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(AdminSurveyTheme.radiusSm);
-    return DropdownButtonFormField<T>(
-      key: ValueKey('$id-$value'),
-      initialValue: value,
-      isExpanded: true,
-      isDense: true,
-      iconSize: 18,
-      borderRadius: radius,
-      style: const TextStyle(
-        fontSize: 13,
-        color: AdminSurveyTheme.textPrimary,
-      ),
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        size: 18,
-        color: AdminSurveyTheme.textMuted,
-      ),
-      decoration: InputDecoration(
-        isDense: true,
-        filled: true,
-        fillColor: AdminSurveyTheme.background,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 10,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AdminSurveyTheme.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AdminSurveyTheme.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AdminSurveyTheme.primary),
-        ),
-      ),
-      items: items,
-      onChanged: onChanged,
     );
   }
 }

@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/core/utils/web_file_download.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
@@ -49,16 +52,9 @@ class EventCover extends StatelessWidget {
       child: aspectRatio != null
           ? AspectRatio(
               aspectRatio: aspectRatio!,
-              child: SizedBox(
-                width: double.infinity,
-                child: image,
-              ),
+              child: SizedBox(width: double.infinity, child: image),
             )
-          : SizedBox(
-              height: height,
-              width: double.infinity,
-              child: image,
-            ),
+          : SizedBox(height: height, width: double.infinity, child: image),
     );
   }
 }
@@ -80,45 +76,122 @@ class EventCoverHero extends StatefulWidget {
   State<EventCoverHero> createState() => _EventCoverHeroState();
 }
 
-class _EventCoverHeroState extends State<EventCoverHero> {
+/// Saves [event]'s cover photo: a browser download on web; on phones the
+/// photo opens in the browser/viewer where it can be saved.
+Future<void> downloadEventCover(BuildContext context, AlumniEvent event) async {
+  final messenger = ScaffoldMessenger.of(context);
+  void show(String text) => messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
+    );
+
+  final value = event.coverImageUrl.trim();
+  if (value.isEmpty) return;
+
+  if (!isWebFileDownloadSupported) {
+    final uri = Uri.tryParse(value);
+    if (AppImage.isDataUrl(value) || uri == null || !uri.hasScheme) {
+      show('This photo can be saved from the web portal.');
+      return;
+    }
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) show('Could not open the photo.');
+    return;
+  }
+
+  try {
+    final Uint8List bytes;
+    String mime;
+    if (AppImage.isDataUrl(value)) {
+      bytes = AppImage.decodeDataUrl(value);
+      mime =
+          RegExp(r'^data:([^;,]+)').firstMatch(value)?.group(1) ?? 'image/jpeg';
+    } else {
+      final response = await http.get(Uri.parse(value));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('download failed (${response.statusCode})');
+      }
+      bytes = response.bodyBytes;
+      mime =
+          response.headers['content-type']?.split(';').first.trim() ??
+          'image/jpeg';
+    }
+    final ext = switch (mime) {
+      'image/png' => 'png',
+      'image/webp' => 'webp',
+      'image/gif' => 'gif',
+      _ => 'jpg',
+    };
+    final safeName = event.theme
+        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_');
+    downloadBytesOnWeb(
+      bytes: bytes,
+      fileName: '${safeName.isEmpty ? 'event' : safeName}_cover.$ext',
+      mimeType: mime,
+    );
+    show('Cover photo downloaded');
+  } catch (e) {
+    show('Could not download the photo: $e');
+  }
+}
+
+/// Round "download" button for overlaying on a cover photo.
+class EventCoverDownloadButton extends StatefulWidget {
+  const EventCoverDownloadButton({super.key, required this.event});
+
+  final AlumniEvent event;
+
+  @override
+  State<EventCoverDownloadButton> createState() =>
+      _EventCoverDownloadButtonState();
+}
+
+class _EventCoverDownloadButtonState extends State<EventCoverDownloadButton> {
   bool _saving = false;
 
   Future<void> _download() async {
-    final url = widget.event.coverImageUrl.trim();
-    if (url.isEmpty) return;
     setState(() => _saving = true);
-    try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Download failed (${response.statusCode})');
-      }
-      final safeName = widget.event.theme
-          .replaceAll(RegExp(r'[^\w\s-]'), '')
-          .trim()
-          .replaceAll(RegExp(r'\s+'), '_');
-      final fileName =
-          '${safeName.isEmpty ? 'event' : safeName}_cover.jpg';
-      if (isWebFileDownloadSupported) {
-        downloadBytesOnWeb(
-          bytes: response.bodyBytes,
-          fileName: fileName,
-          mimeType: 'image/jpeg',
-        );
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cover image saved')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save image: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    await downloadEventCover(context, widget.event);
+    if (mounted) setState(() => _saving = false);
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.45),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _saving ? null : _download,
+        child: Tooltip(
+          message: 'Download photo',
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: _saving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(
+                    Icons.download_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EventCoverHeroState extends State<EventCoverHero> {
   @override
   Widget build(BuildContext context) {
     final provider = AppImage.provider(widget.event.coverImageUrl);
@@ -148,28 +221,7 @@ class _EventCoverHeroState extends State<EventCoverHero> {
             Positioned(
               top: 8,
               right: 8,
-              child: Material(
-                color: Colors.black.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(8),
-                child: IconButton(
-                  tooltip: 'Save image',
-                  onPressed: _saving ? null : _download,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.download_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                ),
-              ),
+              child: EventCoverDownloadButton(event: widget.event),
             ),
         ],
       ),

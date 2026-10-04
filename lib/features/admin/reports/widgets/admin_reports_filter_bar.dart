@@ -41,11 +41,40 @@ class ReportsCohortFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hint = reportsAudienceHint(_selectedSurvey);
-    final active = !filters.isEmpty;
+    final activeCount = [
+      filters.surveyId,
+      filters.batchYear,
+      filters.course,
+    ].where((v) => v != null).length;
+    final active = activeCount > 0;
+    final fields = _fields();
+    final actions = <Widget>[
+      if (hint != null)
+        ReportsDetailsButton(
+          title: 'Audience',
+          body: hint,
+          tooltip: 'Audience details',
+        ),
+      if (active)
+        TextButton.icon(
+          onPressed: () => onChanged(ReportsDashboardFilters.empty),
+          style: TextButton.styleFrom(
+            foregroundColor: AdminReportsTheme.primary,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            minimumSize: const Size(0, 32),
+          ),
+          icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
+          label: const Text(
+            'Clear all',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+    ];
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
       decoration: BoxDecoration(
         color: AdminReportsTheme.card,
         borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
@@ -56,289 +85,215 @@ class ReportsCohortFilterBar extends StatelessWidget {
         ),
         boxShadow: AdminReportsTheme.cardShadow,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth >= 900) {
+            return Row(
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 170),
+                  child: _leading(activeCount),
+                ),
+                const SizedBox(width: 14),
+                Expanded(flex: 3, child: fields[0]),
+                const SizedBox(width: 10),
+                Expanded(flex: 2, child: fields[1]),
+                const SizedBox(width: 10),
+                Expanded(flex: 3, child: fields[2]),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  ...actions,
+                ],
+              ],
+            );
+          }
+
+          final half = (constraints.maxWidth - 10) / 2;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AdminReportsTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  size: 17,
-                  color: AdminReportsTheme.primary,
-                ),
+              Row(
+                children: [
+                  Expanded(child: _leading(activeCount)),
+                  ...actions,
+                ],
               ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Cohort filters',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: AdminReportsTheme.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 1),
-                    Text(
-                      'Narrow charts by wave, batch, and course',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        height: 1.3,
-                        color: AdminReportsTheme.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (hint != null)
-                ReportsDetailsButton(
-                  title: 'Audience',
-                  body: hint,
-                  tooltip: 'Audience details',
-                ),
-              if (active)
-                TextButton(
-                  onPressed: () => onChanged(ReportsDashboardFilters.empty),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AdminReportsTheme.primary,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    minimumSize: const Size(0, 32),
-                  ),
-                  child: const Text(
-                    'Clear all',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 720;
-              final fields = <Widget>[
-                DirectoryFilterField<String?>(
-                  label: waveLabel,
-                  value: filters.surveyId,
-                  minWidth: 160,
-                  items: [
-                    DropdownMenuItem(
-                      value: null,
-                      child: Text(allWavesLabel),
-                    ),
-                    for (final s in surveys)
-                      DropdownMenuItem(
-                        value: s.id,
-                        child: Text(
-                          reportsSurveyFilterLabel(s),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (id) {
-                    if (id == null) {
-                      onChanged(ReportsDashboardFilters.empty);
-                      return;
-                    }
-                    Survey? selected;
-                    for (final s in surveys) {
-                      if (s.id == id) {
-                        selected = s;
-                        break;
-                      }
-                    }
-                    onChanged(filtersPrefillFromSurvey(filters, selected));
-                  },
-                ),
-                DirectoryFilterField<String?>(
-                  label: 'Batch',
-                  value: filters.batchYear,
-                  minWidth: 120,
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('All batches'),
-                    ),
-                    for (final y in {
-                      ...batchYears,
-                      if (filters.batchYear != null) filters.batchYear!,
-                    })
-                      DropdownMenuItem(value: y, child: Text(y)),
-                  ],
-                  onChanged: (v) => onChanged(
-                    filters.copyWith(
-                      batchYear: v,
-                      clearBatch: v == null,
-                    ),
-                  ),
-                ),
-                DirectoryFilterField<String?>(
-                  label: 'Course',
-                  value: filters.course,
-                  minWidth: 150,
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('All courses'),
-                    ),
-                    for (final c in {
-                      ...CourseConstants.courses,
-                      if (filters.course != null) filters.course!,
-                    })
-                      DropdownMenuItem(
-                        value: c,
-                        child: Text(
-                          c,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (v) => onChanged(
-                    filters.copyWith(course: v, clearCourse: v == null),
-                  ),
-                ),
-              ];
-
-              if (wide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 3, child: fields[0]),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 2, child: fields[1]),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 3, child: fields[2]),
-                  ],
-                );
-              }
-
-              return Wrap(
+              const SizedBox(height: 10),
+              Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: [
                   for (final f in fields)
                     SizedBox(
-                      width: (constraints.maxWidth - 10) / 2 < 160
-                          ? constraints.maxWidth
-                          : (constraints.maxWidth - 10) / 2,
+                      width: half < 160 ? constraints.maxWidth : half,
                       child: f,
                     ),
                 ],
-              );
-            },
-          ),
-          if (active) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: AdminReportsTheme.border),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text(
-                  'Active',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AdminReportsTheme.textMuted,
-                  ),
+              ),
+              if (active) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (filters.surveyId != null)
+                      DirectoryActiveFilterChip(
+                        icon: Icons.waves_outlined,
+                        label: _selectedSurvey != null
+                            ? reportsSurveyFilterLabel(_selectedSurvey!)
+                            : 'Wave',
+                        onRemoved: () =>
+                            onChanged(ReportsDashboardFilters.empty),
+                      ),
+                    if (filters.batchYear != null)
+                      DirectoryActiveFilterChip(
+                        icon: Icons.calendar_today_outlined,
+                        label: 'Batch ${filters.batchYear}',
+                        onRemoved: () =>
+                            onChanged(filters.copyWith(clearBatch: true)),
+                      ),
+                    if (filters.course != null)
+                      DirectoryActiveFilterChip(
+                        icon: Icons.school_outlined,
+                        label: filters.course!,
+                        onRemoved: () =>
+                            onChanged(filters.copyWith(clearCourse: true)),
+                      ),
+                  ],
                 ),
-                if (filters.surveyId != null)
-                  _ActiveFilterChip(
-                    icon: Icons.waves_outlined,
-                    label: _selectedSurvey != null
-                        ? reportsSurveyFilterLabel(_selectedSurvey!)
-                        : 'Wave',
-                    onDeleted: () =>
-                        onChanged(ReportsDashboardFilters.empty),
-                  ),
-                if (filters.batchYear != null)
-                  _ActiveFilterChip(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Batch ${filters.batchYear}',
-                    onDeleted: () => onChanged(
-                      filters.copyWith(clearBatch: true),
-                    ),
-                  ),
-                if (filters.course != null)
-                  _ActiveFilterChip(
-                    icon: Icons.school_outlined,
-                    label: filters.course!,
-                    onDeleted: () => onChanged(
-                      filters.copyWith(clearCourse: true),
-                    ),
-                  ),
               ],
-            ),
-          ],
-        ],
+            ],
+          );
+        },
       ),
     );
   }
-}
 
-class _ActiveFilterChip extends StatelessWidget {
-  const _ActiveFilterChip({
-    required this.icon,
-    required this.label,
-    required this.onDeleted,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onDeleted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AdminReportsTheme.primary.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onDeleted,
-        borderRadius: BorderRadius.circular(999),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-          child: Row(
+  Widget _leading(int activeCount) {
+    final active = activeCount > 0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: active
+                ? AdminReportsTheme.primary
+                : AdminReportsTheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.tune_rounded,
+            size: 17,
+            color: active ? AdminReportsTheme.gold : AdminReportsTheme.primary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 13, color: AdminReportsTheme.primary),
-              const SizedBox(width: 6),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AdminReportsTheme.primary,
-                  ),
+              const Text(
+                'Cohort filters',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: AdminReportsTheme.textPrimary,
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.close_rounded,
-                size: 14,
-                color: AdminReportsTheme.primary,
+              const SizedBox(height: 1),
+              Text(
+                active ? '$activeCount active' : 'Showing all data',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.3,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                  color: active
+                      ? AdminReportsTheme.primary
+                      : AdminReportsTheme.textMuted,
+                ),
               ),
             ],
           ),
         ),
-      ),
+      ],
     );
+  }
+
+  List<Widget> _fields() {
+    return [
+      DirectoryFilterField<String?>(
+        label: waveLabel,
+        value: filters.surveyId,
+        minWidth: 160,
+        items: [
+          DropdownMenuItem(value: null, child: Text(allWavesLabel)),
+          for (final s in surveys)
+            DropdownMenuItem(
+              value: s.id,
+              child: Text(
+                reportsSurveyFilterLabel(s),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        onChanged: (id) {
+          if (id == null) {
+            onChanged(ReportsDashboardFilters.empty);
+            return;
+          }
+          Survey? selected;
+          for (final s in surveys) {
+            if (s.id == id) {
+              selected = s;
+              break;
+            }
+          }
+          onChanged(filtersPrefillFromSurvey(filters, selected));
+        },
+      ),
+      DirectoryFilterField<String?>(
+        label: 'Batch',
+        value: filters.batchYear,
+        minWidth: 120,
+        items: [
+          const DropdownMenuItem(value: null, child: Text('All batches')),
+          for (final y in {
+            ...batchYears,
+            if (filters.batchYear != null) filters.batchYear!,
+          })
+            DropdownMenuItem(value: y, child: Text(y)),
+        ],
+        onChanged: (v) =>
+            onChanged(filters.copyWith(batchYear: v, clearBatch: v == null)),
+      ),
+      DirectoryFilterField<String?>(
+        label: 'Course',
+        value: filters.course,
+        minWidth: 150,
+        items: [
+          const DropdownMenuItem(value: null, child: Text('All courses')),
+          for (final c in {
+            ...CourseConstants.courses,
+            if (filters.course != null) filters.course!,
+          })
+            DropdownMenuItem(
+              value: c,
+              child: Text(c, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+        ],
+        onChanged: (v) =>
+            onChanged(filters.copyWith(course: v, clearCourse: v == null)),
+      ),
+    ];
   }
 }
 

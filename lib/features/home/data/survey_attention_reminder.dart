@@ -1,4 +1,5 @@
-/// Soft survey/tracer reminder: once per app session while items are pending.
+/// Soft survey/tracer reminder: once per sign-in while items are pending
+/// (reset on logout via [resetForSession]).
 class SurveyAttentionReminder {
   SurveyAttentionReminder._();
 
@@ -22,7 +23,7 @@ class SurveyAttentionReminder {
     _shownThisSession = true;
   }
 
-  /// For hot-restart / tests: allow the reminder again in this session.
+  /// Allows the reminder again (next sign-in, tests).
   static void resetForSession() {
     _shownThisSession = false;
   }

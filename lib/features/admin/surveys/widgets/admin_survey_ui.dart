@@ -515,81 +515,78 @@ class SurveyResponsesWorkspaceHeader extends StatelessWidget {
 
     return Material(
       color: AdminSurveyTheme.card,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(6, 6, 8, 8),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AdminSurveyTheme.border)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, size: 20),
-                  tooltip: 'Back to surveys',
-                  onPressed: onBack,
-                  style: IconButton.styleFrom(
-                    foregroundColor: AdminSurveyTheme.textSecondary,
-                    minimumSize: AdminDensity.minTapSize,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: const EdgeInsets.all(8),
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                          color: AdminSurveyTheme.textPrimary,
-                        ),
+            IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              tooltip: 'Back to surveys',
+              onPressed: onBack,
+              style: IconButton.styleFrom(
+                foregroundColor: AdminSurveyTheme.textSecondary,
+                minimumSize: AdminDensity.minTapSize,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.all(8),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6, bottom: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                        letterSpacing: -0.2,
+                        color: AdminSurveyTheme.textPrimary,
                       ),
-                      const SizedBox(height: 6),
+                    ),
+                    if (survey != null) ...[
+                      const SizedBox(height: 8),
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          if (survey != null) ...[
-                            SurveyStatusChip(
-                              status: survey!.status,
-                              archived: survey!.archived,
-                              scheduled: survey!.isScheduledWindow,
-                            ),
-                            SurveyKindChip.fromSurvey(survey!),
-                          ],
+                          SurveyStatusChip(
+                            status: survey!.status,
+                            archived: survey!.archived,
+                            scheduled: survey!.isScheduledWindow,
+                          ),
+                          SurveyKindChip.fromSurvey(survey!),
                         ],
                       ),
                     ],
-                  ),
+                  ],
                 ),
-                if (overflowItems.isNotEmpty)
-                  PopupMenuButton<String>(
-                    enabled: overflowEnabled && !overflowBusy,
-                    tooltip: 'More actions',
-                    icon: overflowBusy
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(
-                            Icons.more_vert,
-                            color: AdminSurveyTheme.textSecondary,
-                          ),
-                    onSelected: onOverflowSelected,
-                    itemBuilder: (_) => overflowItems,
-                  ),
-              ],
+              ),
             ),
+            if (overflowItems.isNotEmpty)
+              PopupMenuButton<String>(
+                enabled: overflowEnabled && !overflowBusy,
+                tooltip: 'More actions',
+                icon: overflowBusy
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(
+                        Icons.more_vert_rounded,
+                        color: AdminSurveyTheme.textSecondary,
+                      ),
+                onSelected: onOverflowSelected,
+                itemBuilder: (_) => overflowItems,
+              ),
           ],
         ),
       ),
@@ -614,7 +611,7 @@ class SurveyWorkspaceTabSpec {
   final int? count;
 }
 
-/// Workspace tab bar — matches member-details underline tabs (no filled chip).
+/// Workspace tab bar — evenly spaced underline tabs across the workspace width.
 class SurveyWorkspaceSegmentedNav extends StatelessWidget {
   const SurveyWorkspaceSegmentedNav({
     super.key,
@@ -631,61 +628,104 @@ class SurveyWorkspaceSegmentedNav extends StatelessWidget {
 
     return Material(
       color: AdminSurveyTheme.card,
-      child: TabBar(
-        controller: controller,
-        indicatorColor: AdminSurveyTheme.primary,
-        indicatorWeight: 2.5,
-        labelColor: AdminSurveyTheme.primary,
-        unselectedLabelColor: AdminSurveyTheme.textSecondary,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        unselectedLabelStyle: const TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 13,
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: AdminSurveyTheme.border),
+          ),
         ),
-        dividerColor: AdminSurveyTheme.border,
-        tabs: [
-          for (final tab in tabs)
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(tab.icon, size: 16),
-                  const SizedBox(width: 6),
-                  Text(tab.label),
-                  if (tab.count != null) ...[
-                    const SizedBox(width: 6),
-                    _CountBadge(count: tab.count!),
-                  ],
-                ],
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            final selected = controller.index;
+            return TabBar(
+              controller: controller,
+              indicatorSize: TabBarIndicatorSize.label,
+              indicatorColor: AdminSurveyTheme.primary,
+              indicatorWeight: 2.5,
+              labelColor: AdminSurveyTheme.primary,
+              unselectedLabelColor: AdminSurveyTheme.textSecondary,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                letterSpacing: -0.1,
               ),
-            ),
-        ],
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 13.5,
+                letterSpacing: -0.1,
+              ),
+              dividerColor: Colors.transparent,
+              overlayColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.hovered) ||
+                    states.contains(WidgetState.pressed)) {
+                  return AdminSurveyTheme.primary.withValues(alpha: 0.06);
+                }
+                return Colors.transparent;
+              }),
+              tabs: [
+                for (var i = 0; i < tabs.length; i++)
+                  Tab(
+                    height: 44,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(tabs[i].icon, size: 17),
+                        const SizedBox(width: 7),
+                        Text(tabs[i].label),
+                        if (tabs[i].count != null) ...[
+                          const SizedBox(width: 7),
+                          _CountBadge(
+                            count: tabs[i].count!,
+                            selected: i == selected,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 }
 
 class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count});
+  const _CountBadge({required this.count, this.selected = false});
 
   final int count;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     final text = count > 999 ? '999+' : '$count';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: AdminSurveyTheme.infoBg,
-        borderRadius: BorderRadius.circular(10),
+        color: selected
+            ? AdminSurveyTheme.primary.withValues(alpha: 0.12)
+            : AdminSurveyTheme.infoBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: selected
+              ? AdminSurveyTheme.primary.withValues(alpha: 0.22)
+              : Colors.transparent,
+        ),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: AdminSurveyTheme.primary,
+          height: 1.2,
+          color: selected
+              ? AdminSurveyTheme.primary
+              : AdminSurveyTheme.textSecondary,
         ),
       ),
     );

@@ -6,15 +6,14 @@ import 'package:alumni_system/features/events/models/event_model.dart';
 /// Events data access — Supabase only.
 class EventService {
   EventService({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+    : _supabase = supabase ?? Supabase.instance.client;
 
   final SupabaseClient _supabase;
 
   Future<void> addEvent(AlumniEvent event) async {
-    await _supabase.from('events').upsert(
-          event.toSupabaseRow(),
-          onConflict: 'id',
-        );
+    await _supabase
+        .from('events')
+        .upsert(event.toSupabaseRow(), onConflict: 'id');
   }
 
   Future<void> autoArchivePastEvents() async {
@@ -24,8 +23,11 @@ class EventService {
       final active = await _fetchActiveFromSupabase();
 
       for (final event in active) {
-        final eventDate =
-            DateTime(event.date.year, event.date.month, event.date.day);
+        final eventDate = DateTime(
+          event.date.year,
+          event.date.month,
+          event.date.day,
+        );
         if (eventDate.isBefore(today)) {
           await updateEventStatus(event.id, 'Archived');
         }
@@ -33,7 +35,9 @@ class EventService {
     } catch (_) {}
   }
 
-  Future<List<AlumniEvent>> getActiveEvents({bool runAutoArchive = true}) async {
+  Future<List<AlumniEvent>> getActiveEvents({
+    bool runAutoArchive = true,
+  }) async {
     if (runAutoArchive) {
       await autoArchivePastEvents();
     }
@@ -48,14 +52,14 @@ class EventService {
     final today = DateTime(now.year, now.month, now.day);
 
     final events = await getActiveEvents(runAutoArchive: false);
-    return events
-        .where((event) {
-          final eventDate =
-              DateTime(event.date.year, event.date.month, event.date.day);
-          return eventDate.isAtSameMomentAs(today) || eventDate.isAfter(today);
-        })
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    return events.where((event) {
+      final eventDate = DateTime(
+        event.date.year,
+        event.date.month,
+        event.date.day,
+      );
+      return eventDate.isAtSameMomentAs(today) || eventDate.isAfter(today);
+    }).toList()..sort((a, b) => a.date.compareTo(b.date));
   }
 
   Future<AlumniEvent?> getEventById(String eventId) async {
@@ -86,10 +90,13 @@ class EventService {
   }
 
   Future<void> updateEventStatus(String eventId, String newStatus) async {
-    await _supabase.from('events').update({
-      'status': newStatus,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', eventId);
+    await _supabase
+        .from('events')
+        .update({
+          'status': newStatus,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', eventId);
   }
 
   Future<void> deleteEvent(String eventId) async {
@@ -120,8 +127,10 @@ class EventService {
     final sevenDaysLater = now.add(const Duration(days: 7));
     final active = await getActiveEvents(runAutoArchive: true);
     return active
-        .where((event) =>
-            event.date.isAfter(now) && event.date.isBefore(sevenDaysLater))
+        .where(
+          (event) =>
+              event.date.isAfter(now) && event.date.isBefore(sevenDaysLater),
+        )
         .length;
   }
 
@@ -131,10 +140,9 @@ class EventService {
   }
 
   Future<void> updateEvent(AlumniEvent event) async {
-    await _supabase.from('events').upsert(
-          event.toSupabaseRow(),
-          onConflict: 'id',
-        );
+    await _supabase
+        .from('events')
+        .upsert(event.toSupabaseRow(), onConflict: 'id');
   }
 
   Future<void> restoreEvent(String eventId) async {
@@ -142,10 +150,13 @@ class EventService {
   }
 
   Future<void> cancelEvent(String eventId) async {
-    await _supabase.from('events').update({
-      'cancelled': true,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', eventId);
+    await _supabase
+        .from('events')
+        .update({
+          'cancelled': true,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', eventId);
   }
 
   Future<void> incrementViews(String eventId) async {
@@ -156,10 +167,13 @@ class EventService {
           .eq('id', eventId)
           .maybeSingle();
       final current = (row?['views_count'] as int?) ?? 0;
-      await _supabase.from('events').update({
-        'views_count': current + 1,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', eventId);
+      await _supabase
+          .from('events')
+          .update({
+            'views_count': current + 1,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', eventId);
     } catch (_) {}
   }
 
@@ -167,11 +181,14 @@ class EventService {
     return _supabase
         .from('events')
         .stream(primaryKey: ['id'])
-        .map((rows) => rows
-            .map(AlumniEvent.fromSupabaseRow)
-            .where((e) => e.status == 'Active')
-            .toList()
-          ..sort((a, b) => a.date.compareTo(b.date)));
+        .map(
+          (rows) =>
+              rows
+                  .map(AlumniEvent.fromSupabaseRow)
+                  .where((e) => e.status == 'Active')
+                  .toList()
+                ..sort((a, b) => a.date.compareTo(b.date)),
+        );
   }
 
   Stream<List<AlumniEvent>> getUpcomingEventsStream() {
@@ -179,14 +196,14 @@ class EventService {
     final today = DateTime(now.year, now.month, now.day);
 
     return getActiveEventsStream().map((events) {
-      return events
-          .where((event) {
-            final eventDate =
-                DateTime(event.date.year, event.date.month, event.date.day);
-            return eventDate.isAtSameMomentAs(today) ||
-                eventDate.isAfter(today);
-          })
-          .toList();
+      return events.where((event) {
+        final eventDate = DateTime(
+          event.date.year,
+          event.date.month,
+          event.date.day,
+        );
+        return eventDate.isAtSameMomentAs(today) || eventDate.isAfter(today);
+      }).toList();
     });
   }
 
@@ -262,17 +279,18 @@ class EventService {
     }
   }
 
-  Stream<List<Map<String, dynamic>>> getUserNotificationsStream(
-    String userId,
-  ) {
+  Stream<List<Map<String, dynamic>>> getUserNotificationsStream(String userId) {
     return _supabase
         .from('user_notifications')
         .stream(primaryKey: ['id'])
         .eq('user_id', userId)
         .map((rows) {
           final sorted = List<Map<String, dynamic>>.from(rows)
-            ..sort((a, b) => (b['created_at'] as String? ?? '')
-                .compareTo(a['created_at'] as String? ?? ''));
+            ..sort(
+              (a, b) => (b['created_at'] as String? ?? '').compareTo(
+                a['created_at'] as String? ?? '',
+              ),
+            );
           return sorted;
         });
   }
@@ -326,5 +344,4 @@ class EventService {
       return [];
     }
   }
-
 }

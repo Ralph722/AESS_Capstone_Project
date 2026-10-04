@@ -4,7 +4,7 @@ import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/models/event_rsvp_model.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
-/// Going / Interested actions only (Can't Attend is not exposed in alumni UI).
+/// Going / Not going actions. Only Going is limited by capacity/registration.
 class EventRsvpBar extends StatelessWidget {
   const EventRsvpBar({
     super.key,
@@ -31,18 +31,9 @@ class EventRsvpBar extends StatelessWidget {
   /// Compact feed-card buttons (slightly smaller).
   final bool compact;
 
-  /// Only Going / Interested count as a visible selected RSVP in the alumni UI.
-  static EventRsvpStatus? visibleSelection(EventRsvpStatus? status) {
-    if (status == EventRsvpStatus.going ||
-        status == EventRsvpStatus.interested) {
-      return status;
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final visible = visibleSelection(selected);
+    final visible = selected;
     final height = compact ? 38.0 : (dense ? 40.0 : 46.0);
 
     Widget button({
@@ -55,7 +46,8 @@ class EventRsvpBar extends StatelessWidget {
         outlineIcon: outlineIcon,
         filledIcon: filledIcon,
         selected: visible == status,
-        enabled: enabled &&
+        enabled:
+            enabled &&
             (status != EventRsvpStatus.going ||
                 goingEnabled ||
                 visible == status),
@@ -70,10 +62,10 @@ class EventRsvpBar extends StatelessWidget {
       outlineIcon: Icons.check_circle_outline_rounded,
       filledIcon: Icons.check_circle_rounded,
     );
-    final interested = button(
-      status: EventRsvpStatus.interested,
-      outlineIcon: Icons.star_outline_rounded,
-      filledIcon: Icons.star_rounded,
+    final notGoing = button(
+      status: EventRsvpStatus.notGoing,
+      outlineIcon: Icons.cancel_outlined,
+      filledIcon: Icons.cancel_rounded,
     );
 
     if (expanded || compact) {
@@ -81,7 +73,7 @@ class EventRsvpBar extends StatelessWidget {
         children: [
           Expanded(child: going),
           SizedBox(width: compact ? 8 : 10),
-          Expanded(child: interested),
+          Expanded(child: notGoing),
         ],
       );
     }
@@ -91,7 +83,7 @@ class EventRsvpBar extends StatelessWidget {
       runSpacing: 8,
       children: [
         SizedBox(width: 118, child: going),
-        SizedBox(width: 118, child: interested),
+        SizedBox(width: 118, child: notGoing),
       ],
     );
   }
@@ -125,14 +117,12 @@ class _RsvpActionButton extends StatelessWidget {
         : (selected ? PortalTheme.navy : PortalTheme.textPrimary);
     final bg = !enabled
         ? PortalTheme.surfaceMuted
-        : (selected
-            ? PortalTheme.navy.withValues(alpha: 0.08)
-            : Colors.white);
+        : (selected ? PortalTheme.navy.withValues(alpha: 0.08) : Colors.white);
     final border = !enabled
         ? PortalTheme.border
         : (selected
-            ? PortalTheme.navy.withValues(alpha: 0.55)
-            : PortalTheme.borderStrong);
+              ? PortalTheme.navy.withValues(alpha: 0.55)
+              : PortalTheme.borderStrong);
 
     return SizedBox(
       height: height,
@@ -149,10 +139,7 @@ class _RsvpActionButton extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-              border: Border.all(
-                color: border,
-                width: selected ? 1.6 : 1.2,
-              ),
+              border: Border.all(color: border, width: selected ? 1.6 : 1.2),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -185,22 +172,22 @@ class _RsvpActionButton extends StatelessWidget {
   }
 }
 
-/// Unified social-style counts: ✓ 1 Going · ☆ 0 Interested
+/// Counts line: "✓ 1 Going" (alumni) or "✓ 1 Going · ✕ 2 Not going" (admin).
 class EventRsvpCountRow extends StatelessWidget {
   const EventRsvpCountRow({
     super.key,
     required this.counts,
     this.capacity,
     this.compact = false,
-    this.includeCantAttend = false,
+    this.includeNotGoing = false,
   });
 
   final EventRsvpCounts counts;
   final int? capacity;
   final bool compact;
 
-  /// Admin UIs may still surface Can't Attend totals; alumni UI does not.
-  final bool includeCantAttend;
+  /// Admin UIs show Not going totals; the alumni UI does not.
+  final bool includeNotGoing;
 
   @override
   Widget build(BuildContext context) {
@@ -214,16 +201,16 @@ class EventRsvpCountRow extends StatelessWidget {
         EventRsvpCountsLine(
           counts: counts,
           compact: compact,
-          includeCantAttend: includeCantAttend,
+          includeNotGoing: includeNotGoing,
         ),
         if (seats != null) ...[
           SizedBox(height: compact ? 4 : 6),
           Text(
-            seats == 0
-                ? 'No seats left'
-                : '$seats of $capacity seats left',
+            seats == 0 ? 'No seats left' : '$seats of $capacity seats left',
             style: PortalTheme.caption.copyWith(
-              color: seats == 0 ? PortalTheme.danger : PortalTheme.textSecondary,
+              color: seats == 0
+                  ? PortalTheme.danger
+                  : PortalTheme.textSecondary,
               fontWeight: FontWeight.w700,
               fontSize: compact ? 11 : 12,
             ),
@@ -239,12 +226,12 @@ class EventRsvpCountsLine extends StatelessWidget {
     super.key,
     required this.counts,
     this.compact = false,
-    this.includeCantAttend = false,
+    this.includeNotGoing = false,
   });
 
   final EventRsvpCounts counts;
   final bool compact;
-  final bool includeCantAttend;
+  final bool includeNotGoing;
 
   @override
   Widget build(BuildContext context) {
@@ -270,28 +257,23 @@ class EventRsvpCountsLine extends StatelessWidget {
               style: style,
               children: [
                 TextSpan(text: '${counts.going} Going'),
-                TextSpan(
-                  text: '  ·  ',
-                  style: style.copyWith(color: PortalTheme.textMuted),
-                ),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Icon(
-                      Icons.star_rounded,
-                      size: iconSize,
-                      color: PortalTheme.navyMid,
-                    ),
-                  ),
-                ),
-                TextSpan(text: '${counts.interested} Interested'),
-                if (includeCantAttend) ...[
+                if (includeNotGoing) ...[
                   TextSpan(
                     text: '  ·  ',
                     style: style.copyWith(color: PortalTheme.textMuted),
                   ),
-                  TextSpan(text: "${counts.cantAttend} Can't Attend"),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Icon(
+                        Icons.cancel_rounded,
+                        size: iconSize,
+                        color: PortalTheme.navyMid,
+                      ),
+                    ),
+                  ),
+                  TextSpan(text: '${counts.notGoing} Not going'),
                 ],
               ],
             ),
@@ -309,7 +291,8 @@ Future<void> openVenueInMaps(
   double? latitude,
   double? longitude,
 }) async {
-  final hasPin = latitude != null &&
+  final hasPin =
+      latitude != null &&
       longitude != null &&
       latitude.isFinite &&
       longitude.isFinite;

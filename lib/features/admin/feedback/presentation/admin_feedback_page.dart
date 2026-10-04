@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/features/feedback/models/feedback_model.dart';
 import 'package:alumni_system/features/admin/feedback/presentation/admin_feedback_detail_page.dart';
 import 'package:alumni_system/features/feedback/data/feedback_service.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 
 class AdminFeedbackScreen extends StatefulWidget {
@@ -79,16 +80,16 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _FilterChip(
+            DirectoryToolbarFilterChip(
               label: 'All statuses',
               selected: _statusFilter == null,
-              onSelected: () => setState(() => _statusFilter = null),
+              onSelected: (_) => setState(() => _statusFilter = null),
             ),
             ...FeedbackStatus.values.map(
-              (s) => _FilterChip(
+              (s) => DirectoryToolbarFilterChip(
                 label: s.label,
                 selected: _statusFilter == s,
-                onSelected: () => setState(() => _statusFilter = s),
+                onSelected: (_) => setState(() => _statusFilter = s),
               ),
             ),
           ],
@@ -98,16 +99,16 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _FilterChip(
+            DirectoryToolbarFilterChip(
               label: 'All categories',
               selected: _categoryFilter == null,
-              onSelected: () => setState(() => _categoryFilter = null),
+              onSelected: (_) => setState(() => _categoryFilter = null),
             ),
             ...FeedbackCategory.values.map(
-              (c) => _FilterChip(
+              (c) => DirectoryToolbarFilterChip(
                 label: c.label,
                 selected: _categoryFilter == c,
-                onSelected: () => setState(() => _categoryFilter = c),
+                onSelected: (_) => setState(() => _categoryFilter = c),
               ),
             ),
           ],
@@ -192,29 +193,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(),
-      selectedColor: const Color(0xFF090A4F).withValues(alpha: 0.15),
-      checkmarkColor: const Color(0xFF090A4F),
     );
   }
 }

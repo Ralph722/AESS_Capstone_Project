@@ -4,7 +4,6 @@ import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/events/data/event_service.dart';
 import 'package:alumni_system/features/jobs/data/job_service.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
@@ -743,13 +742,6 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
       }
       final job = archivedJobs.firstWhere((j) => j.id == jobId);
       await _jobService.updateJobPosting(job.copyWith(status: 'active'));
-      try {
-        await NotificationService().notifyJobRestored(
-          jobId: job.id,
-          jobTitle: job.jobTitle,
-          companyName: job.companyName,
-        );
-      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

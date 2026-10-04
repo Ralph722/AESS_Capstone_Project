@@ -5,6 +5,8 @@ import 'package:alumni_system/core/constants/gts_constants.dart';
 import 'package:alumni_system/core/constants/philippine_location_constants.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Mutable GTS live-profile field state — shared by onboarding and Profile screen.
 class GtsProfileFormState {
@@ -450,6 +452,8 @@ class GtsProfileFormFields extends StatelessWidget {
         initialValue: selected,
         style: _fieldStyle,
         isExpanded: true,
+        borderRadius: PortalMenu.dropdownRadius,
+        dropdownColor: PortalTheme.card,
         decoration: onboardingFieldDecoration(label: label, icon: icon),
         hint: const Text(
           'Select',

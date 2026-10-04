@@ -8,7 +8,9 @@ import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/shared/widgets/tracer/demographic_tracer_tab.dart';
 import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:intl/intl.dart';
 
 /// Unified alumni tracer: demographics + employment (Phase 5).
@@ -680,8 +682,8 @@ class _IdTracerScreenState extends State<IdTracerScreen>
       final record = EmploymentRecord(
         id: _existingRecord?.id ?? LocalId.generate(),
         userId: userId,
-        userName: AppSession.currentUser?.userMetadata?['display_name']
-                as String? ??
+        userName:
+            AppSession.currentUser?.userMetadata?['display_name'] as String? ??
             'Unknown',
         userEmail: _emailController.text.trim(),
         schoolId: _schoolIdController.text.trim(),
@@ -835,6 +837,8 @@ class _IdTracerScreenState extends State<IdTracerScreen>
     return DropdownButtonFormField<String>(
       key: ValueKey<String?>('$label|$selected'),
       initialValue: selected,
+      borderRadius: PortalMenu.dropdownRadius,
+      dropdownColor: PortalTheme.card,
       icon: const Icon(Icons.arrow_drop_down, color: OnboardingTheme.navy),
       decoration: onboardingFieldDecoration(label: label, icon: icon),
       items: items.map((item) {

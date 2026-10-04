@@ -86,6 +86,14 @@ class Survey {
   final Map<String, SurveyVisibilityRule> visibilityRules;
   /// Soft-archive flag in `surveys.data` (no new status / migration).
   final bool archived;
+  /// `surveys.data.autoAssignNewAlumni` — when true (default), the database
+  /// assigns this survey to matching alumni who register or update their
+  /// program/batch while it is open.
+  final bool autoAssignNewAlumni;
+
+  /// `surveys.data.aiHelpEnabled` — CHED GTS "Help me answer" AI helper
+  /// (default on). Also enforced by the `tracer-help` Edge Function.
+  final bool aiHelpEnabled;
 
   const Survey({
     required this.id,
@@ -110,6 +118,8 @@ class Survey {
     this.schemaVersion,
     this.visibilityRules = const {},
     this.archived = false,
+    this.autoAssignNewAlumni = true,
+    this.aiHelpEnabled = true,
   });
 
   String get createdByLabel {
@@ -204,6 +214,8 @@ class Survey {
       schemaVersion: data['schema_version'] as String?,
       visibilityRules: _parseVisibilityRules(data),
       archived: data['archived'] == true,
+      autoAssignNewAlumni: data['autoAssignNewAlumni'] != false,
+      aiHelpEnabled: data['aiHelpEnabled'] != false,
     );
   }
 
@@ -225,6 +237,8 @@ class Survey {
       // Always write so clearing rules replaces prior JSON (upsert merges data).
       'visibility_rules': rulesJson,
       'archived': archived,
+      'autoAssignNewAlumni': autoAssignNewAlumni,
+      'aiHelpEnabled': aiHelpEnabled,
     };
     return {
       'id': id,
@@ -274,6 +288,8 @@ class Survey {
     String? schemaVersion,
     Map<String, SurveyVisibilityRule>? visibilityRules,
     bool? archived,
+    bool? autoAssignNewAlumni,
+    bool? aiHelpEnabled,
     String? createdByDisplayName,
   }) {
     return Survey(
@@ -299,6 +315,8 @@ class Survey {
       schemaVersion: schemaVersion ?? this.schemaVersion,
       visibilityRules: visibilityRules ?? this.visibilityRules,
       archived: archived ?? this.archived,
+      autoAssignNewAlumni: autoAssignNewAlumni ?? this.autoAssignNewAlumni,
+      aiHelpEnabled: aiHelpEnabled ?? this.aiHelpEnabled,
     );
   }
 }

@@ -8,7 +8,6 @@ import 'package:alumni_system/features/jobs/data/job_service.dart';
 import 'package:alumni_system/features/jobs/models/job_category_constants.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/presentation/add_job_dialog.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
@@ -332,15 +331,6 @@ class _AdminJobManagementState extends State<AdminJobManagement>
       isActive: next == 'active',
     );
     await _jobService.updateJobPosting(updated);
-    if (next == 'active') {
-      try {
-        await NotificationService().notifyJobRestored(
-          jobId: job.id,
-          jobTitle: job.jobTitle,
-          companyName: job.companyName,
-        );
-      } catch (_) {}
-    }
     await _load();
   }
 
@@ -432,20 +422,9 @@ class _AdminJobManagementState extends State<AdminJobManagement>
     required String label,
   }) {
     final selected = _status == value;
-    return FilterChip(
-      label: Text(label),
+    return DirectoryToolbarFilterChip(
+      label: label,
       selected: selected,
-      showCheckmark: false,
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-      selectedColor: AdminJobTheme.infoBg,
-      labelStyle: TextStyle(
-        fontSize: 12,
-        color: selected ? AdminJobTheme.primary : AdminJobTheme.textSecondary,
-      ),
-      side: const BorderSide(color: AdminJobTheme.border),
       onSelected: (_) => setState(() {
         _status = value;
         _page = 0;

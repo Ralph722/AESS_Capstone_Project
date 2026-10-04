@@ -10,9 +10,6 @@ import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/forum/data/forum_bookmark_service.dart';
 import 'package:alumni_system/features/forum/data/forum_refresh_bus.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
-import 'package:alumni_system/features/notifications/models/notification_model.dart';
-
 /// Forum data access — Supabase only.
 class ForumService {
   ForumService({
@@ -579,10 +576,14 @@ class ForumService {
             onConflict: 'id',
           );
       if (mentionedUserIds.isNotEmpty) {
-        await _supabase.rpc('notify_forum_mentions', params: {
-          'p_post_id': post.id,
-          'p_mentioned_uids': mentionedUserIds,
-        });
+        try {
+          await _supabase.rpc('notify_forum_mentions', params: {
+            'p_post_id': post.id,
+            'p_mentioned_uids': mentionedUserIds,
+          });
+        } catch (_) {
+          // The reply is saved; a mention notice failure must not undo that.
+        }
       }
       notifyTopicsChanged();
     } catch (e) {
@@ -706,12 +707,13 @@ class ForumService {
         .toSet();
   }
 
+  // Lock / unlock / pin notices to the topic author come from the
+  // forum_topics trigger (notify_forum_topic_moderation).
   Future<void> setTopicLocked(
     String topicId,
     bool locked, {
     String? reason,
   }) async {
-    final topic = await getTopic(topicId);
     await _updateTopicFlags(
       topicId,
       isLocked: locked,
@@ -722,54 +724,15 @@ class ForumService {
       action: locked ? 'lock' : 'unlock',
       reason: reason,
     );
-    if (topic != null) {
-      await _notifyTopicAuthor(
-        topic: topic,
-        title: locked ? 'Your discussion was locked' : 'Your discussion was unlocked',
-        message: locked
-            ? 'Moderators locked "${topic.title}".${reason != null && reason.trim().isNotEmpty ? ' Reason: $reason' : ''}'
-            : 'Moderators unlocked "${topic.title}". You can receive replies again.',
-      );
-    }
   }
 
   Future<void> setTopicPinned(String topicId, bool pinned) async {
-    final topic = await getTopic(topicId);
     await _updateTopicFlags(topicId, isPinned: pinned);
     await _logModeration(
       topicId: topicId,
       action: pinned ? 'pin' : 'unpin',
       reason: null,
     );
-    if (topic != null && pinned) {
-      await _notifyTopicAuthor(
-        topic: topic,
-        title: 'Your discussion was pinned',
-        message: 'Moderators pinned "${topic.title}" in the alumni forum.',
-      );
-    }
-  }
-
-  Future<void> _notifyTopicAuthor({
-    required ForumTopic topic,
-    required String title,
-    required String message,
-  }) async {
-    try {
-      final me = AppSession.userId;
-      if (me == null || me == topic.authorUid) return;
-      await NotificationService().createNotification(
-        userId: topic.authorUid,
-        type: NotificationType.forum,
-        title: title,
-        message: message,
-        relatedId: topic.id,
-        data: {
-          'topicId': topic.id,
-          'target': 'forum_topic',
-        },
-      );
-    } catch (_) {}
   }
 
   Future<void> setTopicSolved(String topicId, bool solved) async {

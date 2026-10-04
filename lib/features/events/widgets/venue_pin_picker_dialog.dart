@@ -104,7 +104,9 @@ class _VenuePinPickerDialogState extends State<_VenuePinPickerDialog> {
       if (decoded is! List || decoded.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No map match found for that venue text.')),
+          const SnackBar(
+            content: Text('No map match found for that venue text.'),
+          ),
         );
         return;
       }
@@ -119,9 +121,9 @@ class _VenuePinPickerDialogState extends State<_VenuePinPickerDialog> {
       _mapController.move(point, 16);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not find venue: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not find venue: $e')));
     } finally {
       if (mounted) setState(() => _searching = false);
     }

@@ -53,6 +53,26 @@ void main() {
       expect(v, contains('ched_18_skills'));
     });
 
+    test('20=Others shows required line-of-business specify', () {
+      final base = {
+        'ched_16': ChedGtsBuiltin.yes,
+        'ched_20': 'Education',
+      };
+      expect(
+        ChedGtsVisibility.visibleItemIds(base),
+        isNot(contains('ched_20_other')),
+      );
+      final withOther = {...base, 'ched_20': ChedGtsBuiltin.othersSpecify};
+      expect(
+        ChedGtsVisibility.visibleItemIds(withOther),
+        contains('ched_20_other'),
+      );
+      expect(
+        ChedGtsVisibility.missingRequired(withOther),
+        contains('ched_20_other'),
+      );
+    });
+
     test('22=Yes shows stay reasons and 24a; hides 25', () {
       final v = ChedGtsVisibility.visibleItemIds({
         'ched_16': ChedGtsBuiltin.yes,
@@ -75,23 +95,28 @@ void main() {
       expect(v, contains('ched_27'));
     });
 
-    test('24a=No skips accepting reasons 24b', () {
+    test('24a=No skips accepting reasons 24b and shows change reasons', () {
       final v = ChedGtsVisibility.visibleItemIds({
         'ched_16': ChedGtsBuiltin.yes,
         'ched_22': ChedGtsBuiltin.yes,
         'ched_24a': ChedGtsBuiltin.no,
+        'ched_25': ['Other reason(s), please specify'],
       });
       expect(v, contains('ched_24a'));
       expect(v, isNot(contains('ched_24b')));
+      expect(v, contains('ched_25'));
+      expect(v, contains('ched_25_other'));
+      expect(v, contains('ched_27'));
     });
 
-    test('24a=Yes shows accepting reasons 24b', () {
+    test('24a=Yes shows accepting reasons 24b; hides change reasons', () {
       final v = ChedGtsVisibility.visibleItemIds({
         'ched_16': ChedGtsBuiltin.yes,
         'ched_22': ChedGtsBuiltin.yes,
         'ched_24a': ChedGtsBuiltin.yes,
       });
       expect(v, contains('ched_24b'));
+      expect(v, isNot(contains('ched_25')));
     });
 
     test('32=No hides competencies 33', () {

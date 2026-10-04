@@ -12,6 +12,7 @@ import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Opens the forum composer as a right side panel (admin announcements) or
@@ -173,12 +174,13 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         ),
         actions: [
           TextButton(
+            style: PortalTheme.ghostButton(dense: true),
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Keep editing'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: ForumTheme.navy),
+            style: PortalMenu.dangerButton(dense: true),
             child: const Text('Leave'),
           ),
         ],
@@ -275,9 +277,6 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       context: context,
       builder: (ctx) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
             child: Padding(

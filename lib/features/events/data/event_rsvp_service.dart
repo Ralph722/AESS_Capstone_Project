@@ -57,25 +57,18 @@ class EventRsvpService {
           .select('status')
           .eq('event_id', eventId);
       var going = 0;
-      var interested = 0;
-      var cant = 0;
+      var notGoing = 0;
       for (final row in rows) {
         switch (EventRsvpStatusX.tryParse(row['status'] as String?)) {
           case EventRsvpStatus.going:
             going++;
-          case EventRsvpStatus.interested:
-            interested++;
-          case EventRsvpStatus.cantAttend:
-            cant++;
+          case EventRsvpStatus.notGoing:
+            notGoing++;
           case null:
             break;
         }
       }
-      return EventRsvpCounts(
-        going: going,
-        interested: interested,
-        cantAttend: cant,
-      );
+      return EventRsvpCounts(going: going, notGoing: notGoing);
     } catch (_) {
       return const EventRsvpCounts();
     }
@@ -101,10 +94,8 @@ class EventRsvpService {
         switch (EventRsvpStatusX.tryParse(row['status'] as String?)) {
           case EventRsvpStatus.going:
             map[id] = current.copyWith(going: current.going + 1);
-          case EventRsvpStatus.interested:
-            map[id] = current.copyWith(interested: current.interested + 1);
-          case EventRsvpStatus.cantAttend:
-            map[id] = current.copyWith(cantAttend: current.cantAttend + 1);
+          case EventRsvpStatus.notGoing:
+            map[id] = current.copyWith(notGoing: current.notGoing + 1);
           case null:
             break;
         }
@@ -228,10 +219,7 @@ class EventRsvpService {
             .from('event_rsvps')
             .stream(primaryKey: ['id'])
             .eq('event_id', eventId)
-            .listen(
-              (_) => emit(),
-              onError: (_) => startPolling(),
-            );
+            .listen((_) => emit(), onError: (_) => startPolling());
       } catch (_) {
         await startPolling();
       }

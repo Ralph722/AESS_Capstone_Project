@@ -70,9 +70,18 @@ abstract final class ChedGtsPrefill {
       put('ched_18', empValues['employment.employmentStatus']);
       put('ched_19', empValues['employment.position']);
       final industry = empValues['employment.industry']?.toString();
-      if (industry != null) {
+      if (industry != null && industry.trim().isNotEmpty) {
         final item = ChedGtsBuiltin.byId('ched_20');
-        put('ched_20', _match(industry, item?.options ?? const []));
+        final matched = SurveyPrefillHelper.matchOption(
+          industry,
+          item?.options ?? const [],
+        );
+        if (matched != null) {
+          put('ched_20', matched);
+        } else {
+          put('ched_20', ChedGtsBuiltin.othersSpecify);
+          put('ched_20_other', industry.trim());
+        }
       }
       put('ched_21', empValues['employment.placeOfWork']);
       final salary = empValues['employment.salaryRange']?.toString();

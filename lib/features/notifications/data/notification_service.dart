@@ -4,165 +4,118 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/features/notifications/models/notification_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 
-/// User notifications — Supabase only (`public.user_notifications`).
+/// Reads and updates the signed-in user's notifications
+/// (`public.user_notifications`).
+///
+/// Notifications are created on the server only (database triggers,
+/// scheduled jobs and admin RPCs via `enqueue_notifications`), so this
+/// service never inserts rows for other users.
 class NotificationService {
   NotificationService({SupabaseClient? supabase})
       : _supabase = supabase ?? Supabase.instance.client;
 
   final SupabaseClient _supabase;
 
-  Future<void> createNotification({
-    required String userId,
-    required NotificationType type,
-    required String title,
-    required String message,
-    String? relatedId,
-    Map<String, dynamic>? data,
-  }) async {
-    if (userId.isEmpty) return;
-    final notification = NotificationModel(
-      id: '',
-      userId: userId,
-      type: type,
-      title: title,
-      message: message,
-      relatedId: relatedId,
-      isRead: false,
-      createdAt: DateTime.now(),
-      data: data,
-    );
+  static const pageSize = 20;
 
-    await _supabase
-        .from('user_notifications')
-        .insert(notification.toSupabaseRow(supabaseUserId: userId));
-  }
-
-  Future<void> createNotificationForAllUsers({
-    required NotificationType type,
-    required String title,
-    required String message,
-    String? relatedId,
-    Map<String, dynamic>? data,
-  }) async {
-    final users = await _supabase.from('users').select('id');
-    if (users.isEmpty) return;
-
-    final rows = users.map((u) {
-      final notification = NotificationModel(
-        id: '',
-        userId: u['id'] as String,
-        type: type,
-        title: title,
-        message: message,
-        relatedId: relatedId,
-        isRead: false,
-        createdAt: DateTime.now(),
-        data: data,
-      );
-      return notification.toSupabaseRow(supabaseUserId: u['id'] as String);
-    }).toList();
-
-    await _supabase.from('user_notifications').insert(rows);
-  }
-
+  /// Newest first. [before] pages backwards; [type] filters one category.
   Future<List<NotificationModel>> getUserNotifications({
     int limit = 50,
     bool unreadOnly = false,
+    DateTime? before,
+    NotificationType? type,
   }) async {
     final userId = AppSession.userId;
     if (userId == null) return [];
 
     try {
-      var query = _supabase
-          .from('user_notifications')
-          .select()
-          .eq('user_id', userId);
-      if (unreadOnly) {
-        query = query.eq('is_read', false);
-      }
-      final rows =
-          await query.order('created_at', ascending: false).limit(limit);
-      return rows.map(NotificationModel.fromSupabaseRow).toList();
+      final rows = await fetchPage(
+        limit: limit,
+        unreadOnly: unreadOnly,
+        before: before,
+        type: type,
+      );
+      return rows;
     } catch (_) {
       return [];
     }
   }
 
-  Future<int> getUnreadCount() async {
+  /// Same as [getUserNotifications] but lets errors reach the caller so a
+  /// screen can show a retry state.
+  Future<List<NotificationModel>> fetchPage({
+    int limit = pageSize,
+    bool unreadOnly = false,
+    DateTime? before,
+    NotificationType? type,
+  }) async {
+    final userId = AppSession.userId;
+    if (userId == null) return [];
+
+    var query = _supabase
+        .from('user_notifications')
+        .select()
+        .eq('user_id', userId);
+    if (unreadOnly) query = query.eq('is_read', false);
+    if (type != null) query = query.eq('type', type.name);
+    if (before != null) {
+      query = query.lt('created_at', before.toUtc().toIso8601String());
+    }
+    final rows = await query.order('created_at', ascending: false).limit(limit);
+    final now = DateTime.now();
+    return rows
+        .map(NotificationModel.fromSupabaseRow)
+        .where((n) => n.expiresAt == null || n.expiresAt!.isAfter(now))
+        .toList();
+  }
+
+  /// Unread count for the signed-in user. [excludeType] leaves one type out
+  /// (the admin bell already counts unread messages separately).
+  Future<int> getUnreadCount({NotificationType? excludeType}) async {
     final userId = AppSession.userId;
     if (userId == null) return 0;
 
     try {
-      final response = await _supabase
+      var query = _supabase
           .from('user_notifications')
           .select('id')
           .eq('user_id', userId)
-          .eq('is_read', false)
-          .count(CountOption.exact);
+          .eq('is_read', false);
+      if (excludeType != null) {
+        query = query.neq('type', excludeType.name);
+      }
+      final response = await query.count(CountOption.exact);
       return response.count;
     } catch (_) {
-      try {
-        final rows = await _supabase
-            .from('user_notifications')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('is_read', false)
-            .limit(200);
-        return rows.length;
-      } catch (_) {
-        return 0;
-      }
+      return 0;
     }
   }
 
-  Stream<int> getUnreadCountStream() {
+  Stream<int> getUnreadCountStream({NotificationType? excludeType}) {
     final userId = AppSession.userId;
     if (userId == null) return Stream.value(0);
-
-    final controller = StreamController<int>();
-    StreamSubscription<dynamic>? sub;
-    Timer? poller;
-
-    Future<void> emit() async {
-      final count = await getUnreadCount();
-      if (!controller.isClosed) controller.add(count);
-    }
-
-    Future<void> startPolling() async {
-      await emit();
-      poller?.cancel();
-      poller = Timer.periodic(const Duration(seconds: 15), (_) => emit());
-    }
-
-    controller.onListen = () async {
-      await emit();
-      try {
-        sub = _supabase
-            .from('user_notifications')
-            .stream(primaryKey: ['id'])
-            .eq('user_id', userId)
-            .listen(
-              (_) => emit(),
-              onError: (_) => startPolling(),
-            );
-      } catch (_) {
-        await startPolling();
-      }
-    };
-
-    controller.onCancel = () async {
-      await sub?.cancel();
-      poller?.cancel();
-    };
-
-    return controller.stream;
+    return _NotificationChangeHub.watch(
+      _supabase,
+      userId,
+      () => getUnreadCount(excludeType: excludeType),
+    );
   }
 
   Stream<List<NotificationModel>> getNotificationsStream({int limit = 50}) {
     final userId = AppSession.userId;
-    if (userId == null) return Stream.value([]);
+    if (userId == null) return Stream.value(const []);
+    return _NotificationChangeHub.watch(
+      _supabase,
+      userId,
+      () => getUserNotifications(limit: limit),
+    );
+  }
 
-    return _notificationsStream(limit: limit);
+  /// Emits whenever the signed-in user's notifications change.
+  Stream<void> watchChanges() {
+    final userId = AppSession.userId;
+    if (userId == null) return const Stream.empty();
+    return _NotificationChangeHub.watch<void>(_supabase, userId, () async {});
   }
 
   Future<void> markAsRead(String notificationId) async {
@@ -205,344 +158,111 @@ class NotificationService {
         .eq('user_id', userId)
         .eq('is_read', true);
   }
+}
 
-  Future<void> notifyNewEvent({
-    required String eventId,
-    required String eventTitle,
-    required String eventDate,
-  }) async {
-    await createNotificationForAllUsers(
-      type: NotificationType.event,
-      title: 'New Event: $eventTitle',
-      message: 'A new event has been scheduled on $eventDate',
-      relatedId: eventId,
-      data: {'eventTitle': eventTitle, 'eventDate': eventDate, 'eventId': eventId},
-    );
-  }
+/// One Realtime channel per signed-in user, shared by every badge / list
+/// listener. Bursts of row changes (e.g. "mark all read") collapse into a
+/// single refetch; a slow poll covers dropped connections.
+class _NotificationChangeHub {
+  _NotificationChangeHub._(this._supabase, this.userId);
 
-  Future<void> notifyEventUpdate({
-    required String eventId,
-    required String eventTitle,
-    required String message,
-  }) async {
-    await createNotificationForAllUsers(
-      type: NotificationType.event,
-      title: eventTitle,
-      message: message,
-      relatedId: eventId,
-      data: {'eventId': eventId, 'eventTitle': eventTitle},
-    );
-  }
+  static final Map<String, _NotificationChangeHub> _hubs = {};
 
-  Future<void> notifyEventCancelled({
-    required String eventId,
-    required String eventTitle,
-  }) async {
-    await notifyEventUpdate(
-      eventId: eventId,
-      eventTitle: 'Event cancelled: $eventTitle',
-      message: 'The event "$eventTitle" has been cancelled.',
-    );
-  }
+  static const _debounce = Duration(milliseconds: 250);
+  static const _pollEvery = Duration(seconds: 30);
 
-  Future<void> notifyNewJob({
-    required String jobId,
-    required String jobTitle,
-    required String companyName,
-    List<String> targetPrograms = const [],
-  }) async {
-    final data = {
-      'jobTitle': jobTitle,
-      'companyName': companyName,
-      'jobId': jobId,
-      'target': 'jobs',
-    };
-    if (targetPrograms.isEmpty) {
-      await createNotificationForAllUsers(
-        type: NotificationType.job,
-        title: 'New Job Opportunity: $jobTitle',
-        message: '$companyName is looking for $jobTitle',
-        relatedId: jobId,
-        data: data,
-      );
-      return;
-    }
+  final SupabaseClient _supabase;
+  final String userId;
+  final _ticks = StreamController<void>.broadcast();
+  RealtimeChannel? _channel;
+  Timer? _poller;
+  Timer? _debouncer;
+  int _listeners = 0;
 
-    // Targeted: users whose program matches any target course code.
-    try {
-      final users = await _supabase
-          .from('users')
-          .select('id, program');
-      final targets = targetPrograms.map((e) => e.toUpperCase()).toSet();
-      final ids = <String>[];
-      for (final u in users) {
-        final program = (u['program'] as String? ?? '').toUpperCase();
-        if (targets.any((t) => program.contains(t) || t.contains(program))) {
-          final id = u['id']?.toString() ?? '';
-          if (id.isNotEmpty) ids.add(id);
-        }
-      }
-      // Also check roster course codes.
-      final members = await _supabase
-          .from('alumni_members')
-          .select('auth_uid, course')
-          .eq('is_registered_user', true)
-          .eq('is_deactivated', false);
-      for (final m in members) {
-        final course = (m['course'] as String? ?? '').toUpperCase();
-        if (targets.contains(course)) {
-          final id = m['auth_uid']?.toString() ?? '';
-          if (id.isNotEmpty) ids.add(id);
-        }
-      }
-      final unique = ids.toSet().toList();
-      if (unique.isEmpty) {
-        await createNotificationForAllUsers(
-          type: NotificationType.job,
-          title: 'New Job Opportunity: $jobTitle',
-          message: '$companyName is looking for $jobTitle',
-          relatedId: jobId,
-          data: data,
-        );
-        return;
-      }
-      for (final id in unique) {
-        await createNotification(
-          userId: id,
-          type: NotificationType.job,
-          title: 'New Job Opportunity: $jobTitle',
-          message: '$companyName is looking for $jobTitle',
-          relatedId: jobId,
-          data: data,
-        );
-      }
-    } catch (_) {
-      await createNotificationForAllUsers(
-        type: NotificationType.job,
-        title: 'New Job Opportunity: $jobTitle',
-        message: '$companyName is looking for $jobTitle',
-        relatedId: jobId,
-        data: data,
-      );
-    }
-  }
-
-  /// Notify alumni who favorited or expressed interest in this job.
-  Future<void> notifyJobUpdated({
-    required String jobId,
-    required String jobTitle,
-    required String companyName,
-  }) async {
-    final userIds = <String>{};
-    try {
-      final favs = await _supabase
-          .from('favorite_jobs')
-          .select('user_id')
-          .eq('job_id', jobId);
-      for (final r in favs) {
-        final id = r['user_id']?.toString() ?? '';
-        if (id.isNotEmpty) userIds.add(id);
-      }
-    } catch (_) {}
-    try {
-      final interests = await _supabase
-          .from('job_interests')
-          .select('user_id')
-          .eq('job_id', jobId);
-      for (final r in interests) {
-        final id = r['user_id']?.toString() ?? '';
-        if (id.isNotEmpty) userIds.add(id);
-      }
-    } catch (_) {}
-
-    for (final id in userIds) {
-      await createNotification(
-        userId: id,
-        type: NotificationType.job,
-        title: 'Job updated: $jobTitle',
-        message: '$companyName updated "$jobTitle"',
-        relatedId: jobId,
-        data: {
-          'jobId': jobId,
-          'jobTitle': jobTitle,
-          'companyName': companyName,
-          'target': 'jobs',
-          'kind': 'job_updated',
-        },
-      );
-    }
-  }
-
-  Future<void> notifyJobRestored({
-    required String jobId,
-    required String jobTitle,
-    required String companyName,
-  }) {
-    return notifyJobUpdated(
-      jobId: jobId,
-      jobTitle: jobTitle,
-      companyName: companyName,
-    );
-  }
-
-  /// Client-side deadline reminder (deduped by kind+jobId in data).
-  Future<void> notifyJobDeadlineIfNeeded({
-    required String userId,
-    required String jobId,
-    required String jobTitle,
-    required String companyName,
-    required int daysLeft,
-  }) async {
-    if (userId.isEmpty || jobId.isEmpty) return;
-    if (daysLeft != 1 && daysLeft != 3) return;
-    final kind = 'job_deadline_${daysLeft}d';
-    try {
-      final existing = await _supabase
-          .from('user_notifications')
-          .select('id, data')
-          .eq('user_id', userId)
-          .eq('related_id', jobId)
-          .eq('type', 'job')
-          .limit(40);
-      for (final row in existing) {
-        final data = row['data'];
-        if (data is Map && data['kind'] == kind) return;
-      }
-    } catch (_) {}
-
-    await createNotification(
-      userId: userId,
-      type: NotificationType.job,
-      title: daysLeft == 1
-          ? 'Deadline tomorrow: $jobTitle'
-          : 'Deadline in 3 days: $jobTitle',
-      message: '$companyName — application deadline approaching',
-      relatedId: jobId,
-      data: {
-        'jobId': jobId,
-        'jobTitle': jobTitle,
-        'companyName': companyName,
-        'target': 'jobs',
-        'kind': kind,
-        'daysLeft': daysLeft,
-      },
-    );
-  }
-
-  Future<void> notifyNewMessage({
-    required String userId,
-    required String messageId,
-    required String senderName,
-    String? senderId,
-    String senderRole = '',
-    String? preview,
-  }) async {
-    if (userId.isEmpty || messageId.isEmpty) return;
-
-    // Prefer SECURITY DEFINER RPC so alumni→admin notifies work under RLS.
-    try {
-      await _supabase.rpc(
-        'notify_new_message',
-        params: {
-          'p_recipient_id': userId,
-          'p_message_id': messageId,
-          'p_sender_name': senderName,
-          'p_sender_id': senderId,
-          'p_sender_role': senderRole,
-          'p_preview': preview,
-        },
-      );
-      return;
-    } catch (_) {
-      // Fall through for environments where the RPC is not deployed yet.
-    }
-
-    // Dedupe client-side when falling back to direct insert.
-    try {
-      final existing = await _supabase
-          .from('user_notifications')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('type', 'message')
-          .contains('data', {'messageId': messageId})
-          .limit(1);
-      if (existing.isNotEmpty) return;
-    } catch (_) {}
-
-    final conversationUserId = senderRole.toLowerCase() == 'admin'
-        ? userId
-        : (senderId ?? userId);
-
-    await createNotification(
-      userId: userId,
-      type: NotificationType.message,
-      title: senderRole.toLowerCase() == 'admin'
-          ? 'New message from Alumni Office'
-          : 'New Message from $senderName',
-      message: (preview != null && preview.trim().isNotEmpty)
-          ? preview.trim()
-          : 'You have received a new message',
-      relatedId: messageId,
-      data: {
-        'senderName': senderName,
-        'senderId': senderId,
-        'senderRole': senderRole,
-        'messageId': messageId,
-        'conversationUserId': conversationUserId,
-        'relatedId': messageId,
-        'target': 'messages',
-      },
-    );
-  }
-
-  Stream<List<NotificationModel>> _notificationsStream({
-    int limit = 50,
-  }) {
-    final controller = StreamController<List<NotificationModel>>();
-    final userId = AppSession.userId;
-    if (userId == null) {
-      controller.add([]);
-      return controller.stream;
-    }
+  static Stream<T> watch<T>(
+    SupabaseClient supabase,
+    String userId,
+    Future<T> Function() load,
+  ) {
+    late StreamController<T> controller;
+    StreamSubscription<void>? tickSub;
+    _NotificationChangeHub? hub;
 
     Future<void> emit() async {
-      final items = await getUserNotifications(limit: limit);
-      if (!controller.isClosed) controller.add(items);
-    }
-
-    StreamSubscription<dynamic>? sub;
-    Timer? poller;
-
-    Future<void> startPolling() async {
-      await emit();
-      poller?.cancel();
-      poller = Timer.periodic(
-        const Duration(seconds: 15),
-        (_) => emit(),
-      );
-    }
-
-    controller.onListen = () async {
-      await emit();
       try {
-        sub = _supabase
-            .from('user_notifications')
-            .stream(primaryKey: ['id'])
-            .eq('user_id', userId)
-            .listen(
-              (_) => emit(),
-              onError: (_) => startPolling(),
-            );
-      } catch (_) {
-        await startPolling();
+        final value = await load();
+        if (!controller.isClosed) controller.add(value);
+      } catch (e) {
+        if (!controller.isClosed) controller.addError(e);
       }
-    };
+    }
 
-    controller.onCancel = () async {
-      await sub?.cancel();
-      poller?.cancel();
-    };
-
+    controller = StreamController<T>(
+      onListen: () {
+        hub = _hubs.putIfAbsent(
+          userId,
+          () => _NotificationChangeHub._(supabase, userId),
+        );
+        hub!._retain();
+        tickSub = hub!._ticks.stream.listen((_) => emit());
+        emit();
+      },
+      onCancel: () async {
+        await tickSub?.cancel();
+        hub?._release();
+      },
+    );
     return controller.stream;
+  }
+
+  void _retain() {
+    _listeners++;
+    if (_listeners == 1) _connect();
+  }
+
+  void _release() {
+    _listeners--;
+    if (_listeners > 0) return;
+    _debouncer?.cancel();
+    _poller?.cancel();
+    final channel = _channel;
+    _channel = null;
+    if (channel != null) _supabase.removeChannel(channel);
+    _hubs.remove(userId);
+  }
+
+  void _connect() {
+    _poller = Timer.periodic(_pollEvery, (_) => _tick());
+    try {
+      _channel = _supabase
+          .channel(
+            'user_notifications:$userId:${DateTime.now().microsecondsSinceEpoch}',
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'user_notifications',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value: userId,
+            ),
+            callback: (_) => _scheduleTick(),
+          )
+          .subscribe((status, [_]) {
+            if (status == RealtimeSubscribeStatus.subscribed) _scheduleTick();
+          });
+    } catch (_) {
+      // Polling keeps the badge fresh when Realtime is unavailable.
+    }
+  }
+
+  void _scheduleTick() {
+    _debouncer?.cancel();
+    _debouncer = Timer(_debounce, _tick);
+  }
+
+  void _tick() {
+    if (!_ticks.isClosed) _ticks.add(null);
   }
 }

@@ -12,6 +12,7 @@ import 'package:alumni_system/features/forum/presentation/forum_composer_page.da
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 
@@ -300,14 +301,13 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
               ),
               actions: [
                 TextButton(
+                  style: PortalTheme.ghostButton(dense: true),
                   onPressed: () => Navigator.pop(ctx, false),
                   child: const Text('Cancel'),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ForumTheme.navy,
-                  ),
+                  style: PortalMenu.dangerButton(dense: true),
                   child: const Text('Submit report'),
                 ),
               ],
@@ -389,12 +389,13 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         ),
         actions: [
           TextButton(
+            style: PortalTheme.ghostButton(dense: true),
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: ForumTheme.navy),
+            style: PortalTheme.primaryButton(dense: true),
             child: const Text('Save'),
           ),
         ],
@@ -750,49 +751,55 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                   }
                 },
                 itemBuilder: (ctx) => [
-                  PopupMenuItem(
+                  portalMenuItem(
                     value: 'bookmark',
-                    child: Text(
-                      topic.isBookmarked ? 'Remove bookmark' : 'Bookmark',
-                    ),
+                    label: topic.isBookmarked ? 'Remove bookmark' : 'Bookmark',
+                    icon: topic.isBookmarked
+                        ? Icons.bookmark_remove_outlined
+                        : Icons.bookmark_add_outlined,
                   ),
-                  const PopupMenuItem(
+                  portalMenuItem(
                     value: 'copy',
-                    child: Text('Copy link'),
+                    label: 'Copy link',
+                    icon: Icons.link_rounded,
                   ),
-                  const PopupMenuItem(
+                  portalMenuItem(
                     value: 'report',
-                    child: Text('Report'),
+                    label: 'Report',
+                    icon: Icons.flag_outlined,
                   ),
                   if (canEdit)
-                    const PopupMenuItem(
+                    portalMenuItem(
                       value: 'edit',
-                      child: Text('Edit'),
+                      label: 'Edit',
+                      icon: Icons.edit_outlined,
                     ),
                   if (canSolve)
-                    PopupMenuItem(
+                    portalMenuItem(
                       value: 'solved',
-                      child: Text(
-                        topic.isSolved ? 'Unmark solved' : 'Mark solved',
-                      ),
+                      label: topic.isSolved ? 'Unmark solved' : 'Mark solved',
+                      icon: Icons.check_circle_outline,
                     ),
                   if (canModerate) ...[
-                    PopupMenuItem(
+                    portalMenuItem(
                       value: 'lock',
-                      child: Text(topic.isLocked ? 'Unlock' : 'Lock'),
+                      label: topic.isLocked ? 'Unlock' : 'Lock',
+                      icon: topic.isLocked
+                          ? Icons.lock_open_rounded
+                          : Icons.lock_outline,
                     ),
-                    PopupMenuItem(
+                    portalMenuItem(
                       value: 'pin',
-                      child: Text(topic.isPinned ? 'Unpin' : 'Pin'),
+                      label: topic.isPinned ? 'Unpin' : 'Pin',
+                      icon: Icons.push_pin_outlined,
                     ),
                   ],
                   if (canDelete)
-                    const PopupMenuItem(
+                    portalMenuItem(
                       value: 'delete',
-                      child: Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.red),
-                      ),
+                      label: 'Delete',
+                      icon: Icons.delete_outline_rounded,
+                      destructive: true,
                     ),
                 ],
               ),
@@ -987,26 +994,28 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                     },
                     itemBuilder: (ctx) => [
                       if (!topic.isLocked)
-                        const PopupMenuItem(
+                        portalMenuItem(
                           value: 'quote',
-                          child: Text('Quote reply'),
+                          label: 'Quote reply',
+                          icon: Icons.format_quote_rounded,
                         ),
-                      const PopupMenuItem(
+                      portalMenuItem(
                         value: 'report',
-                        child: Text('Report'),
+                        label: 'Report',
+                        icon: Icons.flag_outlined,
                       ),
                       if (canEdit)
-                        const PopupMenuItem(
+                        portalMenuItem(
                           value: 'edit',
-                          child: Text('Edit'),
+                          label: 'Edit',
+                          icon: Icons.edit_outlined,
                         ),
                       if (canDelete)
-                        const PopupMenuItem(
+                        portalMenuItem(
                           value: 'delete',
-                          child: Text(
-                            'Delete',
-                            style: TextStyle(color: Colors.red),
-                          ),
+                          label: 'Delete',
+                          icon: Icons.delete_outline_rounded,
+                          destructive: true,
                         ),
                     ],
                   ),
@@ -1266,12 +1275,13 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         content: const Text('All replies will be removed.'),
         actions: [
           TextButton(
+            style: PortalTheme.ghostButton(dense: true),
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: PortalMenu.dangerButton(dense: true),
             child: const Text('Delete'),
           ),
         ],

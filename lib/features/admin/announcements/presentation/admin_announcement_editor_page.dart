@@ -64,6 +64,8 @@ class _AdminAnnouncementEditorPanelState
   String? _batchInputError;
   bool _notifyInApp = true;
   bool _notifyEmail = false;
+  bool _notifyPush = true;
+  bool _urgent = false;
   AnnouncementPriority _priority = AnnouncementPriority.normal;
   bool _isLoading = false;
   bool _isSaving = false;
@@ -98,6 +100,8 @@ class _AdminAnnouncementEditorPanelState
       );
       _notifyInApp = item.notifyInApp;
       _notifyEmail = item.notifyEmail;
+      _notifyPush = item.notifyPush;
+      _urgent = item.urgent;
       _priority = item.priority;
     }
     setState(() {
@@ -185,6 +189,8 @@ class _AdminAnnouncementEditorPanelState
         targetBatchYears: _targetBatches,
         notifyInApp: _notifyInApp,
         notifyEmail: _notifyEmail,
+        notifyPush: _notifyPush,
+        urgent: _urgent,
         priority: _priority,
       ),
     );
@@ -427,6 +433,24 @@ class _AdminAnnouncementEditorPanelState
                                   value: _notifyInApp,
                                   onChanged: (v) =>
                                       setState(() => _notifyInApp = v),
+                                ),
+                                _DeliveryToggle(
+                                  title: 'Phone / browser alert',
+                                  subtitle:
+                                      'For alumni who allowed alerts on their device',
+                                  value: _notifyInApp && _notifyPush,
+                                  onChanged: _notifyInApp
+                                      ? (v) => setState(() => _notifyPush = v)
+                                      : null,
+                                ),
+                                _DeliveryToggle(
+                                  title: 'Mark as urgent',
+                                  subtitle:
+                                      'Ignores alumni category settings and quiet hours',
+                                  value: _notifyInApp && _urgent,
+                                  onChanged: _notifyInApp
+                                      ? (v) => setState(() => _urgent = v)
+                                      : null,
                                 ),
                                 _DeliveryToggle(
                                   title: 'Email notification',

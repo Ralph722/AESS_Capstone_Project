@@ -95,23 +95,9 @@ class ForumToolbarFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
+    return DirectoryToolbarFilterChip(
+      label: label,
       selected: selected,
-      showCheckmark: false,
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-      selectedColor: AdminForumTheme.infoBg,
-      labelStyle: TextStyle(
-        fontSize: 12,
-        color: selected
-            ? AdminForumTheme.primary
-            : AdminForumTheme.textSecondary,
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-      ),
-      side: const BorderSide(color: AdminForumTheme.border),
       onSelected: onSelected,
     );
   }

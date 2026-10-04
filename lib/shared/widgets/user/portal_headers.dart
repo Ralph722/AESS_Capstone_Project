@@ -15,6 +15,7 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.title,
     this.subtitle,
+    this.titleContent,
     this.leading,
     this.automaticallyImplyLeading = true,
     this.actions,
@@ -26,6 +27,9 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   final String title;
   final String? subtitle;
+
+  /// Replaces the [title] text (e.g. a logo); [title] stays the tooltip.
+  final Widget? titleContent;
   final Widget? leading;
   final bool automaticallyImplyLeading;
   final List<Widget>? actions;
@@ -54,17 +58,21 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
         : PortalTheme.border.withValues(alpha: 0.9);
 
     // Subtitles are intentionally omitted for a cleaner header.
-    final hasLeading = leading != null ||
+    final hasLeading =
+        leading != null ||
         (automaticallyImplyLeading && Navigator.canPop(context));
-    final titleWidget = Text(
-      title,
-      style: (_dark ? PortalTheme.pageTitleOnDark : PortalTheme.pageTitle)
-          .copyWith(color: fg),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
+    final titleWidget = titleContent != null
+        ? Tooltip(message: title, child: titleContent)
+        : Text(
+            title,
+            style: (_dark ? PortalTheme.pageTitleOnDark : PortalTheme.pageTitle)
+                .copyWith(color: fg),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
 
-    final hairline = bottom ??
+    final hairline =
+        bottom ??
         PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: borderColor),
@@ -88,9 +96,13 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
                     size: PortalTheme.headerIconSize,
                   ),
                   child: NavigationToolbar(
-                    leading: leading ??
+                    leading:
+                        leading ??
                         (automaticallyImplyLeading && Navigator.canPop(context)
-                            ? BackButton(color: fg, onPressed: () => Navigator.maybePop(context))
+                            ? BackButton(
+                                color: fg,
+                                onPressed: () => Navigator.maybePop(context),
+                              )
                             : null),
                     middle: Align(
                       alignment: centerTitle
@@ -136,17 +148,16 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
       leading: leading,
       leadingWidth: hasLeading ? 56 : 0,
       iconTheme: IconThemeData(color: fg, size: PortalTheme.headerIconSize),
-      actionsIconTheme:
-          IconThemeData(color: fg, size: PortalTheme.headerIconSize),
+      actionsIconTheme: IconThemeData(
+        color: fg,
+        size: PortalTheme.headerIconSize,
+      ),
       // Keep title off the screen edge when there is no leading control.
       titleSpacing: hasLeading ? 8 : PortalTheme.headerHPad,
       title: titleWidget,
       actions: actions == null
           ? null
-          : [
-              ...actions!,
-              const SizedBox(width: PortalTheme.headerHPad),
-            ],
+          : [...actions!, const SizedBox(width: PortalTheme.headerHPad)],
       bottom: hairline,
     );
   }
@@ -304,19 +315,13 @@ class PortalChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: selected ? PortalTheme.navy : colors.$1,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: selected ? PortalTheme.navy : colors.$2,
-        ),
+        border: Border.all(color: selected ? PortalTheme.navy : colors.$2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(
-              icon,
-              size: 14,
-              color: selected ? Colors.white : colors.$3,
-            ),
+            Icon(icon, size: 14, color: selected ? Colors.white : colors.$3),
             const SizedBox(width: 4),
           ],
           Text(
@@ -403,29 +408,27 @@ class PortalHighlightPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final decoration = switch (variant) {
       PortalHighlightVariant.navy => BoxDecoration(
-          gradient: PortalTheme.heroGradient,
-          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-          boxShadow: PortalTheme.elevatedShadow,
-        ),
+        gradient: PortalTheme.heroGradient,
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        boxShadow: PortalTheme.elevatedShadow,
+      ),
       PortalHighlightVariant.soft => BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-          border: Border.all(
-            color: PortalTheme.border.withValues(alpha: 0.75),
-          ),
-          boxShadow: PortalTheme.softShadow,
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+        boxShadow: PortalTheme.softShadow,
+      ),
       PortalHighlightVariant.goldEdge => BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-          border: Border.all(color: PortalTheme.gold, width: 1.5),
-          boxShadow: PortalTheme.cardShadow,
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        border: Border.all(color: PortalTheme.gold, width: 1.5),
+        boxShadow: PortalTheme.cardShadow,
+      ),
       PortalHighlightVariant.attention => BoxDecoration(
-          color: const Color(0xFFFFF8EB),
-          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-          border: Border.all(color: PortalTheme.gold.withValues(alpha: 0.65)),
-        ),
+        color: const Color(0xFFFFF8EB),
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        border: Border.all(color: PortalTheme.gold.withValues(alpha: 0.65)),
+      ),
     };
 
     final content = Container(

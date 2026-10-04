@@ -55,8 +55,9 @@ class EventComment {
       profileImageUrl: profileImageUrl,
       comment: row['body'] as String? ?? '',
       createdAt: _parseDateTime(row['created_at']),
-      updatedAt:
-          row['updated_at'] != null ? _parseDateTime(row['updated_at']) : null,
+      updatedAt: row['updated_at'] != null
+          ? _parseDateTime(row['updated_at'])
+          : null,
       parentCommentId: row['comment_id']?.toString() ?? '',
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_help_service.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_help_sheet.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -48,15 +50,29 @@ class ChedGtsForm extends StatefulWidget {
     this.showIntro = true,
     this.sectionFilter,
     this.showSectionHeaders = true,
+    this.onlyItemIds,
+    this.highlightMissing = false,
+    this.helpSurveyId,
   });
 
   final Map<String, dynamic> answers;
   final ChedGtsAnswersChanged onChanged;
   final bool readOnly;
   final bool showIntro;
+
   /// When set, only items in this section are rendered.
   final ChedGtsSection? sectionFilter;
   final bool showSectionHeaders;
+
+  /// When set, only these (visible) items are rendered.
+  final Set<String>? onlyItemIds;
+
+  /// Outlines required items that are still unanswered.
+  final bool highlightMissing;
+
+  /// When set (and not [readOnly]), Q19/Q20 show "Help me answer" backed by
+  /// the `tracer-help` Edge Function for this survey.
+  final String? helpSurveyId;
 
   @override
   State<ChedGtsForm> createState() => _ChedGtsFormState();
@@ -108,19 +124,63 @@ class _ChedGtsFormState extends State<ChedGtsForm> {
 
   Set<String> get _visible => ChedGtsVisibility.visibleItemIds(_answers);
 
-  void _set(String id, dynamic value) {
-    if (widget.readOnly) return;
+  void _set(String id, dynamic value) => _setMany({id: value});
+
+  void _setMany(Map<String, dynamic> updates) {
+    if (widget.readOnly || updates.isEmpty) return;
     setState(() {
-      _answers[id] = value;
+      _answers.addAll(updates);
       _answers = ChedGtsVisibility.pruneHiddenAnswers(_answers);
       _syncTextControllers();
     });
     widget.onChanged(Map<String, dynamic>.from(_answers));
   }
 
+  /// Answer keys filled from a helper suggestion, and the latest suggestion,
+  /// per survey for this app session. Static because the wizard rebuilds this
+  /// form per section.
+  static final Map<String, Set<String>> _helpAppliedKeys = {};
+  static final Map<String, ChedGtsHelpSuggestion> _helpSuggestions = {};
+
+  bool get _helpAvailable => widget.helpSurveyId != null && !widget.readOnly;
+
+  Set<String> get _applied =>
+      _helpAppliedKeys[widget.helpSurveyId] ?? const <String>{};
+
+  /// The button lives on Q19 only; it reads "Ask again" after use.
+  VoidCallback? _helpFor(ChedGtsItem item) {
+    final surveyId = widget.helpSurveyId;
+    if (!_helpAvailable || item.id != 'ched_19') return null;
+    return () => showChedGtsHelpSheet(
+      context,
+      surveyId: surveyId!,
+      onApply: (updates, source) {
+        _helpAppliedKeys.putIfAbsent(surveyId, () => {}).addAll(updates.keys);
+        _helpSuggestions[surveyId] = source;
+        if (mounted) _setMany(updates);
+      },
+    );
+  }
+
+  /// Q20 recommendation after only the Q19 suggestion was used. Hidden once
+  /// Q19 no longer matches the suggested title, or Q20 already has that answer.
+  ChedGtsHelpSuggestion? _q20Recommendation() {
+    if (!_helpAvailable) return null;
+    final s = _helpSuggestions[widget.helpSurveyId];
+    if (s == null || s.unclear || s.lineOfBusiness == null) return null;
+    if (_applied.contains('ched_20')) return null;
+    final q19 = _answers['ched_19']?.toString().trim() ?? '';
+    if (q19 != s.occupation.trim()) return null;
+    if (_answers['ched_20'] == s.lineOfBusiness) return null;
+    return s;
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = _visible;
+    final missing = widget.highlightMissing
+        ? ChedGtsVisibility.missingRequired(_answers).toSet()
+        : const <String>{};
     ChedGtsSection? lastSection;
 
     final children = <Widget>[];
@@ -129,24 +189,49 @@ class _ChedGtsFormState extends State<ChedGtsForm> {
       children.add(const SizedBox(height: 16));
     }
 
+    final q20Recommendation = _q20Recommendation();
+
     for (final item in ChedGtsBuiltin.items) {
       if (!visible.contains(item.id)) continue;
       if (widget.sectionFilter != null &&
           item.section != widget.sectionFilter) {
         continue;
       }
+      final only = widget.onlyItemIds;
+      if (only != null && !only.contains(item.id)) continue;
       if (widget.showSectionHeaders && item.section != lastSection) {
         lastSection = item.section;
         children.add(_SectionHeader(title: item.sectionTitle));
         children.add(const SizedBox(height: 12));
       }
-      children.add(_ItemCard(
-        item: item,
-        value: _answers[item.id],
-        textController: _textControllers[item.id],
-        readOnly: widget.readOnly,
-        onChanged: (v) => _set(item.id, v),
-      ));
+      children.add(
+        _ItemCard(
+          item: item,
+          value: _answers[item.id],
+          textController: _textControllers[item.id],
+          readOnly: widget.readOnly,
+          missing: missing.contains(item.id),
+          onChanged: (v) => _set(item.id, v),
+          onHelp: _helpFor(item),
+          helpUsed: _applied.isNotEmpty,
+          recommendation: item.id == 'ched_20' && q20Recommendation != null
+              ? _Q20Recommendation(
+                  suggestion: q20Recommendation,
+                  onUse: () {
+                    _helpAppliedKeys
+                        .putIfAbsent(widget.helpSurveyId!, () => {})
+                        .add('ched_20');
+                    _setMany(chedGtsLineOfBusinessUpdates(q20Recommendation));
+                  },
+                )
+              : null,
+          helpPointer:
+              item.id == 'ched_20' &&
+              _helpAvailable &&
+              q20Recommendation == null &&
+              !_applied.contains('ched_20'),
+        ),
+      );
       children.add(const SizedBox(height: 12));
     }
 
@@ -165,9 +250,7 @@ class _IntroBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: PortalTheme.navy.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
-        border: Border.all(
-          color: PortalTheme.border.withValues(alpha: 0.8),
-        ),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.8)),
       ),
       child: Text(
         'Complete this GTS questionnaire as accurately as you can. '
@@ -186,12 +269,8 @@ class _RequiredBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = required
-        ? const Color(0xFFFEF3C7)
-        : const Color(0xFFECFDF5);
-    final fg = required
-        ? const Color(0xFF92400E)
-        : const Color(0xFF047857);
+    final bg = required ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5);
+    final fg = required ? const Color(0xFF92400E) : const Color(0xFF047857);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -200,11 +279,7 @@ class _RequiredBadge extends StatelessWidget {
       ),
       child: Text(
         required ? 'Required' : 'Optional',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: fg,
-        ),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg),
       ),
     );
   }
@@ -224,9 +299,240 @@ class _SectionHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
         border: Border.all(color: PortalTheme.border.withValues(alpha: 0.8)),
       ),
-      child: Text(
-        title,
-        style: PortalTheme.cardTitle.copyWith(fontSize: 13),
+      child: Text(title, style: PortalTheme.cardTitle.copyWith(fontSize: 13)),
+    );
+  }
+}
+
+/// Guidance note under the question; long notes collapse to two lines.
+class _HelpNote extends StatefulWidget {
+  const _HelpNote({required this.text});
+
+  final String text;
+
+  @override
+  State<_HelpNote> createState() => _HelpNoteState();
+}
+
+class _HelpNoteState extends State<_HelpNote> {
+  static const _collapsedLines = 2;
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = PortalTheme.meta.copyWith(
+      height: 1.4,
+      color: PortalTheme.textSecondary,
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: PortalTheme.navy.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        border: Border.all(color: PortalTheme.navy.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.lightbulb_outline_rounded,
+              size: 16,
+              color: Color(0xFFD99A00),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final painter = TextPainter(
+                  text: TextSpan(text: widget.text, style: style),
+                  maxLines: _collapsedLines,
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                )..layout(maxWidth: constraints.maxWidth);
+                final overflows = painter.didExceedMaxLines;
+                painter.dispose();
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedSize(
+                      duration: PortalTheme.fast,
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        widget.text,
+                        style: style,
+                        maxLines: _expanded || !overflows
+                            ? null
+                            : _collapsedLines,
+                        overflow: _expanded || !overflows
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (overflows)
+                      InkWell(
+                        onTap: () => setState(() => _expanded = !_expanded),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            _expanded ? 'Less' : 'More',
+                            style: style.copyWith(
+                              color: PortalTheme.navy,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Based on your job…" Q20 recommendation from the Q19 AI suggestion.
+class _Q20Recommendation extends StatelessWidget {
+  const _Q20Recommendation({required this.suggestion, required this.onUse});
+
+  final ChedGtsHelpSuggestion suggestion;
+  final VoidCallback onUse;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = suggestion.lineOfBusiness!;
+    final value =
+        line == ChedGtsBuiltin.othersSpecify &&
+            suggestion.specifyText.isNotEmpty
+        ? 'Others: ${suggestion.specifyText}'
+        : line;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      decoration: BoxDecoration(
+        color: PortalTheme.gold.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        border: Border.all(color: PortalTheme.gold.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 1),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 16,
+                  color: PortalTheme.navy,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Based on your job, your line of business may be:',
+                      style: PortalTheme.meta.copyWith(
+                        color: PortalTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      value,
+                      style: PortalTheme.cardTitle.copyWith(
+                        fontSize: 14,
+                        height: 1.3,
+                      ),
+                    ),
+                    if (suggestion.reason.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        suggestion.reason,
+                        style: PortalTheme.meta.copyWith(height: 1.35),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'This is only a suggestion and might be wrong. Choose '
+                      'the option that matches what your company does.',
+                      style: PortalTheme.meta.copyWith(
+                        height: 1.35,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: onUse,
+              style: TextButton.styleFrom(
+                foregroundColor: PortalTheme.navy,
+                minimumSize: const Size(0, 36),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: const Text('Use this'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HelpMeAnswerPill extends StatelessWidget {
+  const _HelpMeAnswerPill({required this.onPressed, required this.label});
+
+  final VoidCallback onPressed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      shape: StadiumBorder(
+        side: BorderSide(color: PortalTheme.navy.withValues(alpha: 0.18)),
+      ),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 15,
+                color: PortalTheme.navy,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: PortalTheme.navy,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -239,6 +545,11 @@ class _ItemCard extends StatelessWidget {
     required this.onChanged,
     required this.readOnly,
     this.textController,
+    this.missing = false,
+    this.onHelp,
+    this.helpUsed = false,
+    this.recommendation,
+    this.helpPointer = false,
   });
 
   final ChedGtsItem item;
@@ -246,17 +557,32 @@ class _ItemCard extends StatelessWidget {
   final ValueChanged<dynamic> onChanged;
   final bool readOnly;
   final TextEditingController? textController;
+  final bool missing;
+  final VoidCallback? onHelp;
+  final bool helpUsed;
+
+  /// Replaces the written note (Q20 after a Q19 AI suggestion).
+  final Widget? recommendation;
+
+  /// Adds "Not sure? Tap Help me answer on question 19." under the note.
+  final bool helpPointer;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(PortalTheme.space3),
+    return AnimatedContainer(
+      duration: PortalTheme.fast,
       decoration: BoxDecoration(
         color: PortalTheme.card,
         borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+        border: Border.all(
+          color: missing
+              ? PortalTheme.danger.withValues(alpha: 0.6)
+              : PortalTheme.border.withValues(alpha: 0.75),
+          width: missing ? 1.5 : 1,
+        ),
         boxShadow: PortalTheme.softShadow,
       ),
+      padding: const EdgeInsets.all(PortalTheme.space3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -276,6 +602,65 @@ class _ItemCard extends StatelessWidget {
               _RequiredBadge(required: item.required),
             ],
           ),
+          if (missing) ...[
+            const SizedBox(height: 6),
+            const Row(
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 15,
+                  color: PortalTheme.danger,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'This question needs an answer',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: PortalTheme.danger,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (recommendation != null) ...[
+            const SizedBox(height: 10),
+            recommendation!,
+          ] else if (item.helpText != null) ...[
+            const SizedBox(height: 8),
+            _HelpNote(text: item.helpText!),
+          ],
+          if (helpPointer) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 14,
+                  color: PortalTheme.navy,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: 'Not sure? Tap '),
+                        TextSpan(
+                          text: 'Help me answer',
+                          style: PortalTheme.meta.copyWith(
+                            color: PortalTheme.navy,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const TextSpan(text: ' on question 19.'),
+                      ],
+                    ),
+                    style: PortalTheme.meta.copyWith(height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (!item.required && !item.isOthersSpecify) ...[
             const SizedBox(height: 6),
             Text(
@@ -286,7 +671,17 @@ class _ItemCard extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 12),
+          if (onHelp != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _HelpMeAnswerPill(
+                onPressed: onHelp!,
+                label: helpUsed ? 'Ask again' : 'Help me answer',
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
           _buildField(),
         ],
       ),
@@ -323,9 +718,7 @@ class _ItemCard extends StatelessWidget {
             return ChoiceChip(
               label: Text(opt),
               selected: selected,
-              onSelected: readOnly
-                  ? null
-                  : (_) => onChanged(opt),
+              onSelected: readOnly ? null : (_) => onChanged(opt),
               selectedColor: PortalTheme.navy.withValues(alpha: 0.12),
               backgroundColor: PortalTheme.surfaceMuted,
               side: BorderSide(
@@ -444,6 +837,57 @@ class _DateField extends StatelessWidget {
   }
 }
 
+/// Horizontal scroll with an always-visible scrollbar (shown only on overflow).
+class _VisibleHorizontalScroll extends StatefulWidget {
+  const _VisibleHorizontalScroll({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_VisibleHorizontalScroll> createState() =>
+      _VisibleHorizontalScrollState();
+}
+
+class _VisibleHorizontalScrollState extends State<_VisibleHorizontalScroll> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollbarTheme(
+      data: ScrollbarThemeData(
+        thickness: const WidgetStatePropertyAll(6),
+        radius: const Radius.circular(999),
+        thumbColor: const WidgetStatePropertyAll(PortalTheme.navy),
+        trackColor: WidgetStatePropertyAll(
+          PortalTheme.navy.withValues(alpha: 0.06),
+        ),
+        trackBorderColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      child: Scrollbar(
+        controller: _controller,
+        thumbVisibility: true,
+        trackVisibility: true,
+        child: ScrollConfiguration(
+          // Avoids a second, hover-only scrollbar on desktop/web.
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 14),
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MatrixField extends StatelessWidget {
   const _MatrixField({
     required this.item,
@@ -457,19 +901,52 @@ class _MatrixField extends StatelessWidget {
   final ValueChanged<Map<String, dynamic>> onChanged;
   final bool readOnly;
 
+  static const _minLabelWidth = 160.0;
+  static const _minCheckWidth = 120.0;
+  static const _margin = 12.0;
+  static const _spacing = 16.0;
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fill the card: spare width is split between the label column and
+        // the checkbox columns; below the minimum it scrolls instead.
+        final cols = item.matrixColumns.length;
+        final chrome = _margin * 2 + _spacing * cols + 1;
+        final extra =
+            constraints.maxWidth -
+            chrome -
+            _minLabelWidth -
+            cols * _minCheckWidth;
+        final spare = extra > 0 ? extra : 0.0;
+        final labelWidth = _minLabelWidth + spare / 2;
+        final checkWidth = _minCheckWidth + (cols == 0 ? 0 : spare / 2 / cols);
+        return _buildTable(labelWidth, checkWidth);
+      },
+    );
+  }
+
+  Widget _buildTable(double labelWidth, double checkWidth) {
+    return _VisibleHorizontalScroll(
       child: DataTable(
         headingRowHeight: 40,
         dataRowMinHeight: 40,
         dataRowMaxHeight: 56,
+        horizontalMargin: _margin,
+        columnSpacing: _spacing,
         columns: [
-          const DataColumn(label: Text('')),
+          DataColumn(label: SizedBox(width: labelWidth)),
           ...item.matrixColumns.map(
             (c) => DataColumn(
-              label: Text(c, style: const TextStyle(fontSize: 11)),
+              label: SizedBox(
+                width: checkWidth,
+                child: Text(
+                  c,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ),
             ),
           ),
         ],
@@ -481,34 +958,48 @@ class _MatrixField extends StatelessWidget {
             cells: [
               DataCell(
                 SizedBox(
-                  width: 160,
+                  width: labelWidth,
                   child: Text(row, style: const TextStyle(fontSize: 12)),
                 ),
               ),
               ...item.matrixColumns.map((col) {
                 final checked = rowMap[col] == true;
                 return DataCell(
-                  Checkbox(
-                    value: checked,
-                    onChanged: readOnly
-                        ? null
-                        : (v) {
-                            final next = Map<String, dynamic>.from(value);
-                            final nextRow = Map<String, dynamic>.from(rowMap);
-                            // Single select per column for job level (item 30).
-                            if (item.id == 'ched_30' && v == true) {
-                              for (final r in item.matrixRows) {
-                                final other = next[r] is Map
-                                    ? Map<String, dynamic>.from(next[r] as Map)
-                                    : <String, dynamic>{};
-                                other[col] = false;
-                                next[r] = other;
-                              }
-                            }
-                            nextRow[col] = v == true;
-                            next[row] = nextRow;
-                            onChanged(next);
-                          },
+                  SizedBox(
+                    width: checkWidth,
+                    child: Center(
+                      child: Checkbox(
+                        value: checked,
+                        activeColor: PortalTheme.navy,
+                        side: BorderSide(
+                          color: PortalTheme.navy.withValues(alpha: 0.6),
+                          width: 1.5,
+                        ),
+                        onChanged: readOnly
+                            ? null
+                            : (v) {
+                                final next = Map<String, dynamic>.from(value);
+                                final nextRow = Map<String, dynamic>.from(
+                                  rowMap,
+                                );
+                                // Single select per column for job level (item 30).
+                                if (item.id == 'ched_30' && v == true) {
+                                  for (final r in item.matrixRows) {
+                                    final other = next[r] is Map
+                                        ? Map<String, dynamic>.from(
+                                            next[r] as Map,
+                                          )
+                                        : <String, dynamic>{};
+                                    other[col] = false;
+                                    next[r] = other;
+                                  }
+                                }
+                                nextRow[col] = v == true;
+                                next[row] = nextRow;
+                                onChanged(next);
+                              },
+                      ),
+                    ),
                   ),
                 );
               }),
@@ -609,7 +1100,10 @@ String formatChedGtsAnswer(ChedGtsItem item, dynamic value) {
       if (value is! List) return value.toString();
       return value
           .whereType<Map>()
-          .map((row) => row.values.where((v) => '$v'.trim().isNotEmpty).join(' | '))
+          .map(
+            (row) =>
+                row.values.where((v) => '$v'.trim().isNotEmpty).join(' | '),
+          )
           .where((s) => s.isNotEmpty)
           .join('\n');
     default:

@@ -76,7 +76,9 @@ class EventSeatsLine extends StatelessWidget {
             '$seats / ${event.capacity} seats left',
             style: PortalTheme.meta.copyWith(
               fontWeight: FontWeight.w700,
-              color: seats == 0 ? PortalTheme.danger : PortalTheme.textSecondary,
+              color: seats == 0
+                  ? PortalTheme.danger
+                  : PortalTheme.textSecondary,
             ),
           ),
         ],
@@ -99,7 +101,9 @@ class EventConstraintLabels extends StatelessWidget {
         spacing: 6,
         runSpacing: 4,
         children: labels
-            .map((label) => PortalChip(label: label, tone: PortalChipTone.danger))
+            .map(
+              (label) => PortalChip(label: label, tone: PortalChipTone.danger),
+            )
             .toList(),
       ),
     );
@@ -130,7 +134,7 @@ class AlumniEventsEmptyState extends StatelessWidget {
   }
 }
 
-/// Compact feed summary: "✓ 1 Going · ☆ 0 Interested"
+/// Compact feed summary: "✓ 1 Going"
 class EventRsvpSummaryPill extends StatelessWidget {
   const EventRsvpSummaryPill({
     super.key,
@@ -179,141 +183,140 @@ class AlumniEventListCard extends StatelessWidget {
     final when =
         '${DateFormat('EEE, MMM d').format(event.date)} · ${formatAlumniEventTimeRange(event.startTime, event.endTime)}';
     final status = deriveEventDisplayStatus(event);
-    final isTodayEmphasis = status == EventDisplayStatus.today ||
+    final isTodayEmphasis =
+        status == EventDisplayStatus.today ||
         status == EventDisplayStatus.ongoing;
 
+    final radius = BorderRadius.circular(PortalTheme.radius2xl);
+
+    // Border is a foreground layer so the cover image can't paint over it at
+    // the rounded top corners.
     return Align(
       alignment: Alignment.topCenter,
       widthFactor: 1,
       heightFactor: 1,
-      child: Material(
-        color: Colors.white,
-        elevation: 0,
-        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-              border: Border.all(
-                color: isTodayEmphasis
-                    ? PortalTheme.gold.withValues(alpha: 0.85)
-                    : PortalTheme.border.withValues(alpha: 0.7),
-                width: isTodayEmphasis ? 1.6 : 1,
-              ),
-              boxShadow: isTodayEmphasis
-                  ? [
-                      BoxShadow(
-                        color: PortalTheme.gold.withValues(alpha: 0.22),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : PortalTheme.cardShadow,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Stack(
-                  children: [
-                    ColoredBox(
-                      color: PortalTheme.surfaceMuted,
-                      child: EventCover(
-                        event: event,
-                        aspectRatio: EventCover.feedTeaserRatio,
-                        borderRadius: 0,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const Positioned(
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      height: 64,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Color(0x990A1128),
-                              Color(0x000A1128),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 12,
-                      top: 12,
-                      child: _FrostedDateBadge(month: month, day: day),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: isTodayEmphasis
+              ? [
+                  BoxShadow(
+                    color: PortalTheme.gold.withValues(alpha: 0.22),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : PortalTheme.cardShadow,
+        ),
+        foregroundDecoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(
+            color: isTodayEmphasis
+                ? PortalTheme.gold.withValues(alpha: 0.85)
+                : PortalTheme.border.withValues(alpha: 0.7),
+            width: isTodayEmphasis ? 1.6 : 1,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: Material(
+            color: Colors.white,
+            child: InkWell(
+              onTap: onTap,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
                     children: [
-                      EventCategoryChip(category: event.category),
-                      const SizedBox(height: 8),
-                      Text(
-                        event.theme,
-                        style: PortalTheme.cardTitle.copyWith(
-                          fontSize: 16,
-                          height: 1.25,
+                      ColoredBox(
+                        color: PortalTheme.surfaceMuted,
+                        child: EventCover(
+                          event: event,
+                          aspectRatio: EventCover.feedTeaserRatio,
+                          borderRadius: 0,
+                          fit: BoxFit.cover,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 10),
-                      EventMetaRow(
-                        icon: Icons.schedule_outlined,
-                        text: when,
-                      ),
-                      const SizedBox(height: 6),
-                      EventMetaRow(
-                        icon: Icons.place_outlined,
-                        text: event.venue.trim().isEmpty
-                            ? 'Venue TBA'
-                            : event.venue,
-                      ),
-                      const SizedBox(height: 6),
-                      EventMetaRow(
-                        icon: Icons.groups_outlined,
-                        text:
-                            '${counts.going} Going · ${counts.interested} Interested',
-                      ),
-                      EventSeatsLine(event: event, goingCount: counts.going),
-                      if (constraintLabels.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        EventConstraintLabels(labels: constraintLabels),
-                      ],
-                      if (onRsvpChanged != null) ...[
-                        const SizedBox(height: 12),
-                        IgnorePointer(
-                          ignoring: busy,
-                          child: Opacity(
-                            opacity: busy ? 0.55 : 1,
-                            child: EventRsvpBar(
-                              compact: true,
-                              selected: selectedStatus,
-                              goingEnabled: goingEnabled,
-                              onChanged: onRsvpChanged!,
+                      const Positioned(
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        height: 64,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0x990A1128), Color(0x000A1128)],
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                      Positioned(
+                        left: 12,
+                        top: 12,
+                        child: _FrostedDateBadge(month: month, day: day),
+                      ),
                     ],
                   ),
-                ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        EventCategoryChip(category: event.category),
+                        const SizedBox(height: 8),
+                        Text(
+                          event.theme,
+                          style: PortalTheme.cardTitle.copyWith(
+                            fontSize: 16,
+                            height: 1.25,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 10),
+                        EventMetaRow(icon: Icons.schedule_outlined, text: when),
+                        const SizedBox(height: 6),
+                        EventMetaRow(
+                          icon: Icons.place_outlined,
+                          text: event.venue.trim().isEmpty
+                              ? 'Venue TBA'
+                              : event.venue,
+                        ),
+                        const SizedBox(height: 6),
+                        EventMetaRow(
+                          icon: Icons.groups_outlined,
+                          text: '${counts.going} Going',
+                        ),
+                        EventSeatsLine(event: event, goingCount: counts.going),
+                        if (constraintLabels.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          EventConstraintLabels(labels: constraintLabels),
+                        ],
+                        if (onRsvpChanged != null) ...[
+                          const SizedBox(height: 12),
+                          IgnorePointer(
+                            ignoring: busy,
+                            child: Opacity(
+                              opacity: busy ? 0.55 : 1,
+                              child: EventRsvpBar(
+                                compact: true,
+                                selected: selectedStatus,
+                                goingEnabled: goingEnabled,
+                                onChanged: onRsvpChanged!,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

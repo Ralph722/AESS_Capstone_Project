@@ -1,12 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/features/events/models/event_comment_model.dart';
-import 'package:alumni_system/features/notifications/models/notification_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 
 class EventCommentService {
   EventCommentService({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+    : _supabase = supabase ?? Supabase.instance.client;
 
   final SupabaseClient _supabase;
 
@@ -69,8 +67,11 @@ class EventCommentService {
         .eq('event_id', eventId)
         .asyncMap((rows) async {
           final sorted = List<Map<String, dynamic>>.from(rows)
-            ..sort((a, b) => (b['created_at'] as String? ?? '')
-                .compareTo(a['created_at'] as String? ?? ''));
+            ..sort(
+              (a, b) => (b['created_at'] as String? ?? '').compareTo(
+                a['created_at'] as String? ?? '',
+              ),
+            );
           return _attachUserInfo(sorted);
         });
   }
@@ -104,9 +105,10 @@ class EventCommentService {
         throw Exception('You do not have permission to edit this comment');
       }
 
-      await _supabase.from('event_comments').update({
-        'body': newComment.trim(),
-      }).eq('id', commentId);
+      await _supabase
+          .from('event_comments')
+          .update({'body': newComment.trim()})
+          .eq('id', commentId);
     } catch (e) {
       throw Exception('Error updating comment: $e');
     }
@@ -162,15 +164,17 @@ class EventCommentService {
 
   /// Stream of all comments (for admin)
   Stream<List<EventComment>> getAllCommentsStream() {
-    return _supabase
-        .from('event_comments')
-        .stream(primaryKey: ['id'])
-        .asyncMap((rows) async {
-          final sorted = List<Map<String, dynamic>>.from(rows)
-            ..sort((a, b) => (b['created_at'] as String? ?? '')
-                .compareTo(a['created_at'] as String? ?? ''));
-          return _attachUserInfo(sorted);
-        });
+    return _supabase.from('event_comments').stream(primaryKey: ['id']).asyncMap(
+      (rows) async {
+        final sorted = List<Map<String, dynamic>>.from(rows)
+          ..sort(
+            (a, b) => (b['created_at'] as String? ?? '').compareTo(
+              a['created_at'] as String? ?? '',
+            ),
+          );
+        return _attachUserInfo(sorted);
+      },
+    );
   }
 
   /// Helper: Check if current user is admin
@@ -227,34 +231,8 @@ class EventCommentService {
         profileImageUrl: userInfo?['profile_image_base64'] as String? ?? '',
       );
 
-      // Send notification to the original commenter
-      try {
-        if (originalComment.userId.isNotEmpty) {
-          final event = await _supabase
-              .from('events')
-              .select('theme')
-              .eq('id', eventId)
-              .maybeSingle();
-          final eventTheme = event?['theme'] as String? ?? 'Event';
-
-          await NotificationService().createNotification(
-            userId: originalComment.userId,
-            type: NotificationType.event,
-            title: 'Admin replied to your comment',
-            message:
-                'Admin replied to your comment on "$eventTheme": ${reply.trim()}',
-            relatedId: eventId,
-            data: {
-              'commentId': commentId,
-              'replyId': newReply.id,
-              'eventId': eventId,
-            },
-          );
-        }
-      } catch (_) {
-        // Don't fail reply creation if notification fails
-      }
-
+      // The commenter is notified by the event_replies trigger
+      // (notify_event_comment_reply).
       return newReply;
     } catch (e) {
       throw Exception('Error creating reply: $e');
@@ -289,8 +267,11 @@ class EventCommentService {
         .eq('comment_id', commentId)
         .asyncMap((rows) async {
           final sorted = List<Map<String, dynamic>>.from(rows)
-            ..sort((a, b) => (a['created_at'] as String? ?? '')
-                .compareTo(b['created_at'] as String? ?? ''));
+            ..sort(
+              (a, b) => (a['created_at'] as String? ?? '').compareTo(
+                b['created_at'] as String? ?? '',
+              ),
+            );
           return _attachUserInfo(sorted);
         });
   }

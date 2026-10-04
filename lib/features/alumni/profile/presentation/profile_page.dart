@@ -17,6 +17,7 @@ import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
 import 'package:alumni_system/features/feedback/presentation/user_feedback_list_page.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 import 'package:alumni_system/features/messages/presentation/user_messages_page.dart';
+import 'package:alumni_system/features/notifications/presentation/notifications_page.dart';
 import 'package:alumni_system/features/surveys/presentation/user_surveys_page.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
@@ -362,6 +363,21 @@ class ProfileScreenState extends State<ProfileScreen>
                     MaterialPageRoute(
                       builder: (_) =>
                           const UserMessagesScreen(isTabActive: true),
+                    ),
+                  );
+                },
+              ),
+              const _PortalAccountDivider(),
+              _PortalAccountRow(
+                icon: Icons.notifications_outlined,
+                iconColor: PortalTheme.navy,
+                title: 'Notifications',
+                subtitle: 'History and alert settings',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
                     ),
                   );
                 },

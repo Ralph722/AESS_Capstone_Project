@@ -129,12 +129,18 @@ abstract final class ChedGtsPdfMapper {
     );
     putText('selfEmployedSkills', answers['ched_18_skills']);
     putText('occupation', answers['ched_19']);
-    putMapped(
-      'businessLine',
-      answers['ched_20'],
-      kChedGtsPdfBusinessLine,
-      answerKey: 'ched_20',
-    );
+    final businessLine = _asTrimmedString(answers['ched_20']);
+    if (businessLine != null && _isOthersLabel(businessLine)) {
+      final other = _asTrimmedString(answers['ched_20_other']);
+      putText('businessLine', other == null ? 'Others' : 'Others: $other');
+    } else {
+      putMapped(
+        'businessLine',
+        answers['ched_20'],
+        kChedGtsPdfBusinessLine,
+        answerKey: 'ched_20',
+      );
+    }
     putMapped(
       'placeOfWork',
       answers['ched_21'],

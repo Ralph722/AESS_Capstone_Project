@@ -11,6 +11,9 @@ import 'package:alumni_system/features/alumni/tracer/presentation/tracer_page.da
 import 'package:alumni_system/features/alumni/profile/presentation/profile_page.dart';
 import 'package:alumni_system/features/community/presentation/user_community_page.dart';
 import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
+import 'package:alumni_system/features/events/data/reminder_service.dart';
+import 'package:alumni_system/features/notifications/application/notification_router.dart';
+import 'package:alumni_system/features/notifications/push/push_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
@@ -35,6 +38,9 @@ class MainNavigation extends StatefulWidget {
 }
 
 class MainNavigationState extends State<MainNavigation> {
+  /// The mounted alumni shell, used by notification deep links.
+  static MainNavigationState? active;
+
   late int _currentIndex;
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
   final GlobalKey<EventsScreenState> _eventsKey =
@@ -45,6 +51,8 @@ class MainNavigationState extends State<MainNavigation> {
       GlobalKey<ProfileScreenState>();
   final Set<int> _visitedTabs = {PortalTabs.home};
 
+  bool get isHomeTabActive => _currentIndex == PortalTabs.home;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +60,19 @@ class MainNavigationState extends State<MainNavigation> {
         .clamp(0, PortalTabs.count - 1);
     _visitedTabs.add(_currentIndex);
     _recordAlumniActivity();
+    active = this;
+    ReminderService.onReminderTap = (eventId) => openEvent(eventId);
+    NotificationRouter.alumniShellReady();
+    PushService.instance.syncForSignedInUser();
+  }
+
+  @override
+  void dispose() {
+    if (identical(active, this)) {
+      active = null;
+      ReminderService.onReminderTap = null;
+    }
+    super.dispose();
   }
 
   /// Switch bottom-nav tab without rebuilding the whole app shell.

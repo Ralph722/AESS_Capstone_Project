@@ -6,7 +6,9 @@ import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Demographic (ID Tracer) fields — editable, saved to `users/{uid}`.
 class DemographicTracerTab extends StatefulWidget {
@@ -398,6 +400,8 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
       child: DropdownButtonFormField<String>(
         key: ValueKey<String?>('$label|$selected'),
         initialValue: selected,
+        borderRadius: PortalMenu.dropdownRadius,
+        dropdownColor: PortalTheme.card,
         decoration: onboardingFieldDecoration(label: label, icon: icon),
         items: items
             .map((e) => DropdownMenuItem(value: e, child: Text(e)))

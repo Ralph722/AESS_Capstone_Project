@@ -8,6 +8,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_search_field.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 
 /// Admin activity / audit log viewer (extracted from [AdminDashboardWeb]).
 class AdminActivityLogsScreen extends StatefulWidget {
@@ -345,13 +346,16 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
               Row(
                 children: [
                   Expanded(
-                    child: _buildFilterDropdown(
-                      'Action',
-                      _selectedActionFilter,
-                      actions,
-                      (value) {
+                    child: DirectoryFilterField<String>(
+                      label: 'Action',
+                      value: _selectedActionFilter,
+                      items: [
+                        for (final item in actions)
+                          DropdownMenuItem(value: item, child: Text(item)),
+                      ],
+                      onChanged: (value) {
                         setState(() {
-                          _selectedActionFilter = value;
+                          _selectedActionFilter = value ?? 'All';
                           _page = 0;
                         });
                       },
@@ -359,13 +363,16 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: _buildFilterDropdown(
-                      'Resource',
-                      _selectedResourceFilter,
-                      resources,
-                      (value) {
+                    child: DirectoryFilterField<String>(
+                      label: 'Resource',
+                      value: _selectedResourceFilter,
+                      items: [
+                        for (final item in resources)
+                          DropdownMenuItem(value: item, child: Text(item)),
+                      ],
+                      onChanged: (value) {
                         setState(() {
-                          _selectedResourceFilter = value;
+                          _selectedResourceFilter = value ?? 'All';
                           _page = 0;
                         });
                       },
@@ -373,13 +380,16 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: _buildFilterDropdown(
-                      'Status',
-                      _selectedStatusFilter,
-                      statuses,
-                      (value) {
+                    child: DirectoryFilterField<String>(
+                      label: 'Status',
+                      value: _selectedStatusFilter,
+                      items: [
+                        for (final item in statuses)
+                          DropdownMenuItem(value: item, child: Text(item)),
+                      ],
+                      onChanged: (value) {
                         setState(() {
-                          _selectedStatusFilter = value;
+                          _selectedStatusFilter = value ?? 'All';
                           _page = 0;
                         });
                       },
@@ -387,21 +397,56 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: _buildDatePicker('Start Date', _startDate, (date) {
-                      setState(() {
-                        _startDate = date;
-                        _page = 0;
-                      });
-                    }),
+                    child: DirectoryDateFilterChip(
+                      label: 'Start',
+                      expand: true,
+                      displayText: _startDate == null
+                          ? 'Any date'
+                          : DirectoryDateTimePickers.formatDate(_startDate!),
+                      active: _startDate != null,
+                      onTap: () async {
+                        final picked = await DirectoryDateTimePickers.pickDate(
+                          context,
+                          initialDate: _startDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          helpText: 'Start date',
+                        );
+                        if (picked == null || !mounted) return;
+                        setState(() {
+                          _startDate = picked;
+                          if (_endDate != null && _endDate!.isBefore(picked)) {
+                            _endDate = picked;
+                          }
+                          _page = 0;
+                        });
+                      },
+                    ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: _buildDatePicker('End Date', _endDate, (date) {
-                      setState(() {
-                        _endDate = date;
-                        _page = 0;
-                      });
-                    }),
+                    child: DirectoryDateFilterChip(
+                      label: 'End',
+                      expand: true,
+                      displayText: _endDate == null
+                          ? 'Any date'
+                          : DirectoryDateTimePickers.formatDate(_endDate!),
+                      active: _endDate != null,
+                      onTap: () async {
+                        final picked = await DirectoryDateTimePickers.pickDate(
+                          context,
+                          initialDate: _endDate ?? _startDate ?? DateTime.now(),
+                          firstDate: _startDate ?? DateTime(2020),
+                          lastDate: DateTime.now(),
+                          helpText: 'End date',
+                        );
+                        if (picked == null || !mounted) return;
+                        setState(() {
+                          _endDate = picked;
+                          _page = 0;
+                        });
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -730,110 +775,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
           ),
         ),
         AdminTableTextCell(log.description, muted: true, maxLines: 2),
-      ],
-    );
-  }
-
-  Widget _buildFilterDropdown(
-    String label,
-    String value,
-    List<String> items,
-    Function(String) onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF090A4F),
-          ),
-        ),
-        const SizedBox(height: 8),
-        DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          items: items
-              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-              .toList(),
-          onChanged: (newValue) => onChanged(newValue ?? 'All'),
-          underline: Container(height: 1, color: Colors.grey.shade300),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDatePicker(
-    String label,
-    DateTime? selectedDate,
-    Function(DateTime) onDateSelected,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF090A4F),
-          ),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () async {
-            final DateTime? picked = await showDatePicker(
-              context: context,
-              initialDate: selectedDate ?? DateTime.now(),
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now(),
-            );
-            if (picked != null) {
-              onDateSelected(picked);
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today,
-                  size: 16,
-                  color: Color(0xFF090A4F),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    selectedDate != null
-                        ? DateFormat('MMM d, yyyy').format(selectedDate)
-                        : 'Select date',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: selectedDate != null
-                          ? const Color(0xFF090A4F)
-                          : Colors.grey.shade500,
-                    ),
-                  ),
-                ),
-                if (selectedDate != null)
-                  GestureDetector(
-                    onTap: () => onDateSelected(DateTime(1900)),
-                    child: const Icon(
-                      Icons.close,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
       ],
     );
   }

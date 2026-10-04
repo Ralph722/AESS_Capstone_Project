@@ -505,14 +505,19 @@ class DirectoryActiveFilterChip extends StatelessWidget {
     super.key,
     required this.label,
     required this.onRemoved,
+    this.icon,
   });
 
   final String label;
   final VoidCallback onRemoved;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return InputChip(
+      avatar: icon == null
+          ? null
+          : Icon(icon, size: 14, color: AdminDirectoryTheme.primary),
       label: Text(
         label,
         style: const TextStyle(
@@ -537,6 +542,53 @@ class DirectoryActiveFilterChip extends StatelessWidget {
   }
 }
 
+/// Compact status / quick-filter chip for list toolbars.
+///
+/// Prefer this over ad-hoc [FilterChip]s so every admin screen matches.
+class DirectoryToolbarFilterChip extends StatelessWidget {
+  const DirectoryToolbarFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+      selectedColor: AdminDirectoryTheme.infoBg,
+      backgroundColor: AdminDirectoryTheme.card,
+      labelStyle: TextStyle(
+        fontSize: 12,
+        color: selected
+            ? AdminDirectoryTheme.primary
+            : AdminDirectoryTheme.textSecondary,
+        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+      ),
+      side: BorderSide(
+        color: selected
+            ? AdminDirectoryTheme.primary.withValues(alpha: 0.28)
+            : AdminDirectoryTheme.border,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
+      ),
+      onSelected: onSelected,
+    );
+  }
+}
+
 class DirectoryFilterField<T> extends StatelessWidget {
   const DirectoryFilterField({
     super.key,
@@ -546,6 +598,7 @@ class DirectoryFilterField<T> extends StatelessWidget {
     required this.onChanged,
     this.width,
     this.minWidth = 128,
+    this.enabled = true,
   });
 
   final String label;
@@ -554,6 +607,7 @@ class DirectoryFilterField<T> extends StatelessWidget {
   final ValueChanged<T?> onChanged;
   final double? width;
   final double minWidth;
+  final bool enabled;
 
   /// Outer height shared by filter dropdowns and date chips.
   static const double controlHeight =
@@ -593,19 +647,26 @@ class DirectoryFilterField<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AdminDirectoryTheme.radiusSm);
     final field = DropdownButtonFormField<T>(
       key: ValueKey('$label-$value'),
       initialValue: value,
       isExpanded: true,
       isDense: true,
       iconSize: 18,
+      borderRadius: radius,
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        size: 18,
+        color: AdminDirectoryTheme.textMuted,
+      ),
       style: const TextStyle(
         fontSize: 12.5,
         color: AdminDirectoryTheme.textPrimary,
       ),
       decoration: decoration(label: label),
       items: items,
-      onChanged: onChanged,
+      onChanged: enabled ? onChanged : null,
     );
 
     if (width != null) {
@@ -618,9 +679,277 @@ class DirectoryFilterField<T> extends StatelessWidget {
   }
 }
 
-/// Date filter that renders with the same [DropdownButtonFormField] shell as
-/// [DirectoryFilterField], so height/outline always match. A transparent layer
-/// captures taps and opens the date picker instead of a menu.
+/// Shared themed date / time / range pickers for admin chrome.
+abstract final class DirectoryDateTimePickers {
+  static ThemeData _theme(BuildContext context) {
+    final base = Theme.of(context);
+    return base.copyWith(
+      colorScheme: base.colorScheme.copyWith(
+        primary: AdminDirectoryTheme.primary,
+        onPrimary: Colors.white,
+        surface: AdminDirectoryTheme.card,
+        onSurface: AdminDirectoryTheme.textPrimary,
+      ),
+      datePickerTheme: DatePickerThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusLg),
+        ),
+        headerBackgroundColor: AdminDirectoryTheme.primary,
+        headerForegroundColor: Colors.white,
+        todayForegroundColor: const WidgetStatePropertyAll(
+          AdminDirectoryTheme.primary,
+        ),
+        todayBackgroundColor: WidgetStatePropertyAll(
+          AdminDirectoryTheme.primary.withValues(alpha: 0.08),
+        ),
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: AdminDirectoryTheme.card,
+        dialHandColor: AdminDirectoryTheme.primary,
+        dialBackgroundColor: AdminDirectoryTheme.surface,
+        dialTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return Colors.white;
+          }
+          return AdminDirectoryTheme.textPrimary;
+        }),
+        hourMinuteColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AdminDirectoryTheme.primary;
+          }
+          return AdminDirectoryTheme.infoBg;
+        }),
+        hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return Colors.white;
+          }
+          return AdminDirectoryTheme.textPrimary;
+        }),
+        dayPeriodColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AdminDirectoryTheme.primary;
+          }
+          return AdminDirectoryTheme.card;
+        }),
+        dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return Colors.white;
+          }
+          return AdminDirectoryTheme.textSecondary;
+        }),
+        dayPeriodBorderSide: const BorderSide(
+          color: AdminDirectoryTheme.border,
+        ),
+        entryModeIconColor: AdminDirectoryTheme.primary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusLg),
+        ),
+      ),
+    );
+  }
+
+  static Widget _wrap(BuildContext context, Widget? child) {
+    return Theme(data: _theme(context), child: child!);
+  }
+
+  static Future<DateTime?> pickDate(
+    BuildContext context, {
+    DateTime? initialDate,
+    DateTime? firstDate,
+    DateTime? lastDate,
+    String? helpText,
+  }) {
+    final now = DateTime.now();
+    return showDatePicker(
+      context: context,
+      initialDate: initialDate ?? now,
+      firstDate: firstDate ?? DateTime(2020),
+      lastDate: lastDate ?? DateTime(2100),
+      helpText: helpText,
+      builder: _wrap,
+    );
+  }
+
+  static Future<TimeOfDay?> pickTime(
+    BuildContext context, {
+    TimeOfDay? initialTime,
+    String? helpText,
+  }) {
+    return showTimePicker(
+      context: context,
+      initialTime: initialTime ?? TimeOfDay.now(),
+      helpText: helpText,
+      builder: _wrap,
+    );
+  }
+
+  static Future<DateTimeRange?> pickDateRange(
+    BuildContext context, {
+    DateTimeRange? initialDateRange,
+    DateTime? firstDate,
+    DateTime? lastDate,
+    String? helpText,
+  }) {
+    final now = DateTime.now();
+    return showDateRangePicker(
+      context: context,
+      firstDate: firstDate ?? DateTime(now.year - 25),
+      lastDate: lastDate ?? DateTime(now.year + 2),
+      initialDateRange: initialDateRange ??
+          DateTimeRange(
+            start: DateTime(now.year, now.month - 3, now.day),
+            end: now,
+          ),
+      helpText: helpText,
+      builder: _wrap,
+    );
+  }
+
+  /// Date then time, combined into one [DateTime]. Cancel on either step aborts.
+  static Future<DateTime?> pickDateTime(
+    BuildContext context, {
+    DateTime? initial,
+    DateTime? firstDate,
+    DateTime? lastDate,
+  }) async {
+    final now = DateTime.now();
+    final base = initial ?? now;
+    final date = await pickDate(
+      context,
+      initialDate: base,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (date == null || !context.mounted) return null;
+    final time = await pickTime(
+      context,
+      initialTime: TimeOfDay.fromDateTime(base),
+    );
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  static String formatDate(DateTime date, {bool includeYear = true}) {
+    return DateFormat(includeYear ? 'MMM d, yyyy' : 'MMM d').format(date);
+  }
+
+  static String formatDateRange(DateTime start, DateTime end) {
+    final sameYear = start.year == end.year;
+    if (sameYear) {
+      return '${DateFormat('MMM d').format(start)} – ${DateFormat('MMM d, yyyy').format(end)}';
+    }
+    return '${DateFormat('MMM d, yyyy').format(start)} – ${DateFormat('MMM d, yyyy').format(end)}';
+  }
+
+  static String formatTime(BuildContext context, TimeOfDay time) {
+    return time.format(context);
+  }
+}
+
+/// Shared shell for date / time / range filter controls (matches [DirectoryFilterField]).
+class _DirectoryPickerFilterShell extends StatelessWidget {
+  const _DirectoryPickerFilterShell({
+    required this.label,
+    required this.displayText,
+    required this.onTap,
+    required this.trailingIcon,
+    this.active = false,
+    this.enabled = true,
+    this.width = 132,
+    this.expand = false,
+    this.minWidth = 128,
+  });
+
+  final String label;
+  final String displayText;
+  final VoidCallback onTap;
+  final IconData trailingIcon;
+  final bool active;
+  final bool enabled;
+  final double? width;
+  final bool expand;
+  final double minWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = !enabled
+        ? AdminDirectoryTheme.border
+        : active
+        ? AdminDirectoryTheme.primary.withValues(alpha: 0.35)
+        : AdminDirectoryTheme.border;
+    final valueColor = !enabled
+        ? AdminDirectoryTheme.textMuted
+        : active
+        ? AdminDirectoryTheme.primary
+        : AdminDirectoryTheme.textMuted;
+    final iconColor = !enabled
+        ? AdminDirectoryTheme.textMuted
+        : active
+        ? AdminDirectoryTheme.primary
+        : AdminDirectoryTheme.textSecondary;
+
+    final field = Stack(
+      children: [
+        DropdownButtonFormField<String>(
+          key: ValueKey('$label-$displayText-$active'),
+          initialValue: displayText,
+          isExpanded: true,
+          isDense: true,
+          iconSize: 14,
+          icon: Icon(trailingIcon, size: 14, color: iconColor),
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+            color: valueColor,
+          ),
+          decoration: DirectoryFilterField.decoration(
+            label: label,
+            floatingLabelBehavior: FloatingLabelBehavior.always,
+            borderColor: borderColor,
+          ),
+          items: [
+            DropdownMenuItem<String>(
+              value: displayText,
+              child: Text(
+                displayText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          onChanged: enabled ? (_) {} : null,
+        ),
+        Positioned.fill(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: enabled ? onTap : null,
+              borderRadius: BorderRadius.circular(
+                AdminDirectoryTheme.radiusSm,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (expand) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(minWidth: minWidth),
+        child: field,
+      );
+    }
+    if (width != null) {
+      return SizedBox(width: width, child: field);
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(minWidth: minWidth),
+      child: field,
+    );
+  }
+}
+
+/// Date filter that renders with the same shell as [DirectoryFilterField].
 class DirectoryDateFilterChip extends StatelessWidget {
   const DirectoryDateFilterChip({
     super.key,
@@ -628,78 +957,111 @@ class DirectoryDateFilterChip extends StatelessWidget {
     required this.displayText,
     required this.onTap,
     this.active = false,
+    this.enabled = true,
     this.width = 132,
+    this.expand = false,
+    this.minWidth = 128,
   });
 
   final String label;
   final String displayText;
   final VoidCallback onTap;
   final bool active;
-  final double width;
+  final bool enabled;
+  final double? width;
+  final bool expand;
+  final double minWidth;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = active
-        ? AdminDirectoryTheme.primary.withValues(alpha: 0.35)
-        : AdminDirectoryTheme.border;
-    final valueColor = active
-        ? AdminDirectoryTheme.primary
-        : AdminDirectoryTheme.textPrimary;
-    final iconColor = active
-        ? AdminDirectoryTheme.primary
-        : AdminDirectoryTheme.textSecondary;
-
-    return SizedBox(
+    return _DirectoryPickerFilterShell(
+      label: label,
+      displayText: displayText,
+      onTap: onTap,
+      trailingIcon: Icons.calendar_today_rounded,
+      active: active,
+      enabled: enabled,
       width: width,
-      child: Stack(
-        children: [
-          DropdownButtonFormField<String>(
-            key: ValueKey('$label-$displayText'),
-            initialValue: displayText,
-            isExpanded: true,
-            isDense: true,
-            iconSize: 14,
-            icon: Icon(
-              Icons.calendar_today_rounded,
-              size: 14,
-              color: iconColor,
-            ),
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-              color: valueColor,
-            ),
-            decoration: DirectoryFilterField.decoration(
-              label: label,
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              borderColor: borderColor,
-            ),
-            items: [
-              DropdownMenuItem<String>(
-                value: displayText,
-                child: Text(
-                  displayText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-            // Non-null so the field stays enabled/looks active; menu is blocked below.
-            onChanged: (_) {},
-          ),
-          Positioned.fill(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(
-                  AdminDirectoryTheme.radiusSm,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      expand: expand,
+      minWidth: minWidth,
+    );
+  }
+}
+
+/// Date-range filter (single control) matching [DirectoryFilterField] density.
+class DirectoryDateRangeFilterChip extends StatelessWidget {
+  const DirectoryDateRangeFilterChip({
+    super.key,
+    required this.label,
+    required this.displayText,
+    required this.onTap,
+    this.active = false,
+    this.enabled = true,
+    this.width = 220,
+    this.expand = false,
+    this.minWidth = 180,
+  });
+
+  final String label;
+  final String displayText;
+  final VoidCallback onTap;
+  final bool active;
+  final bool enabled;
+  final double? width;
+  final bool expand;
+  final double minWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DirectoryPickerFilterShell(
+      label: label,
+      displayText: displayText,
+      onTap: onTap,
+      trailingIcon: Icons.date_range_rounded,
+      active: active,
+      enabled: enabled,
+      width: width,
+      expand: expand,
+      minWidth: minWidth,
+    );
+  }
+}
+
+/// Time-of-day filter matching [DirectoryFilterField] density.
+class DirectoryTimeFilterChip extends StatelessWidget {
+  const DirectoryTimeFilterChip({
+    super.key,
+    required this.label,
+    required this.displayText,
+    required this.onTap,
+    this.active = false,
+    this.enabled = true,
+    this.width = 120,
+    this.expand = false,
+    this.minWidth = 110,
+  });
+
+  final String label;
+  final String displayText;
+  final VoidCallback onTap;
+  final bool active;
+  final bool enabled;
+  final double? width;
+  final bool expand;
+  final double minWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DirectoryPickerFilterShell(
+      label: label,
+      displayText: displayText,
+      onTap: onTap,
+      trailingIcon: Icons.schedule_rounded,
+      active: active,
+      enabled: enabled,
+      width: width,
+      expand: expand,
+      minWidth: minWidth,
     );
   }
 }

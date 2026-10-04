@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/core/constants/course_constants.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 
 /// Result of the CHED wave comparison picker.
@@ -74,9 +75,7 @@ class _ChedWaveComparisonDialogState extends State<_ChedWaveComparisonDialog> {
         return bAt.compareTo(aAt); // newest first in UI
       });
 
-    _selectedIds = {
-      for (final s in sorted.take(2)) s.id,
-    };
+    _selectedIds = {for (final s in sorted.take(2)) s.id};
   }
 
   bool get _canConfirm =>
@@ -125,15 +124,9 @@ class _ChedWaveComparisonDialogState extends State<_ChedWaveComparisonDialog> {
             Row(
               children: [
                 Expanded(
-                  child: DropdownButtonFormField<String?>(
-                    initialValue: _batchYear,
-                    isExpanded: true,
-                    isDense: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Batch',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
+                  child: DirectoryFilterField<String?>(
+                    label: 'Batch',
+                    value: _batchYear,
                     items: [
                       const DropdownMenuItem(
                         value: null,
@@ -147,15 +140,9 @@ class _ChedWaveComparisonDialogState extends State<_ChedWaveComparisonDialog> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: DropdownButtonFormField<String?>(
-                    initialValue: _course,
-                    isExpanded: true,
-                    isDense: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Course',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
+                  child: DirectoryFilterField<String?>(
+                    label: 'Course',
+                    value: _course,
                     items: [
                       const DropdownMenuItem(
                         value: null,
@@ -199,7 +186,8 @@ class _ChedWaveComparisonDialogState extends State<_ChedWaveComparisonDialog> {
                     final s = sorted[index];
                     final when = s.publishedAt ?? s.openAt ?? s.createdAt;
                     final selected = _selectedIds.contains(s.id);
-                    final atCap = !selected &&
+                    final atCap =
+                        !selected &&
                         _selectedIds.length >=
                             ChedWaveComparisonReport.maxWaves;
                     return CheckboxListTile(

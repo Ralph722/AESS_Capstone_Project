@@ -1,9 +1,44 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:alumni_system/shared/widgets/user/skeleton.dart';
 
 // ---------------------------------------------------------------------------
 // Home
 // ---------------------------------------------------------------------------
+
+/// Home "Upcoming Events" slideshow placeholder (16:9 cover + dots).
+class HomeEventCarouselSkeleton extends StatelessWidget {
+  const HomeEventCarouselSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerScope(
+      child: Column(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) => Skeleton(
+              width: double.infinity,
+              height: math.min(constraints.maxWidth * 9 / 16, 260),
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Skeleton(width: 18, height: 6),
+              SizedBox(width: 6),
+              Skeleton(width: 6, height: 6),
+              SizedBox(width: 6),
+              Skeleton(width: 6, height: 6),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Home "Upcoming Events" cards — matches `_buildEventCard` on HomeScreen.
 class HomeEventCardsSkeleton extends StatelessWidget {
@@ -301,7 +336,11 @@ class _EventListCardSkeleton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Skeleton(width: 88, height: 18, borderRadius: BorderRadius.all(Radius.circular(6))),
+                Skeleton(
+                  width: 88,
+                  height: 18,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                ),
                 SizedBox(height: 10),
                 Skeleton(width: double.infinity, height: 16),
                 SizedBox(height: 8),
@@ -535,8 +574,10 @@ class MessageThreadSkeleton extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final avatarSpace = fromAdmin ? 36.0 : 0.0;
-                final maxBubble =
-                    (constraints.maxWidth - avatarSpace).clamp(64.0, 600.0);
+                final maxBubble = (constraints.maxWidth - avatarSpace).clamp(
+                  64.0,
+                  600.0,
+                );
                 final bubbleW = maxBubble * widths[i % widths.length];
                 return Align(
                   alignment: fromAdmin
@@ -550,8 +591,7 @@ class MessageThreadSkeleton extends StatelessWidget {
                         const Skeleton(
                           width: 28,
                           height: 28,
-                          borderRadius:
-                              BorderRadius.all(Radius.circular(14)),
+                          borderRadius: BorderRadius.all(Radius.circular(14)),
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -628,7 +668,9 @@ class _NotificationTileSkeleton extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(child: Skeleton(width: double.infinity, height: 14)),
+                    Expanded(
+                      child: Skeleton(width: double.infinity, height: 14),
+                    ),
                     SizedBox(width: 8),
                     Skeleton(
                       width: 8,
@@ -1117,9 +1159,9 @@ class TracerFormSkeleton extends StatelessWidget {
           const SizedBox(height: 16),
           _tracerSection(sectionFields),
           const SizedBox(height: 12),
-          _tracerSection(fieldCount - sectionFields > 0
-              ? fieldCount - sectionFields
-              : 2),
+          _tracerSection(
+            fieldCount - sectionFields > 0 ? fieldCount - sectionFields : 2,
+          ),
           const SizedBox(height: 20),
           const Skeleton(
             width: double.infinity,
@@ -1214,8 +1256,7 @@ class SurveyFormSkeleton extends StatelessWidget {
                           Skeleton(
                             width: 20,
                             height: 20,
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(10)),
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
                           ),
                           SizedBox(width: 12),
                           Expanded(child: Skeleton(height: 14)),

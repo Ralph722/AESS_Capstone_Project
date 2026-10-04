@@ -115,12 +115,12 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
     setState(() => _isLoading = true);
     try {
       final list = await _surveyService.getAllSurveysForAdmin();
-      if (mounted) {
-        setState(() {
-          _surveys = list;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _surveys = list;
+        _isLoading = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -489,10 +489,7 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
       );
       if (!ok) return;
       try {
-        final count = await _surveyService.publishSurvey(
-          s.id,
-          notify: false,
-        );
+        final count = await _surveyService.publishSurvey(s.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -780,29 +777,15 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
             },
           ),
           for (final f in _SurveyStatusFilter.values)
-            FilterChip(
-              label: Text(switch (f) {
+            DirectoryToolbarFilterChip(
+              label: switch (f) {
                 _SurveyStatusFilter.all => 'Active',
                 _SurveyStatusFilter.draft => 'Draft',
                 _SurveyStatusFilter.published => 'Published',
                 _SurveyStatusFilter.closed => 'Closed',
                 _SurveyStatusFilter.archived => 'Archived ($_archivedCount)',
-              }),
+              },
               selected: _statusFilter == f,
-              showCheckmark: false,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-              selectedColor: AdminSurveyTheme.infoBg,
-              checkmarkColor: AdminSurveyTheme.primary,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                color: _statusFilter == f
-                    ? AdminSurveyTheme.primary
-                    : AdminSurveyTheme.textSecondary,
-              ),
-              side: const BorderSide(color: AdminSurveyTheme.border),
               onSelected: (_) => setState(() => _statusFilter = f),
             ),
         ],

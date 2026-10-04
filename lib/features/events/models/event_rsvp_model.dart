@@ -1,28 +1,24 @@
-enum EventRsvpStatus { going, interested, cantAttend }
+enum EventRsvpStatus { going, notGoing }
 
 extension EventRsvpStatusX on EventRsvpStatus {
   String get dbValue => switch (this) {
     EventRsvpStatus.going => 'going',
-    EventRsvpStatus.interested => 'interested',
-    EventRsvpStatus.cantAttend => 'cant_attend',
+    EventRsvpStatus.notGoing => 'cant_attend',
   };
 
   String get label => switch (this) {
     EventRsvpStatus.going => 'Going',
-    EventRsvpStatus.interested => 'Interested',
-    EventRsvpStatus.cantAttend => "Can't Attend",
+    EventRsvpStatus.notGoing => 'Not going',
   };
 
   static EventRsvpStatus? tryParse(String? raw) {
     switch ((raw ?? '').trim().toLowerCase()) {
       case 'going':
         return EventRsvpStatus.going;
-      case 'interested':
-        return EventRsvpStatus.interested;
       case 'cant_attend':
       case 'cantattend':
       case 'declined':
-        return EventRsvpStatus.cantAttend;
+        return EventRsvpStatus.notGoing;
       default:
         return null;
     }
@@ -64,9 +60,11 @@ class EventRsvp {
       userId: row['user_id']?.toString() ?? '',
       status:
           EventRsvpStatusX.tryParse(row['status'] as String?) ??
-          EventRsvpStatus.interested,
+          EventRsvpStatus.notGoing,
       createdAt: _parseDate(row['created_at']),
-      updatedAt: row['updated_at'] != null ? _parseDate(row['updated_at']) : null,
+      updatedAt: row['updated_at'] != null
+          ? _parseDate(row['updated_at'])
+          : null,
       userName: userName,
       userEmail: userEmail,
       profileImageUrl: profileImageUrl,
@@ -83,23 +81,17 @@ class EventRsvp {
 }
 
 class EventRsvpCounts {
-  const EventRsvpCounts({
-    this.going = 0,
-    this.interested = 0,
-    this.cantAttend = 0,
-  });
+  const EventRsvpCounts({this.going = 0, this.notGoing = 0});
 
   final int going;
-  final int interested;
-  final int cantAttend;
+  final int notGoing;
 
-  int get totalResponses => going + interested + cantAttend;
+  int get totalResponses => going + notGoing;
 
-  EventRsvpCounts copyWith({int? going, int? interested, int? cantAttend}) {
+  EventRsvpCounts copyWith({int? going, int? notGoing}) {
     return EventRsvpCounts(
       going: going ?? this.going,
-      interested: interested ?? this.interested,
-      cantAttend: cantAttend ?? this.cantAttend,
+      notGoing: notGoing ?? this.notGoing,
     );
   }
 }

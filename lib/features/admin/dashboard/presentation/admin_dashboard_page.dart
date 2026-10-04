@@ -24,6 +24,7 @@ import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/admin/activity/models/audit_log_model.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/user/portal_overlay_theme.dart';
 
 import 'package:alumni_system/features/admin/jobs/presentation/admin_job_management_page.dart';
 import 'package:alumni_system/features/admin/roster/presentation/admin_alumni_members_page.dart';
@@ -32,6 +33,7 @@ import 'package:alumni_system/features/admin/surveys/presentation/admin_surveys_
 import 'package:alumni_system/features/admin/announcements/presentation/admin_announcements_page.dart';
 import 'package:alumni_system/features/admin/forum/presentation/admin_forum_page.dart';
 import 'package:alumni_system/features/admin/feedback/presentation/admin_feedback_page.dart';
+import 'package:alumni_system/features/admin/dss/presentation/admin_dss_page.dart';
 import 'package:alumni_system/features/ai/presentation/ai_assistant_page.dart';
 import 'package:alumni_system/features/surveys/application/survey_catalog_refresh.dart';
 
@@ -80,6 +82,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
     6,
     7,
     9,
+    15,
     10,
     11,
     12,
@@ -90,6 +93,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => PortalOverlayTheme.suspended.value = true,
+    );
     _loadCriticalMetrics();
     _loadFeedPanels();
     _startDashboardLiveListeners();
@@ -469,6 +475,8 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
         return const AiAssistantScreen(isAdmin: true);
       case 14:
         return const AdminFeedbackScreen();
+      case 15:
+        return AdminDssScreen(onOpenAdminMenu: _onMenuSelected);
       default:
         return const SizedBox.shrink();
     }
@@ -494,6 +502,9 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => PortalOverlayTheme.suspended.value = false,
+    );
     _adminUnreadSubscription?.cancel();
     _openFeedbackSubscription?.cancel();
     _messageOpenSubscription?.cancel();

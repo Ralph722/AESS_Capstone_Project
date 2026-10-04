@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart' as intl;
 import 'dart:async';
+import 'package:alumni_system/core/navigation/app_navigator.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/events/data/event_service.dart';
-import 'package:alumni_system/features/jobs/application/job_deadline_reminders.dart';
 import 'package:alumni_system/features/jobs/data/job_service.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/presentation/job_posting_page.dart';
@@ -14,7 +14,7 @@ import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/presentation/events_page.dart';
-import 'package:alumni_system/features/notifications/models/notification_model.dart';
+import 'package:alumni_system/features/notifications/presentation/notification_panel_sheet.dart';
 import 'package:alumni_system/features/shell/presentation/main_navigation.dart';
 import 'package:alumni_system/features/surveys/presentation/user_surveys_page.dart';
 import 'package:alumni_system/features/surveys/presentation/user_survey_take_page.dart';
@@ -27,14 +27,12 @@ import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
-import 'package:alumni_system/features/feedback/presentation/user_feedback_detail_page.dart';
-import 'package:alumni_system/features/messages/presentation/user_messages_page.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
+import 'package:alumni_system/shared/widgets/aess_logo.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
-import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/features/home/data/survey_attention_reminder.dart';
 import 'package:alumni_system/features/home/models/home_calendar_item.dart';
 import 'package:alumni_system/features/home/widgets/home_widgets.dart';
@@ -49,7 +47,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => HomeScreenState();
 }
 
-class HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> with RouteAware {
   final EventService _eventService = EventService();
   final JobService _jobService = JobService();
   final MessageService _messageService = MessageService();
@@ -58,7 +56,6 @@ class HomeScreenState extends State<HomeScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   StreamSubscription<int>? _messagesCountSubscription;
   StreamSubscription<int>? _notificationsCountSubscription;
-  StreamSubscription<List<NotificationModel>>? _notificationsStreamSubscription;
   StreamSubscription<String?>? _avatarSubscription;
   StreamSubscription<void>? _forumRefreshSubscription;
 
@@ -82,13 +79,11 @@ class HomeScreenState extends State<HomeScreen> {
   List<JobPosting> _activeJobs = [];
   List<HomeCalendarItem> _calendarItems = [];
   List<ForumTopic> _communityTopics = [];
-  List<NotificationModel> notifications = [];
   bool isLoadingEvents = false;
   bool isLoadingCommunity = false;
   bool isLoadingCalendar = false;
   String? _eventsError;
   String? _communityError;
-  bool isLoadingNotifications = false;
 
   // Profile data
   String? _profileImageUrl;
@@ -118,6 +113,25 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) AppNavigator.routeObserver.subscribe(this, route);
+  }
+
+  /// A screen opened over the dashboard (e.g. from a push tap) was closed.
+  @override
+  void didPopNext() => unawaited(_maybeShowAttentionReminder());
+
+  /// True only while the dashboard is on screen: Home tab selected and no
+  /// route (screen, dialog, sheet) open above it.
+  bool get _dashboardVisible {
+    if (!mounted) return false;
+    if (ModalRoute.of(context)?.isCurrent == false) return false;
+    return MainNavigationState.active?.isHomeTabActive ?? true;
+  }
+
   /// Called when Home tab becomes visible again (see [MainNavigation]).
   Future<void> refreshDashboard() => _loadDashboardContent();
 
@@ -132,7 +146,7 @@ class HomeScreenState extends State<HomeScreen> {
       _loadSurveyAttention(),
       _loadAnnouncements(),
       _loadCommunitySection(),
-      _loadNotifications(),
+      _ensureUserRow(),
     ]);
     await _buildCalendarItems();
   }
@@ -306,21 +320,23 @@ class HomeScreenState extends State<HomeScreen> {
     return 'Due ${intl.DateFormat.MMMd().add_jm().format(closeAt)}';
   }
 
+  /// Stays pending (not marked shown) while another screen covers the
+  /// dashboard; [didPopNext] or returning to the Home tab retries.
   Future<void> _maybeShowAttentionReminder() async {
     final hasActions = _openTracerAttention || _pendingCustomSurveys > 0;
     final should = await SurveyAttentionReminder.shouldShow(
       hasActions: hasActions,
     );
-    if (!should || !mounted) return;
+    if (!should || !_dashboardVisible) return;
 
     await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
+    if (!_dashboardVisible) return;
 
     final stillHasActions = _openTracerAttention || _pendingCustomSurveys > 0;
     final stillShould = await SurveyAttentionReminder.shouldShow(
       hasActions: stillHasActions,
     );
-    if (!stillShould || !mounted) return;
+    if (!stillShould || !mounted || !_dashboardVisible) return;
 
     final hasTracer = _openTracerAttention;
     final hasSurveys = _pendingCustomSurveys > 0;
@@ -526,7 +542,6 @@ class HomeScreenState extends State<HomeScreen> {
       final jobs = await _jobService.getActiveJobs();
       if (!mounted) return;
       setState(() => _activeJobs = jobs);
-      unawaited(runJobDeadlineReminders(jobs: jobs));
     } catch (_) {}
   }
 
@@ -673,74 +688,22 @@ class HomeScreenState extends State<HomeScreen> {
             });
           }
         }, onError: (_) {});
-
-    // Listen to notifications stream
-    _notificationsStreamSubscription = _notificationService
-        .getNotificationsStream(limit: 20)
-        .listen(
-          (notificationsList) {
-            if (mounted) {
-              setState(() {
-                notifications = notificationsList;
-                isLoadingNotifications = false;
-              });
-            }
-          },
-          onError: (_) {
-            if (mounted) {
-              setState(() {
-                notifications = [];
-                isLoadingNotifications = false;
-              });
-            }
-          },
-        );
   }
 
-  Future<void> _loadNotifications() async {
+  /// Creates the `users` row when an older account is missing one.
+  Future<void> _ensureUserRow() async {
     try {
       final userId = AppSession.userId;
-
-      if (userId == null) {
-        if (!mounted) return;
-        setState(() {
-          notifications = [];
-          isLoadingNotifications = false;
-        });
-        return;
-      }
-
-      // Check if user row exists in Supabase, create if missing
+      if (userId == null) return;
       final userRow = await _supabase
           .from('users')
           .select('id')
           .eq('id', userId)
           .maybeSingle();
-
       if (userRow == null) {
-        try {
-          final authService = AuthService();
-          await authService.setUserRole(userId, UserRole.user);
-        } catch (_) {}
+        await AuthService().setUserRole(userId, UserRole.user);
       }
-
-      if (!mounted) return;
-      setState(() => isLoadingNotifications = true);
-      final notificationsList = await _notificationService.getUserNotifications(
-        limit: 20,
-      );
-      if (!mounted) return;
-      setState(() {
-        notifications = notificationsList;
-        isLoadingNotifications = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        notifications = [];
-        isLoadingNotifications = false;
-      });
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadCounts() async {
@@ -757,9 +720,9 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    AppNavigator.routeObserver.unsubscribe(this);
     _messagesCountSubscription?.cancel();
     _notificationsCountSubscription?.cancel();
-    _notificationsStreamSubscription?.cancel();
     _avatarSubscription?.cancel();
     _forumRefreshSubscription?.cancel();
     super.dispose();
@@ -775,36 +738,15 @@ class HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: PortalTheme.pageBg,
       appBar: PortalAppBar(
-        title: 'AESS',
+        title: 'Alumni Engagement and Support System',
+        titleContent: const AessLogo(height: 30),
         automaticallyImplyLeading: false,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: PortalTheme.headerHPad),
-          child: Center(
-            child: Tooltip(
-              message: 'Alumni Engagement and Support System',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  'assets/images/system_logo.png',
-                  width: 34,
-                  height: 34,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.school_rounded,
-                    size: 28,
-                    color: PortalTheme.navy,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
         actions: [
           PortalHeaderAction(
             icon: Icons.notifications_outlined,
             tooltip: 'Notifications',
             badgeCount: unreadNotificationsCount,
-            onPressed: _showNotificationsPanel,
+            onPressed: () => showNotificationPanel(context),
           ),
         ],
       ),
@@ -915,7 +857,7 @@ class HomeScreenState extends State<HomeScreen> {
       if (isLoadingEvents)
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: HomeEventCardsSkeleton(count: 2),
+          child: HomeEventCarouselSkeleton(),
         )
       else if (_eventsError != null)
         _SectionRetry(message: _eventsError!, onRetry: _loadUpcomingEvents)
@@ -980,9 +922,7 @@ class HomeScreenState extends State<HomeScreen> {
   void _openAnnouncements() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const UserAnnouncementsScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const UserAnnouncementsScreen()),
     );
   }
 
@@ -1041,9 +981,7 @@ class HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => JobPostingScreen(initialJobId: jobId),
-      ),
+      MaterialPageRoute(builder: (_) => JobPostingScreen(initialJobId: jobId)),
     );
   }
 
@@ -1056,9 +994,7 @@ class HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ForumTopicScreen(topicId: topicId),
-      ),
+      MaterialPageRoute(builder: (_) => ForumTopicScreen(topicId: topicId)),
     );
   }
 
@@ -1072,466 +1008,6 @@ class HomeScreenState extends State<HomeScreen> {
         builder: (context) => MainNavigation(initialIndex: index),
       ),
     );
-  }
-
-  Future<void> _openEventNotification(NotificationModel notification) async {
-    final data = notification.data ?? const <String, dynamic>{};
-    final eventId = (data['eventId'] ?? notification.relatedId)
-        ?.toString()
-        .trim();
-    final shouldOpenComments =
-        data['target'] == 'event_comments' ||
-        data.containsKey('commentId') ||
-        data.containsKey('replyId');
-
-    if (eventId == null || eventId.isEmpty) {
-      _navigateToScreen(PortalTabs.events);
-      return;
-    }
-
-    await _openEventById(eventId, openComments: shouldOpenComments);
-  }
-
-  void _showNotificationsPanel() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final currentNotifications = notifications.isNotEmpty
-              ? notifications
-              : <NotificationModel>[];
-          final currentLoadingState = isLoadingNotifications;
-          final currentUnreadCount = unreadNotificationsCount;
-
-          return Material(
-            color: PortalTheme.pageBg,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(PortalTheme.radius2xl),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SizedBox(
-              height: MediaQuery.of(context).size.height * 0.82,
-              child: Column(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        bottom: BorderSide(
-                          color: PortalTheme.border.withValues(alpha: 0.75),
-                        ),
-                      ),
-                      boxShadow: PortalTheme.softShadow,
-                    ),
-                    child: SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 8, 14),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: PortalTheme.borderStrong,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: PortalTheme.navy
-                                        .withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.notifications_rounded,
-                                    color: PortalTheme.navy,
-                                    size: 22,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Notifications',
-                                        style: PortalTheme.pageTitle.copyWith(
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        currentUnreadCount > 0
-                                            ? '$currentUnreadCount unread'
-                                            : 'You\'re all caught up',
-                                        style: PortalTheme.meta.copyWith(
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (currentUnreadCount > 0)
-                                  TextButton(
-                                    onPressed: () async {
-                                      await _notificationService
-                                          .markAllAsRead();
-                                      if (!mounted) return;
-                                      setState(() {
-                                        unreadNotificationsCount = 0;
-                                      });
-                                      setModalState(() {});
-                                      if (!sheetContext.mounted) return;
-                                      ScaffoldMessenger.of(sheetContext)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'All notifications marked as read',
-                                          ),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    },
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: PortalTheme.sky,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    child: Text(
-                                      'Mark all read',
-                                      style: PortalTheme.meta.copyWith(
-                                        color: PortalTheme.sky,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                IconButton(
-                                  tooltip: 'Refresh',
-                                  onPressed: () {
-                                    _loadNotifications();
-                                    setModalState(() {});
-                                  },
-                                  icon: const Icon(
-                                    Icons.refresh_rounded,
-                                    color: PortalTheme.navy,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Close',
-                                  onPressed: () =>
-                                      Navigator.pop(sheetContext),
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    color: PortalTheme.navy,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: currentLoadingState
-                        ? const NotificationListSkeleton()
-                        : currentNotifications.isEmpty
-                            ? const PortalEmptyState(
-                                icon: Icons.notifications_none_rounded,
-                                title: 'No notifications',
-                                subtitle:
-                                    'Updates about events, jobs, and community will show up here.',
-                              )
-                            : _buildGroupedNotificationsList(
-                                currentNotifications,
-                                onItemTap: () {
-                                  if (sheetContext.mounted) {
-                                    Navigator.pop(sheetContext);
-                                  }
-                                },
-                              ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildGroupedNotificationsList(
-    List<NotificationModel> items, {
-    VoidCallback? onItemTap,
-  }) {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final today = <NotificationModel>[];
-    final earlier = <NotificationModel>[];
-
-    for (final n in items) {
-      final day = DateTime(
-        n.createdAt.year,
-        n.createdAt.month,
-        n.createdAt.day,
-      );
-      if (!day.isBefore(todayStart)) {
-        today.add(n);
-      } else {
-        earlier.add(n);
-      }
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      children: [
-        if (today.isNotEmpty) ...[
-          _buildNotificationGroupHeader('Today'),
-          ...today.map(
-            (n) => _buildNotificationItem(n, onSheetClose: onItemTap),
-          ),
-        ],
-        if (earlier.isNotEmpty) ...[
-          if (today.isNotEmpty) const SizedBox(height: 8),
-          _buildNotificationGroupHeader('Earlier'),
-          ...earlier.map(
-            (n) => _buildNotificationItem(n, onSheetClose: onItemTap),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildNotificationGroupHeader(String label) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 10),
-      child: Text(
-        label,
-        style: PortalTheme.meta.copyWith(
-          fontWeight: FontWeight.w800,
-          color: PortalTheme.navy,
-          letterSpacing: 0.2,
-          fontSize: 12.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationItem(
-    NotificationModel notification, {
-    VoidCallback? onSheetClose,
-  }) {
-    final isToday =
-        notification.createdAt.day == DateTime.now().day &&
-        notification.createdAt.month == DateTime.now().month &&
-        notification.createdAt.year == DateTime.now().year;
-
-    final timeText = isToday
-        ? intl.DateFormat('hh:mm a').format(notification.createdAt)
-        : intl.DateFormat('MMM d • hh:mm a').format(notification.createdAt);
-    final accent = Color(notification.colorValue);
-    final unread = !notification.isRead;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: PortalCardShell(
-        onTap: () async {
-          if (unread) {
-            await _notificationService.markAsRead(notification.id);
-          }
-
-          if (!mounted) return;
-          onSheetClose?.call();
-
-          if (notification.relatedId != null) {
-            switch (notification.type) {
-              case NotificationType.event:
-                await _openEventNotification(notification);
-                break;
-              case NotificationType.job:
-                final jobId = notification.relatedId?.trim();
-                if (jobId != null && jobId.isNotEmpty) {
-                  await _openJobById(jobId);
-                } else {
-                  _navigateToScreen(PortalTabs.jobs);
-                }
-                break;
-              case NotificationType.message:
-                await _openSupportMessages();
-                break;
-              case NotificationType.survey:
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const UserSurveysScreen(),
-                  ),
-                );
-                break;
-              case NotificationType.announcement:
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => UserAnnouncementsScreen(
-                      initialAnnouncementId: notification.relatedId,
-                    ),
-                  ),
-                );
-                break;
-              case NotificationType.feedback:
-                if (notification.relatedId != null) {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => UserFeedbackDetailScreen(
-                        feedbackId: notification.relatedId!,
-                      ),
-                    ),
-                  );
-                }
-                break;
-              case NotificationType.forum:
-                final topicId =
-                    (notification.data?['topicId'] ?? notification.relatedId)
-                        ?.toString();
-                if (topicId != null && topicId.isNotEmpty) {
-                  await _openForumTopic(topicId);
-                }
-                break;
-              default:
-                break;
-            }
-          }
-        },
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
-        elevation: 1,
-        shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
-        color: unread
-            ? PortalTheme.navy.withValues(alpha: 0.03)
-            : Colors.white,
-        borderColor: unread
-            ? PortalTheme.navy.withValues(alpha: 0.16)
-            : PortalTheme.border.withValues(alpha: 0.75),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                _getNotificationIcon(notification.type),
-                color: accent,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          notification.title,
-                          style: PortalTheme.cardTitle.copyWith(
-                            fontSize: 14.5,
-                            fontWeight:
-                                unread ? FontWeight.w800 : FontWeight.w700,
-                            color: PortalTheme.navy,
-                            height: 1.25,
-                          ),
-                        ),
-                      ),
-                      if (unread) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(top: 5),
-                          decoration: const BoxDecoration(
-                            color: PortalTheme.sky,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    notification.message,
-                    style: PortalTheme.bodySecondary.copyWith(
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    timeText,
-                    style: PortalTheme.caption.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: PortalTheme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  IconData _getNotificationIcon(NotificationType type) {
-    switch (type) {
-      case NotificationType.event:
-        return Icons.event;
-      case NotificationType.job:
-        return Icons.work;
-      case NotificationType.message:
-        return Icons.message;
-      case NotificationType.announcement:
-        return Icons.campaign;
-      case NotificationType.survey:
-        return Icons.poll_outlined;
-      case NotificationType.feedback:
-        return Icons.feedback_outlined;
-      case NotificationType.forum:
-        return Icons.forum_outlined;
-      case NotificationType.system:
-        return Icons.info;
-    }
-  }
-
-  Future<void> _openSupportMessages() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const UserMessagesScreen(isTabActive: true),
-      ),
-    );
-    refreshMessagesCount();
   }
 }
 

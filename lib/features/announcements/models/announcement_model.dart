@@ -12,6 +12,12 @@ class Announcement {
   final List<String> targetBatchYears;
   final bool notifyInApp;
   final bool notifyEmail;
+
+  /// Also send a phone / browser alert when published.
+  final bool notifyPush;
+
+  /// Urgent notices bypass recipients' category settings and quiet hours.
+  final bool urgent;
   final String createdBy;
   final DateTime createdAt;
   final DateTime? publishedAt;
@@ -27,6 +33,8 @@ class Announcement {
     this.targetBatchYears = const [],
     this.notifyInApp = true,
     this.notifyEmail = false,
+    this.notifyPush = true,
+    this.urgent = false,
     required this.createdBy,
     required this.createdAt,
     this.publishedAt,
@@ -51,6 +59,8 @@ class Announcement {
       targetBatchYears: List<String>.from(data['targetBatchYears'] ?? []),
       notifyInApp: data['notifyInApp'] as bool? ?? true,
       notifyEmail: data['notifyEmail'] as bool? ?? false,
+      notifyPush: data['notifyPush'] as bool? ?? true,
+      urgent: data['urgent'] as bool? ?? false,
       createdBy: data['createdBy'] as String? ?? '',
       createdAt: _parseDateTime(row['created_at']),
       publishedAt: row['published_at'] != null
@@ -73,6 +83,8 @@ class Announcement {
         'targetBatchYears': targetBatchYears,
         'notifyInApp': notifyInApp,
         'notifyEmail': notifyEmail,
+        'notifyPush': notifyPush,
+        'urgent': urgent,
         'createdBy': createdBy,
         'recipientCount': recipientCount,
       },
@@ -98,6 +110,8 @@ class Announcement {
     List<String>? targetBatchYears,
     bool? notifyInApp,
     bool? notifyEmail,
+    bool? notifyPush,
+    bool? urgent,
     DateTime? publishedAt,
     int? recipientCount,
   }) {
@@ -111,6 +125,8 @@ class Announcement {
       targetBatchYears: targetBatchYears ?? this.targetBatchYears,
       notifyInApp: notifyInApp ?? this.notifyInApp,
       notifyEmail: notifyEmail ?? this.notifyEmail,
+      notifyPush: notifyPush ?? this.notifyPush,
+      urgent: urgent ?? this.urgent,
       createdBy: createdBy,
       createdAt: createdAt,
       publishedAt: publishedAt ?? this.publishedAt,

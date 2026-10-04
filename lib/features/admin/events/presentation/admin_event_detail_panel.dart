@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/admin/events/widgets/admin_event_ui.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/events/presentation/admin_event_comments_dialog.dart';
 import 'package:alumni_system/features/events/data/event_comment_service.dart';
 import 'package:alumni_system/features/events/data/event_rsvp_service.dart';
@@ -14,6 +15,7 @@ import 'package:alumni_system/features/events/widgets/event_rsvp_bar.dart';
 import 'package:alumni_system/features/events/widgets/event_status_badge.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 Future<void> showAdminEventDetail({
@@ -28,11 +30,7 @@ Future<void> showAdminEventDetail({
     initialCounts: initialCounts,
   );
   if (adminIsWideSurface(context)) {
-    return showAdminSidePanel<void>(
-      context: context,
-      width: 520,
-      child: child,
-    );
+    return showAdminSidePanel<void>(context: context, width: 520, child: child);
   }
   return showAdminDialogSurface<void>(
     context: context,
@@ -180,11 +178,7 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 20),
       children: [
-        EventCoverHero(
-          event: e,
-          borderRadius: 10,
-          showDownload: true,
-        ),
+        EventCoverHero(event: e, borderRadius: 10, showDownload: true),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -212,7 +206,7 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
           child: EventRsvpCountRow(
             counts: _counts,
             capacity: e.capacity,
-            includeCantAttend: true,
+            includeNotGoing: true,
           ),
         ),
         const SizedBox(height: 12),
@@ -258,7 +252,7 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
           _detailSection(
             title: 'Description',
             icon: Icons.notes_outlined,
-            child: Text(
+            child: SafeLinkText(
               e.description,
               style: const TextStyle(
                 height: 1.45,
@@ -411,42 +405,30 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
                 Expanded(
                   child: EventRsvpCountRow(
                     counts: _counts,
-                    includeCantAttend: true,
+                    includeNotGoing: true,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AdminEventTheme.border),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<EventRsvpStatus?>(
-                      value: _attendeeFilter,
-                      hint: const Text('Filter', style: TextStyle(fontSize: 13)),
-                      isDense: true,
-                      items: const [
-                        DropdownMenuItem(value: null, child: Text('All')),
-                        DropdownMenuItem(
-                          value: EventRsvpStatus.going,
-                          child: Text('Going'),
-                        ),
-                        DropdownMenuItem(
-                          value: EventRsvpStatus.interested,
-                          child: Text('Interested'),
-                        ),
-                        DropdownMenuItem(
-                          value: EventRsvpStatus.cantAttend,
-                          child: Text("Can't Attend"),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        setState(() => _attendeeFilter = v);
-                        _loadRsvp();
-                      },
-                    ),
+                SizedBox(
+                  width: 140,
+                  child: DirectoryFilterField<EventRsvpStatus?>(
+                    label: 'RSVP',
+                    value: _attendeeFilter,
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('All')),
+                      DropdownMenuItem(
+                        value: EventRsvpStatus.going,
+                        child: Text('Going'),
+                      ),
+                      DropdownMenuItem(
+                        value: EventRsvpStatus.notGoing,
+                        child: Text('Not going'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      setState(() => _attendeeFilter = v);
+                      _loadRsvp();
+                    },
                   ),
                 ),
               ],
@@ -458,121 +440,122 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
           child: _loadingRsvp
               ? const Center(child: CircularProgressIndicator())
               : _attendees.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.people_outline,
-                              size: 40,
-                              color: AdminEventTheme.textMuted,
-                            ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'No RSVPs yet',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: AdminEventTheme.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Alumni responses will appear here.',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: AdminEventTheme.textSecondary,
-                              ),
-                            ),
-                          ],
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 40,
+                          color: AdminEventTheme.textMuted,
                         ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'No RSVPs yet',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AdminEventTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Alumni responses will appear here.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AdminEventTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 20),
+                  itemCount: _attendees.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final a = _attendees[i];
+                    final avatar = AppImage.provider(a.profileImageUrl);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 20),
-                      itemCount: _attendees.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, i) {
-                        final a = _attendees[i];
-                        final avatar = AppImage.provider(a.profileImageUrl);
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius:
-                                BorderRadius.circular(AdminEventTheme.radiusSm),
-                            border: Border.all(color: AdminEventTheme.border),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: const Color(0xFF090A4F),
-                                backgroundImage: avatar,
-                                child: avatar == null
-                                    ? Text(
-                                        a.userName.isNotEmpty
-                                            ? a.userName[0].toUpperCase()
-                                            : '?',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      a.userName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13.5,
-                                        color: AdminEventTheme.textPrimary,
-                                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(
+                          AdminEventTheme.radiusSm,
+                        ),
+                        border: Border.all(color: AdminEventTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: const Color(0xFF090A4F),
+                            backgroundImage: avatar,
+                            child: avatar == null
+                                ? Text(
+                                    a.userName.isNotEmpty
+                                        ? a.userName[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                    if (a.userEmail.trim().isNotEmpty)
-                                      Text(
-                                        a.userEmail,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AdminEventTheme.textSecondary,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AdminEventTheme.infoBg,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  a.status.label,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  a.userName,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11.5,
-                                    color: AdminEventTheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13.5,
+                                    color: AdminEventTheme.textPrimary,
                                   ),
                                 ),
-                              ),
-                            ],
+                                if (a.userEmail.trim().isNotEmpty)
+                                  Text(
+                                    a.userEmail,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AdminEventTheme.textSecondary,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        );
-                      },
-                    ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AdminEventTheme.infoBg,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              a.status.label,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11.5,
+                                color: AdminEventTheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -594,8 +577,7 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
           children: [
             _kpi('Views', '${e.viewsCount}'),
             _kpi('Going', '${_counts.going}'),
-            _kpi('Interested', '${_counts.interested}'),
-            _kpi("Can't Attend", '${_counts.cantAttend}'),
+            _kpi('Not going', '${_counts.notGoing}'),
             _kpi('Going %', '${(goingPct * 100).round()}%'),
             _kpi('Capacity %', '${(capacityPct * 100).round()}%'),
             _kpi('Comments', '${e.comments}'),
@@ -631,20 +613,9 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
                           ),
                         ),
                         PieChartSectionData(
-                          value: _counts.interested.toDouble(),
-                          color: const Color(0xFFD97706),
-                          title: 'Int.',
-                          radius: 48,
-                          titleStyle: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        PieChartSectionData(
-                          value: _counts.cantAttend.toDouble(),
+                          value: _counts.notGoing.toDouble(),
                           color: const Color(0xFFDC2626),
-                          title: 'No',
+                          title: 'Not going',
                           radius: 48,
                           titleStyle: const TextStyle(
                             fontSize: 10,
@@ -703,7 +674,10 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
         children: [
           Icon(icon, size: 14, color: const Color(0xFF475569)),
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );

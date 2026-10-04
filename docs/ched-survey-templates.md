@@ -20,17 +20,18 @@ Custom blank surveys still use the generic question editor and separate take pag
 | **16** = No / Never Employed | Show **17**; hide **18–33** |
 | **16** = Yes | Hide **17**; show **18–22** and first-job block **27–32** |
 | **18** = Self-employed | Show self-employed skills text |
-| **22** = Yes | Show **23**, **24a**; hide **25** |
-| **22** = No | Show **25**; hide **23/24**; continue to **27+** |
-| **24a** = No | Skip **24b** (reasons for accepting) |
-| **24a** = Yes | Show **24b** |
+| **20** = Others, please specify | Show line-of-business specify text (campus addition; not on the official paper list) |
+| **22** = Yes | Show **23**, **24**; hide **26** |
+| **22** = No | Show **26**; hide **23–25**; continue to **27+** |
+| **24** = No | Skip **25** (reasons for accepting); show **26** (reasons for changing job) |
+| **24** = Yes | Show **25**; hide **26** |
 | **32** = No | Hide **33** |
 | **32** = Yes | Show **33** |
-| “Others, please specify” | Specify field only when that option is selected |
+| “Others, please specify” | Specify field only when that option is selected; **required** while shown |
 
-- Paper note: item **26** does not exist in the source template; numbering jumps **25 → 27**. Duplicate paper “24” is stored as **24a** / **24b**.
+- Numbering: the paper prints “24” twice and has no 26. The app displays them as **24** (first job related), **25** (reasons for accepting) and **26** (reasons for changing job). Stored answer ids stay `ched_24a` / `ched_24b` / `ched_25`.
 - Section E (referrals) is **not** included in the digital form.
-- Optional items (e.g. **13**, **14**, **15a/15b**, **34**, and conditional “Others, please specify”) show an **Optional** badge; alumni may skip or write None / N/A.
+- Optional items (e.g. **13**, **14**, **15a/15b**, **34**) show an **Optional** badge; alumni may skip or write None / N/A.
 
 ## Admin workflow
 

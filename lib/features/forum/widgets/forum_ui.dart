@@ -621,12 +621,13 @@ Future<String?> showForumModerationReasonDialog(
             ),
             actions: [
               TextButton(
+                style: PortalTheme.ghostButton(dense: true),
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                style: PortalTheme.primaryButton(),
+                style: PortalTheme.primaryButton(dense: true),
                 child: Text(confirmLabel ?? 'Confirm'),
               ),
             ],

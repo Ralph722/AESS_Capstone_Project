@@ -4,13 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/config/email_delivery_config.dart';
 import 'package:alumni_system/core/utils/local_id.dart';
 import 'package:alumni_system/features/announcements/models/announcement_model.dart';
-import 'package:alumni_system/features/notifications/models/notification_model.dart';
 import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/email_service.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
-
 /// Announcements data access — Supabase only.
 class AnnouncementService {
   AnnouncementService({SupabaseClient? supabase})
@@ -160,28 +157,11 @@ class AnnouncementService {
       );
     }
 
-    final notificationService = NotificationService();
+    // In-app notices are created by the announcements trigger when the
+    // status flips to published (notify_announcement_published).
     EmailService? emailService;
     if (item.notifyEmail && EmailDeliveryConfig.isConfigured) {
       emailService = EmailService();
-    }
-
-    final excerpt = item.body.length > 200
-        ? '${item.body.substring(0, 200)}…'
-        : item.body;
-
-    if (item.notifyInApp) {
-      for (final entry in matched.entries) {
-        try {
-          await notificationService.createNotification(
-            userId: entry.key,
-            type: NotificationType.announcement,
-            title: item.title,
-            message: excerpt,
-            relatedId: id,
-          );
-        } catch (_) {}
-      }
     }
 
     if (item.notifyEmail && emailService != null) {
@@ -237,15 +217,26 @@ class AnnouncementService {
     return list;
   }
 
+  /// Last list delivered per user, so reopening the screen can paint
+  /// immediately while the live subscription reconnects.
+  static final Map<String, List<Announcement>> _lastPublishedByUser = {};
+
+  List<Announcement>? cachedPublishedForUser(String userId) =>
+      _lastPublishedByUser[userId];
+
   Stream<List<Announcement>> watchPublishedForUser(String userId) {
     final controller = StreamController<List<Announcement>>();
+    var delivered = false;
 
     Future<void> emit() async {
       try {
         final list = await getPublishedForUser(userId);
+        _lastPublishedByUser[userId] = list;
+        delivered = true;
         if (!controller.isClosed) controller.add(list);
-      } catch (_) {
-        if (!controller.isClosed) controller.add(const []);
+      } catch (e, st) {
+        // Keep showing the last good list on a transient refresh failure.
+        if (!delivered && !controller.isClosed) controller.addError(e, st);
       }
     }
 

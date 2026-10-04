@@ -347,7 +347,7 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: _FilterDropdown<String?>(
+                    child: DirectoryFilterField<String?>(
                       label: 'Course',
                       value: _course,
                       items: [
@@ -364,7 +364,7 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _FilterDropdown<String?>(
+                    child: DirectoryFilterField<String?>(
                       label: 'Batch',
                       value: _batch,
                       items: [
@@ -451,55 +451,6 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _FilterDropdown<T> extends StatelessWidget {
-  const _FilterDropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String label;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<T>(
-      key: ValueKey('$label-$value'),
-      initialValue: value,
-      isExpanded: true,
-      isDense: true,
-      decoration: InputDecoration(
-        isDense: true,
-        labelText: label,
-        labelStyle: const TextStyle(
-          fontSize: 12,
-          color: AdminDirectoryTheme.textSecondary,
-        ),
-        filled: true,
-        fillColor: AdminDirectoryTheme.background,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-          borderSide: const BorderSide(color: AdminDirectoryTheme.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-          borderSide: const BorderSide(color: AdminDirectoryTheme.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-          borderSide: const BorderSide(color: AdminDirectoryTheme.primary),
-        ),
-      ),
-      items: items,
-      onChanged: onChanged,
     );
   }
 }

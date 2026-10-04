@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:alumni_system/features/feedback/models/feedback_model.dart';
 import 'package:alumni_system/features/feedback/data/feedback_service.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
@@ -101,6 +102,8 @@ class _UserFeedbackSubmitScreenState extends State<UserFeedbackSubmitScreen> {
                       DropdownButtonFormField<FeedbackCategory>(
                         key: ValueKey(_category),
                         initialValue: _category,
+                        borderRadius: PortalMenu.dropdownRadius,
+                        dropdownColor: PortalTheme.card,
                         decoration: _inputDecoration('Category'),
                         items: FeedbackCategory.values
                             .map(

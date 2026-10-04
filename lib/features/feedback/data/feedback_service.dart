@@ -4,11 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:alumni_system/core/utils/local_id.dart';
 import 'package:alumni_system/features/feedback/models/feedback_model.dart';
-import 'package:alumni_system/features/notifications/models/notification_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/core/services/supabase_user_bridge.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 
@@ -18,20 +16,20 @@ class FeedbackService {
     SupabaseClient? supabase,
     SupabaseUserBridge? bridge,
     AuditService? auditService,
-    NotificationService? notificationService,
     UserProfileService? userProfileService,
     AuthService? authService,
   })  : _supabase = supabase ?? Supabase.instance.client,
         _bridge = bridge ?? SupabaseUserBridge(client: supabase),
         _auditService = auditService ?? AuditService(),
-        _notificationService = notificationService ?? NotificationService(),
         _userProfileService = userProfileService ?? UserProfileService(),
         _authService = authService ?? AuthService();
+
+  // Submitter / admin notices come from the feedback table trigger
+  // (notify_feedback_changes).
 
   final SupabaseClient _supabase;
   final SupabaseUserBridge _bridge;
   final AuditService _auditService;
-  final NotificationService _notificationService;
   final UserProfileService _userProfileService;
   final AuthService _authService;
 
@@ -283,15 +281,6 @@ class FeedbackService {
           'Changed feedback status from ${existing.status.label} to ${status.label}',
       userRole: 'admin',
     );
-
-    if (status == FeedbackStatus.resolved || status == FeedbackStatus.closed) {
-      await _notifySubmitter(
-        userId: existing.userId,
-        feedbackId: feedbackId,
-        title: 'Feedback update',
-        message: 'Your feedback is now marked as ${status.label.toLowerCase()}.',
-      );
-    }
   }
 
   Future<void> respondToFeedback({
@@ -330,13 +319,6 @@ class FeedbackService {
       resourceId: feedbackId,
       description: 'Replied to feedback from ${existing.userName}',
       userRole: 'admin',
-    );
-
-    await _notifySubmitter(
-      userId: existing.userId,
-      feedbackId: feedbackId,
-      title: 'Response to your feedback',
-      message: trimmed.length > 120 ? '${trimmed.substring(0, 120)}…' : trimmed,
     );
   }
 
@@ -410,23 +392,5 @@ class FeedbackService {
         .select()
         .order('created_at', ascending: false);
     return rows.map(FeedbackSubmission.fromSupabaseRow).toList();
-  }
-
-  Future<void> _notifySubmitter({
-    required String userId,
-    required String feedbackId,
-    required String title,
-    required String message,
-  }) async {
-    try {
-      await _notificationService.createNotification(
-        userId: userId,
-        type: NotificationType.feedback,
-        title: title,
-        message: message,
-        relatedId: feedbackId,
-        data: {'feedbackId': feedbackId},
-      );
-    } catch (_) {}
   }
 }

@@ -47,7 +47,7 @@ Future<void> openExternalLinkSafely(
     context: context,
     builder: (ctx) => Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
@@ -64,18 +64,19 @@ Future<void> openExternalLinkSafely(
                     height: 42,
                     decoration: BoxDecoration(
                       color: PortalTheme.sky.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
                     ),
                     child: const Icon(
                       Icons.link_rounded,
+                      size: 20,
                       color: PortalTheme.navy,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       'Open external link?',
-                      style: PortalTheme.sectionTitle.copyWith(fontSize: 16),
+                      style: PortalTheme.pageTitle,
                     ),
                   ),
                 ],
@@ -91,7 +92,7 @@ Future<void> openExternalLinkSafely(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: PortalTheme.pageBg,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
                   border: Border.all(color: PortalTheme.border),
                 ),
                 child: Column(
@@ -114,21 +115,18 @@ Future<void> openExternalLinkSafely(
               ),
               const SizedBox(height: 16),
               Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      style: PortalTheme.secondaryButton(dense: true),
-                      child: const Text('Cancel'),
-                    ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    style: PortalTheme.ghostButton(dense: true),
+                    child: const Text('Cancel'),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: PortalTheme.primaryButton(dense: true),
-                      child: const Text('Open link'),
-                    ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: PortalTheme.primaryButton(dense: true),
+                    child: const Text('Open link'),
                   ),
                 ],
               ),

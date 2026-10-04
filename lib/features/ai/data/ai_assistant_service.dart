@@ -29,6 +29,9 @@ class AiAssistantService {
     double temperature = 0.7,
     String? systemInstructionOverride,
     String? responseMimeType,
+    /// When true, asks Gemini 2.5+ to skip internal "thinking" so short
+    /// answers are not cut off by the output token budget.
+    bool disableThinking = false,
   }) async {
     if (!AiConfig.isConfigured) {
       throw AiNotConfiguredException(
@@ -66,6 +69,9 @@ class AiAssistantService {
     };
     if (responseMimeType != null && responseMimeType.trim().isNotEmpty) {
       generationConfig['responseMimeType'] = responseMimeType.trim();
+    }
+    if (disableThinking) {
+      generationConfig['thinkingConfig'] = {'thinkingBudget': 0};
     }
 
     final body = <String, dynamic>{
@@ -127,21 +133,27 @@ class AiAssistantService {
       throw Exception('No response from AI');
     }
 
-    final content = candidates.first['content'] as Map<String, dynamic>?;
+    final candidate = candidates.first as Map<String, dynamic>;
+    final content = candidate['content'] as Map<String, dynamic>?;
     final parts = content?['parts'] as List<dynamic>?;
     if (parts == null || parts.isEmpty) {
       throw Exception('Empty AI response');
     }
 
-    // Gemini may split long answers across multiple parts — join them all
-    // so section-based responses are never truncated to the first part.
+    // Prefer visible answer text; skip Gemini "thought" parts when present.
     final text = parts
+        .whereType<Map>()
+        .where((p) => p['thought'] != true)
+        .map((p) => (p['text'] as String?) ?? '')
+        .join();
+    final fallbackJoined = parts
         .map((p) => (p as Map<String, dynamic>)['text'] as String? ?? '')
         .join();
-    if (text.trim().isEmpty) {
+    final resolved = text.trim().isNotEmpty ? text.trim() : fallbackJoined.trim();
+    if (resolved.isEmpty) {
       throw Exception('Empty AI response');
     }
-    return text.trim();
+    return resolved;
   }
 
   bool _isQuotaError(int statusCode, String body) {

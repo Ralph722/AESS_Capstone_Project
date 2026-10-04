@@ -7,12 +7,13 @@ allprojects {
     }
 }
 
-val shortPathBuildDir = File("C:/Users/ACERLA~1/alumni_system/build")
-rootProject.layout.buildDirectory.set(shortPathBuildDir)
-
+// Keep Gradle output under <project>/build (where the flutter tool expects
+// the APK) without hardcoding absolute paths.
+val projectBuildDir = File(rootProject.projectDir.parentFile, "build")
+rootProject.layout.buildDirectory.set(projectBuildDir)
 subprojects {
-    val newSubprojectBuildDir = File(shortPathBuildDir, project.name)
-    project.layout.buildDirectory.set(newSubprojectBuildDir)
+    val subBuildDir = File(projectBuildDir, project.name)
+    project.layout.buildDirectory.set(subBuildDir)
 }
 subprojects {
     project.evaluationDependsOn(":app")

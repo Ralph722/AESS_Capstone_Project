@@ -385,28 +385,15 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
             },
           ),
           for (final f in _AnnouncementStatusFilter.values)
-            FilterChip(
-              label: Text(switch (f) {
+            DirectoryToolbarFilterChip(
+              label: switch (f) {
                 _AnnouncementStatusFilter.all => 'Active',
                 _AnnouncementStatusFilter.draft => 'Draft',
                 _AnnouncementStatusFilter.published => 'Published',
                 _AnnouncementStatusFilter.archived =>
                   'Archived ($_archivedCount)',
-              }),
+              },
               selected: _statusFilter == f,
-              showCheckmark: false,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-              selectedColor: AdminAnnouncementTheme.infoBg,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                color: _statusFilter == f
-                    ? AdminAnnouncementTheme.primary
-                    : AdminAnnouncementTheme.textSecondary,
-              ),
-              side: const BorderSide(color: AdminAnnouncementTheme.border),
               onSelected: (_) => setState(() => _statusFilter = f),
             ),
         ],

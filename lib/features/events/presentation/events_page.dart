@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/events/data/event_comment_service.dart';
 import 'package:alumni_system/features/events/data/event_rsvp_service.dart';
 import 'package:alumni_system/features/events/data/event_service.dart';
 import 'package:alumni_system/features/events/data/reminder_service.dart';
-import 'package:alumni_system/features/events/models/event_comment_model.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/models/event_rsvp_model.dart';
+import 'package:alumni_system/features/events/widgets/event_comments_sheet.dart';
 import 'package:alumni_system/features/events/widgets/event_cover.dart';
 import 'package:alumni_system/features/events/widgets/event_rsvp_bar.dart';
 import 'package:alumni_system/features/events/widgets/event_status_badge.dart';
 import 'package:alumni_system/features/events/widgets/events_month_calendar.dart';
+import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
@@ -48,7 +48,7 @@ class EventsScreenState extends State<EventsScreen>
     'This Week',
     'This Month',
     'Newest',
-    'Going & Interested',
+    'Going',
   ];
   final EventService _eventService = EventService();
   final ReminderService _reminderService = ReminderService();
@@ -111,6 +111,9 @@ class EventsScreenState extends State<EventsScreen>
       });
       _recomputeFilteredEvents();
       _openInitialTargetIfNeeded();
+      _reminderService.syncGoingEvents(
+        events.where((e) => myRsvps[e.id] == EventRsvpStatus.going),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -163,10 +166,9 @@ class EventsScreenState extends State<EventsScreen>
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
       case 4:
-        next = allEvents.where((event) {
-          final s = _myRsvps[event.id];
-          return s == EventRsvpStatus.going || s == EventRsvpStatus.interested;
-        }).toList();
+        next = allEvents
+            .where((event) => _myRsvps[event.id] == EventRsvpStatus.going)
+            .toList();
         break;
     }
     if (_searchQuery.isNotEmpty) {
@@ -189,10 +191,7 @@ class EventsScreenState extends State<EventsScreen>
     _handledInitialTarget = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      openEventById(
-        targetEventId,
-        openComments: widget.openCommentsOnLaunch,
-      );
+      openEventById(targetEventId, openComments: widget.openCommentsOnLaunch);
     });
   }
 
@@ -214,9 +213,9 @@ class EventsScreenState extends State<EventsScreen>
     event ??= await _eventService.getEventById(id);
     if (!mounted) return;
     if (event == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event not found')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Event not found')));
       return;
     }
 
@@ -364,7 +363,7 @@ class EventsScreenState extends State<EventsScreen>
               pinned: true,
               delegate: _EventsFilterHeaderDelegate(
                 child: _buildStickyFilterBar(filteredEvents.length),
-                height: 188,
+                height: _filterBarHeight(context),
               ),
             ),
 
@@ -384,7 +383,7 @@ class EventsScreenState extends State<EventsScreen>
               SliverFillRemaining(child: _buildEmptyState())
             else if (_showCalendar)
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 sliver: SliverToBoxAdapter(child: _buildCalendarView()),
               )
             else
@@ -414,7 +413,7 @@ class EventsScreenState extends State<EventsScreen>
                   }
 
                   // Match tile height to card content so rows stay tight.
-                  const hPad = 12.0;
+                  const hPad = 16.0;
                   const gap = 12.0;
                   const bodyEstimate = 228.0;
                   final tileWidth =
@@ -423,7 +422,7 @@ class EventsScreenState extends State<EventsScreen>
                   final mainAxisExtent = imageHeight + bodyEstimate;
 
                   return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    padding: const EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: cols,
@@ -544,6 +543,15 @@ class EventsScreenState extends State<EventsScreen>
     );
   }
 
+  /// Exact height of [_buildStickyFilterBar]: margins 18 + card padding 26 +
+  /// border 2 + search 44 + gap 12 + chips 36 + gap 10, plus the count line.
+  double _filterBarHeight(BuildContext context) {
+    final countLine =
+        MediaQuery.textScalerOf(context).scale(PortalTheme.meta.fontSize!) *
+        PortalTheme.meta.height!;
+    return (148 + countLine).ceilToDouble() + 1;
+  }
+
   Widget _buildStickyFilterBar(int count) {
     return ColoredBox(
       color: PortalTheme.pageBg,
@@ -607,43 +615,39 @@ class EventsScreenState extends State<EventsScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              SizedBox(
+              _ScrollableChipRow(
                 height: 36,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _filters.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final selected = _selectedFilter == index;
-                    return FilterChip(
-                      selected: selected,
-                      showCheckmark: false,
-                      label: Text(_filters[index]),
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      onSelected: (v) {
-                        if (v) _filterEvents(index);
-                      },
-                      selectedColor: PortalTheme.navy,
-                      backgroundColor: PortalTheme.surfaceMuted,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: selected
-                            ? Colors.white
-                            : PortalTheme.textSecondary,
-                      ),
-                      side: BorderSide(
-                        color: selected ? PortalTheme.navy : PortalTheme.border,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    );
-                  },
-                ),
+                itemCount: _filters.length,
+                itemBuilder: (context, index) {
+                  final selected = _selectedFilter == index;
+                  return FilterChip(
+                    selected: selected,
+                    showCheckmark: false,
+                    label: Text(_filters[index]),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    onSelected: (v) {
+                      if (v) _filterEvents(index);
+                    },
+                    selectedColor: PortalTheme.navy,
+                    backgroundColor: PortalTheme.surfaceMuted,
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? Colors.white
+                          : PortalTheme.textSecondary,
+                    ),
+                    side: BorderSide(
+                      color: selected ? PortalTheme.navy : PortalTheme.border,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 10),
               Text(
@@ -731,9 +735,11 @@ class EventsScreenState extends State<EventsScreen>
                               ColoredBox(
                                 color: PortalTheme.surfaceMuted,
                                 child: ConstrainedBox(
+                                  // Full width at the photo's own aspect
+                                  // ratio; only very tall posters get capped.
                                   constraints: BoxConstraints(
                                     maxHeight:
-                                        MediaQuery.sizeOf(context).height * 0.42,
+                                        MediaQuery.sizeOf(context).height * 0.8,
                                     minHeight: 180,
                                   ),
                                   child: ClipRect(
@@ -800,6 +806,14 @@ class EventsScreenState extends State<EventsScreen>
                                   ),
                                 ),
                               ),
+                              if (currentEvent.hasCoverImage)
+                                Positioned(
+                                  top: 14,
+                                  right: 58,
+                                  child: EventCoverDownloadButton(
+                                    event: currentEvent,
+                                  ),
+                                ),
                             ],
                           ),
                           Padding(
@@ -851,15 +865,14 @@ class EventsScreenState extends State<EventsScreen>
                                     child: EventRsvpBar(
                                       expanded: true,
                                       selected: status,
-                                      goingEnabled: _goingEnabled(
-                                        currentEvent,
-                                      ),
+                                      goingEnabled: _goingEnabled(currentEvent),
                                       onChanged: handleRsvp,
                                     ),
                                   ),
                                 ),
-                                if (_constraintLabels(currentEvent)
-                                    .isNotEmpty) ...[
+                                if (_constraintLabels(
+                                  currentEvent,
+                                ).isNotEmpty) ...[
                                   const SizedBox(height: 10),
                                   _buildConstraintLabels(currentEvent),
                                 ],
@@ -889,32 +902,26 @@ class EventsScreenState extends State<EventsScreen>
                                       currentEvent.venue.trim().isEmpty
                                           ? 'Venue TBA'
                                           : currentEvent.venue,
-                                      trailing: TextButton(
-                                        onPressed: () =>
-                                            openEventVenueInMaps(currentEvent),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: PortalTheme.navyMid,
-                                          visualDensity: VisualDensity.compact,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          currentEvent.hasVenuePin
-                                              ? 'Open pinned location'
-                                              : 'Open in Maps',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
+                                      trailing:
+                                          currentEvent.hasVenuePin ||
+                                              currentEvent.venue
+                                                  .trim()
+                                                  .isNotEmpty
+                                          ? _OpenMapPill(
+                                              tooltip: currentEvent.hasVenuePin
+                                                  ? 'Open pinned location'
+                                                  : 'Open in Maps',
+                                              onTap: () => openEventVenueInMaps(
+                                                currentEvent,
+                                              ),
+                                            )
+                                          : null,
                                     ),
                                     _detailMetaDivider(),
                                     _detailMetaRow(
                                       Icons.groups_outlined,
                                       'Responses',
-                                      '${counts.going} Going · ${counts.interested} Interested',
+                                      '${counts.going} Going',
                                     ),
                                     if (currentEvent.capacity != null &&
                                         currentEvent.capacity! > 0) ...[
@@ -948,7 +955,7 @@ class EventsScreenState extends State<EventsScreen>
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(
+                                  SafeLinkText(
                                     currentEvent.description,
                                     style: PortalTheme.body.copyWith(
                                       fontSize: 14,
@@ -1161,7 +1168,7 @@ class EventsScreenState extends State<EventsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _CommentsDialog(
+      builder: (context) => EventCommentsSheet(
         event: event,
         commentService: _commentService,
         onCommentsChanged: (count) {
@@ -1173,690 +1180,159 @@ class EventsScreenState extends State<EventsScreen>
   }
 }
 
-class _CommentsDialog extends StatefulWidget {
-  final AlumniEvent event;
-  final EventCommentService commentService;
-  final ValueChanged<int> onCommentsChanged;
-
-  const _CommentsDialog({
-    required this.event,
-    required this.commentService,
-    required this.onCommentsChanged,
+/// Horizontal chip list with a ">" hint at the right edge while more chips
+/// are off-screen; tapping the hint scrolls further.
+class _ScrollableChipRow extends StatefulWidget {
+  const _ScrollableChipRow({
+    required this.height,
+    required this.itemCount,
+    required this.itemBuilder,
   });
 
+  final double height;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+
   @override
-  State<_CommentsDialog> createState() => _CommentsDialogState();
+  State<_ScrollableChipRow> createState() => _ScrollableChipRowState();
 }
 
-class _CommentsDialogState extends State<_CommentsDialog> {
-  final TextEditingController _commentController = TextEditingController();
-  bool _isSubmitting = false;
-  String? _editingCommentId;
-  final TextEditingController _editController = TextEditingController();
-  List<EventComment> _comments = [];
-  final Map<String, List<EventComment>> _repliesByComment = {};
-  bool _loadingComments = true;
-  String? _loadError;
-
-  static const _navy = Color(0xFF090A4F);
-  static const _gold = Color(0xFFFFD700);
+class _ScrollableChipRowState extends State<_ScrollableChipRow> {
+  final _controller = ScrollController();
+  bool _canScrollRight = false;
 
   @override
   void initState() {
     super.initState();
-    _reloadComments();
+    _controller.addListener(_update);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
   }
 
   @override
   void dispose() {
-    _commentController.dispose();
-    _editController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  Future<void> _reloadComments() async {
-    setState(() {
-      _loadingComments = true;
-      _loadError = null;
-    });
-    try {
-      final comments = await widget.commentService.getComments(widget.event.id);
-      final replies = <String, List<EventComment>>{};
-      for (final c in comments) {
-        try {
-          replies[c.id] = await widget.commentService.getReplies(
-            widget.event.id,
-            c.id,
-          );
-        } catch (_) {
-          replies[c.id] = const [];
-        }
-      }
-      if (!mounted) return;
-      setState(() {
-        _comments = comments;
-        _repliesByComment
-          ..clear()
-          ..addAll(replies);
-        _loadingComments = false;
-      });
-      widget.onCommentsChanged(comments.length);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadingComments = false;
-        _loadError = e.toString();
-      });
-    }
+  void _update() {
+    if (!mounted || !_controller.hasClients) return;
+    final pos = _controller.position;
+    final next = pos.maxScrollExtent - pos.pixels > 4;
+    if (next != _canScrollRight) setState(() => _canScrollRight = next);
   }
 
-  Future<void> _submitComment() async {
-    if (_commentController.text.trim().isEmpty) return;
-    setState(() => _isSubmitting = true);
-    try {
-      await widget.commentService.createComment(
-        eventId: widget.event.id,
-        comment: _commentController.text,
-      );
-      _commentController.clear();
-      await _reloadComments();
-      widget.onCommentsChanged(_comments.length);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Comment added successfully'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding comment: $e'),
-            backgroundColor: const Color(0xFFFF6B6B),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  Future<void> _updateComment(String commentId) async {
-    if (_editController.text.trim().isEmpty) {
-      setState(() {
-        _editingCommentId = null;
-        _editController.clear();
-      });
-      return;
-    }
-    try {
-      await widget.commentService.updateComment(
-        eventId: widget.event.id,
-        commentId: commentId,
-        newComment: _editController.text,
-      );
-      setState(() {
-        _editingCommentId = null;
-        _editController.clear();
-      });
-      await _reloadComments();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Comment updated successfully'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating comment: $e'),
-            backgroundColor: const Color(0xFFFF6B6B),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteComment(String commentId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Comment'),
-        content: const Text('Are you sure you want to delete this comment?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFFF6B6B),
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+  void _scrollRight() {
+    if (!_controller.hasClients) return;
+    final pos = _controller.position;
+    final target = (pos.pixels + pos.viewportDimension * 0.7).clamp(
+      0.0,
+      pos.maxScrollExtent,
     );
-
-    if (confirmed == true) {
-      try {
-        await widget.commentService.deleteComment(
-          eventId: widget.event.id,
-          commentId: commentId,
-        );
-        await _reloadComments();
-        widget.onCommentsChanged(_comments.length);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Comment deleted successfully'),
-              backgroundColor: Color(0xFF4CAF50),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting comment: $e'),
-              backgroundColor: const Color(0xFFFF6B6B),
-            ),
-          );
-        }
-      }
-    }
+    _controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
   }
 
-  bool _canEditDelete(EventComment comment) {
-    final userId = AppSession.userId;
-    if (userId == null) return false;
-    return comment.userId == userId;
-  }
-
-  Widget _buildAvatar(
-    EventComment comment, {
-    double radius = 14,
-    Color background = _navy,
-    Color foreground = Colors.white,
-  }) {
-    final provider = AppImage.provider(comment.profileImageUrl);
-    if (provider != null) {
-      return CircleAvatar(radius: radius, backgroundImage: provider);
-    }
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: background,
-      child: Text(
-        comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : '?',
-        style: TextStyle(
-          color: foreground,
-          fontSize: radius * 0.78,
-          fontWeight: FontWeight.bold,
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: widget.height,
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: (_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _update());
+          return false;
+        },
+        child: Stack(
+          children: [
+            ListView.separated(
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.itemCount,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: widget.itemBuilder,
+            ),
+            if (_canScrollRight)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 48,
+                  alignment: Alignment.centerRight,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.white.withValues(alpha: 0), Colors.white],
+                      stops: const [0, 0.45],
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(
+                      side: BorderSide(color: PortalTheme.border),
+                    ),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _scrollRight,
+                      child: const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: PortalTheme.navy,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildReplies(EventComment comment) {
-    final replies = _repliesByComment[comment.id] ?? const <EventComment>[];
-    if (replies.isEmpty) return const SizedBox.shrink();
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        ...replies.map(
-          (reply) => Container(
-            margin: const EdgeInsets.only(left: 22, bottom: 6),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _navy.withValues(alpha: 0.18)),
-            ),
+/// Red "Open" pill that opens the venue (pin or name) in Maps.
+class _OpenMapPill extends StatelessWidget {
+  const _OpenMapPill({required this.tooltip, required this.onTap});
+
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: PortalTheme.danger,
+        shape: const StadiumBorder(),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: const Padding(
+            padding: EdgeInsets.fromLTRB(9, 6, 12, 6),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildAvatar(
-                  reply,
-                  radius: 12,
-                  background: _gold,
-                  foreground: _navy,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            reply.userName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                              color: _navy,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _gold.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Admin',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: _navy,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(reply.comment, style: const TextStyle(fontSize: 12)),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatDate(reply.createdAt),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
+                Icon(Icons.location_on_rounded, size: 15, color: Colors.white),
+                SizedBox(width: 4),
+                Text(
+                  'Open',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
                 ),
               ],
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.forum_outlined, color: _navy, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Comments',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            color: _navy,
-                          ),
-                        ),
-                        Text(
-                          widget.event.theme,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _loadingComments
-                  ? const CommentListSkeleton()
-                  : _loadError != null
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.wifi_off_rounded,
-                              size: 40,
-                              color: Colors.grey.shade400,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Could not load comments',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: _reloadComments,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Try again'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : _comments.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.comment_outlined,
-                            size: 48,
-                            color: Colors.grey.shade300,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No comments yet',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Be the first to ask a question!',
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _reloadComments,
-                      child: ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                        itemCount: _comments.length,
-                        itemBuilder: (context, index) {
-                          final comment = _comments[index];
-                          final isEditing = _editingCommentId == comment.id;
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8F9FA),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    _buildAvatar(comment),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            comment.userName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          Text(
-                                            _formatDate(comment.createdAt),
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (_canEditDelete(comment))
-                                      PopupMenuButton(
-                                        icon: const Icon(
-                                          Icons.more_vert,
-                                          size: 18,
-                                          color: Colors.grey,
-                                        ),
-                                        itemBuilder: (context) => [
-                                          PopupMenuItem(
-                                            onTap: () {
-                                              Future.delayed(
-                                                const Duration(
-                                                  milliseconds: 100,
-                                                ),
-                                                () {
-                                                  setState(() {
-                                                    _editingCommentId =
-                                                        comment.id;
-                                                    _editController.text =
-                                                        comment.comment;
-                                                  });
-                                                },
-                                              );
-                                            },
-                                            child: const Row(
-                                              children: [
-                                                Icon(Icons.edit, size: 16),
-                                                SizedBox(width: 8),
-                                                Text('Edit'),
-                                              ],
-                                            ),
-                                          ),
-                                          PopupMenuItem(
-                                            onTap: () {
-                                              Future.delayed(
-                                                const Duration(
-                                                  milliseconds: 100,
-                                                ),
-                                                () =>
-                                                    _deleteComment(comment.id),
-                                              );
-                                            },
-                                            child: const Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.delete,
-                                                  size: 16,
-                                                  color: Color(0xFFFF6B6B),
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Delete',
-                                                  style: TextStyle(
-                                                    color: Color(0xFFFF6B6B),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                if (isEditing)
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      TextField(
-                                        controller: _editController,
-                                        maxLines: 3,
-                                        style: const TextStyle(fontSize: 13),
-                                        decoration: InputDecoration(
-                                          hintText: 'Edit your comment…',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          contentPadding: const EdgeInsets.all(
-                                            10,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          TextButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                _editingCommentId = null;
-                                                _editController.clear();
-                                              });
-                                            },
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () =>
-                                                _updateComment(comment.id),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: _navy,
-                                            ),
-                                            child: const Text('Save'),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                else
-                                  Text(
-                                    comment.comment,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                if (comment.updatedAt != null &&
-                                    comment.updatedAt != comment.createdAt)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Text(
-                                      'Edited ${_formatDate(comment.updatedAt!)}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey.shade500,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ),
-                                _buildReplies(comment),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-            ),
-            Container(
-              padding: EdgeInsets.fromLTRB(
-                12,
-                10,
-                12,
-                10 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _commentController,
-                      maxLines: null,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: 'Ask a question or share a thought…',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _isSubmitting ? null : _submitComment,
-                    icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send_rounded, size: 20),
-                    color: _navy,
-                    style: IconButton.styleFrom(
-                      backgroundColor: _navy.withValues(alpha: 0.08),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    if (difference.inDays == 0) {
-      if (difference.inHours == 0) {
-        if (difference.inMinutes == 0) return 'Just now';
-        return '${difference.inMinutes}m ago';
-      }
-      return '${difference.inHours}h ago';
-    }
-    if (difference.inDays == 1) return 'Yesterday';
-    if (difference.inDays < 7) return '${difference.inDays}d ago';
-    return DateFormat('MMM d, yyyy').format(date);
   }
 }
 

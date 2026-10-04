@@ -66,6 +66,7 @@ abstract final class ChedGtsBuiltin {
     'Other Community, Social and Personal Service Activities',
     'Private Households with Employed Persons',
     'Extra-territorial Organizations and Bodies',
+    'Others, please specify',
   ];
 
   static const _jobLevels = [
@@ -93,6 +94,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.a,
       type: ChedGtsFieldType.text,
       prompt: 'Name',
+      helpText: 'Write your full name: Last name, First name, Middle name.',
       required: true,
       prefillKey: 'profile.displayName',
     ),
@@ -102,6 +104,9 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.a,
       type: ChedGtsFieldType.text,
       prompt: 'Permanent Address',
+      helpText:
+          'House no. or street, barangay, city or municipality, and '
+          'province.',
       required: true,
       prefillKey: 'profile.address',
     ),
@@ -111,6 +116,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.a,
       type: ChedGtsFieldType.text,
       prompt: 'E-mail Address',
+      helpText: 'Use an email address you check regularly.',
       required: true,
       prefillKey: 'profile.email',
     ),
@@ -120,6 +126,9 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.a,
       type: ChedGtsFieldType.text,
       prompt: 'Telephone or Contact Number(s)',
+      helpText:
+          'A landline or another number where you can be reached. If you '
+          'only have a mobile number, you can write it here too.',
       required: true,
       prefillKey: 'profile.telephoneNumber',
     ),
@@ -129,6 +138,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.a,
       type: ChedGtsFieldType.text,
       prompt: 'Mobile Number',
+      helpText: 'Your active mobile number, e.g. 0917 123 4567.',
       required: true,
       prefillKey: 'profile.mobileNumber',
     ),
@@ -168,6 +178,9 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.single,
       prompt: 'Region of Origin',
       options: GtsConstants.regionsOfOrigin,
+      helpText:
+          'The region of your home province, e.g. Region 10 for Misamis '
+          'Oriental or Bukidnon.',
       required: true,
       prefillKey: 'profile.regionOfOrigin',
     ),
@@ -177,6 +190,8 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.a,
       type: ChedGtsFieldType.text,
       prompt: 'Province',
+      helpText:
+          'The province of your permanent address, e.g. Misamis Oriental.',
       required: true,
       prefillKey: 'profile.province',
     ),
@@ -187,6 +202,9 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.single,
       prompt: 'Location of Residence',
       options: GtsConstants.locationOfResidenceOptions,
+      helpText:
+          'Choose City if you live in a city, or Municipality if you live'
+          ' in a town.',
       required: true,
       prefillKey: 'profile.locationOfResidence',
     ),
@@ -197,14 +215,17 @@ abstract final class ChedGtsBuiltin {
       chedNumber: '12',
       section: ChedGtsSection.b,
       type: ChedGtsFieldType.tableRows,
-      prompt:
-          'Educational Attainment (Baccalaureate Degree only)',
+      prompt: 'Educational Attainment (Baccalaureate Degree only)',
       tableColumns: const [
         'Degree(s) & Specialization(s)',
         'College or University',
         'Year Graduated',
         'Honor(s) or Award(s) Received',
       ],
+      helpText:
+          'Your bachelor\'s degree (e.g. BS Information Technology), '
+          'school, year graduated, and honors such as Cum Laude. Add a '
+          'row for each degree.',
       required: true,
       prefillKey: 'profile.educationRow',
     ),
@@ -214,11 +235,10 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.b,
       type: ChedGtsFieldType.tableRows,
       prompt: 'Professional Examination(s) Passed',
-      tableColumns: const [
-        'Name of Examination',
-        'Date Taken',
-        'Rating',
-      ],
+      tableColumns: const ['Name of Examination', 'Date Taken', 'Rating'],
+      helpText:
+          'Licensure or civil service exams you passed, e.g. LET or Civil'
+          ' Service Professional. Leave blank if none.',
       required: false,
     ),
     ChedGtsItem(
@@ -229,10 +249,11 @@ abstract final class ChedGtsBuiltin {
       prompt:
           'Reason(s) for taking the course(s) or pursuing degree(s). You may check more than one answer.',
       matrixRows: _reasonRows,
-      matrixColumns: const [
-        'Undergraduate/AB/BS',
-        'Graduate/MS/MA/PhD',
-      ],
+      matrixColumns: const ['Undergraduate/AB/BS', 'Graduate/MS/MA/PhD'],
+      helpText:
+          'Tick every reason that applies. Use the Undergraduate column '
+          'for your bachelor\'s degree, and the Graduate column only if '
+          'you took a master\'s or PhD.',
       required: false,
       othersSpecifyId: 'ched_14_other',
     ),
@@ -242,7 +263,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.b,
       type: ChedGtsFieldType.text,
       prompt: 'Others, please specify (reasons for taking the course)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
 
@@ -259,6 +280,10 @@ abstract final class ChedGtsBuiltin {
         'Duration and Credits Earned',
         'Name of Training Institution/College/University',
       ],
+      helpText:
+          'Seminars, certifications, short courses or graduate studies '
+          'after college, e.g. "CCNA Certification, 40 hours, Cisco '
+          'Networking Academy". Leave blank if none.',
       required: false,
     ),
     ChedGtsItem(
@@ -272,6 +297,9 @@ abstract final class ChedGtsBuiltin {
         'For professional development',
         'Others, please specify',
       ],
+      helpText:
+          'Answer only if you took advance studies such as a master\'s '
+          'degree. Otherwise, skip it.',
       required: false,
       othersSpecifyId: 'ched_15b_other',
     ),
@@ -281,7 +309,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.c,
       type: ChedGtsFieldType.text,
       prompt: 'Others, please specify (advance studies)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
 
@@ -293,6 +321,10 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.single,
       prompt: 'Are you presently employed?',
       options: const [yes, no, neverEmployed],
+      helpText:
+          'Yes if you have paid work now, including part-time or '
+          'self-employment. No if you worked before but not now. Never '
+          'Employed if you have never had a job.',
       required: true,
       prefillKey: 'employment.presentlyEmployed',
     ),
@@ -312,6 +344,9 @@ abstract final class ChedGtsBuiltin {
         'Did not look for a job',
         'Other reason(s), please specify',
       ],
+      helpText:
+          'Tick every reason that explains why you are not working right '
+          'now.',
       required: true,
       othersSpecifyId: 'ched_17_other',
     ),
@@ -321,7 +356,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Other reason(s), please specify (not employed)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
@@ -337,6 +372,12 @@ abstract final class ChedGtsBuiltin {
         'Contractual',
         'Self-employed',
       ],
+      helpText:
+          'Regular or Permanent: a permanent position, usually after '
+          'probation. Temporary: a short-term post, such as a substitute '
+          'role. Casual: paid per day or only when needed. Contractual: a'
+          ' fixed-term or project-based contract. Self-employed: you run '
+          'your own business or freelance.',
       required: true,
       prefillKey: 'employment.employmentStatus',
     ),
@@ -347,6 +388,9 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.text,
       prompt:
           'If self-employed, what skills acquired in college were you able to apply in your work?',
+      helpText:
+          'For example: programming, bookkeeping, customer service or '
+          'marketing skills you use in your business.',
       required: false,
     ),
     ChedGtsItem(
@@ -356,6 +400,10 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.text,
       prompt:
           'Present occupation (Ex. Grade School Teacher, Electrical Engineer, Self-employed)',
+      helpText:
+          'Write your job title, e.g. Web Developer, Sales Associate or '
+          'Delivery Driver. If you run your own business, write '
+          'Self-employed and what you do.',
       required: true,
       prefillKey: 'employment.position',
     ),
@@ -367,8 +415,23 @@ abstract final class ChedGtsBuiltin {
       prompt:
           'Major line of business of the company you are presently employed in. Check one only.',
       options: _lineOfBusiness,
+      helpText:
+          'Not sure where your company fits? IT, software, BPO and consulting '
+          'firms fall under Real Estate, Renting and Business Activities; '
+          'telecommunications falls under Transport Storage and Communication. '
+          'If none fits, choose Others, please specify.',
       required: true,
       prefillKey: 'employment.industry',
+      othersSpecifyId: 'ched_20_other',
+    ),
+    ChedGtsItem(
+      id: 'ched_20_other',
+      chedNumber: '20',
+      section: ChedGtsSection.d,
+      type: ChedGtsFieldType.text,
+      prompt: 'Others, please specify (line of business)',
+      required: true,
+      isOthersSpecify: true,
     ),
     ChedGtsItem(
       id: 'ched_21',
@@ -377,6 +440,9 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.single,
       prompt: 'Place of work',
       options: const ['Local', 'Abroad'],
+      helpText:
+          'Local if your workplace is in the Philippines, Abroad if it is'
+          ' in another country.',
       required: true,
       prefillKey: 'employment.placeOfWork',
     ),
@@ -387,6 +453,9 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.single,
       prompt: 'Is this your first job after college?',
       options: const [yes, no],
+      helpText:
+          'Yes if this is the first job you had after graduating. No if '
+          'you worked somewhere else before this job.',
       required: true,
     ),
     ChedGtsItem(
@@ -406,6 +475,7 @@ abstract final class ChedGtsBuiltin {
         'Family influence',
         'Other reason(s), please specify',
       ],
+      helpText: 'Tick every reason that keeps you in your current job.',
       required: true,
       othersSpecifyId: 'ched_23_other',
     ),
@@ -415,22 +485,24 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Other reason(s), please specify (staying on the job)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
       id: 'ched_24a',
-      chedNumber: '24a',
+      chedNumber: '24',
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.single,
-      prompt:
-          'Is your first job related to the course you took up in college?',
+      prompt: 'Is your first job related to the course you took up in college?',
       options: const [yes, no],
+      helpText:
+          'Yes if your first job after college used the knowledge or '
+          'skills from your course.',
       required: true,
     ),
     ChedGtsItem(
       id: 'ched_24b',
-      chedNumber: '24b',
+      chedNumber: '25',
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.multi,
       prompt:
@@ -442,21 +514,24 @@ abstract final class ChedGtsBuiltin {
         'Proximity to residence',
         'Other reason(s), please specify',
       ],
+      helpText:
+          'Think about why you accepted your first job offer. Tick all '
+          'that apply.',
       required: true,
       othersSpecifyId: 'ched_24b_other',
     ),
     ChedGtsItem(
       id: 'ched_24b_other',
-      chedNumber: '24b',
+      chedNumber: '25',
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Other reason(s), please specify (accepting the job)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
       id: 'ched_25',
-      chedNumber: '25',
+      chedNumber: '26',
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.multi,
       prompt:
@@ -468,16 +543,19 @@ abstract final class ChedGtsBuiltin {
         'Proximity to residence',
         'Other reason(s), please specify',
       ],
+      helpText:
+          'Answer if you have changed jobs since your first job. Tick '
+          'every reason you moved.',
       required: true,
       othersSpecifyId: 'ched_25_other',
     ),
     ChedGtsItem(
       id: 'ched_25_other',
-      chedNumber: '25',
+      chedNumber: '26',
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Other reason(s), please specify (changing job)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
@@ -487,6 +565,9 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.single,
       prompt: 'How long did you stay in your first job?',
       options: _durationOptions,
+      helpText:
+          'Count from your first day to your last day in your first job. '
+          'If you are still there, count up to today.',
       required: true,
       othersSpecifyId: 'ched_27_other',
     ),
@@ -496,7 +577,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Others, please specify (length of stay in first job)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
@@ -515,6 +596,11 @@ abstract final class ChedGtsBuiltin {
         'Job Fair or Public Employment Service Office (PESO)',
         'Others, please specify',
       ],
+      helpText:
+          'Advertisement: you applied to a job post (online, print or '
+          'social media). Walk-in: you applied in person without a '
+          'posting. Recommended: someone referred or endorsed you. '
+          'Friends: friends told you about the opening.',
       required: true,
       othersSpecifyId: 'ched_28_other',
     ),
@@ -524,7 +610,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Others, please specify (how you found first job)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
@@ -534,6 +620,9 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.single,
       prompt: 'How long did it take you to land your first job?',
       options: _durationOptions,
+      helpText:
+          'Count from your graduation to the day you started your first '
+          'job.',
       required: true,
       othersSpecifyId: 'ched_29_other',
     ),
@@ -543,7 +632,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Others, please specify (time to land first job)',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
@@ -553,10 +642,15 @@ abstract final class ChedGtsBuiltin {
       type: ChedGtsFieldType.matrix,
       prompt: 'Job Level Position',
       matrixRows: _jobLevels,
-      matrixColumns: const [
-        '30.1. First Job',
-        '30.2. Current or Present Job',
-      ],
+      matrixColumns: const ['30.1. First Job', '30.2. Current or Present Job'],
+      helpText:
+          'Tick one level for your first job and one for your current '
+          'job. Rank or Clerical: staff or support roles, e.g. clerk, '
+          'cashier, encoder. Professional, Technical or Supervisory: '
+          'specialist or team-lead roles, e.g. engineer, teacher, '
+          'programmer, supervisor. Managerial or Executive: you head a '
+          'department or company. Self-employed: you run your own '
+          'business.',
       required: true,
     ),
     ChedGtsItem(
@@ -574,6 +668,9 @@ abstract final class ChedGtsBuiltin {
         'P20,000.00 to less than P25,000.00',
         'P25,000.00 and above',
       ],
+      helpText:
+          'Your monthly pay before deductions (tax, SSS, PhilHealth, '
+          'Pag-IBIG) when you started your first job.',
       required: true,
       prefillKey: 'employment.salaryRange',
     ),
@@ -585,6 +682,9 @@ abstract final class ChedGtsBuiltin {
       prompt:
           'Was the curriculum you had in college relevant to your first job?',
       options: const [yes, no],
+      helpText:
+          'Yes if what you studied in college was useful in your first '
+          'job.',
       required: true,
     ),
     ChedGtsItem(
@@ -603,6 +703,9 @@ abstract final class ChedGtsBuiltin {
         'Critical Thinking skills',
         'Other skills, please specify',
       ],
+      helpText:
+          'Answer only if you said Yes to question 32. Tick every skill '
+          'from college that helped you.',
       required: true,
       othersSpecifyId: 'ched_33_other',
     ),
@@ -612,7 +715,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.text,
       prompt: 'Other skills, please specify',
-      required: false,
+      required: true,
       isOthersSpecify: true,
     ),
     ChedGtsItem(
@@ -621,6 +724,9 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.d,
       type: ChedGtsFieldType.longText,
       prompt: 'List down suggestions to further improve your course curriculum',
+      helpText:
+          'Optional. Share subjects, skills or tools you wish your course'
+          ' had covered, e.g. more hands-on projects or industry tools.',
       required: false,
     ),
   ];
@@ -628,15 +734,7 @@ abstract final class ChedGtsBuiltin {
 
 enum ChedGtsSection { a, b, c, d }
 
-enum ChedGtsFieldType {
-  text,
-  longText,
-  single,
-  multi,
-  date,
-  matrix,
-  tableRows,
-}
+enum ChedGtsFieldType { text, longText, single, multi, date, matrix, tableRows }
 
 class ChedGtsItem {
   const ChedGtsItem({
@@ -649,6 +747,7 @@ class ChedGtsItem {
     this.matrixRows = const [],
     this.matrixColumns = const [],
     this.tableColumns = const [],
+    this.helpText,
     this.required = false,
     this.prefillKey,
     this.othersSpecifyId,
@@ -664,16 +763,18 @@ class ChedGtsItem {
   final List<String> matrixRows;
   final List<String> matrixColumns;
   final List<String> tableColumns;
+
+  /// Short guidance shown under the prompt (not part of the official wording).
+  final String? helpText;
   final bool required;
   final String? prefillKey;
   final String? othersSpecifyId;
   final bool isOthersSpecify;
 
   String get sectionTitle => switch (section) {
-        ChedGtsSection.a => 'A. GENERAL INFORMATION',
-        ChedGtsSection.b => 'B. EDUCATIONAL BACKGROUND',
-        ChedGtsSection.c =>
-          'C. TRAINING(S)/ADVANCE STUDIES ATTENDED AFTER COLLEGE',
-        ChedGtsSection.d => 'D. EMPLOYMENT DATA',
-      };
+    ChedGtsSection.a => 'A. GENERAL INFORMATION',
+    ChedGtsSection.b => 'B. EDUCATIONAL BACKGROUND',
+    ChedGtsSection.c => 'C. TRAINING(S)/ADVANCE STUDIES ATTENDED AFTER COLLEGE',
+    ChedGtsSection.d => 'D. EMPLOYMENT DATA',
+  };
 }

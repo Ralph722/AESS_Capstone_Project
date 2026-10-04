@@ -29,7 +29,7 @@ Existing Excel / management report exports are unchanged.
 
 ### v3.1.0 coverage vs official CHED
 
-- Items **1–25, 27–34** with printed numbers; item **26** absent (official jump)
+- Items **1–34** with printed numbers; the paper's duplicate **24** and missing **26** are renumbered as **24** (first job related), **25** (reasons for accepting) and **26** (reasons for changing job)
 - Graduate + undergraduate columns for item **14**
 - **Others, please specify** checkboxes/radios + text destinations
 - Education **3** rows, exams **3** rows, trainings **3** rows

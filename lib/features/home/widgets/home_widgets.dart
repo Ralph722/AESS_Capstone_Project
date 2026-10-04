@@ -1,10 +1,13 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/announcements/models/announcement_model.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/models/event_display_status.dart';
-import 'package:alumni_system/features/events/widgets/event_cover.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/home/models/home_calendar_item.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
@@ -22,6 +25,7 @@ String homeGreetingForNow(DateTime now) {
 }
 
 const double _hPad = 16;
+
 /// Consistent vertical gap above each home section card.
 const double _sectionTop = 10;
 
@@ -103,9 +107,7 @@ class HomeAlumniIdentityHero extends StatelessWidget {
           onTap: openProfile,
           customBorder: RoundedRectangleBorder(borderRadius: heroRadius),
           child: Ink(
-            decoration: const BoxDecoration(
-              gradient: PortalTheme.heroGradient,
-            ),
+            decoration: const BoxDecoration(gradient: PortalTheme.heroGradient),
             child: Stack(
               children: [
                 Positioned(
@@ -904,7 +906,7 @@ class HomeUpcomingEventsList extends StatelessWidget {
                   TextButton(
                     onPressed: onSeeAll,
                     style: TextButton.styleFrom(
-                      foregroundColor: PortalTheme.sky,
+                      foregroundColor: PortalTheme.navy,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -912,7 +914,7 @@ class HomeUpcomingEventsList extends StatelessWidget {
                     child: Text(
                       'See all',
                       style: PortalTheme.meta.copyWith(
-                        color: PortalTheme.sky,
+                        color: PortalTheme.navy,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -920,13 +922,7 @@ class HomeUpcomingEventsList extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            for (var i = 0; i < events.length; i++) ...[
-              if (i > 0) const SizedBox(height: 8),
-              HomeCompactEventCard(
-                event: events[i],
-                onTap: () => onTap(events[i]),
-              ),
-            ],
+            _HomeEventSlideshow(events: events, onTap: onTap),
           ],
         ),
       ),
@@ -934,12 +930,181 @@ class HomeUpcomingEventsList extends StatelessWidget {
   }
 }
 
-class HomeCompactEventCard extends StatelessWidget {
-  const HomeCompactEventCard({
-    super.key,
-    required this.event,
-    required this.onTap,
-  });
+/// 16:9 slide height for [width], capped so wide single-column layouts
+/// (tablets, narrow browser windows) don't push the rest of the page down.
+double homeEventSlideHeight(double width) => math.min(width * 9 / 16, 260);
+
+/// 16:9 cover slides with the event details on the photo. Auto-advances
+/// every few seconds (paused while touched or hovered, off for reduced
+/// motion); tappable dots underneath.
+class _HomeEventSlideshow extends StatefulWidget {
+  const _HomeEventSlideshow({required this.events, required this.onTap});
+
+  final List<AlumniEvent> events;
+  final ValueChanged<AlumniEvent> onTap;
+
+  @override
+  State<_HomeEventSlideshow> createState() => _HomeEventSlideshowState();
+}
+
+class _HomeEventSlideshowState extends State<_HomeEventSlideshow> {
+  static const _interval = Duration(seconds: 5);
+  static const _slideDuration = Duration(milliseconds: 450);
+
+  final _controller = PageController();
+  Timer? _timer;
+  int _index = 0;
+  bool _paused = false;
+  bool _reduceMotion = false;
+
+  int get _count => widget.events.length;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    if (reduce != _reduceMotion || _timer == null) {
+      _reduceMotion = reduce;
+      _restartTimer();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeEventSlideshow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.events.length != _count) {
+      if (_index >= _count) _index = 0;
+      _restartTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _restartTimer() {
+    _timer?.cancel();
+    _timer = null;
+    if (_count < 2 || _reduceMotion) return;
+    _timer = Timer.periodic(_interval, (_) {
+      if (!mounted || _paused || !_controller.hasClients) return;
+      _controller.animateToPage(
+        (_index + 1) % _count,
+        duration: _slideDuration,
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _setPaused(bool paused) {
+    if (_paused == paused) return;
+    _paused = paused;
+    if (!paused) _restartTimer();
+  }
+
+  void _goTo(int i) {
+    if (!_controller.hasClients) return;
+    if (_reduceMotion) {
+      _controller.jumpToPage(i);
+    } else {
+      _controller.animateToPage(
+        i,
+        duration: _slideDuration,
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final events = widget.events;
+    return Column(
+      children: [
+        MouseRegion(
+          onEnter: (_) => _setPaused(true),
+          onExit: (_) => _setPaused(false),
+          child: Listener(
+            onPointerDown: (_) => _setPaused(true),
+            onPointerUp: (_) => _setPaused(false),
+            onPointerCancel: (_) => _setPaused(false),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SizedBox(
+                height: homeEventSlideHeight(constraints.maxWidth),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                  child: ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context).copyWith(
+                      dragDevices: const {
+                        PointerDeviceKind.touch,
+                        PointerDeviceKind.mouse,
+                        PointerDeviceKind.trackpad,
+                        PointerDeviceKind.stylus,
+                      },
+                    ),
+                    child: PageView.builder(
+                      controller: _controller,
+                      itemCount: events.length,
+                      onPageChanged: (i) {
+                        setState(() => _index = i);
+                        _restartTimer();
+                      },
+                      itemBuilder: (context, i) => _HomeEventSlide(
+                        event: events[i],
+                        onTap: () => widget.onTap(events[i]),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (events.length > 1) ...[
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var i = 0; i < events.length; i++)
+                Semantics(
+                  button: true,
+                  selected: i == _index,
+                  label: 'Show event ${i + 1} of ${events.length}',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _goTo(i),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 3,
+                        vertical: 4,
+                      ),
+                      child: AnimatedContainer(
+                        duration: PortalTheme.normal,
+                        curve: Curves.easeOutCubic,
+                        width: i == _index ? 18 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: i == _index
+                              ? PortalTheme.navy
+                              : PortalTheme.borderStrong,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _HomeEventSlide extends StatelessWidget {
+  const _HomeEventSlide({required this.event, required this.onTap});
 
   final AlumniEvent event;
   final VoidCallback onTap;
@@ -947,128 +1112,128 @@ class HomeCompactEventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isToday = homeEventIsToday(event);
-    final timeRange = homeFormatEventTimeRange(event.startTime, event.endTime);
     final statusLabel = homeEventRelativeLabel(event);
+    final timeRange = homeFormatEventTimeRange(event.startTime, event.endTime);
     final venue = event.venue.trim();
-    final month = intl.DateFormat('MMM').format(event.date).toUpperCase();
-    final day = intl.DateFormat('d').format(event.date);
-    final subtitle = venue.isEmpty ? timeRange : '$timeRange · $venue';
+    final details = venue.isEmpty ? timeRange : '$timeRange · $venue';
+    final url = event.coverImageUrl.trim();
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-        child: Ink(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isToday
-                ? PortalTheme.gold.withValues(alpha: 0.12)
-                : PortalTheme.surfaceMuted.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-            border: isToday
-                ? Border.all(color: PortalTheme.gold.withValues(alpha: 0.45))
-                : null,
+    return Semantics(
+      button: true,
+      label: '${event.theme}, $statusLabel, $details',
+      excludeSemantics: true,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (url.isEmpty)
+            const _HomeEventSlidePlaceholder()
+          else
+            AppImage.widget(
+              url,
+              width: 960,
+              height: 540,
+              fit: BoxFit.cover,
+              semanticLabel: 'Cover for ${event.theme}',
+              errorBuilder: (_, __, ___) => const _HomeEventSlidePlaceholder(),
+            ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [0.35, 1],
+                colors: [Colors.transparent, Color(0xC7000000)],
+              ),
+            ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
+          Positioned(
+            top: 12,
+            left: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isToday
+                    ? PortalTheme.gold
+                    : Colors.white.withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                statusLabel,
+                style: PortalTheme.caption.copyWith(
                   color: PortalTheme.navy,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      month,
-                      style: PortalTheme.caption.copyWith(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 9,
-                        letterSpacing: 0.4,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      day,
-                      style: PortalTheme.cardTitle.copyWith(
-                        color: Colors.white,
-                        fontSize: 16,
-                        height: 1,
-                      ),
-                    ),
-                  ],
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isToday
-                            ? PortalTheme.gold.withValues(alpha: 0.28)
-                            : PortalTheme.sky.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: isToday
-                              ? PortalTheme.gold.withValues(alpha: 0.55)
-                              : PortalTheme.sky.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        statusLabel,
-                        style: PortalTheme.caption.copyWith(
-                          color: isToday
-                              ? PortalTheme.navy
-                              : PortalTheme.navyMid,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      event.theme,
-                      style: PortalTheme.cardTitle.copyWith(fontSize: 13),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: PortalTheme.meta.copyWith(
-                        fontSize: 11,
-                        color: isToday
-                            ? PortalTheme.navy.withValues(alpha: 0.75)
-                            : PortalTheme.textSecondary,
-                        fontWeight:
-                            isToday ? FontWeight.w600 : FontWeight.w500,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: PortalTheme.textMuted,
-                size: 22,
-              ),
-            ],
+            ),
           ),
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 12,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  event.theme,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: PortalTheme.cardTitle.copyWith(
+                    color: Colors.white,
+                    fontSize: 17,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  details,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PortalTheme.meta.copyWith(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                splashColor: Colors.white.withValues(alpha: 0.12),
+                highlightColor: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeEventSlidePlaceholder extends StatelessWidget {
+  const _HomeEventSlidePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF090A4F), Color(0xFF1A237E)],
+        ),
+      ),
+      child: Align(
+        alignment: const Alignment(0.85, -0.6),
+        child: Icon(
+          Icons.event_rounded,
+          size: 96,
+          color: Colors.white.withValues(alpha: 0.08),
         ),
       ),
     );
@@ -1141,7 +1306,7 @@ class HomeCommunityCarousel extends StatelessWidget {
                   TextButton(
                     onPressed: onSeeAll,
                     style: TextButton.styleFrom(
-                      foregroundColor: PortalTheme.sky,
+                      foregroundColor: PortalTheme.navy,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1149,7 +1314,7 @@ class HomeCommunityCarousel extends StatelessWidget {
                     child: Text(
                       'See all',
                       style: PortalTheme.meta.copyWith(
-                        color: PortalTheme.sky,
+                        color: PortalTheme.navy,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1698,191 +1863,6 @@ class _LegendDot extends StatelessWidget {
         const SizedBox(width: 4),
         Text(label, style: PortalTheme.caption.copyWith(fontSize: 10)),
       ],
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// EVENTS — horizontal carousel / sleek preview (legacy)
-// ═══════════════════════════════════════════════════════════════════════════
-
-class HomeEventsCarousel extends StatelessWidget {
-  const HomeEventsCarousel({
-    super.key,
-    required this.events,
-    required this.onTap,
-  });
-
-  final List<AlumniEvent> events;
-  final ValueChanged<AlumniEvent> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    if (events.isEmpty) return const SizedBox.shrink();
-
-    if (events.length == 1) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: _hPad),
-        child: HomeEventPreviewCard(
-          event: events.first,
-          onTap: () => onTap(events.first),
-          width: double.infinity,
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 210,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: _hPad),
-        itemCount: events.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, i) {
-          final e = events[i];
-          return HomeEventPreviewCard(
-            event: e,
-            onTap: () => onTap(e),
-            width: 268,
-          );
-        },
-      ),
-    );
-  }
-}
-
-class HomeEventPreviewCard extends StatelessWidget {
-  const HomeEventPreviewCard({
-    super.key,
-    required this.event,
-    required this.onTap,
-    this.width = 268,
-  });
-
-  final AlumniEvent event;
-  final VoidCallback onTap;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    final date = event.date;
-    final month = intl.DateFormat('MMM').format(date).toUpperCase();
-    final day = intl.DateFormat('d').format(date);
-    final when = intl.DateFormat('EEE · h:mm a').format(date);
-    final imageH = width == double.infinity ? 128.0 : 112.0;
-
-    return SizedBox(
-      width: width == double.infinity ? null : width,
-      child: _portalCard(
-        onTap: onTap,
-        radius: PortalTheme.radiusXl,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(PortalTheme.radiusXl),
-              ),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    EventCover(
-                      event: event,
-                      height: imageH,
-                      borderRadius: 0,
-                      fit: BoxFit.cover,
-                    ),
-                    Positioned(
-                      left: 10,
-                      top: 10,
-                      child: Container(
-                        width: 44,
-                        padding: const EdgeInsets.symmetric(vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: PortalTheme.border.withValues(alpha: 0.7),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              month,
-                              style: PortalTheme.caption.copyWith(
-                                color: PortalTheme.navy,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 9,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            Text(
-                              day,
-                              style: PortalTheme.cardTitle.copyWith(
-                                fontSize: 16,
-                                height: 1.1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (event.category.isNotEmpty)
-                      Positioned(
-                        right: 10,
-                        top: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: PortalTheme.navy.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            event.category,
-                            style: PortalTheme.caption.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.theme,
-                    style: PortalTheme.cardTitle.copyWith(fontSize: 14),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    event.venue.trim().isEmpty
-                        ? when
-                        : '$when · ${event.venue}',
-                    style: PortalTheme.meta.copyWith(fontSize: 11),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

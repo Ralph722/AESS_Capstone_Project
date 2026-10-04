@@ -11,9 +11,9 @@ import 'package:alumni_system/features/jobs/data/job_service.dart';
 import 'package:alumni_system/features/jobs/models/job_category_constants.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 
 class AddJobDialog extends StatefulWidget {
   final JobPosting? job;
@@ -224,27 +224,13 @@ class _AddJobDialogState extends State<AddJobDialog> {
         applicationUrl: _applicationUrlController.text.trim(),
       );
 
+      // Alumni notices come from the jobs table trigger (notify_job_changes).
       final service = JobService();
       if (_isEditing) {
         await service.updateJobPosting(posting);
-        try {
-          await NotificationService().notifyJobUpdated(
-            jobId: posting.id,
-            jobTitle: posting.jobTitle,
-            companyName: posting.companyName,
-          );
-        } catch (_) {}
         widget.onJobUpdated?.call(posting);
       } else {
         await service.addJobPosting(posting);
-        try {
-          await NotificationService().notifyNewJob(
-            jobId: posting.id,
-            jobTitle: posting.jobTitle,
-            companyName: posting.companyName,
-            targetPrograms: posting.targetPrograms,
-          );
-        } catch (_) {}
         widget.onJobAdded?.call(posting);
       }
 
@@ -301,6 +287,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
                             DropdownButtonFormField<String>(
                               // ignore: deprecated_member_use
                               value: _selectedCategory,
+                              borderRadius: PortalMenu.dropdownRadius,
                               decoration: const InputDecoration(
                                 labelText: 'Category',
                                 border: OutlineInputBorder(),
@@ -322,6 +309,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
                             DropdownButtonFormField<String>(
                               // ignore: deprecated_member_use
                               value: _selectedJobType,
+                              borderRadius: PortalMenu.dropdownRadius,
                               decoration: const InputDecoration(
                                 labelText: 'Job type',
                                 border: OutlineInputBorder(),
@@ -347,6 +335,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
                             DropdownButtonFormField<String>(
                               // ignore: deprecated_member_use
                               value: _selectedExperienceLevel,
+                              borderRadius: PortalMenu.dropdownRadius,
                               decoration: const InputDecoration(
                                 labelText: 'Experience',
                                 border: OutlineInputBorder(),

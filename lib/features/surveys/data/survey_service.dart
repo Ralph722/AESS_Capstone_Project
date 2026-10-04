@@ -10,11 +10,9 @@ import 'package:alumni_system/features/admin/roster/data/alumni_member_service.d
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
-import 'package:alumni_system/features/notifications/models/notification_model.dart';
 import 'package:alumni_system/core/config/email_delivery_config.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/email_service.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_template_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_template_model.dart';
 import 'package:alumni_system/features/alumni/tracer/data/id_tracer_service.dart';
@@ -396,7 +394,10 @@ class SurveyService {
   }
 
   /// Creates or refreshes assignments. Safe to run again on published surveys.
-  Future<int> publishSurvey(String surveyId, {bool notify = true}) async {
+  ///
+  /// Newly assigned alumni are notified by the database (once per survey,
+  /// when the survey is published and open), not by this method.
+  Future<int> publishSurvey(String surveyId) async {
     final survey = await getSurvey(surveyId);
     if (survey == null) throw Exception('Survey not found');
     if (survey.archived) {
@@ -413,7 +414,6 @@ class SurveyService {
     final rows = await _fetchEligibleAlumni();
     final existingAssignments = await getSurveyAssignments(surveyId);
     final existingByUser = {for (final a in existingAssignments) a.userId: a};
-    final notificationService = NotificationService();
     final now = DateTime.now();
     final matchedUserIds = <String>[];
 
@@ -490,21 +490,6 @@ class SurveyService {
       await _supabase.from('surveys').update(patch).eq('id', surveyId);
     } catch (e) {
       throw Exception('Error publishing survey: $e');
-    }
-
-    if (notify) {
-      for (final userId in matchedUserIds) {
-        if (existingByUser.containsKey(userId)) continue;
-        try {
-          await notificationService.createNotification(
-            userId: userId,
-            type: NotificationType.survey,
-            title: 'New survey: ${survey.title}',
-            message: 'Please complete the graduate tracer survey.',
-            relatedId: surveyId,
-          );
-        } catch (_) {}
-      }
     }
 
     _notifyCatalogChanged();
@@ -1213,6 +1198,8 @@ class SurveyService {
       schemaVersion: source.schemaVersion,
       visibilityRules: remappedRules,
       archived: false,
+      autoAssignNewAlumni: source.autoAssignNewAlumni,
+      aiHelpEnabled: source.aiHelpEnabled,
     );
 
     await _upsertSurveyToSupabase(copy);
@@ -1299,7 +1286,6 @@ class SurveyService {
     final survey = await getSurvey(surveyId);
     if (survey == null) throw Exception('Survey not found');
 
-    final notificationService = NotificationService();
     EmailService? emailService;
     if (email && EmailDeliveryConfig.isConfigured) {
       emailService = EmailService();
@@ -1317,6 +1303,20 @@ class SurveyService {
     final reminderMessage =
         'Please complete "${survey.title}" in the Alumni System app.';
 
+    // In-app reminders: server-side, at most one per alumnus per survey per
+    // day (repeat clicks the same day are skipped).
+    if (inApp) {
+      try {
+        final sent = await _supabase.rpc(
+          'admin_send_survey_reminders',
+          params: {'p_survey_id': surveyId, 'p_user_ids': userIds},
+        );
+        inAppSent = (sent as num?)?.toInt() ?? 0;
+      } catch (e) {
+        failures.add('In-app reminders: $e');
+      }
+    }
+
     for (final userId in userIds) {
       Map<String, dynamic>? row;
       try {
@@ -1330,21 +1330,6 @@ class SurveyService {
       final name = (profile?.displayName.isNotEmpty ?? false)
           ? profile!.displayName
           : (row?['email'] as String? ?? 'Alumni');
-
-      if (inApp) {
-        try {
-          await notificationService.createNotification(
-            userId: userId,
-            type: NotificationType.survey,
-            title: 'Reminder: ${survey.title}',
-            message: reminderMessage,
-            relatedId: surveyId,
-          );
-          inAppSent++;
-        } catch (e) {
-          failures.add('$name (in-app): $e');
-        }
-      }
 
       if (emailEnabled) {
         final address = (profile?.email ?? '').trim();
@@ -1777,6 +1762,12 @@ class SurveyService {
       final newData = Map<String, dynamic>.from(row['data'] as Map? ?? {});
       // Preserve keys like adminLastSeen* while overlaying kind / visibility_rules.
       row['data'] = {...existingData, ...newData};
+      if (existing != null) {
+        // Counts are maintained by publish and the auto-assign trigger; an
+        // editor holding a stale copy must not overwrite them.
+        row.remove('assignment_count');
+        row.remove('response_count');
+      }
       await _supabase.from('surveys').upsert(row, onConflict: 'id');
     } catch (e) {
       throw Exception('Error saving survey: $e');

@@ -7,7 +7,6 @@ import 'package:alumni_system/features/messages/data/image_storage_service.dart'
 import 'package:alumni_system/features/messages/data/message_realtime.dart';
 import 'package:alumni_system/features/messages/data/message_repository.dart';
 import 'package:alumni_system/features/messages/models/message_model.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 
 export 'package:alumni_system/features/messages/models/message_model.dart'
     show
@@ -40,17 +39,14 @@ class MessageService {
     SupabaseUserBridge? bridge,
     MessageRepository? repository,
     MessageRealtime? realtime,
-    NotificationService? notifications,
     ImageStorageService? imageStorage,
   })  : _repo = repository ??
             MessageRepository(supabase: supabase, bridge: bridge),
         _realtime = realtime ?? MessageRealtime(supabase: supabase),
-        _notifications = notifications ?? NotificationService(supabase: supabase),
         _imageStorage = imageStorage ?? ImageStorageService(supabase: supabase);
 
   final MessageRepository _repo;
   final MessageRealtime _realtime;
-  final NotificationService _notifications;
   final ImageStorageService _imageStorage;
 
   MessageRepository get repository => _repo;
@@ -127,23 +123,8 @@ class MessageService {
         senderSupabaseId: senderSupabaseId,
         recipientSupabaseId: recipientSupabaseId,
       );
-
-      // Notification: DB trigger is primary; client call dedupes if both run.
-      final preview = trimmedBody.isNotEmpty
-          ? trimmedBody
-          : (imageUrl != null && imageUrl.isNotEmpty ? 'Sent an image' : null);
-      try {
-        await _notifications.notifyNewMessage(
-          userId: recipientSupabaseId,
-          messageId: messageId,
-          senderName: senderName,
-          senderId: senderSupabaseId,
-          senderRole: safeRole,
-          preview: preview,
-        );
-      } catch (_) {
-        // Message already sent; notification failure must not fail the send.
-      }
+      // The recipient's notification is created by the messages insert
+      // trigger (notify_message_recipient).
     } catch (e) {
       throw Exception('Error sending message: $e');
     }

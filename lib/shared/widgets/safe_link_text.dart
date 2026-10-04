@@ -2,8 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:alumni_system/core/utils/safe_external_link.dart';
 
-/// Plain text that auto-detects http(s) links and opens them safely
-/// (confirmation dialog + external browser).
+/// Plain text that auto-detects http(s) and "www." links and opens them
+/// safely (confirmation dialog + external browser).
 class SafeLinkText extends StatefulWidget {
   const SafeLinkText(
     this.text, {
@@ -27,6 +27,12 @@ class SafeLinkText extends StatefulWidget {
 }
 
 class _SafeLinkTextState extends State<SafeLinkText> {
+  static final _linkPattern = RegExp(
+    '${kHttpUrlPattern.pattern}|'
+    r'(\bwww\.[a-z0-9-]+(?:\.[a-z0-9-]+)+[^\s<>"{}|\\^`\[\]]*)',
+    caseSensitive: false,
+  );
+
   final List<TapGestureRecognizer> _recognizers = [];
   late List<InlineSpan> _spans;
 
@@ -83,7 +89,7 @@ class _SafeLinkTextState extends State<SafeLinkText> {
 
     final spans = <InlineSpan>[];
     var start = 0;
-    for (final match in kHttpUrlPattern.allMatches(text)) {
+    for (final match in _linkPattern.allMatches(text)) {
       if (match.start > start) {
         spans.add(
           TextSpan(text: text.substring(start, match.start), style: base),
@@ -91,9 +97,12 @@ class _SafeLinkTextState extends State<SafeLinkText> {
       }
 
       final raw = match.group(0) ?? '';
-      final url = sanitizeCapturedUrl(raw);
+      final shown = sanitizeCapturedUrl(raw);
       final trailing =
-          raw.length > url.length ? raw.substring(url.length) : '';
+          raw.length > shown.length ? raw.substring(shown.length) : '';
+      final url = shown.toLowerCase().startsWith('http')
+          ? shown
+          : 'https://$shown';
 
       if (isSafeExternalHttpUrl(url)) {
         final recognizer = TapGestureRecognizer()
@@ -102,7 +111,9 @@ class _SafeLinkTextState extends State<SafeLinkText> {
             openExternalLinkSafely(context, url: url);
           };
         _recognizers.add(recognizer);
-        spans.add(TextSpan(text: url, style: linkStyle, recognizer: recognizer));
+        spans.add(
+          TextSpan(text: shown, style: linkStyle, recognizer: recognizer),
+        );
         if (trailing.isNotEmpty) {
           spans.add(TextSpan(text: trailing, style: base));
         }

@@ -94,13 +94,16 @@ class _AdminJobCardState extends State<AdminJobCard> {
   Widget build(BuildContext context) {
     final job = widget.job;
     final fmt = DateFormat.yMMMd();
-    final facts = <String>[
+    final metaParts = <String>[
+      if (job.companyName.isNotEmpty) job.companyName,
       if (job.jobType.isNotEmpty) job.jobType,
-      if (job.location.isNotEmpty) job.location,
-      if (job.isRemote) 'Remote',
-      if (job.salaryRange.isNotEmpty) job.salaryRange,
-      if (job.experienceLevel.isNotEmpty) job.experienceLevel,
+      if (job.isRemote)
+        'Remote'
+      else if (job.location.isNotEmpty)
+        job.location,
+      'Deadline ${fmt.format(job.applicationDeadline)}',
     ];
+    final metaLine = metaParts.join(' · ');
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -122,8 +125,8 @@ class _AdminJobCardState extends State<AdminJobCard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  JobCompanyLogo(job: job, size: 40, radius: 8),
-                  const SizedBox(width: 12),
+                  JobCompanyLogo(job: job, size: 32, radius: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,66 +141,27 @@ class _AdminJobCardState extends State<AdminJobCard> {
                             color: AdminJobTheme.textPrimary,
                           ),
                         ),
-                        if (job.companyName.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            job.companyName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: AdminJobTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Wrap(
-                          spacing: 6,
+                          spacing: 4,
                           runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             JobStatusBadge(status: job.status),
                             JobCategoryBadge(category: job.category),
-                            ...facts.map(_factChip),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            _metricPill(
-                              icon: Icons.visibility_outlined,
-                              label: 'Views',
-                              value: '${job.views}',
-                            ),
-                            _metricPill(
-                              icon: Icons.star_outline,
-                              label: 'Interested',
-                              value: '${job.interestedCount}',
-                            ),
-                            _metricPill(
-                              icon: Icons.bookmark_border,
-                              label: 'Saved',
-                              value: '${job.favoriteCount}',
-                            ),
-                            _metricPill(
-                              icon: Icons.event_outlined,
-                              label: 'Deadline',
-                              value: fmt.format(job.applicationDeadline),
-                            ),
-                            _metricPill(
-                              icon: Icons.schedule_outlined,
-                              label: 'Posted',
-                              value: fmt.format(job.postedDate),
-                            ),
-                          ],
+                        const SizedBox(height: 4),
+                        Text(
+                          metaLine,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: AdminJobTheme.textSecondary,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 4),
                   PopupMenuButton<String>(
                     tooltip: 'Job actions',
                     onSelected: (value) {
@@ -248,63 +212,6 @@ class _AdminJobCardState extends State<AdminJobCard> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _factChip(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AdminJobTheme.border),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 11.5,
-          color: AdminJobTheme.textSecondary,
-        ),
-      ),
-    );
-  }
-
-  Widget _metricPill({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: AdminJobTheme.surface,
-        borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
-        border: Border.all(color: AdminJobTheme.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AdminJobTheme.textMuted),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AdminJobTheme.textMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AdminJobTheme.textPrimary,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1494,37 +1401,22 @@ class _InterestedPanelState extends State<_InterestedPanel> {
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  height: AdminDirectoryTheme.toolbarControlHeight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: AdminJobTheme.surface,
-                      borderRadius:
-                          BorderRadius.circular(AdminJobTheme.radiusSm),
-                      border: Border.all(color: AdminJobTheme.border),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _sort,
-                        isDense: true,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: AdminJobTheme.textPrimary,
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'newest',
-                            child: Text('Newest'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'az',
-                            child: Text('Name A–Z'),
-                          ),
-                        ],
-                        onChanged: (v) =>
-                            setState(() => _sort = v ?? 'newest'),
+                  width: 128,
+                  child: DirectoryFilterField<String>(
+                    label: 'Sort',
+                    value: _sort,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'newest',
+                        child: Text('Newest'),
                       ),
-                    ),
+                      DropdownMenuItem(
+                        value: 'az',
+                        child: Text('Name A–Z'),
+                      ),
+                    ],
+                    onChanged: (v) =>
+                        setState(() => _sort = v ?? 'newest'),
                   ),
                 ),
               ],

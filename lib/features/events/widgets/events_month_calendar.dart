@@ -43,9 +43,7 @@ class EventsMonthCalendar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(
-          color: PortalTheme.border.withValues(alpha: 0.75),
-        ),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
         boxShadow: PortalTheme.softShadow,
       ),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
@@ -55,9 +53,8 @@ class EventsMonthCalendar extends StatelessWidget {
             children: [
               IconButton(
                 tooltip: 'Previous month',
-                onPressed: () => onMonthChanged(
-                  DateTime(month.year, month.month - 1, 1),
-                ),
+                onPressed: () =>
+                    onMonthChanged(DateTime(month.year, month.month - 1, 1)),
                 icon: const Icon(Icons.chevron_left, color: PortalTheme.navy),
               ),
               Expanded(
@@ -69,9 +66,8 @@ class EventsMonthCalendar extends StatelessWidget {
               ),
               IconButton(
                 tooltip: 'Next month',
-                onPressed: () => onMonthChanged(
-                  DateTime(month.year, month.month + 1, 1),
-                ),
+                onPressed: () =>
+                    onMonthChanged(DateTime(month.year, month.month + 1, 1)),
                 icon: const Icon(Icons.chevron_right, color: PortalTheme.navy),
               ),
             ],
@@ -108,7 +104,8 @@ class EventsMonthCalendar extends StatelessWidget {
                   final day = DateTime(month.year, month.month, dayNum);
                   final dayEvents = byDay[day] ?? const <AlumniEvent>[];
                   final hasEvents = dayEvents.isNotEmpty;
-                  final isSelected = selectedDay != null &&
+                  final isSelected =
+                      selectedDay != null &&
                       selectedDay!.year == day.year &&
                       selectedDay!.month == day.month &&
                       selectedDay!.day == day.day;
@@ -125,8 +122,8 @@ class EventsMonthCalendar extends StatelessWidget {
                           color: isSelected
                               ? PortalTheme.navy
                               : (hasEvents
-                                  ? PortalTheme.gold.withValues(alpha: 0.18)
-                                  : Colors.transparent),
+                                    ? PortalTheme.gold.withValues(alpha: 0.18)
+                                    : Colors.transparent),
                           borderRadius: BorderRadius.circular(12),
                           border: isToday && !isSelected
                               ? Border.all(color: PortalTheme.navy, width: 1.2)
@@ -179,10 +176,10 @@ class EventsMonthCalendar extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             if ((byDay[DateTime(
-                  selectedDay!.year,
-                  selectedDay!.month,
-                  selectedDay!.day,
-                )] ??
+                      selectedDay!.year,
+                      selectedDay!.month,
+                      selectedDay!.day,
+                    )] ??
                     const <AlumniEvent>[])
                 .isEmpty)
               Padding(

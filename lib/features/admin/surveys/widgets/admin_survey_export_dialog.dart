@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 
@@ -644,21 +645,47 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
               child: Row(
                 children: [
                   Expanded(
-                    child: _ExportCohortDropdown(
-                      id: 'batch',
+                    child: DirectoryFilterField<String?>(
+                      label: 'Batch',
                       value: _batchYear,
-                      hint: 'All batches',
-                      items: widget.batchOptions,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All batches'),
+                        ),
+                        for (final item in widget.batchOptions)
+                          DropdownMenuItem<String?>(
+                            value: item,
+                            child: Text(
+                              item,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
                       onChanged: (v) => setState(() => _batchYear = v),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _ExportCohortDropdown(
-                      id: 'course',
+                    child: DirectoryFilterField<String?>(
+                      label: 'Course',
                       value: _course,
-                      hint: 'All courses',
-                      items: widget.courseOptions,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All courses'),
+                        ),
+                        for (final item in widget.courseOptions)
+                          DropdownMenuItem<String?>(
+                            value: item,
+                            child: Text(
+                              item,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
                       onChanged: (v) => setState(() => _course = v),
                     ),
                   ),
@@ -764,87 +791,6 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ExportCohortDropdown extends StatelessWidget {
-  const _ExportCohortDropdown({
-    required this.id,
-    required this.value,
-    required this.hint,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String id;
-  final String? value;
-  final String hint;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(AdminSurveyTheme.radiusSm);
-    return DropdownButtonFormField<String?>(
-      key: ValueKey('export-$id-$value'),
-      initialValue: value,
-      isExpanded: true,
-      isDense: true,
-      iconSize: 18,
-      borderRadius: radius,
-      style: const TextStyle(
-        fontSize: 13,
-        color: AdminSurveyTheme.textPrimary,
-      ),
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        size: 18,
-        color: AdminSurveyTheme.textMuted,
-      ),
-      decoration: InputDecoration(
-        isDense: true,
-        filled: true,
-        fillColor: AdminSurveyTheme.card,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 10,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AdminSurveyTheme.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AdminSurveyTheme.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(
-            color: AdminSurveyTheme.primary,
-            width: 1.4,
-          ),
-        ),
-      ),
-      items: [
-        DropdownMenuItem<String?>(
-          value: null,
-          child: Text(
-            hint,
-            style: const TextStyle(color: AdminSurveyTheme.textMuted),
-          ),
-        ),
-        for (final item in items)
-          DropdownMenuItem<String?>(
-            value: item,
-            child: Text(
-              item,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-      ],
-      onChanged: onChanged,
     );
   }
 }

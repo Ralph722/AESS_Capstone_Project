@@ -165,6 +165,18 @@ void main() {
       );
     });
 
+    test('maps businessLine others option to specified text', () {
+      final mapped = ChedGtsPdfMapper.mapAnswers({
+        'ched_20': 'Others, please specify',
+        'ched_20_other': 'Renewable energy consulting',
+      });
+      expect(
+        mapped.values['businessLine'],
+        'Others: Renewable energy consulting',
+      );
+      expect(mapped.notes, isEmpty);
+    });
+
     test('maps duration others option', () {
       final mapped = ChedGtsPdfMapper.mapAnswers({
         'ched_27': 'Others, please specify',

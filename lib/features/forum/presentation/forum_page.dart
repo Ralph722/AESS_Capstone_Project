@@ -9,6 +9,7 @@ import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart'
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 
@@ -341,6 +342,8 @@ class _ForumScreenState extends State<ForumScreen> {
                             DropdownButtonHideUnderline(
                               child: DropdownButton<ForumSort>(
                                 value: _sort,
+                                borderRadius: PortalMenu.dropdownRadius,
+                                dropdownColor: PortalTheme.card,
                                 style: PortalTheme.meta.copyWith(
                                   color: PortalTheme.navy,
                                   fontWeight: FontWeight.w700,

@@ -56,6 +56,15 @@ abstract final class ChedGtsVisibility {
         visible.add('ched_18_skills');
       }
 
+      _maybeOthers(
+        visible,
+        answers,
+        parentId: 'ched_20',
+        othersId: 'ched_20_other',
+        triggerOptions: const [ChedGtsBuiltin.othersSpecify],
+        single: true,
+      );
+
       final firstJob = _str(answers['ched_22']);
       if (firstJob == ChedGtsBuiltin.yes) {
         visible.add('ched_23');
@@ -78,17 +87,12 @@ abstract final class ChedGtsVisibility {
             othersId: 'ched_24b_other',
             triggerOptions: const ['Other reason(s), please specify'],
           );
+        } else if (related == ChedGtsBuiltin.no) {
+          // Paper: "If NO, proceed to Question 26" (reasons for changing job).
+          _addChangingJob(visible, answers);
         }
-        // If related == No → skip 24b (paper: proceed toward 26/27).
       } else if (firstJob == ChedGtsBuiltin.no) {
-        visible.add('ched_25');
-        _maybeOthers(
-          visible,
-          answers,
-          parentId: 'ched_25',
-          othersId: 'ched_25_other',
-          triggerOptions: const ['Other reason(s), please specify'],
-        );
+        _addChangingJob(visible, answers);
       }
 
       _maybeOthers(
@@ -226,6 +230,20 @@ abstract final class ChedGtsVisibility {
       return v.map((e) => e.toString()).toList();
     }
     return const [];
+  }
+
+  static void _addChangingJob(
+    Set<String> visible,
+    Map<String, dynamic> answers,
+  ) {
+    visible.add('ched_25');
+    _maybeOthers(
+      visible,
+      answers,
+      parentId: 'ched_25',
+      othersId: 'ched_25_other',
+      triggerOptions: const ['Other reason(s), please specify'],
+    );
   }
 
   static void _maybeOthers(

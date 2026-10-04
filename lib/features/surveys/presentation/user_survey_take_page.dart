@@ -202,7 +202,6 @@ class _UserSurveyTakeScreenState extends State<UserSurveyTakeScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Submit survey?'),
         content: const Text(
           'You will not be able to edit answers after submitting.',
@@ -210,13 +209,12 @@ class _UserSurveyTakeScreenState extends State<UserSurveyTakeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
+            style: PortalTheme.ghostButton(dense: true),
             child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: SurveyTakeTheme.navy,
-            ),
+            style: PortalTheme.primaryButton(dense: true),
             child: const Text('Submit'),
           ),
         ],

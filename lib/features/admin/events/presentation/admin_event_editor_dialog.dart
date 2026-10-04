@@ -12,7 +12,6 @@ import 'package:alumni_system/features/events/models/event_agenda_item.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/widgets/venue_pin_picker_dialog.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
-import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_form_fields.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
@@ -41,7 +40,6 @@ class AdminEventEditorDialog extends StatefulWidget {
 
 class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
   final _eventService = EventService();
-  final _notificationService = NotificationService();
   final _imageStorage = ImageStorageService();
   final _picker = ImagePicker();
 
@@ -265,39 +263,12 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
         venueLongitude: _venueLongitude,
       );
 
-      final old = widget.event;
+      // Alumni notices (new event / venue / schedule) come from the
+      // events table trigger (notify_event_changes).
       if (_isEdit) {
         await _eventService.updateEvent(event);
-        try {
-          if (old != null &&
-              (old.venue != event.venue ||
-                  old.venueLatitude != event.venueLatitude ||
-                  old.venueLongitude != event.venueLongitude)) {
-            await _notificationService.notifyEventUpdate(
-              eventId: event.id,
-              eventTitle: event.theme,
-              message: 'Venue updated to ${event.venue}.',
-            );
-          } else if (old != null &&
-              (old.date != event.date ||
-                  old.startTime != event.startTime ||
-                  old.endTime != event.endTime)) {
-            await _notificationService.notifyEventUpdate(
-              eventId: event.id,
-              eventTitle: event.theme,
-              message: 'Schedule updated for ${event.theme}.',
-            );
-          }
-        } catch (_) {}
       } else {
         await _eventService.addEvent(event);
-        try {
-          await _notificationService.notifyNewEvent(
-            eventId: event.id,
-            eventTitle: event.theme,
-            eventDate: DateFormat('MMM d, yyyy').format(event.date),
-          );
-        } catch (_) {}
       }
 
       if (!mounted) return;
@@ -427,7 +398,8 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
                         context,
                         'Description',
                         _description,
-                        'Optional overview',
+                        'Optional overview. Links (https://… or www.…) '
+                            'become clickable.',
                         isMultiline: true,
                         icon: Icons.description,
                       ),

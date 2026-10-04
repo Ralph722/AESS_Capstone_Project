@@ -635,7 +635,7 @@ def build() -> list[str]:
 
     b.label("22. Is this your first job after college?", bold=True)
     b.radio_options("isFirstJob", [("yes", "Yes"), ("no", "No")], cols=4)
-    b.note("If NO, proceed to Questions 25 and 27. If YES, proceed to Question 23.")
+    b.note("If NO, proceed to Questions 26 and 27. If YES, proceed to Question 23.")
     b.gap(4)
 
     b.label(
@@ -660,13 +660,13 @@ def build() -> list[str]:
     b.note("Please proceed to Question 24.")
     b.gap(4)
 
-    b.label("24a. Is your first job related to the course you took up in college?", bold=True)
+    b.label("24. Is your first job related to the course you took up in college?", bold=True)
     b.radio_options("firstJobRelated", [("yes", "Yes"), ("no", "No")], cols=4)
-    b.note("If NO, proceed to Question 25.")
+    b.note("If NO, proceed to Question 26.")
     b.gap(4)
 
     b.label(
-        "24b. What were your reasons for accepting the job? You may check more than one answer.",
+        "25. What were your reasons for accepting the job? You may check more than one answer.",
         bold=True,
     )
     b.check_options(
@@ -684,7 +684,7 @@ def build() -> list[str]:
     b.gap(4)
 
     b.label(
-        "25. What were your reason(s) for changing job? You may check more than one answer.",
+        "26. What were your reason(s) for changing job? You may check more than one answer.",
         bold=True,
     )
     b.check_options(
@@ -701,8 +701,6 @@ def build() -> list[str]:
     b.text_row("changingReasonsOther", h=14)
 
     b.new_page()
-    b.note("Note: Official CHED form has no item 26 in this section (numbering jumps 25 to 27).")
-    b.gap(4)
 
     b.label("27. How long did you stay in your first job?", bold=True)
     b.radio_options(

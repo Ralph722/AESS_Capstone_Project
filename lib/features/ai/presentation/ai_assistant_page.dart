@@ -85,7 +85,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           '--dart-define-from-file=config/dart_defines.json',
         ),
         actions: [
-          TextButton(
+          FilledButton(
+            style: PortalTheme.primaryButton(dense: true),
             onPressed: () => Navigator.pop(ctx),
             child: const Text('OK'),
           ),

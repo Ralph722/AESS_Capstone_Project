@@ -17,6 +17,7 @@ import 'package:alumni_system/features/messages/widgets/message_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
@@ -587,47 +588,45 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
 
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.add_reaction, color: Colors.orange),
-              title: const Text('Add Reaction'),
+      builder: (context) => PortalOptionsSheet(
+        children: [
+          PortalSheetOption(
+            label: 'Add reaction',
+            icon: Icons.add_reaction_outlined,
+            onTap: () {
+              Navigator.pop(context);
+              _showReactionPicker(context, messageDocId);
+            },
+          ),
+          if (text.trim().isNotEmpty)
+            PortalSheetOption(
+              label: 'Copy message',
+              icon: Icons.copy_outlined,
               onTap: () {
                 Navigator.pop(context);
-                _showReactionPicker(context, messageDocId);
+                copyMessageText(context, text);
               },
             ),
-            if (text.trim().isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.copy_outlined, color: MessageTheme.navy),
-                title: const Text('Copy message'),
-                onTap: () {
-                  Navigator.pop(context);
-                  copyMessageText(context, text);
-                },
-              ),
-            if (isCurrentUser) ...[
-              ListTile(
-                leading: const Icon(Icons.edit, color: Colors.blue),
-                title: const Text('Edit Message'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _editMessage(message);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Delete Message'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _deleteMessage(message);
-                },
-              ),
-            ],
+          if (isCurrentUser) ...[
+            PortalSheetOption(
+              label: 'Edit message',
+              icon: Icons.edit_outlined,
+              onTap: () {
+                Navigator.pop(context);
+                _editMessage(message);
+              },
+            ),
+            PortalSheetOption(
+              label: 'Delete message',
+              icon: Icons.delete_outline_rounded,
+              destructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                _deleteMessage(message);
+              },
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

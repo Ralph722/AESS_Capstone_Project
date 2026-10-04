@@ -189,10 +189,12 @@ class AlumniEvent {
       agenda: agenda ?? this.agenda,
       viewsCount: viewsCount ?? this.viewsCount,
       cancelled: cancelled ?? this.cancelled,
-      venueLatitude:
-          clearVenuePin ? null : (venueLatitude ?? this.venueLatitude),
-      venueLongitude:
-          clearVenuePin ? null : (venueLongitude ?? this.venueLongitude),
+      venueLatitude: clearVenuePin
+          ? null
+          : (venueLatitude ?? this.venueLatitude),
+      venueLongitude: clearVenuePin
+          ? null
+          : (venueLongitude ?? this.venueLongitude),
     );
   }
 }

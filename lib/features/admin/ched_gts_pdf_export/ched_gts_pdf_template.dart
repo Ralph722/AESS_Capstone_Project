@@ -49,10 +49,10 @@ abstract final class ChedGtsPdfTemplate {
     displayName:
         'CHED Graduate Tracer Study (GTS) — Official-aligned PDF v3.1.0',
     notes: [
-      'Aligned to official CHED GTS structure (A–D; items 1-25, 27-34)',
+      'Aligned to official CHED GTS structure (A–D; items 1-34)',
       'Header left blank (campus export copy; not official CHED letterhead)',
       'Section E alumni referrals omitted by design',
-      'Item 26 intentionally absent (official paper numbering jump)',
+      'Paper duplicate 24 and missing 26 renumbered as 24, 25, 26',
     ],
   );
 

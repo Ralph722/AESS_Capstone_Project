@@ -6,9 +6,12 @@ import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/features/alumni/tracer/data/id_tracer_service.dart';
 import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
-import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_prefill.dart';
-import 'package:alumni_system/features/surveys/ched_gts/ched_gts_wizard.dart';
+import 'package:alumni_system/features/alumni/tracer/data/tracer_reminder_service.dart';
+import 'package:alumni_system/features/alumni/tracer/presentation/tracer_history_screen.dart';
+import 'package:alumni_system/features/alumni/tracer/presentation/tracer_reminder_sheet.dart';
+import 'package:alumni_system/features/alumni/tracer/presentation/tracer_intro_view.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_take_screen.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/presentation/user_surveys_page.dart';
@@ -28,36 +31,27 @@ class TracerScreen extends StatefulWidget {
   State<TracerScreen> createState() => _TracerScreenState();
 }
 
-class _TracerScreenState extends State<TracerScreen>
-    with SingleTickerProviderStateMixin {
+class _TracerScreenState extends State<TracerScreen> {
   final _surveyService = SurveyService();
   final _profileService = UserProfileService();
   final _idTracerService = IdTracerService();
-  late TabController _tabs;
 
   List<SurveyAssignment> _assignments = [];
   List<SurveyResponseWithMeta> _history = [];
   final Map<String, Survey> _surveyById = {};
   bool _loading = true;
 
-  String? _inlineSurveyId;
-  Map<String, dynamic> _inlineAnswers = {};
-  bool _inlineLoading = false;
-  bool _inlineSaving = false;
-  final _activeScrollController = ScrollController();
+  String? _chedSurveyId;
+  Map<String, dynamic> _chedAnswers = {};
+  bool _chedHasDraft = false;
+  bool _chedLoading = false;
+  TracerReminder? _chedReminder;
+  final _reminderService = TracerReminderService();
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
     _load();
-  }
-
-  @override
-  void dispose() {
-    _activeScrollController.dispose();
-    _tabs.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -99,7 +93,7 @@ class _TracerScreenState extends State<TracerScreen>
       _loading = false;
     });
 
-    await _prepareInlineChedForm();
+    await _prepareChedAnswers();
   }
 
   List<SurveyAssignment> get _incompleteAssignments => _assignments
@@ -110,9 +104,8 @@ class _TracerScreenState extends State<TracerScreen>
       _surveyById[surveyId]?.acceptsResponses == true;
 
   /// Incomplete + currently within schedule window (takeable now).
-  List<SurveyAssignment> get _activeAssignments => _incompleteAssignments
-      .where((a) => _surveyIsOpen(a.surveyId))
-      .toList();
+  List<SurveyAssignment> get _activeAssignments =>
+      _incompleteAssignments.where((a) => _surveyIsOpen(a.surveyId)).toList();
 
   /// Incomplete CHED assignment that has not opened yet.
   SurveyAssignment? get _scheduledChedAssignment {
@@ -135,14 +128,18 @@ class _TracerScreenState extends State<TracerScreen>
       .where((a) => _surveyById[a.surveyId]?.isChedGtsBuiltin != true)
       .toList();
 
-  Future<void> _prepareInlineChedForm() async {
+  /// Loads draft + profile prefill so the intro can show progress and the
+  /// answering screen opens with everything pre-filled.
+  Future<void> _prepareChedAnswers() async {
     final assignment = _primaryChedAssignment;
     if (assignment == null) {
       if (mounted) {
         setState(() {
-          _inlineSurveyId = null;
-          _inlineAnswers = {};
-          _inlineLoading = false;
+          _chedSurveyId = null;
+          _chedAnswers = {};
+          _chedHasDraft = false;
+          _chedLoading = false;
+          _chedReminder = null;
         });
       }
       return;
@@ -152,11 +149,12 @@ class _TracerScreenState extends State<TracerScreen>
     if (uid == null) return;
 
     setState(() {
-      _inlineSurveyId = assignment.surveyId;
-      _inlineLoading = true;
+      _chedSurveyId = assignment.surveyId;
+      _chedLoading = true;
     });
 
     try {
+      final reminderFuture = _reminderService.getReminder(assignment.surveyId);
       final existing = await _surveyService.getResponse(
         assignment.surveyId,
         uid,
@@ -174,48 +172,104 @@ class _TracerScreenState extends State<TracerScreen>
         existing: existing?.answers ?? const {},
         prefill: prefill,
       );
+      final reminder = await reminderFuture;
 
       if (!mounted) return;
       setState(() {
-        _inlineAnswers = merged;
-        _inlineLoading = false;
+        _chedAnswers = merged;
+        _chedReminder = reminder;
+        _chedHasDraft =
+            existing != null &&
+            existing.submittedAt == null &&
+            existing.answers.isNotEmpty;
+        _chedLoading = false;
       });
-      unawaited(_surveyService.recordSurveyOpened(assignment.surveyId));
     } catch (_) {
-      if (mounted) setState(() => _inlineLoading = false);
+      if (mounted) setState(() => _chedLoading = false);
     }
   }
 
-  Future<void> _saveInline({required bool submit}) async {
-    final surveyId = _inlineSurveyId;
+  Future<void> _openChedForm() async {
+    final surveyId = _chedSurveyId;
     if (surveyId == null) return;
+    final submitted = await ChedGtsTakeScreen.open(
+      context,
+      surveyId: surveyId,
+      initialAnswers: _chedAnswers,
+      closeAt: _surveyById[surveyId]?.closeAt,
+      aiHelpEnabled: _surveyById[surveyId]?.aiHelpEnabled ?? true,
+    );
+    if (!mounted) return;
+    await _load();
+    if (!submitted || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Thank you! Your CHED GTS has been submitted.'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: PortalTheme.success,
+        action: SnackBarAction(
+          label: 'View',
+          textColor: Colors.white,
+          onPressed: _openHistory,
+        ),
+      ),
+    );
+  }
 
-    setState(() => _inlineSaving = true);
+  void _openHistory() {
+    TracerHistoryScreen.open(context, history: _chedHistory);
+  }
+
+  void _snack(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: error ? PortalTheme.danger : PortalTheme.success,
+        ),
+      );
+  }
+
+  Future<void> _setReminder() async {
+    final surveyId = _chedSurveyId;
+    if (surveyId == null) return;
+    final current = _chedReminder;
+    final choice = await showTracerReminderSheet(
+      context,
+      closeAt: _surveyById[surveyId]?.closeAt,
+      initialRepeatHourly: current?.repeatHourly ?? false,
+      title: current?.isUpcoming == true
+          ? 'Change your reminder'
+          : 'Remind me to finish',
+      dismissLabel: null,
+    );
+    if (choice == null || !mounted) return;
     try {
-      await _surveyService.saveResponse(
+      final saved = await _reminderService.setReminder(
         surveyId: surveyId,
-        answers: _inlineAnswers,
-        submit: submit,
+        remindAt: choice.remindAt,
+        repeatHourly: choice.repeatHourly,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(submit ? 'CHED GTS submitted' : 'Draft saved'),
-          backgroundColor: PortalTheme.success,
-        ),
-      );
-      await _load();
-      if (submit && mounted) _tabs.animateTo(1);
+      setState(() => _chedReminder = saved);
+      _snack("We'll remind you ${formatReminderTime(saved.remindAt)}.");
     } catch (e) {
+      if (mounted) _snack(portalFriendlyError(e), error: true);
+    }
+  }
+
+  Future<void> _cancelReminder() async {
+    final surveyId = _chedSurveyId;
+    if (surveyId == null) return;
+    try {
+      await _reminderService.cancelReminder(surveyId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(portalFriendlyError(e)),
-          backgroundColor: PortalTheme.danger,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _inlineSaving = false);
+      setState(() => _chedReminder = null);
+      _snack('Reminder cancelled.');
+    } catch (e) {
+      if (mounted) _snack(portalFriendlyError(e), error: true);
     }
   }
 
@@ -227,33 +281,16 @@ class _TracerScreenState extends State<TracerScreen>
         title: 'Tracer',
         subtitle: 'CHED Graduate Tracer Study',
         automaticallyImplyLeading: !widget.embeddedInNav,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(47),
-          child: Column(
-            children: [
-              TabBar(
-                controller: _tabs,
-                indicatorColor: PortalTheme.gold,
-                indicatorWeight: 3,
-                labelColor: PortalTheme.navy,
-                unselectedLabelColor: PortalTheme.textSecondary,
-                labelStyle: PortalTheme.meta.copyWith(fontWeight: FontWeight.w700),
-                tabs: const [
-                  Tab(text: 'Active Tracer'),
-                  Tab(text: 'History'),
-                ],
-              ),
-              Container(height: 1, color: PortalTheme.border),
-            ],
+        actions: [
+          PortalHeaderAction(
+            icon: Icons.history_rounded,
+            tooltip: 'Past responses',
+            onPressed: _openHistory,
           ),
-        ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: _loading
-          ? const PortalCardListSkeleton()
-          : TabBarView(
-              controller: _tabs,
-              children: [_activeTab(), _historyTab()],
-            ),
+      body: _loading ? const PortalCardListSkeleton() : _activeTab(),
     );
   }
 
@@ -268,21 +305,21 @@ class _TracerScreenState extends State<TracerScreen>
       onRefresh: _load,
       color: PortalTheme.navy,
       child: ListView(
-        controller: _activeScrollController,
         padding: padding.copyWith(bottom: widget.embeddedInNav ? 108 : 40),
         children: [
           if (ched != null) ...[
-            if (_inlineLoading)
+            if (_chedLoading)
               const PortalCardListSkeleton(count: 4, shrinkWrap: true)
             else
-              ChedGtsWizard(
-                title: _surveyById[ched.surveyId]?.title ?? ched.surveyTitle,
-                answers: _inlineAnswers,
-                saving: _inlineSaving,
-                scrollController: _activeScrollController,
-                onChanged: (a) => setState(() => _inlineAnswers = a),
-                onSaveDraft: () => _saveInline(submit: false),
-                onSubmit: () => _saveInline(submit: true),
+              TracerIntroView(
+                survey: _surveyById[ched.surveyId],
+                fallbackTitle: ched.surveyTitle,
+                answers: _chedAnswers,
+                hasDraft: _chedHasDraft,
+                onStart: _openChedForm,
+                reminder: _chedReminder,
+                onSetReminder: _setReminder,
+                onCancelReminder: _cancelReminder,
               ),
           ] else if (scheduled != null)
             _scheduledChedCard(scheduled)
@@ -423,7 +460,7 @@ class _TracerScreenState extends State<TracerScreen>
           const SizedBox(height: 8),
           Text(
             lastText != null
-                ? 'You last submitted on $lastText. Past CHED responses are in History.'
+                ? 'You last submitted on $lastText. You can view it in Past responses.'
                 : 'When your school publishes the official CHED GTS, it will appear here.',
             textAlign: TextAlign.center,
             style: PortalTheme.bodySecondary,
@@ -431,7 +468,7 @@ class _TracerScreenState extends State<TracerScreen>
           if (_chedHistory.isNotEmpty) ...[
             const SizedBox(height: PortalTheme.space3),
             OutlinedButton.icon(
-              onPressed: () => _tabs.animateTo(1),
+              onPressed: _openHistory,
               style: PortalTheme.secondaryButton(dense: true),
               icon: const Icon(Icons.history),
               label: const Text('View history'),
@@ -457,117 +494,5 @@ class _TracerScreenState extends State<TracerScreen>
     final ched = _chedHistory;
     if (ched.isEmpty) return null;
     return ched.first.response.submittedAt;
-  }
-
-  Widget _historyTab() {
-    final chedHistory = _chedHistory;
-    final width = PortalBreakpoints.widthOf(context);
-    final padding = PortalBreakpoints.pagePadding(width);
-
-    if (chedHistory.isEmpty) {
-      return const PortalEmptyState(
-        icon: Icons.history_outlined,
-        title: 'No CHED history yet',
-        subtitle:
-            'Submitted CHED Graduate Tracer responses will appear here for your records.',
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _load,
-      color: PortalTheme.navy,
-      child: ListView.builder(
-        padding: padding.copyWith(bottom: widget.embeddedInNav ? 108 : 40),
-        itemCount: chedHistory.length,
-        itemBuilder: (context, index) {
-          final item = chedHistory[index];
-          final submitted = item.response.submittedAt;
-          return _HistoryResponseCard(
-            title: item.surveyTitle,
-            submittedLabel: submitted != null
-                ? DateFormat.yMMMd().add_jm().format(submitted)
-                : 'Submitted',
-            answers: item.response.answers,
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _HistoryResponseCard extends StatelessWidget {
-  const _HistoryResponseCard({
-    required this.title,
-    required this.submittedLabel,
-    required this.answers,
-  });
-
-  final String title;
-  final String submittedLabel;
-  final Map<String, dynamic> answers;
-
-  @override
-  Widget build(BuildContext context) {
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-      side: BorderSide(color: PortalTheme.border.withValues(alpha: 0.75)),
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: PortalTheme.space2),
-      child: Material(
-        color: PortalTheme.card,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        shape: shape,
-        clipBehavior: Clip.antiAlias,
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            dividerColor: Colors.transparent,
-            splashColor: PortalTheme.navy.withValues(alpha: 0.06),
-            highlightColor: PortalTheme.navy.withValues(alpha: 0.04),
-            hoverColor: PortalTheme.navy.withValues(alpha: 0.03),
-          ),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(
-              horizontal: PortalTheme.space3,
-              vertical: 4,
-            ),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            shape: const Border(),
-            collapsedShape: const Border(),
-            leading: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: PortalTheme.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
-              ),
-              child: const Icon(
-                Icons.verified_outlined,
-                color: PortalTheme.success,
-                size: 20,
-              ),
-            ),
-            title: Text(
-              title,
-              style: PortalTheme.cardTitle.copyWith(fontSize: 15),
-            ),
-            subtitle: Text(
-              'Submitted $submittedLabel',
-              style: PortalTheme.meta,
-            ),
-            children: [
-              ChedGtsForm(
-                answers: answers,
-                onChanged: (_) {},
-                readOnly: true,
-                showIntro: false,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
-import 'package:alumni_system/features/jobs/application/job_deadline_reminders.dart';
 import 'package:alumni_system/features/jobs/data/favorite_job_service.dart';
 import 'package:alumni_system/features/jobs/data/job_interest_service.dart';
 import 'package:alumni_system/features/jobs/data/job_recommendation.dart';
@@ -18,6 +17,7 @@ import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 class JobPostingScreen extends StatefulWidget {
@@ -86,12 +86,6 @@ class JobPostingScreenState extends State<JobPostingScreen> {
       }
     } catch (_) {}
     await _load();
-    unawaited(
-      runJobDeadlineReminders(
-        alumniCourse: _alumniCourse,
-        jobs: _jobs.isEmpty ? null : _jobs,
-      ),
-    );
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -591,21 +585,13 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     final label = items.firstWhere((e) => e.$1 == value).$2;
     final isActive = value != 'all' && value != 'newest';
     return PopupMenuButton<String>(
-      offset: const Offset(0, 36),
       onSelected: onChanged,
       itemBuilder: (ctx) => items
           .map(
-            (e) => PopupMenuItem(
+            (e) => portalMenuItem(
               value: e.$1,
-              child: Text(
-                e.$2,
-                style: TextStyle(
-                  fontWeight: e.$1 == value ? FontWeight.w700 : FontWeight.w400,
-                  color: e.$1 == value
-                      ? JobUiTheme.navy
-                      : PortalTheme.textPrimary,
-                ),
-              ),
+              label: e.$2,
+              selected: e.$1 == value,
             ),
           )
           .toList(),
@@ -1054,9 +1040,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
         : job.location.trim();
 
     return Material(
-      color: Colors.white,
+      color: PortalTheme.card,
       borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(JobUiTheme.radius2xl),
+        top: Radius.circular(PortalTheme.radius2xl),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
+import 'package:alumni_system/features/home/data/survey_attention_reminder.dart';
 
 enum UserRole { admin, user }
 
@@ -10,6 +11,11 @@ class AuthService {
       : _supabase = supabase ?? Supabase.instance.client;
 
   final SupabaseClient _supabase;
+
+  /// Runs before [logout] signs out, while the session is still valid
+  /// (detaches this device from phone/browser alerts). Bounded so a slow
+  /// network never blocks signing out.
+  static Future<void> Function()? beforeSignOut;
 
   User? getCurrentUser() => AppSession.currentUser;
 
@@ -191,7 +197,14 @@ class AuthService {
 
   Future<void> logout() async {
     AppImage.clearDecodedCache();
+    final hook = beforeSignOut;
+    if (hook != null) {
+      try {
+        await hook().timeout(const Duration(seconds: 4));
+      } catch (_) {}
+    }
     await _supabase.auth.signOut();
+    SurveyAttentionReminder.resetForSession();
   }
 
   /// Public entry used by [loginWithEmailPassword] and cold-start [AuthGate].

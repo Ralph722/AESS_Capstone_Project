@@ -1,0 +1,22 @@
+﻿n,test,expected,actual
+1,legacy tables dropped,gone,gone
+2,batch_year / roster employment columns dropped,0,0
+3,old helper signatures dropped,gone,gone
+4,only dss functions still mention batch_year,"dss_recheck_open_flags, dss_run_flag_action","dss_recheck_open_flags, dss_run_flag_action"
+5,audience match by graduation year,true/false/true,true/false/true
+6,"get_public_profiles works, no batch_year column","2 rows, no batch_year","2 rows, no batch_year"
+7,alumnus profile save keeps roster year,"ok, year kept","ok, year kept"
+8,alumnus cannot change roster year,blocked,blocked
+9,admin roster insert normalizes year,ok/2031,ok/2031
+10,auto-assign still runs,ok,ok
+11,announcement targeted by year reaches A (in-app),+1,+1
+12,announcement for another year skips A,+0,+0
+13,registration link still works for A,true,true
+14,clock parser,07:00/00:00/12:30/19:05/19:00/null/null,07:00/00:00/12:30/19:05/19:00/null/null
+15,"every event has typed times, end >= start",0 bad,0 bad
+16,backfill matches the text times (Manila),0 mismatched,0 mismatched
+17,admin creates event -> typed times derived,"ok, 2026-12-02 01:00 -> 09:00 UTC","ok, 2026-12-02 01:00 -> 09:00 UTC"
+18,client cannot override typed times,"ok, unchanged","ok, unchanged"
+19,overnight event ends next day,"ok, 2026-12-02 14:00 -> 2026-12-02 17:00 UTC","ok, 2026-12-02 14:00 -> 2026-12-02 17:00 UTC"
+20,event reminder job runs on typed times,ok,ok
+21,admin_remove_alumni_account still works,true,true

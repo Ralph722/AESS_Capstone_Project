@@ -1,0 +1,47 @@
+﻿rel,deactivated_user,after_reactivation
+alumni_members,blocked,same as before
+announcements,blocked,same as before
+audit_logs,blocked,same as before
+dss_flag_checks,blocked,same as before
+dss_flag_notes,blocked,same as before
+dss_flags,blocked,same as before
+dss_rules,blocked,same as before
+event_comments,blocked,same as before
+event_replies,blocked,same as before
+event_rsvps,blocked,same as before
+events,blocked,same as before
+favorite_jobs,blocked,same as before
+feedback,blocked,same as before
+forum_bookmarks,blocked,same as before
+forum_helpful_reactions,blocked,same as before
+forum_moderation_events,blocked,same as before
+forum_posts,blocked,same as before
+forum_reports,blocked,same as before
+forum_tags,blocked,same as before
+forum_topic_tags,blocked,same as before
+forum_topics,blocked,same as before
+gts_employment_records,blocked,same as before
+gts_question_catalog,blocked,same as before
+gts_respondent_facts,blocked,same as before
+job_interests,blocked,same as before
+jobs,blocked,same as before
+messages,blocked,same as before
+notification_deliveries,blocked,same as before
+notification_preferences,blocked,same as before
+programs,blocked,same as before
+push_tokens,blocked,same as before
+storage.objects,blocked,same as before
+survey_assignments,blocked,same as before
+survey_questions,blocked,same as before
+survey_response_events,blocked,same as before
+survey_responses,blocked,same as before
+survey_template_questions,blocked,same as before
+survey_templates,blocked,same as before
+surveys,blocked,same as before
+tracer_draft_reminders,blocked,same as before
+tracer_help_usage,blocked,same as before
+user_notifications,blocked,same as before
+users,blocked,same as before
+~ anon can execute caller_is_active,no,
+~ policies named active_caller_only,one per RLS table + storage,
+~ roster employment_status column,dropped,

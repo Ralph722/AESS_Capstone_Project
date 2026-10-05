@@ -23,6 +23,17 @@ supabase db query --linked -f docs/database/queries/columns.sql -o csv
 
 If this snapshot and `supabase/migrations` disagree, the migrations win and the snapshot is out of date.
 
+## Regression tests
+
+[`supabase/regression/`](../../supabase/regression/) holds the test suites from the 2026-10 audit (one per phase, plus a parity report, a scheduled-job dry run and Edge Function abuse tests). Each suite runs in a transaction that is rolled back. Run them before and after any schema change:
+
+```powershell
+.\supabase\regression\run_all.ps1            # compare with baselines
+.\supabase\regression\run_all.ps1 -Reports -Edge
+```
+
+After an intended change, review the reported lines and accept them with `-UpdateBaselines`.
+
 ## Restoring from a data backup
 
 A JSON data backup (one file per table) must be loaded into the schema it was taken from, not into today's schema. Later migrations transform the data; for example, `events.starts_at` and `ends_at` are filled by a trigger added in Phase 7 and are missing from older backups.

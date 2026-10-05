@@ -1,0 +1,34 @@
+﻿n,test,expected,actual
+1,gts_single: list / padded text / blank / null / number,a|b|(null)|(null)|5,a|b|(null)|(null)|5
+2,"gts_job_level: current job wins, first job fallback, non-object",Managerial or Executive|Rank or Clerical|(null),Managerial or Executive|Rank or Clerical|(null)
+3,gts_salary_rank,0|5|(null),0|5|(null)
+4,facts: admin sees every submitted CHED response,3,3
+5,facts: alumnus A sees only own,3,3
+6,facts: anon blocked,permission denied,ERROR: permission denied for view gts_respondent_facts
+7,gts_metric matches stored Dart metric for every open flag,0 differences,0 differences of 7
+8,gts_metric: alumnus blocked,Admin access required,ERROR: Admin access required
+9,gts_metric: anon blocked,permission denied,ERROR: permission denied for function gts_metric
+10,"gts_metric: admin, unknown key",Unknown metric key,ERROR: Unknown metric key: nope
+11,"gts_metric: response_rate with empty wave is 0, not null",0,0.00000000000000000000
+12,gts_metric: institution unemployment over all waves' latest flags (sanity),value between 0 and 1,value between 0 and 1
+13,employment view: one row per alumnus with a CHED answer (admin),1,1
+14,employment view: statuses,Employed/Unemployed only,Employed
+15,employment view: alumnus A sees only own row,0 foreign rows,0 foreign rows
+16,employment view: anon blocked,permission denied,ERROR: permission denied for view gts_employment_records
+17,employment view: alumnus cannot write,blocked,"ERROR: cannot insert into view ""gts_employment_records"""
+18,employment view: employed rows carry CHED fields,all employed rows have position/industry/type,all employed rows have position/industry/type
+19,employment_records retired,gone,gone
+20,archived_employment_records dropped (Phase 7),gone,gone
+21,no policies left on retired employment tables,0,0
+22,dss_flag_checks: one row per open flag,7,7
+23,dss_flag_checks: states,listed,"DATA_QUALITY_LOW=still_triggered(0.500), DATA_QUALITY_LOW=still_triggered(0.500), RELATEDNESS_HIGH=still_triggered(1.000), RELATEDNESS_LOW=still_triggered(1.000), UNDEREMPLOYMENT=still_triggered(1.000), UNDEREMPLOYMENT=still_triggered(1.000), UNEMPLOYMENT_HIGH=still_triggered(1.000)"
+24,dss_flags not modified by the re-check,unchanged,unchanged
+25,dss_flag_checks: alumnus sees none,0,0
+26,dss_flag_checks: admin can read,7,7
+27,dss_flag_checks: admin cannot write,permission denied,ERROR: permission denied for table dss_flag_checks
+28,dss_recheck_open_flags: clients cannot run it,permission denied,ERROR: permission denied for function dss_recheck_open_flags
+29,recheck is repeatable and keeps recovered_since,"same count, recovered_since kept","same count, recovered_since kept"
+30,cron job scheduled,15 19 * * *,15 19 * * *
+31,new views are security_invoker,2,2
+32,new functions pin search_path,6,6
+33,anon cannot execute helper functions,permission denied,ERROR: permission denied for function gts_single

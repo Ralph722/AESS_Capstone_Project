@@ -1,0 +1,41 @@
+﻿n,test,expected,actual
+1,owner edits submitted answers,blocked,ERROR: This survey response was already submitted and can no longer be changed.
+2,owner reverts submitted to draft,blocked,ERROR: This survey response was already submitted and can no longer be changed.
+3,owner touches telemetry on submitted,1,1
+4,"admin update (no admin UPDATE policy exists, unchanged)",0,0
+5,owner marks assignment completed without submitting,blocked,ERROR: Submit the survey before marking it completed.
+6,owner moves completed assignment back,completed,completed
+7,admin deletes survey with submissions,blocked,ERROR: This survey already has submitted responses. Close or archive it instead of deleting it.
+8,alumnus A edits role/program/ID/email + name,"user|program,ID,email kept|name changed","user|program,ID,email kept|name changed"
+9,users rows with mismatched auth email,0,0
+10,alumnus forges audit identity,own uid|user|real name,own uid|user|real name
+11,alumnus logs as another user,stamped as self,stamped as self
+12,admin edits an audit row,permission denied,ERROR: permission denied for table audit_logs
+13,admin deletes audit rows,permission denied,ERROR: permission denied for table audit_logs
+14,retention cron scheduled,45 19 * * *,45 19 * * *
+15,"alumnus sends as ""AESS Office""","real name, real email, user role","real name, real email, user role"
+16,sender renames own message later,blocked,ERROR: sender cannot reassign message participants
+17,admin: resolved -> dismissed directly,blocked,ERROR: Reopen this flag before marking it dismissed.
+18,admin reopens resolved flag,ran,ran
+18,...flag + note written together,open|reopen|admin name|resolved_at cleared,open|reopen|admin name|resolved_at cleared
+19,alumnus calls DSS status RPC,admin required,ERROR: Admin access required.
+20,note author name forged by client,stamped,stamped
+21,alumnus calls account removal,admin required,ERROR: Admin access required.
+22,admin removes unclaimed roster row,no linked account,ERROR: This roster entry has no linked portal account.
+23,admin removes alumnus B,ok,ok
+24,"B: users row anonymized, cohort kept",Deleted alumni|no email|program kept|anonymized,Deleted alumni|no email|program kept|anonymized
+25,"B: auth login banned, real email gone, 0 sessions",banned|placeholder|0,2999|placeholder|0
+26,"B: tracer rows kept, identifying answers blanked",kept|0 identifying keys,kept|0 identifying keys
+27,"B: roster row kept, deactivated, unlinked",deactivated|unlinked,deactivated|unlinked
+28,B: messages show anonymized sender,0 with old name,0 with old name
+29,admin reactivates B roster: anonymized login stays banned,2999,2999
+30,hard-deleting B's auth user (tracer evidence),blocked,"ERROR: update or delete on table ""users"" violates foreign key constraint ""survey_assignments_user_id_fkey"" on table ""survey_assignments"""
+31,test user creates topic,1,1
+32,alumnus A replies,1,1
+33,delete topic author account,1,1
+33,...thread survives,"topic kept, author null, A reply kept","topic kept, author null, A reply kept"
+34,functions anon can execute,3,"3: is_admin, is_signed_in, validate_alumni_eligibility"
+35,trigger functions authenticated can execute,0,0
+36,functions without fixed search_path,0,0
+37,"job with ""Active"" status rejected",check violation,5
+38,duplicate roster ID + course rejected,unique violation,"ERROR: duplicate key value violates unique constraint ""alumni_members_student_course_key"""

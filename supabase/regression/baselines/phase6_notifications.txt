@@ -1,0 +1,25 @@
+﻿n,test,expected,actual
+1,alumnus cannot create own notification,blocked,ERROR: permission denied for table user_notifications
+2,admin cannot insert notifications directly,blocked,ERROR: permission denied for table user_notifications
+3,anon cannot read notifications,permission denied,ERROR: permission denied for table user_notifications
+4,alumnus still reads own notifications,all own rows,all own rows
+5,alumnus can mark own notifications read (as the app does),"ok, all read","ok, all read"
+6,alumnus B cannot touch A's notifications,0 changed,0 changed
+7,server trigger still notifies (message A -> admin),"ok, +1 for admin","ok, +1 for admin"
+8,notify_new_message dropped,gone,gone
+9,delivery table renamed,notification_deliveries,notification_deliveries
+10,"new notification queues push deliveries (one per device, incl. test token)","push only, test token included","push only, test token included"
+11,"push claim returns the push row, never email rows","push claimed, email untouched","push claimed, email untouched"
+12,"complete marks push sent, ignores email rows",sent/queued,sent/queued
+13,email row needs a recipient,check violation,"ERROR: new row for relation ""notification_deliveries"" violates check constraint ""notification_deliveries_target_check"""
+14,push row needs a token,check violation,"ERROR: new row for relation ""notification_deliveries"" violates check constraint ""notification_deliveries_target_check"""
+15,unknown channel rejected,check violation,"ERROR: new row for relation ""notification_deliveries"" violates check constraint ""notification_deliveries_channel_check"""
+16,sms row accepted (reserved channel),ok,ok
+17,admin reads delivery log,>= 3,>= 3
+18,alumnus sees no delivery rows,0,0
+19,admin cannot write delivery log,permission denied,ERROR: permission denied for table notification_deliveries
+20,anon cannot read delivery log,permission denied,ERROR: permission denied for table notification_deliveries
+21,clients cannot run claim/complete,false/false,false/false
+22,cleanup runs on the renamed table,ok,ok
+23,no function still references the old table name,0,0
+24,no INSERT policy left on user_notifications,0,0

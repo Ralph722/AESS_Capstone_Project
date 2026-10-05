@@ -1,0 +1,19 @@
+﻿n,test,expected,actual
+1,"row visibility identical for A, B, admin, anon on every RLS table",0 differences,0 differences
+2,tables compared,>= 40,40
+3,policies with per-row auth/is_admin calls,0,0
+4,overlapping permissive policies,0,0
+5,foreign keys without an index,0,0
+6,realtime tables,"11, no forum_reports/helpful","11, no forum_reports/helpful"
+7,BFPT name,BFPT,BFPT
+8,admin creates announcement,ok,ok
+9,admin edits + deletes it,1/1,1/1
+10,alumnus creates announcement,blocked,"ERROR: new row violates row-level security policy for table ""announcements"""
+11,alumnus edits a survey question,0,0
+12,admin edits survey questions,>0,>0
+13,alumnus RSVPs for self / for B,ok / blocked,ok / blocked
+14,admin deletes all RSVPs,all,all
+15,alumnus deletes B's job interests,0,0
+16,admin deletes job interests,all visible,all visible
+17,alumnus inserts an admin-role users row,blocked,"ERROR: new row violates row-level security policy for table ""users"""
+18,alumnus writes user_notifications table,blocked,ERROR: permission denied for table user_notifications

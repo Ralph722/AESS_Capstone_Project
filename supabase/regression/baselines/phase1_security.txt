@@ -1,0 +1,24 @@
+﻿n,test,expected,actual
+1,anon reads roster rows,0,0
+2,anon eligibility check still works,eligible false,not_found
+3,anon calls link RPC,permission denied,ERROR: permission denied for function link_alumni_registration
+4,anon bumps job views,permission denied,ERROR: permission denied for function increment_job_views
+5,anon lists images bucket,0,0
+6,alumnus reads roster rows,1 (own),1
+7,alumnus updates own last_active_at,1,1
+8,alumnus changes own official name,blocked,ERROR: Only the alumni office can change official roster details.
+9,alumnus flips own is_deactivated,blocked,ERROR: Only the alumni office can change official roster details.
+10,alumnus claims unclaimed row directly,0,0
+11,alumnus links B's roster row (correct details),already_exists,already_exists
+12,alumnus links an unclaimed row (correct details),already_exists,already_exists
+13,alumnus links with wrong name,failed_precondition,failed_precondition
+14,recipient A sees chat image,1,1
+15,other alumnus B sees chat image,0,0
+16,admin sees chat image,1,1
+17,alumnus sends message with public image URL,invalid reference,ERROR: invalid message image reference
+18,alumnus uploads chat image to images bucket,blocked,"ERROR: new row violates row-level security policy for table ""objects"""
+19,"deactivate B: login banned, sessions ended","banned, 0 sessions","2999, 0 sessions"
+20,reactivate B: ban lifted,not banned,not banned
+21,unconfirmed sign-up creates users row,0,0
+22,confirmed sign-up creates users row,1,1
+23,functions anon can execute,3,"3: is_admin, is_signed_in, validate_alumni_eligibility"

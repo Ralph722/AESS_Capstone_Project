@@ -1,0 +1,45 @@
+﻿n,test,expected,actual
+1,normalize_grad_year samples,2019||2024|1998,2019||2024|1998
+2,linked roster rows got the alumni year,2027/2027 2027/2027,2027/2027 2027/2027
+3,unlinked roster rows keep a blank year,0,0
+4,programs readable by anon,5,5
+5,alumnus cannot add a program,blocked,"ERROR: new row violates row-level security policy for table ""programs"""
+6,roster row with unknown course rejected,fk violation,"ERROR: insert or update on table ""alumni_members"" violates foreign key constraint ""alumni_members_course_fkey"""
+7,...stored year,2027/2027,2027/2027
+7,alumnus A sets year 2020 (roster says 2027),1,1
+8,alumnus A changes batch only,2027/2027,2027/2027
+9,alumnus A edits own roster year,blocked,ERROR: Only the alumni office can change official roster details.
+10,alumnus A mirrors contact details to roster,1,1
+11,...users A follows,BTLED-ICT 2025/2025,BTLED-ICT 2025/2025
+11,"admin sets roster A year to ""Batch 2025"" and course BTLED-ICT",2025/2025,2025/2025
+12,...users B keeps its year,2027,2027
+12,admin clears roster B year,-/,-/
+13,...users and roster B,2023/2023 roster 2023/2023,2023/2023 roster 2023/2023
+13,alumnus B sets year 2023,1,1
+14,alumnus B now locked by roster year,2023,2023
+15,privileged batch-only write moves both,1999/1999,1999/1999
+16,...stored counts,a=2 r=1,a=2 r=1
+16,admin writes response_count = 99,kept 1,1
+17,new survey with fake counts,0/0,0/0
+18,assign two alumni,2,2
+19,remove one assignment,1,1
+20,delete survey that has assignments (cascade + recount),1,1
+21,submitted response moved back to draft (raw),r=0,r=0
+22,all survey counters accurate,0,0
+23,views column mirrored in data.views,all match,all match
+24,admin edit with stale views + new title,kept|kept|P3 title|P3 title,kept|kept|P3 title|P3 title
+25,alumnus opens job (increment_job_views),+1|+1,+1|+1
+26,alumnus sets views directly,0,0
+27,legacy insert with only data fields,Legacy|ACME|active|7,Legacy|ACME|active|7
+28,alumnus A looks up B and admin,"2 rows, emails hidden","2 rows, emails hidden"
+29,B profile fields for alumni,"name set, BSIT, 2023","name set, BSIT, 2023"
+30,admin sees emails,emails shown,emails shown
+31,anon cannot call get_public_profiles,permission denied,ERROR: permission denied for function get_public_profiles
+32,alumnus still cannot read B's users row directly,0,0
+33,catalog rows visible to alumni,47,47
+34,catalog hidden from anon,permission denied,ERROR: permission denied for table gts_question_catalog
+35,catalog spot check ched_16,single / d / required,single / d / required
+36,surveys.created_by nullable,YES,YES
+37,functions anon can execute,3,"3: is_admin, is_signed_in, validate_alumni_eligibility"
+38,trigger functions authenticated can execute,0,0
+39,functions without fixed search_path,0,0

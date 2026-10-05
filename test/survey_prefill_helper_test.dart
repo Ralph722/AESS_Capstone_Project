@@ -45,6 +45,28 @@ void main() {
       expect(values['employment.position'], 'Developer');
     });
 
+    test('never employed is not employed and keeps its CHED answer', () {
+      final record = _record(employmentStatus: 'Never Employed');
+      expect(SurveyPrefillHelper.isEmployed(record), isFalse);
+      expect(SurveyPrefillHelper.presentlyEmployed(record), 'Never Employed');
+    });
+
+    test('CHED Q18 answers from GTS rows map back unchanged', () {
+      for (final type in const [
+        'Regular or Permanent',
+        'Temporary',
+        'Casual',
+        'Contractual',
+        'Self-employed',
+      ]) {
+        final record = _record(
+          employmentStatus: 'Employed',
+          employmentType: type,
+        );
+        expect(SurveyPrefillHelper.employmentStatusType(record), type);
+      }
+    });
+
     test('matchOption does not map No to Permanent', () {
       final options = [
         'Regular or Permanent',

@@ -223,7 +223,8 @@ class UserProfileService {
   }
 
   Future<Set<String>> _employmentUserIds() async {
-    final rows = await _supabase.from('employment_records').select('user_id');
+    final rows =
+        await _supabase.from('gts_employment_records').select('user_id');
     return rows
         .map((r) => r['user_id'] as String? ?? '')
         .where((id) => id.isNotEmpty)
@@ -234,7 +235,7 @@ class UserProfileService {
     final uid = AppSession.userId;
     if (uid == null) return false;
     final row = await _supabase
-        .from('employment_records')
+        .from('gts_employment_records')
         .select('id')
         .eq('user_id', uid)
         .maybeSingle();

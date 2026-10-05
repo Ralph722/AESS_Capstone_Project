@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-77 triggers on tables in the `public` and `auth` schemas.
+74 triggers on tables in the `public` and `auth` schemas.
 
 
 ## auth.users
@@ -54,14 +54,6 @@
 | Trigger | Definition |
 |---|---|
 | trg_dss_rules_updated_at | `BEFORE UPDATE ON public.dss_rules FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
-
-## public.employment_records
-
-| Trigger | Definition |
-|---|---|
-| trg_employment_owner_update | `BEFORE UPDATE ON public.employment_records FOR EACH ROW EXECUTE FUNCTION enforce_employment_owner_update()` |
-| trg_employment_records_updated_at | `BEFORE UPDATE ON public.employment_records FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
-| trg_notify_employment_verification | `AFTER UPDATE OF verification_status ON public.employment_records FOR EACH ROW EXECUTE FUNCTION notify_employment_verification()` |
 
 ## public.event_comments
 

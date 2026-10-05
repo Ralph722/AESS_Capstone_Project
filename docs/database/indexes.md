@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-119 indexes, including the ones that back primary keys and unique constraints.
+120 indexes, including the ones that back primary keys and unique constraints.
 
 
 ## alumni_members
@@ -20,12 +20,26 @@
 |---|---|---|
 | announcements_pkey | PK | `btree (id)` |
 
+## archived_employment_records
+
+| Index | Kind | Definition |
+|---|---|---|
+| employment_records_pkey | PK | `btree (id)` |
+| idx_employment_records_user |  | `btree (user_id)` |
+| idx_employment_records_verified_by |  | `btree (verified_by)` |
+
 ## audit_logs
 
 | Index | Kind | Definition |
 |---|---|---|
 | audit_logs_pkey | PK | `btree (id)` |
 | idx_audit_logs_user_id |  | `btree (user_id)` |
+
+## dss_flag_checks
+
+| Index | Kind | Definition |
+|---|---|---|
+| dss_flag_checks_pkey | PK | `btree (flag_id)` |
 
 ## dss_flag_notes
 
@@ -53,14 +67,6 @@
 | Index | Kind | Definition |
 |---|---|---|
 | dss_rules_pkey | PK | `btree (rule_id)` |
-
-## employment_records
-
-| Index | Kind | Definition |
-|---|---|---|
-| employment_records_pkey | PK | `btree (id)` |
-| idx_employment_records_user |  | `btree (user_id)` |
-| idx_employment_records_verified_by |  | `btree (verified_by)` |
 
 ## event_comments
 

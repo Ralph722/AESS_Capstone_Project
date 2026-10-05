@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-106 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
+110 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
 
 | Function | Arguments | Returns | Security | Settings | anon can run | authenticated can run | Language |
 |---|---|---|---|---|---|---|---|
@@ -19,14 +19,15 @@
 | claim_push_deliveries | `p_limit integer` | `TABLE(delivery_id uuid, notification_id uuid, provider text, platform text, token text, subscription jsonb, type text, priority text, title text, body text, route text, attempts integer)` | definer | `search_path=public` | false | false | plpgsql |
 | complete_push_deliveries | `p_results jsonb` | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | dss_ched_single | `p_answers jsonb, p_key text` | `text` | invoker | `search_path=public` | false | true | sql |
+| dss_crosses | `op text, v numeric, t numeric` | `boolean` | invoker | `search_path=public` | false | true | sql |
 | dss_flag_notes_stamp_author |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | dss_flags_guard_status_transition |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| dss_recheck_open_flags |  | `integer` | invoker | `search_path=public` | false | false | plpgsql |
 | dss_run_flag_action | `p_flag_id uuid, p_action text, p_user_ids uuid[], p_job_ids uuid[]` | `jsonb` | definer | `search_path=public` | false | true | plpgsql |
 | dss_update_flag_status | `p_flag_id uuid, p_status text, p_note text, p_intervention_type text, p_intervention_detail text, p_followup_value numeric, p_followup_sample_n integer, p_impact_verdict text, p_verify_due_at timestamp with time zone, p_clear_resolved_at boolean` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | edit_forum_post | `p_post_id uuid, p_body text` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | edit_forum_topic | `p_topic_id uuid, p_title text, p_body text` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | enforce_assignment_owner_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
-| enforce_employment_owner_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | enforce_message_insert |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | enforce_message_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | enqueue_notifications | `p_user_ids uuid[], p_type text, p_title text, p_body text, p_data jsonb, p_priority text, p_dedupe_key text, p_route text, p_push boolean, p_expires_at timestamp with time zone` | `integer` | definer | `search_path=public` | false | false | plpgsql |
@@ -35,6 +36,10 @@
 | forum_topics_guard_author_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | forum_topics_guard_insert |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | get_public_profiles | `p_ids uuid[]` | `TABLE(id uuid, display_name text, profile_image_base64 text, program text, year_graduated text, batch_year text, role text, email text)` | definer | `search_path=public` | false | true | sql |
+| gts_job_level | `v jsonb` | `text` | invoker | `search_path=public` | false | true | sql |
+| gts_metric | `p_metric_key text, p_survey_id uuid, p_course text, p_year text, p_previous_survey_id uuid` | `TABLE(metric_key text, hits integer, total integer, value numeric, sample_n integer, eligible_n integer, metric_version integer)` | invoker | `search_path=public` | false | true | plpgsql |
+| gts_salary_rank | `bracket text` | `integer` | invoker | `search_path=public` | false | true | sql |
+| gts_single | `v jsonb` | `text` | invoker | `search_path=public` | false | true | sql |
 | handle_new_user |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | increment_forum_topic_views | `p_topic_id uuid` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | increment_job_views | `p_job_id uuid` | `void` | definer | `search_path=public` | false | true | plpgsql |
@@ -66,7 +71,6 @@
 | notify_admins_new_event_comment |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_admins_new_registration |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_announcement_published |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
-| notify_employment_verification |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_event_changes |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_event_comment_reply |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_feedback_changes |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |

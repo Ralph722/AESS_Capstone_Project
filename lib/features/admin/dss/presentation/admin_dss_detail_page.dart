@@ -632,6 +632,22 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               color: AdminDssTheme.textMuted,
             ),
           ),
+          if (_recheckNote(flag) case final note?) ...[
+            const SizedBox(height: 8),
+            Text(
+              note,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: flag.recheckRecovered
+                    ? FontWeight.w600
+                    : FontWeight.normal,
+                color: flag.recheckRecovered
+                    ? AdminDssTheme.success
+                    : AdminDssTheme.textMuted,
+              ),
+            ),
+          ],
           if (flag.confidence == DssConfidence.low) ...[
             const SizedBox(height: 8),
             Text(
@@ -1618,6 +1634,39 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         borderSide: const BorderSide(color: AdminDssTheme.primary, width: 1.5),
       ),
     );
+  }
+
+  /// Latest nightly server re-check; only for flags still awaiting action.
+  String? _recheckNote(DssFlag flag) {
+    if (flag.status != DssFlagStatus.open &&
+        flag.status != DssFlagStatus.inProgress) {
+      return null;
+    }
+    final at = flag.recheckedAt;
+    if (flag.recheckState == null || at == null) return null;
+    // Refreshing insights rewrites the flag; an older check is stale.
+    if (flag.updatedAt.isAfter(at)) return null;
+    final when = DateFormat('MMM d, h:mm a').format(at);
+    final value = flag.recheckValue;
+    final n = flag.recheckSampleN ?? 0;
+    final answers = '$n answer${n == 1 ? '' : 's'}';
+    switch (flag.recheckState) {
+      case 'recovered':
+        final since = flag.recoveredSince;
+        final sinceText = since == null || since.isAtSameMomentAs(at)
+            ? ''
+            : ' since ${DateFormat('MMM d').format(since)}';
+        return 'Nightly re-check ($when): now '
+            '${value == null ? 'below target' : flag.metricLabelFor(value)} '
+            'from $answers, no longer past the threshold$sinceText. '
+            'Review and resolve if the improvement holds.';
+      case 'still_triggered':
+        return 'Nightly re-check ($when): still '
+            '${value == null ? 'past the threshold' : flag.metricLabelFor(value)} '
+            'from $answers.';
+      default:
+        return 'Nightly re-check ($when): no answers to measure for this group.';
+    }
   }
 
   Widget _kv(String k, String v) {

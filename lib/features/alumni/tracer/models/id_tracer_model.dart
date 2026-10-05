@@ -4,15 +4,14 @@ class EmploymentRecord {
   final String userName;
   final String userEmail;
   final String schoolId;
-  final String employmentStatus; // 'Employed' or 'Unemployed'
+  final String employmentStatus; // 'Employed', 'Unemployed' or 'Never Employed'
   final int? monthsUnemployed;
 
   // Employment details (if employed)
   final String? companyName;
   final String? position;
   final String? industry;
-  final String?
-  employmentType; // 'Full-time', 'Part-time', 'Contract', 'Freelance', 'Self-employed'
+  final String? employmentType; // CHED Q18, e.g. 'Regular or Permanent'
   final DateTime? startDate;
   final String? salaryRange;
 
@@ -29,7 +28,7 @@ class EmploymentRecord {
   final DateTime lastUpdated;
   final String? verifiedBy;
   final DateTime? verifiedAt;
-  final String verificationStatus; // 'Pending', 'Verified', 'Rejected'
+  final String verificationStatus; // 'Submitted' (self-reported GTS answer)
   final String? notes;
 
   EmploymentRecord({
@@ -59,36 +58,7 @@ class EmploymentRecord {
   }) : submittedAt = submittedAt ?? DateTime.now(),
        lastUpdated = lastUpdated ?? DateTime.now();
 
-  /// Convert to a `public.employment_records` row payload.
-  Map<String, dynamic> toSupabaseRow() {
-    return {
-      'user_id': userId,
-      'status': employmentStatus,
-      'company': companyName ?? '',
-      'position': position ?? '',
-      'start_date': startDate?.toUtc().toIso8601String().split('T').first,
-      'data': {
-        'userName': userName,
-        'userEmail': userEmail,
-        'schoolId': schoolId,
-        'monthsUnemployed': monthsUnemployed,
-        'industry': industry,
-        'employmentType': employmentType,
-        'salaryRange': salaryRange,
-        'city': city,
-        'province': province,
-        'country': country,
-        'contactNumber': contactNumber,
-        'notes': notes,
-      },
-      'verification_status': verificationStatus,
-      'verified_by': verifiedBy,
-      'verified_at': verifiedAt?.toUtc().toIso8601String(),
-      'created_at': submittedAt.toUtc().toIso8601String(),
-      'updated_at': lastUpdated.toUtc().toIso8601String(),
-    };
-  }
-
+  /// Reads a `public.gts_employment_records` row.
   factory EmploymentRecord.fromSupabaseRow(Map<String, dynamic> row) {
     final data = row['data'] as Map<String, dynamic>? ?? {};
     return EmploymentRecord(

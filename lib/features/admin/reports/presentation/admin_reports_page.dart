@@ -118,7 +118,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     'users',
     'events',
     'jobs',
-    'employment_records',
     'surveys',
     'survey_questions',
     'survey_assignments',
@@ -700,8 +699,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   /// Employment-record details only for alumni marked employed on CHED in scope.
   ///
-  /// Prevents “Not employed” status from still showing Self-employed / salary /
-  /// industry from a stale employment_records row.
+  /// Prevents “Not employed” in the scoped wave from still showing
+  /// Self-employed / salary / industry from the alumnus' latest GTS row.
   List<EmploymentRecord> _scopedEmployedDetailRecords(AdminReportsAnalytics a) {
     if (_waveEmploymentSamples.isEmpty) {
       return a.reportEmploymentRecords

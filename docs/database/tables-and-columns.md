@@ -2,17 +2,18 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Public schema: 42 tables, 464 columns.
+Public schema: 43 tables, 475 columns.
 
 | Table | Columns | Row level security |
 |---|---|---|
 | [alumni_members](#alumni_members) | 26 | enabled=true, forced=false |
 | [announcements](#announcements) | 8 | enabled=true, forced=false |
+| [archived_employment_records](#archived_employment_records) | 13 | enabled=true, forced=false |
 | [audit_logs](#audit_logs) | 8 | enabled=true, forced=false |
+| [dss_flag_checks](#dss_flag_checks) | 11 | enabled=true, forced=false |
 | [dss_flag_notes](#dss_flag_notes) | 10 | enabled=true, forced=false |
 | [dss_flags](#dss_flags) | 32 | enabled=true, forced=false |
 | [dss_rules](#dss_rules) | 15 | enabled=true, forced=false |
-| [employment_records](#employment_records) | 13 | enabled=true, forced=false |
 | [event_comments](#event_comments) | 6 | enabled=true, forced=false |
 | [event_replies](#event_replies) | 7 | enabled=true, forced=false |
 | [event_rsvps](#event_rsvps) | 6 | enabled=true, forced=false |
@@ -93,6 +94,24 @@ Public schema: 42 tables, 464 columns.
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
 
+## archived_employment_records
+
+| Column | Type | Not null | Default | Generated |
+|---|---|---|---|---|
+| id | uuid | yes | `gen_random_uuid()` |  |
+| user_id | uuid | yes |  |  |
+| status | text | yes | `''::text` |  |
+| company | text | yes | `''::text` |  |
+| position | text | yes | `''::text` |  |
+| start_date | date |  |  |  |
+| end_date | date |  |  |  |
+| data | jsonb | yes | `'{}'::jsonb` |  |
+| verification_status | text | yes | `'Pending'::text` |  |
+| verified_by | uuid |  |  |  |
+| verified_at | timestamp with time zone |  |  |  |
+| created_at | timestamp with time zone | yes | `now()` |  |
+| updated_at | timestamp with time zone | yes | `now()` |  |
+
 ## audit_logs
 
 | Column | Type | Not null | Default | Generated |
@@ -105,6 +124,22 @@ Public schema: 42 tables, 464 columns.
 | details | jsonb | yes | `'{}'::jsonb` |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
+
+## dss_flag_checks
+
+| Column | Type | Not null | Default | Generated |
+|---|---|---|---|---|
+| flag_id | uuid | yes |  |  |
+| metric_key | text | yes |  |  |
+| metric_version | integer | yes |  |  |
+| checked_at | timestamp with time zone | yes | `now()` |  |
+| metric_value | numeric |  |  |  |
+| hits | integer |  |  |  |
+| total | integer |  |  |  |
+| sample_n | integer | yes | `0` |  |
+| eligible_n | integer |  |  |  |
+| state | text | yes |  |  |
+| recovered_since | timestamp with time zone |  |  |  |
 
 ## dss_flag_notes
 
@@ -175,24 +210,6 @@ Public schema: 42 tables, 464 columns.
 | playbook | jsonb | yes | `'[]'::jsonb` |  |
 | category | text | yes | `'outcome'::text` |  |
 | sort_order | integer | yes | `100` |  |
-| created_at | timestamp with time zone | yes | `now()` |  |
-| updated_at | timestamp with time zone | yes | `now()` |  |
-
-## employment_records
-
-| Column | Type | Not null | Default | Generated |
-|---|---|---|---|---|
-| id | uuid | yes | `gen_random_uuid()` |  |
-| user_id | uuid | yes |  |  |
-| status | text | yes | `''::text` |  |
-| company | text | yes | `''::text` |  |
-| position | text | yes | `''::text` |  |
-| start_date | date |  |  |  |
-| end_date | date |  |  |  |
-| data | jsonb | yes | `'{}'::jsonb` |  |
-| verification_status | text | yes | `'Pending'::text` |  |
-| verified_by | uuid |  |  |  |
-| verified_at | timestamp with time zone |  |  |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
 

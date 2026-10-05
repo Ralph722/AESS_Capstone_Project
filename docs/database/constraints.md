@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 152 constraints in total.
+Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 155 constraints in total.
 
 
 ## alumni_members
@@ -22,12 +22,28 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | announcements_status_check | Check | `CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])))` |
 | announcements_pkey | Primary key | `PRIMARY KEY (id)` |
 
+## archived_employment_records
+
+| Constraint | Kind | Definition |
+|---|---|---|
+| employment_records_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
+| employment_records_verified_by_fkey | Foreign key | `FOREIGN KEY (verified_by) REFERENCES auth.users(id) ON DELETE SET NULL` |
+| employment_records_pkey | Primary key | `PRIMARY KEY (id)` |
+
 ## audit_logs
 
 | Constraint | Kind | Definition |
 |---|---|---|
 | audit_logs_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | audit_logs_pkey | Primary key | `PRIMARY KEY (id)` |
+
+## dss_flag_checks
+
+| Constraint | Kind | Definition |
+|---|---|---|
+| dss_flag_checks_state_check | Check | `CHECK ((state = ANY (ARRAY['still_triggered'::text, 'recovered'::text, 'no_data'::text])))` |
+| dss_flag_checks_flag_id_fkey | Foreign key | `FOREIGN KEY (flag_id) REFERENCES dss_flags(id) ON DELETE CASCADE` |
+| dss_flag_checks_pkey | Primary key | `PRIMARY KEY (flag_id)` |
 
 ## dss_flag_notes
 
@@ -60,14 +76,6 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | dss_rules_operator_check | Check | `CHECK ((operator = ANY (ARRAY['gte'::text, 'lte'::text, 'gt'::text, 'lt'::text])))` |
 | dss_rules_severity_check | Check | `CHECK ((severity = ANY (ARRAY['info'::text, 'warning'::text, 'critical'::text])))` |
 | dss_rules_pkey | Primary key | `PRIMARY KEY (rule_id)` |
-
-## employment_records
-
-| Constraint | Kind | Definition |
-|---|---|---|
-| employment_records_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
-| employment_records_verified_by_fkey | Foreign key | `FOREIGN KEY (verified_by) REFERENCES auth.users(id) ON DELETE SET NULL` |
-| employment_records_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## event_comments
 

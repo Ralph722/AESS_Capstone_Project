@@ -269,6 +269,11 @@ class DssFlag {
     this.ruleOperator,
     this.ruleMinN,
     this.ruleCategory,
+    this.recheckState,
+    this.recheckValue,
+    this.recheckSampleN,
+    this.recheckedAt,
+    this.recoveredSince,
   });
 
   final String id;
@@ -312,6 +317,16 @@ class DssFlag {
   final int? ruleMinN;
   final DssRuleCategory? ruleCategory;
 
+  /// Latest nightly server re-check (`dss_flag_checks`); null until it runs.
+  /// One of `still_triggered`, `recovered`, `no_data`.
+  final String? recheckState;
+  final double? recheckValue;
+  final int? recheckSampleN;
+  final DateTime? recheckedAt;
+  final DateTime? recoveredSince;
+
+  bool get recheckRecovered => recheckState == 'recovered';
+
   String get cohortLabel {
     switch (cohortLevel) {
       case DssCohortLevel.institution:
@@ -338,12 +353,14 @@ class DssFlag {
   bool get isTrend => ruleCategory == DssRuleCategory.trend ||
       ruleId == 'UNEMPLOYMENT_TREND_UP';
 
-  String get metricPercentLabel {
+  String get metricPercentLabel => metricLabelFor(metricValue);
+
+  String metricLabelFor(double value) {
     if (ruleId == 'SALARY_STAGNATION') {
-      return metricValue.toStringAsFixed(1);
+      return value.toStringAsFixed(1);
     }
-    if (isTrend) return formatPoints(metricValue);
-    return '${(metricValue * 100).toStringAsFixed(1)}%';
+    if (isTrend) return formatPoints(value);
+    return '${(value * 100).toStringAsFixed(1)}%';
   }
 
   factory DssFlag.fromSupabaseRow(Map<String, dynamic> row) {
@@ -371,6 +388,13 @@ class DssFlag {
         playbook = pb.map(DssPlaybookStep.fromJson).toList();
       }
     }
+
+    final checkRaw = row['dss_flag_checks'];
+    final check = checkRaw is Map
+        ? checkRaw
+        : (checkRaw is List && checkRaw.isNotEmpty && checkRaw.first is Map)
+            ? checkRaw.first as Map
+            : null;
 
     return DssFlag(
       id: (row['id'] ?? '').toString(),
@@ -411,6 +435,11 @@ class DssFlag {
       ruleOperator: ruleOperator,
       ruleMinN: ruleMinN,
       ruleCategory: ruleCategory,
+      recheckState: check?['state']?.toString(),
+      recheckValue: _asDouble(check?['metric_value']),
+      recheckSampleN: _asInt(check?['sample_n']),
+      recheckedAt: _asDate(check?['checked_at']),
+      recoveredSince: _asDate(check?['recovered_since']),
     );
   }
 }

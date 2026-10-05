@@ -13,7 +13,8 @@ class DssRepository {
   final AuditService _audit;
 
   static const _flagSelect =
-      '*, dss_rules(name, severity, playbook, recommended_action, operator, min_n, category)';
+      '*, dss_rules(name, severity, playbook, recommended_action, operator, min_n, category), '
+      'dss_flag_checks(state, metric_value, sample_n, checked_at, recovered_since)';
 
   Future<List<DssRule>> listRules() async {
     final rows = await _supabase

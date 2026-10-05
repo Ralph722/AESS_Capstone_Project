@@ -66,7 +66,7 @@ class ChedGtsExportService {
   }
 
   Future<Map<String, EmploymentRecord>> _loadEmploymentByUserId() async {
-    final rows = await _supabase.from('employment_records').select();
+    final rows = await _supabase.from('gts_employment_records').select();
     final map = <String, EmploymentRecord>{};
     for (final row in rows) {
       final record = EmploymentRecord.fromSupabaseRow(row);

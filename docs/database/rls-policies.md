@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-138 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+135 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
@@ -30,6 +30,12 @@
 | audit_logs_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | audit_logs_select_admin | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 
+## public.dss_flag_checks
+
+| Policy | Command | Roles | USING | WITH CHECK |
+|---|---|---|---|---|
+| dss_flag_checks_select_admin | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+
 ## public.dss_flag_notes
 
 | Policy | Command | Roles | USING | WITH CHECK |
@@ -47,15 +53,6 @@
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
 | dss_rules_admin_all | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
-
-## public.employment_records
-
-| Policy | Command | Roles | USING | WITH CHECK |
-|---|---|---|---|---|
-| employment_records_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
-| employment_records_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
-| employment_records_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
-| employment_records_update_admin_or_owner | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |
 
 ## public.event_comments
 
@@ -365,14 +362,13 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | announcements | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | audit_logs | anon | INSERT, REFERENCES, SELECT, TRIGGER |
 | audit_logs | authenticated | INSERT, REFERENCES, SELECT, TRIGGER |
+| dss_flag_checks | authenticated | SELECT |
 | dss_flag_notes | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | dss_flag_notes | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | dss_flags | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | dss_flags | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | dss_rules | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | dss_rules | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| employment_records | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| employment_records | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | event_comments | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | event_comments | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | event_replies | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
@@ -401,7 +397,9 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | forum_topic_tags | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | forum_topics | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | forum_topics | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| gts_employment_records | authenticated | SELECT |
 | gts_question_catalog | authenticated | SELECT |
+| gts_respondent_facts | authenticated | SELECT |
 | job_interests | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | job_interests | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | jobs | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |

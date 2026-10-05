@@ -40,7 +40,7 @@ class SurveyPrefillHelper {
 
   static bool isEmployed(EmploymentRecord record) {
     final status = record.employmentStatus.trim().toLowerCase();
-    if (status == 'unemployed' || status.contains('unemploy')) return false;
+    if (status.contains('unemploy') || status.contains('never')) return false;
     if (status == 'employed') return true;
     if (status.contains('employ') && !status.contains('unemploy')) return true;
     return false;
@@ -49,14 +49,18 @@ class SurveyPrefillHelper {
   static String? presentlyEmployed(EmploymentRecord record) {
     if (isEmployed(record)) return 'Yes';
     final status = record.employmentStatus.trim().toLowerCase();
-    if (status == 'unemployed' || status.contains('unemploy')) return 'No';
     if (status.contains('never')) return 'Never Employed';
+    if (status.contains('unemploy')) return 'No';
     return null;
   }
 
   static String? employmentStatusType(EmploymentRecord record) {
     if (!isEmployed(record)) return null;
     final type = (record.employmentType ?? '').toLowerCase();
+    if (type.contains('regular') || type.contains('permanent')) {
+      return 'Regular or Permanent';
+    }
+    if (type.contains('casual')) return 'Casual';
     if (type.contains('self')) return 'Self-employed';
     if (type.contains('contract')) return 'Contractual';
     if (type.contains('part')) return 'Casual';

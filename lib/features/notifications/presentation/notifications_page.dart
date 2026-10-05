@@ -6,6 +6,7 @@ import 'package:alumni_system/features/notifications/data/notification_service.d
 import 'package:alumni_system/features/notifications/models/notification_model.dart';
 import 'package:alumni_system/features/notifications/presentation/notification_preferences_page.dart';
 import 'package:alumni_system/features/notifications/presentation/widgets/notification_tile.dart';
+import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
@@ -98,7 +99,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  void _setFilter({_Filter? filter, NotificationType? type, bool clearType = false}) {
+  void _setFilter({
+    _Filter? filter,
+    NotificationType? type,
+    bool clearType = false,
+  }) {
     setState(() {
       if (filter != null) _filter = filter;
       if (clearType) {
@@ -170,7 +175,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       await _service.deleteNotification(n.id);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _items = [..._items]..insert(index.clamp(0, _items.length), n));
+      setState(
+        () => _items = [..._items]..insert(index.clamp(0, _items.length), n),
+      );
       _snack('Could not delete notification');
     }
   }
@@ -232,11 +239,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildFilters(),
-          Expanded(child: _buildBody()),
-        ],
+      body: PortalContentFrame(
+        child: Column(
+          children: [
+            _buildFilters(),
+            Expanded(child: _buildBody()),
+          ],
+        ),
       ),
     );
   }
@@ -267,14 +276,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
         children: [
-          chip('All', _filter == _Filter.all && _type == null,
-              () => _setFilter(filter: _Filter.all, clearType: true)),
-          chip('Unread', _filter == _Filter.unread,
-              () => _setFilter(
-                    filter: _filter == _Filter.unread
-                        ? _Filter.all
-                        : _Filter.unread,
-                  )),
+          chip(
+            'All',
+            _filter == _Filter.all && _type == null,
+            () => _setFilter(filter: _Filter.all, clearType: true),
+          ),
+          chip(
+            'Unread',
+            _filter == _Filter.unread,
+            () => _setFilter(
+              filter: _filter == _Filter.unread ? _Filter.all : _Filter.unread,
+            ),
+          ),
           for (final type in NotificationType.values)
             chip(
               notificationTypeLabel(type),
@@ -344,7 +357,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                   ),
                   onDismissed: (_) => _delete(n),
-                  child: NotificationTile(notification: n, onTap: () => _open(n)),
+                  child: NotificationTile(
+                    notification: n,
+                    onTap: () => _open(n),
+                  ),
                 ),
             ],
             if (_loadingMore)

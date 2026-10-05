@@ -44,25 +44,25 @@ abstract final class AdminJobTheme {
 }
 
 ButtonStyle jobFilledButtonStyle({Color? background}) => FilledButton.styleFrom(
-      backgroundColor: background ?? AdminJobTheme.primary,
-      foregroundColor: Colors.white,
-      minimumSize: const Size(0, AdminJobTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
-      ),
-    );
+  backgroundColor: background ?? AdminJobTheme.primary,
+  foregroundColor: Colors.white,
+  minimumSize: const Size(0, AdminJobTheme.buttonHeight),
+  padding: const EdgeInsets.symmetric(horizontal: 16),
+  elevation: 0,
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
+  ),
+);
 
 ButtonStyle jobOutlinedButtonStyle() => OutlinedButton.styleFrom(
-      foregroundColor: AdminJobTheme.textPrimary,
-      side: const BorderSide(color: AdminJobTheme.border),
-      minimumSize: const Size(0, AdminJobTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
-      ),
-    );
+  foregroundColor: AdminJobTheme.textPrimary,
+  side: const BorderSide(color: AdminJobTheme.border),
+  minimumSize: const Size(0, AdminJobTheme.buttonHeight),
+  padding: const EdgeInsets.symmetric(horizontal: 14),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
+  ),
+);
 
 /// Compact survey-style row card for Job Postings list.
 class AdminJobCard extends StatefulWidget {
@@ -97,10 +97,7 @@ class _AdminJobCardState extends State<AdminJobCard> {
     final metaParts = <String>[
       if (job.companyName.isNotEmpty) job.companyName,
       if (job.jobType.isNotEmpty) job.jobType,
-      if (job.isRemote)
-        'Remote'
-      else if (job.location.isNotEmpty)
-        job.location,
+      if (job.isRemote) 'Remote' else if (job.location.isNotEmpty) job.location,
       'Deadline ${fmt.format(job.applicationDeadline)}',
     ];
     final metaLine = metaParts.join(' · ');
@@ -187,10 +184,7 @@ class _AdminJobCardState extends State<AdminJobCard> {
                         value: 'interested',
                         child: Text('Interested (${job.interestedCount})'),
                       ),
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit'),
-                      ),
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
                       PopupMenuItem(
                         value: 'archive',
                         child: Text(
@@ -448,10 +442,7 @@ class _JobInsightsDialogBody extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           for (final e in byStatus.entries)
-                            _countChip(
-                              label: e.key,
-                              count: e.value,
-                            ),
+                            _countChip(label: e.key, count: e.value),
                         ],
                       ),
                     ),
@@ -673,10 +664,7 @@ class _JobInsightsDialogBody extends StatelessWidget {
   Widget _emptyHint(String text) {
     return Text(
       text,
-      style: const TextStyle(
-        fontSize: 12.5,
-        color: AdminJobTheme.textMuted,
-      ),
+      style: const TextStyle(fontSize: 12.5, color: AdminJobTheme.textMuted),
     );
   }
 }
@@ -686,16 +674,9 @@ Future<void> showAdminJobDetailsDrawer({
   required JobPosting job,
   required VoidCallback onOpenInterested,
 }) {
-  final child = _JobDetailsPanel(
-    job: job,
-    onOpenInterested: onOpenInterested,
-  );
+  final child = _JobDetailsPanel(job: job, onOpenInterested: onOpenInterested);
   if (adminIsWideSurface(context)) {
-    return showAdminSidePanel<void>(
-      context: context,
-      width: 480,
-      child: child,
-    );
+    return showAdminSidePanel<void>(context: context, width: 480, child: child);
   }
   return showAdminDialogSurface<void>(
     context: context,
@@ -708,10 +689,7 @@ Future<void> showAdminJobDetailsDrawer({
 }
 
 class _JobDetailsPanel extends StatelessWidget {
-  const _JobDetailsPanel({
-    required this.job,
-    required this.onOpenInterested,
-  });
+  const _JobDetailsPanel({required this.job, required this.onOpenInterested});
 
   final JobPosting job;
   final VoidCallback onOpenInterested;
@@ -785,6 +763,20 @@ class _JobDetailsPanel extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
               children: [
+                if (job.hasCoverImage) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: AppImage.widget(
+                        job.coverImage,
+                        fit: BoxFit.cover,
+                        semanticLabel: 'Cover photo for ${job.jobTitle}',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -1021,9 +1013,7 @@ class _JobDetailsPanel extends StatelessWidget {
                 onOpenInterested();
               },
               icon: const Icon(Icons.star_outline, size: 18),
-              label: Text(
-                'Interested alumni (${job.interestedCount})',
-              ),
+              label: Text('Interested alumni (${job.interestedCount})'),
               style: jobFilledButtonStyle(),
             ),
           ),
@@ -1199,11 +1189,7 @@ Future<void> showAdminInterestedDrawer({
     onOpenMessages: onOpenMessages,
   );
   if (adminIsWideSurface(context)) {
-    return showAdminSidePanel<void>(
-      context: context,
-      width: 500,
-      child: child,
-    );
+    return showAdminSidePanel<void>(context: context, width: 500, child: child);
   }
   return showAdminDialogSurface<void>(
     context: context,
@@ -1406,17 +1392,10 @@ class _InterestedPanelState extends State<_InterestedPanel> {
                     label: 'Sort',
                     value: _sort,
                     items: const [
-                      DropdownMenuItem(
-                        value: 'newest',
-                        child: Text('Newest'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'az',
-                        child: Text('Name A–Z'),
-                      ),
+                      DropdownMenuItem(value: 'newest', child: Text('Newest')),
+                      DropdownMenuItem(value: 'az', child: Text('Name A–Z')),
                     ],
-                    onChanged: (v) =>
-                        setState(() => _sort = v ?? 'newest'),
+                    onChanged: (v) => setState(() => _sort = v ?? 'newest'),
                   ),
                 ),
               ],
@@ -1432,9 +1411,7 @@ class _InterestedPanelState extends State<_InterestedPanel> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            total == 0
-                                ? Icons.star_border
-                                : Icons.search_off,
+                            total == 0 ? Icons.star_border : Icons.search_off,
                             size: 40,
                             color: AdminJobTheme.textMuted,
                           ),
@@ -1535,8 +1512,7 @@ class _InterestedAlumniCardState extends State<_InterestedAlumniCard> {
       if (a.course.isNotEmpty) a.course,
       if (a.batch.isNotEmpty) a.batch,
     ].join(' · ');
-    final interestedLabel =
-        DateFormat.yMMMd().add_jm().format(a.interestedAt);
+    final interestedLabel = DateFormat.yMMMd().add_jm().format(a.interestedAt);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1551,8 +1527,7 @@ class _InterestedAlumniCardState extends State<_InterestedAlumniCard> {
             CircleAvatar(
               radius: 20,
               backgroundImage: provider,
-              backgroundColor:
-                  AdminJobTheme.primary.withValues(alpha: 0.08),
+              backgroundColor: AdminJobTheme.primary.withValues(alpha: 0.08),
               child: provider == null
                   ? Text(
                       a.name.isNotEmpty ? a.name[0].toUpperCase() : 'A',
@@ -1700,8 +1675,8 @@ Future<void> exportInterestedAlumniCsv({
     mimeType: 'text/csv',
   );
   if (ok && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('CSV downloaded')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('CSV downloaded')));
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
+import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
@@ -12,6 +14,10 @@ String chedSectionLabel(ChedGtsSection section) => switch (section) {
   ChedGtsSection.c => 'Training & advanced studies',
   ChedGtsSection.d => 'Employment data',
 };
+
+/// Keeps the wizard in a [PortalBreakpoints.chatMax] reading column.
+double chedWizardSideInset(double width) =>
+    PortalBreakpoints.centeredInset(width, maxWidth: PortalBreakpoints.chatMax);
 
 /// Full-screen, distraction-free section wizard: A → B → C → D → Review.
 ///
@@ -159,75 +165,65 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Some answers are missing'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                items.length == 1
-                    ? 'Please answer this required question before continuing:'
-                    : 'Please answer these ${items.length} required questions '
-                          'before continuing:',
-                style: PortalTheme.bodySecondary,
-              ),
-              const SizedBox(height: 14),
-              for (final item in items.take(maxListed))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: PortalTheme.danger.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          'Q${item.chedNumber}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: PortalTheme.danger,
-                          ),
-                        ),
+      builder: (ctx) => PortalActionDialog(
+        title: 'Some answers are missing',
+        message: items.length == 1
+            ? 'Please answer this required question before continuing.'
+            : 'Please answer these ${items.length} required questions before '
+                  'continuing.',
+        body: Container(
+          decoration: BoxDecoration(
+            color: PortalTheme.surfaceMuted,
+            borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+            border: Border.all(color: PortalTheme.border),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, item) in items.take(maxListed).indexed) ...[
+                  if (i > 0)
+                    const Divider(height: 1, color: PortalTheme.border),
+                  _MissingRow(item: item),
+                ],
+                if (extra > 0) ...[
+                  const Divider(height: 1, color: PortalTheme.border),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    child: Text(
+                      extra == 1
+                          ? '+ 1 more question'
+                          : '+ $extra more questions',
+                      style: PortalTheme.meta.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: PortalTheme.textSecondary,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item.prompt,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: PortalTheme.body.copyWith(fontSize: 13.5),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              if (extra > 0)
-                Text(
-                  '+ $extra more',
-                  style: PortalTheme.meta.copyWith(fontWeight: FontWeight.w700),
-                ),
-            ],
+                ],
+              ],
+            ),
           ),
         ),
         actions: [
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: PortalTheme.primaryButton(),
+            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+            label: const Text('Show missing questions'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            style: PortalTheme.ghostButton(dense: true),
+            style: PortalTheme.ghostButton().copyWith(
+              foregroundColor: const WidgetStatePropertyAll(
+                PortalTheme.textSecondary,
+              ),
+            ),
             child: const Text('Close'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: PortalTheme.primaryButton(dense: true),
-            child: const Text('Show missing questions'),
           ),
         ],
       ),
@@ -265,10 +261,7 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
       child: Scaffold(
         backgroundColor: PortalTheme.pageBg,
         appBar: _WizardTopBar(
-          title: section == null
-              ? 'Review & submit'
-              : chedSectionLabel(section),
-          subtitle:
+          progressLabel:
               'Step ${_step + 1} of $_totalSteps · '
               '$_overallRequiredPercent% complete',
           step: _step,
@@ -276,55 +269,165 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
           saving: widget.saving,
           onClose: widget.onClose,
         ),
-        body: ListView(
-          controller: _scroll,
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            24 + MediaQuery.paddingOf(context).bottom,
-          ),
-          children: [
-            if (_focusIds != null && section != null) ...[
-              _FocusBanner(
-                remaining: _focusIds!
-                    .intersection(
-                      ChedGtsVisibility.missingRequiredInSection(
-                        widget.answers,
-                        section,
-                      ).toSet(),
-                    )
-                    .length,
-                onShowAll: () => setState(() => _focusIds = null),
+        body: LayoutBuilder(
+          builder: (context, constraints) => ListView(
+            controller: _scroll,
+            padding: EdgeInsets.fromLTRB(
+              chedWizardSideInset(constraints.maxWidth),
+              16,
+              chedWizardSideInset(constraints.maxWidth),
+              24 + MediaQuery.paddingOf(context).bottom,
+            ),
+            children: [
+              _SectionTitleCard(
+                eyebrow: section == null
+                    ? 'Final step'
+                    : 'Section ${section.name.toUpperCase()}',
+                title: section == null
+                    ? 'Review & submit'
+                    : chedSectionLabel(section),
               ),
               const SizedBox(height: 14),
-            ],
-            if (section == null)
-              _ReviewStep(
-                answers: widget.answers,
-                onJumpToSection: (s) => _setStep(_sections.indexOf(s)),
-              )
-            else
-              ChedGtsForm(
-                key: ValueKey('ched-section-$_step'),
-                answers: widget.answers,
-                onChanged: _onAnswersChanged,
-                showIntro: false,
-                sectionFilter: section,
-                showSectionHeaders: false,
-                onlyItemIds: _focusIds,
-                highlightMissing: _highlight,
-                helpSurveyId: widget.helpSurveyId,
+              if (_focusIds != null && section != null) ...[
+                _FocusBanner(
+                  remaining: _focusIds!
+                      .intersection(
+                        ChedGtsVisibility.missingRequiredInSection(
+                          widget.answers,
+                          section,
+                        ).toSet(),
+                      )
+                      .length,
+                  onShowAll: () => setState(() => _focusIds = null),
+                ),
+                const SizedBox(height: 14),
+              ],
+              if (section == null)
+                _ReviewStep(
+                  answers: widget.answers,
+                  onJumpToSection: (s) => _setStep(_sections.indexOf(s)),
+                )
+              else
+                ChedGtsForm(
+                  key: ValueKey('ched-section-$_step'),
+                  answers: widget.answers,
+                  onChanged: _onAnswersChanged,
+                  showIntro: false,
+                  sectionFilter: section,
+                  showSectionHeaders: false,
+                  onlyItemIds: _focusIds,
+                  highlightMissing: _highlight,
+                  helpSurveyId: widget.helpSurveyId,
+                ),
+              const SizedBox(height: 12),
+              _WizardActions(
+                isReview: _isReview,
+                saving: widget.saving,
+                onBack: _step == 0 ? null : _goBack,
+                onNext: _isReview ? _submit : _goNext,
               ),
-            const SizedBox(height: 12),
-            _WizardActions(
-              isReview: _isReview,
-              saving: widget.saving,
-              onBack: _step == 0 ? null : _goBack,
-              onNext: _isReview ? _submit : _goNext,
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _MissingRow extends StatelessWidget {
+  const _MissingRow({required this.item});
+
+  final ChedGtsItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            constraints: const BoxConstraints(minWidth: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: PortalTheme.danger.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'Q${item.chedNumber}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: PortalTheme.danger,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              item.prompt,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: PortalTheme.body.copyWith(fontSize: 13.5, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// First card of each step: section label and title (scrolls with the page).
+class _SectionTitleCard extends StatelessWidget {
+  const _SectionTitleCard({required this.eyebrow, required this.title});
+
+  final String eyebrow;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: PortalTheme.card,
+        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+        boxShadow: PortalTheme.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(height: 5, color: PortalTheme.navy),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PortalTheme.space4,
+              PortalTheme.space3,
+              PortalTheme.space4,
+              PortalTheme.space4,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  eyebrow.toUpperCase(),
+                  style: PortalTheme.meta.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: PortalTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: PortalTheme.sectionTitle.copyWith(
+                    color: PortalTheme.navy,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -332,22 +435,20 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
 
 class _WizardTopBar extends StatelessWidget implements PreferredSizeWidget {
   const _WizardTopBar({
-    required this.title,
-    required this.subtitle,
+    required this.progressLabel,
     required this.step,
     required this.totalSteps,
     required this.saving,
     required this.onClose,
   });
 
-  final String title;
-  final String subtitle;
+  final String progressLabel;
   final int step;
   final int totalSteps;
   final bool saving;
   final VoidCallback onClose;
 
-  static const double _height = 84;
+  static const double _height = 68;
 
   @override
   Size get preferredSize => const Size.fromHeight(_height);
@@ -369,25 +470,18 @@ class _WizardTopBar extends StatelessWidget implements PreferredSizeWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 56),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: PortalTheme.pageTitle,
+                      child: Center(
+                        child: Text(
+                          progressLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: PortalTheme.body.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: PortalTheme.textPrimary,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: PortalTheme.meta,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                     Positioned.fill(
@@ -405,26 +499,33 @@ class _WizardTopBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Row(
-                  children: List.generate(totalSteps, (i) {
-                    return Expanded(
-                      child: AnimatedContainer(
-                        duration: PortalTheme.normal,
-                        margin: EdgeInsets.only(
-                          right: i == totalSteps - 1 ? 0 : 4,
+              LayoutBuilder(
+                builder: (context, constraints) => Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    chedWizardSideInset(constraints.maxWidth),
+                    4,
+                    chedWizardSideInset(constraints.maxWidth),
+                    12,
+                  ),
+                  child: Row(
+                    children: List.generate(totalSteps, (i) {
+                      return Expanded(
+                        child: AnimatedContainer(
+                          duration: PortalTheme.normal,
+                          margin: EdgeInsets.only(
+                            right: i == totalSteps - 1 ? 0 : 4,
+                          ),
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: i <= step
+                                ? PortalTheme.gold
+                                : PortalTheme.border,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
                         ),
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: i <= step
-                              ? PortalTheme.gold
-                              : PortalTheme.border,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    );
-                  }),
+                      );
+                    }),
+                  ),
                 ),
               ),
             ],

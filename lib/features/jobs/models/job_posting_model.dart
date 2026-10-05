@@ -2,6 +2,9 @@ class JobPosting {
   final String id;
   final String companyName;
   final String companyLogo;
+
+  /// Optional wide cover photo (URL); empty when none.
+  final String coverImage;
   final String jobTitle;
   final String jobType;
   final String location;
@@ -23,6 +26,7 @@ class JobPosting {
   final String category;
   final List<String> targetPrograms;
   final String applicationUrl;
+
   /// Populated client-side after interest/favorite count fetches.
   final int interestedCount;
   final int favoriteCount;
@@ -49,6 +53,7 @@ class JobPosting {
     required this.isRemote,
     required this.experienceLevel,
     required this.status,
+    this.coverImage = '',
     this.category = 'Others',
     this.targetPrograms = const [],
     this.applicationUrl = '',
@@ -71,9 +76,12 @@ class JobPosting {
   bool get isActiveForAlumni =>
       status.toLowerCase() == 'active' && !isExpiredByDeadline;
 
+  bool get hasCoverImage => coverImage.trim().isNotEmpty;
+
   JobPosting copyWith({
     String? companyName,
     String? companyLogo,
+    String? coverImage,
     String? jobTitle,
     String? jobType,
     String? location,
@@ -100,6 +108,7 @@ class JobPosting {
       id: id,
       companyName: companyName ?? this.companyName,
       companyLogo: companyLogo ?? this.companyLogo,
+      coverImage: coverImage ?? this.coverImage,
       jobTitle: jobTitle ?? this.jobTitle,
       jobType: jobType ?? this.jobType,
       location: location ?? this.location,
@@ -139,6 +148,7 @@ class JobPosting {
         'id': id,
         'companyName': companyName,
         'companyLogo': companyLogo,
+        'coverImage': coverImage,
         'jobTitle': jobTitle,
         'jobType': jobType,
         'location': location,
@@ -187,13 +197,15 @@ class JobPosting {
       companyName:
           (data['companyName'] as String?) ?? (row['company'] as String? ?? ''),
       companyLogo: data['companyLogo'] as String? ?? '',
+      coverImage: data['coverImage'] as String? ?? '',
       jobTitle:
           (data['jobTitle'] as String?) ?? (row['title'] as String? ?? ''),
       jobType: data['jobType'] as String? ?? '',
       location:
           (data['location'] as String?) ?? (row['location'] as String? ?? ''),
       salaryRange: data['salaryRange'] as String? ?? '',
-      description: (data['description'] as String?) ??
+      description:
+          (data['description'] as String?) ??
           (row['description'] as String? ?? ''),
       requirements: List<String>.from(data['requirements'] ?? const []),
       benefits: List<String>.from(data['benefits'] ?? const []),

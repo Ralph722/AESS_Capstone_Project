@@ -290,7 +290,9 @@ class _TracerScreenState extends State<TracerScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: _loading ? const PortalCardListSkeleton() : _activeTab(),
+      body: PortalContentFrame(
+        child: _loading ? const PortalCardListSkeleton() : _activeTab(),
+      ),
     );
   }
 
@@ -299,7 +301,10 @@ class _TracerScreenState extends State<TracerScreen> {
     final scheduled = _scheduledChedAssignment;
     final others = _otherActiveAssignments;
     final width = PortalBreakpoints.widthOf(context);
-    final padding = PortalBreakpoints.pagePadding(width);
+    // Same 16 px side inset as Home so card edges line up across tabs.
+    final padding = PortalBreakpoints.pagePadding(
+      width,
+    ).copyWith(left: 16, right: 16);
 
     return RefreshIndicator(
       onRefresh: _load,

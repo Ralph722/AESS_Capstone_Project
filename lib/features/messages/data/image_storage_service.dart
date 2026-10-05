@@ -9,7 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// stored in Postgres, files live in the public `images` bucket.
 class ImageStorageService {
   ImageStorageService({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+    : _supabase = supabase ?? Supabase.instance.client;
 
   final SupabaseClient _supabase;
 
@@ -118,7 +118,9 @@ class ImageStorageService {
       throw ArgumentError('Upload rejected: not a valid JPEG.');
     }
 
-    await _supabase.storage.from(bucket).uploadBinary(
+    await _supabase.storage
+        .from(bucket)
+        .uploadBinary(
           path,
           jpeg,
           fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
@@ -179,9 +181,9 @@ class ImageStorageService {
     required String messageId,
   }) async {
     try {
-      await _supabase.storage
-          .from(bucket)
-          .remove([messageImagePath(userId, messageId)]);
+      await _supabase.storage.from(bucket).remove([
+        messageImagePath(userId, messageId),
+      ]);
     } catch (_) {}
   }
 
@@ -224,9 +226,9 @@ class ImageStorageService {
   Future<void> deleteEventCoverImage(String eventId) async {
     try {
       final safeEventId = sanitizePathSegment(eventId, label: 'eventId');
-      await _supabase.storage
-          .from(bucket)
-          .remove(['events/$safeEventId/cover.jpg']);
+      await _supabase.storage.from(bucket).remove([
+        'events/$safeEventId/cover.jpg',
+      ]);
     } catch (_) {}
   }
 
@@ -239,6 +241,24 @@ class ImageStorageService {
     return uploadImage(bytes: bytes, path: 'jobs/$safeJobId/logo.jpg');
   }
 
+  /// Wide cover photo for a job posting (admin uploads; public read).
+  Future<String> uploadJobCoverImage({
+    required String jobId,
+    required Uint8List bytes,
+  }) {
+    final safeJobId = sanitizePathSegment(jobId, label: 'jobId');
+    return uploadImage(bytes: bytes, path: 'jobs/$safeJobId/cover.jpg');
+  }
+
+  Future<void> deleteJobCoverImage(String jobId) async {
+    try {
+      final safeJobId = sanitizePathSegment(jobId, label: 'jobId');
+      await _supabase.storage.from(bucket).remove([
+        'jobs/$safeJobId/cover.jpg',
+      ]);
+    } catch (_) {}
+  }
+
   Future<void> deleteJobCompanyLogo(String jobId) async {
     try {
       final safeJobId = sanitizePathSegment(jobId, label: 'jobId');
@@ -246,4 +266,3 @@ class ImageStorageService {
     } catch (_) {}
   }
 }
-

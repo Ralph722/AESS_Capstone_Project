@@ -239,7 +239,15 @@ class _ForumScreenState extends State<ForumScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
         // Clear the floating pill bottom nav when embedded in Community hub.
-        padding: EdgeInsets.only(bottom: widget.embeddedInHub ? 88 : 0),
+        // Tablet / web use a side rail instead, so no offset there.
+        padding: EdgeInsets.only(
+          bottom: widget.embeddedInHub &&
+                  !PortalBreakpoints.useNavigationRail(
+                    PortalBreakpoints.widthOf(context),
+                  )
+              ? 88
+              : 0,
+        ),
         child: FloatingActionButton.extended(
           onPressed: _openComposer,
           backgroundColor: ForumTheme.navy,

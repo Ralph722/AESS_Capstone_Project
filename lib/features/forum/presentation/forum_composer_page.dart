@@ -2,17 +2,21 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/data/forum_content_moderation_service.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
+import 'package:alumni_system/features/forum/widgets/forum_format_toolbar.dart';
+import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
+import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
+import 'package:alumni_system/features/forum/widgets/forum_rich_text_controller.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
-import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
-import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
+import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Opens the forum composer as a right side panel (admin announcements) or
@@ -43,6 +47,8 @@ Future<String?> showAdminForumComposer({
   );
 }
 
+enum _LeaveChoice { save, discard }
+
 class ForumComposerPage extends StatefulWidget {
   const ForumComposerPage({
     super.key,
@@ -66,7 +72,8 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   final _forumService = ForumService();
   final _moderationService = ForumContentModerationService();
   final _titleController = TextEditingController();
-  final _bodyController = TextEditingController();
+  final _bodyController = ForumRichTextController();
+  final _bodyFocus = FocusNode();
   final _formKey = GlobalKey<FormState>();
 
   late final TabController _tabs;
@@ -78,6 +85,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   bool _checkingContent = false;
   bool _dirty = false;
   bool _loadingTags = true;
+  bool _draftRestored = false;
   Timer? _draftTimer;
 
   bool get _isEditing => widget.editTopic != null;
@@ -100,14 +108,64 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     setState(() => _dirty = true);
     _draftTimer?.cancel();
     if (_isEditing) return;
-    _draftTimer = Timer(const Duration(milliseconds: 600), () {
-      _forumService.saveDraft(
-        title: _titleController.text,
-        body: _bodyController.text,
-        tagIds: _selectedTagIds.toList(),
-        asAnnouncement: _asAnnouncement,
-      );
+    _draftTimer = Timer(const Duration(milliseconds: 600), _saveDraftNow);
+  }
+
+  bool get _hasContent =>
+      _titleController.text.trim().isNotEmpty ||
+      _bodyController.text.trim().isNotEmpty;
+
+  /// New posts ask whenever there is text (it is kept as a draft); edits ask
+  /// only when something changed (edits are not drafted).
+  bool get _shouldAskOnLeave => _isEditing ? _dirty : _hasContent;
+
+  Future<void> _saveDraftNow() {
+    _draftTimer?.cancel();
+    if (!_hasContent) return _forumService.clearDraft();
+    return _forumService.saveDraft(
+      title: _titleController.text,
+      body: _bodyController.markdown,
+      tagIds: _selectedTagIds.toList(),
+      asAnnouncement: _asAnnouncement,
+    );
+  }
+
+  Future<void> _discardDraft() async {
+    final title = _titleController.text;
+    final body = _bodyController.markdown;
+    final tagIds = Set<String>.of(_selectedTagIds);
+    final asAnnouncement = _asAnnouncement;
+
+    _draftTimer?.cancel();
+    await _forumService.clearDraft();
+    if (!mounted) return;
+    _titleController.clear();
+    _bodyController.clear();
+    _draftTimer?.cancel();
+    setState(() {
+      _selectedTagIds.clear();
+      _asAnnouncement = widget.initialAsAnnouncement;
+      _draftRestored = false;
+      _dirty = false;
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Draft discarded'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            if (!mounted) return;
+            _titleController.text = title;
+            _bodyController.loadMarkdown(body);
+            setState(() {
+              _selectedTagIds.addAll(tagIds);
+              _asAnnouncement = asAnnouncement;
+            });
+            _saveDraftNow();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _bootstrap() async {
@@ -126,7 +184,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     if (_isEditing) {
       final t = widget.editTopic!;
       _titleController.text = t.title;
-      _bodyController.text = t.body;
+      _bodyController.loadMarkdown(t.body);
       _selectedTagIds.addAll(t.tags.map((e) => e.id));
       _asAnnouncement = t.isAnnouncement;
       _dirty = false;
@@ -134,7 +192,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       final draft = await _forumService.loadDraft();
       if (draft != null && mounted) {
         _titleController.text = draft['title'] as String? ?? '';
-        _bodyController.text = draft['body'] as String? ?? '';
+        _bodyController.loadMarkdown(draft['body'] as String? ?? '');
         final ids = draft['tagIds'];
         if (ids is List) {
           _selectedTagIds.addAll(ids.map((e) => e.toString()));
@@ -142,8 +200,8 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         if (_isAdmin && draft['asAnnouncement'] == true) {
           _asAnnouncement = true;
         }
-        _dirty = _titleController.text.isNotEmpty ||
-            _bodyController.text.isNotEmpty;
+        _draftRestored = _hasContent;
+        _dirty = false;
       }
     }
 
@@ -154,39 +212,93 @@ class _ForumComposerPageState extends State<ForumComposerPage>
 
   @override
   void dispose() {
+    // Keeps the last few keystrokes when the page is left without _close().
+    if (_draftTimer?.isActive ?? false) _saveDraftNow();
     _draftTimer?.cancel();
     _tabs.dispose();
     _titleController.dispose();
     _bodyController.dispose();
+    _bodyFocus.dispose();
     super.dispose();
   }
 
   Future<bool> _confirmLeave() async {
-    if (!_dirty) return true;
-    final ok = await showDialog<bool>(
+    if (!_shouldAskOnLeave) {
+      if (!_isEditing) await _saveDraftNow();
+      return true;
+    }
+    return _isEditing ? _confirmDiscardEdits() : _confirmSaveDraft();
+  }
+
+  Future<bool> _confirmDiscardEdits() async {
+    final discard = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Discard changes?'),
-        content: Text(
-          _isEditing
-              ? 'Your edits will be lost.'
-              : 'Your draft is saved on this device. Leave anyway?',
-        ),
+      builder: (ctx) => PortalActionDialog(
+        title: 'Discard changes?',
+        message:
+            'Your edits to this discussion have not been saved and '
+            'will be lost.',
         actions: [
-          TextButton(
-            style: PortalTheme.ghostButton(dense: true),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, false),
+            style: PortalTheme.primaryButton(),
             child: const Text('Keep editing'),
           ),
-          FilledButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: PortalMenu.dangerButton(dense: true),
-            child: const Text('Leave'),
+            style: PortalActionDialog.dangerOutlinedButton(),
+            child: const Text('Discard changes'),
           ),
         ],
       ),
     );
-    return ok == true;
+    return discard == true;
+  }
+
+  Future<bool> _confirmSaveDraft() async {
+    final choice = await showDialog<_LeaveChoice>(
+      context: context,
+      builder: (ctx) => PortalActionDialog(
+        title: 'Save as draft?',
+        message:
+            'Your title and message will be kept on this device so you '
+            'can finish this post later.',
+        actions: [
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, _LeaveChoice.save),
+            style: PortalTheme.primaryButton(),
+            icon: const Icon(Icons.save_outlined, size: 18),
+            label: const Text('Save draft'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, _LeaveChoice.discard),
+            style: PortalActionDialog.dangerOutlinedButton(),
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: PortalActionDialog.quietButton(),
+            child: const Text('Keep writing'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return false;
+
+    final messenger = ScaffoldMessenger.of(context);
+    if (choice == _LeaveChoice.save) {
+      await _saveDraftNow();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Draft saved. You can continue it next time.'),
+        ),
+      );
+    } else {
+      _draftTimer?.cancel();
+      await _forumService.clearDraft();
+      messenger.showSnackBar(const SnackBar(content: Text('Draft discarded')));
+    }
+    return true;
   }
 
   Future<void> _close() async {
@@ -212,37 +324,21 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     }
     if (!mounted) return;
 
-    if (moderation.isBlocked) {
-      await _showModerationDialog(
-        title: 'Content cannot be published',
-        message:
-            'This topic appears to contain inappropriate or sensitive content. '
-            'Please revise the title or description before posting.',
-        reasons: moderation.reasons,
-        allowPublishAnyway: false,
-      );
-      return;
-    }
+    final proceed = await showForumModerationResult(
+      context,
+      moderation,
+      subject: 'topic',
+    );
+    if (!proceed || !mounted) return;
 
-    if (moderation.isWarned) {
-      final proceed = await _showModerationDialog(
-        title: 'Please review before posting',
-        message:
-            'This topic may include sensitive content. You can edit it, '
-            'or publish anyway if it is appropriate for the alumni community.',
-        reasons: moderation.reasons,
-        allowPublishAnyway: true,
-      );
-      if (proceed != true || !mounted) return;
-    }
-
+    _draftTimer?.cancel();
     setState(() => _saving = true);
     try {
       if (_isEditing) {
         await _forumService.editTopic(
           topicId: widget.editTopic!.id,
           title: _titleController.text,
-          body: _bodyController.text,
+          body: _bodyController.markdown,
           tagIds: _selectedTagIds.toList(),
         );
         if (!mounted) return;
@@ -250,7 +346,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       } else {
         final id = await _forumService.createTopic(
           title: _titleController.text,
-          body: _bodyController.text,
+          body: _bodyController.markdown,
           tagIds: _selectedTagIds.toList(),
           asAnnouncement: _isAdmin && _asAnnouncement,
         );
@@ -265,136 +361,6 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  Future<bool?> _showModerationDialog({
-    required String title,
-    required String message,
-    required List<String> reasons,
-    required bool allowPublishAnyway,
-  }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: allowPublishAnyway
-                              ? PortalTheme.gold.withValues(alpha: 0.18)
-                              : PortalTheme.danger.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          allowPublishAnyway
-                              ? Icons.info_outline_rounded
-                              : Icons.shield_outlined,
-                          color: allowPublishAnyway
-                              ? PortalTheme.navy
-                              : PortalTheme.danger,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: PortalTheme.sectionTitle.copyWith(fontSize: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    message,
-                    style: PortalTheme.bodySecondary.copyWith(height: 1.4),
-                  ),
-                  if (reasons.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: PortalTheme.pageBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: PortalTheme.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Why this was flagged',
-                            style: PortalTheme.caption.copyWith(
-                              color: PortalTheme.navy,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          for (final reason in reasons)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '•  ',
-                                    style: PortalTheme.meta.copyWith(
-                                      color: PortalTheme.navy,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      reason,
-                                      style: PortalTheme.meta.copyWith(
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          style: PortalTheme.secondaryButton(dense: true),
-                          child: Text(allowPublishAnyway ? 'Edit' : 'OK'),
-                        ),
-                      ),
-                      if (allowPublishAnyway) ...[
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: PortalTheme.primaryButton(dense: true),
-                            child: const Text('Publish anyway'),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   String get _headerTitle {
@@ -427,10 +393,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           Expanded(
             child: TabBarView(
               controller: _tabs,
-              children: [
-                _writeTab(),
-                _previewTab(),
-              ],
+              children: [_writeTab(), _previewTab()],
             ),
           ),
           if (widget.asSidePanel) _panelFooter(),
@@ -443,7 +406,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     }
 
     return PopScope(
-      canPop: !_dirty,
+      canPop: !_shouldAskOnLeave,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         await _close();
@@ -592,6 +555,10 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       children: [
+        if (_draftRestored && !_isEditing) ...[
+          _draftRestoredNote(),
+          const SizedBox(height: 14),
+        ],
         if (_isAdmin && !_isEditing) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -660,38 +627,30 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           style: const TextStyle(fontSize: 12, color: ForumTheme.textMuted),
         ),
         const SizedBox(height: 12),
-        TextFormField(
+        ForumFormatToolbar(
           controller: _bodyController,
-          maxLength: ForumService.bodyMaxLength,
-          minLines: widget.asSidePanel ? 10 : 8,
-          maxLines: 18,
-          decoration: InputDecoration(
-            labelText: 'Message',
-            alignLabelWithHint: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-              borderSide: BorderSide(
-                color: ForumTheme.border.withValues(alpha: 0.9),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-              borderSide: const BorderSide(color: ForumTheme.navy, width: 1.4),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          validator: (v) {
-            final t = (v ?? '').trim();
-            if (t.isEmpty) return 'Message is required';
-            if (t.length > ForumService.bodyMaxLength) {
-              return 'Message is too long';
-            }
-            return null;
+          focusNode: _bodyFocus,
+          enabled: !_busy,
+        ),
+        const SizedBox(height: 8),
+        CallbackShortcuts(
+          bindings: {
+            for (final ctrl in [true, false]) ...{
+              SingleActivator(
+                LogicalKeyboardKey.keyB,
+                control: ctrl,
+                meta: !ctrl,
+              ): () =>
+                  _bodyController.toggle(ForumInline.bold),
+              SingleActivator(
+                LogicalKeyboardKey.keyI,
+                control: ctrl,
+                meta: !ctrl,
+              ): () =>
+                  _bodyController.toggle(ForumInline.italic),
+            },
           },
+          child: _bodyField(),
         ),
         Text(
           '$bodyLen / ${ForumService.bodyMaxLength}',
@@ -735,11 +694,84 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     );
   }
 
+  Widget _bodyField() {
+    return TextFormField(
+      controller: _bodyController,
+      focusNode: _bodyFocus,
+      maxLength: ForumService.bodyMaxLength,
+      minLines: widget.asSidePanel ? 10 : 8,
+      maxLines: 18,
+      decoration: InputDecoration(
+        labelText: 'Message',
+        alignLabelWithHint: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+          borderSide: BorderSide(
+            color: ForumTheme.border.withValues(alpha: 0.9),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+          borderSide: const BorderSide(color: ForumTheme.navy, width: 1.4),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      validator: (v) {
+        final t = (v ?? '').trim();
+        if (t.isEmpty) return 'Message is required';
+        if (t.length > ForumService.bodyMaxLength) {
+          return 'Message is too long';
+        }
+        if (_bodyController.markdown.trim().length >
+            ForumService.bodyMaxLength) {
+          return 'Message is too long (formatting counts toward the limit)';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _draftRestoredNote() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: PortalTheme.navy.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        border: Border.all(color: PortalTheme.navy.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.history_rounded, size: 18, color: PortalTheme.navy),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Draft restored from your last visit.',
+              style: PortalTheme.body.copyWith(fontSize: 13),
+            ),
+          ),
+          TextButton(
+            onPressed: _busy ? null : _discardDraft,
+            style: TextButton.styleFrom(
+              foregroundColor: PortalTheme.danger,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('Discard draft'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _previewTab() {
     final title = _titleController.text.trim();
-    final body = _bodyController.text.trim();
-    final selectedTags =
-        _tags.where((t) => _selectedTagIds.contains(t.id)).toList();
+    final body = _bodyController.markdown.trim();
+    final selectedTags = _tags
+        .where((t) => _selectedTagIds.contains(t.id))
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
@@ -800,7 +832,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
                             ),
                           )
                         else
-                          SafeLinkText(
+                          ForumFormattedText(
                             body,
                             style: const TextStyle(
                               fontSize: 14.5,

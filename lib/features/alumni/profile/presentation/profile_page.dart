@@ -121,9 +121,9 @@ class ProfileScreenState extends State<ProfileScreen>
       await _uploadProfileImage(rawBytes);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
       }
     }
   }
@@ -191,10 +191,7 @@ class ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final hPad = PortalBreakpoints.pagePadding(
-          PortalBreakpoints.widthOf(context),
-        ).horizontal /
-        2;
+    const hPad = 16.0;
 
     return Scaffold(
       backgroundColor: PortalTheme.pageBg,
@@ -203,11 +200,11 @@ class ProfileScreenState extends State<ProfileScreen>
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),
-      body: _isLoading
-          ? const ProfileSkeleton()
-          : PortalContentFrame(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 100),
+      body: PortalContentFrame(
+        child: _isLoading
+            ? const ProfileSkeleton()
+            : SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(hPad, 0, hPad, 100),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -218,7 +215,7 @@ class ProfileScreenState extends State<ProfileScreen>
                   ],
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -275,16 +272,14 @@ class ProfileScreenState extends State<ProfileScreen>
             ),
             clipBehavior: Clip.antiAlias,
             child: _isUploadingImage
-                ? const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : provider == null
-                    ? Icon(
-                        Icons.person_rounded,
-                        size: 56,
-                        color: PortalTheme.navy.withValues(alpha: 0.35),
-                      )
-                    : null,
+                ? Icon(
+                    Icons.person_rounded,
+                    size: 56,
+                    color: PortalTheme.navy.withValues(alpha: 0.35),
+                  )
+                : null,
           ),
           Container(
             width: 36,

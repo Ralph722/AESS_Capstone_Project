@@ -8,8 +8,12 @@ import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/data/forum_bookmark_service.dart';
+import 'package:alumni_system/features/forum/data/forum_content_moderation_service.dart';
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
+import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
+import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
@@ -38,6 +42,7 @@ class ForumTopicScreen extends StatefulWidget {
 
 class _ForumTopicScreenState extends State<ForumTopicScreen> {
   final _forumService = ForumService();
+  final _moderationService = ForumContentModerationService();
   final _bookmarkService = ForumBookmarkService();
   final _authService = AuthService();
   final _replyController = TextEditingController();
@@ -102,31 +107,31 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       _posts = const [];
     });
 
-    _topicSub = _forumService.watchTopic(widget.topicId).listen(
-      (topic) {
-        if (!mounted) return;
-        setState(() {
-          _topic = topic;
-          _loading = false;
-          if (topic == null) _error = null;
-        });
-        widget.onChanged?.call();
-      },
-      onError: (e) {
-        if (!mounted) return;
-        setState(() {
-          _loading = false;
-          _error = '$e';
-        });
-      },
-    );
+    _topicSub = _forumService
+        .watchTopic(widget.topicId)
+        .listen(
+          (topic) {
+            if (!mounted) return;
+            setState(() {
+              _topic = topic;
+              _loading = false;
+              if (topic == null) _error = null;
+            });
+            widget.onChanged?.call();
+          },
+          onError: (e) {
+            if (!mounted) return;
+            setState(() {
+              _loading = false;
+              _error = '$e';
+            });
+          },
+        );
 
-    _postsSub = _forumService.watchPosts(widget.topicId).listen(
-      (posts) {
-        if (!mounted) return;
-        setState(() => _posts = posts);
-      },
-    );
+    _postsSub = _forumService.watchPosts(widget.topicId).listen((posts) {
+      if (!mounted) return;
+      setState(() => _posts = posts);
+    });
   }
 
   Future<void> _loadRole() async {
@@ -225,11 +230,24 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
     setState(() => _sending = true);
     try {
+      final moderation = await _moderationService.reviewReply(
+        body: text,
+        topicTitle: topic.title,
+      );
+      if (!mounted) return;
+      final proceed = await showForumModerationResult(
+        context,
+        moderation,
+        subject: 'reply',
+      );
+      if (!proceed || !mounted) return;
       await _forumService.createPost(
         topicId: widget.topicId,
         body: text,
         quotedPostId: _quoting?.id,
-        quotedExcerpt: _quoting?.body,
+        quotedExcerpt: _quoting == null
+            ? null
+            : ForumFormattedText.plain(_quoting!.body),
         mentionedUserIds: _mentionedIdsInBody(text),
       );
       _replyController.clear();
@@ -265,7 +283,9 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              title: Text(postId == null ? 'Report discussion' : 'Report reply'),
+              title: Text(
+                postId == null ? 'Report discussion' : 'Report reply',
+              ),
               content: SizedBox(
                 width: 360,
                 child: Column(
@@ -366,9 +386,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
   Future<void> _editTopic(ForumTopic topic) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ForumComposerPage(editTopic: topic),
-      ),
+      MaterialPageRoute(builder: (_) => ForumComposerPage(editTopic: topic)),
     );
     if (mounted) await _loadAll(silent: true);
   }
@@ -406,6 +424,17 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       return;
     }
     try {
+      final moderation = await _moderationService.reviewReply(
+        body: controller.text,
+        topicTitle: _topic?.title,
+      );
+      if (!mounted) return;
+      final proceed = await showForumModerationResult(
+        context,
+        moderation,
+        subject: 'reply',
+      );
+      if (!proceed || !mounted) return;
       await _forumService.editPost(postId: post.id, body: controller.text);
       await _loadAll(silent: true);
     } catch (e) {
@@ -430,10 +459,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         children: [
           _buildEmbeddedHeader(),
           Expanded(
-            child: ColoredBox(
-              color: ForumTheme.pageBg,
-              child: body,
-            ),
+            child: ColoredBox(color: ForumTheme.pageBg, child: body),
           ),
         ],
       );
@@ -487,10 +513,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       return const FeedbackDetailSkeleton();
     }
     if (_error != null && _topic == null) {
-      return ForumErrorState(
-        message: _error!,
-        onRetry: () => _loadAll(),
-      );
+      return ForumErrorState(message: _error!, onRetry: () => _loadAll());
     }
     final topic = _topic;
     if (topic == null) {
@@ -515,14 +538,17 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     final canSolve = (isOwner || _isAdmin) && !topic.isAnnouncement;
     final canDelete = _isAdmin || isOwner;
 
-    return Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final inset = PortalBreakpoints.centeredInset(constraints.maxWidth);
+        return Column(
       children: [
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
+              inset,
               PortalTheme.space3,
-              PortalTheme.space3,
-              PortalTheme.space3,
+              inset,
               PortalTheme.space2,
             ),
             children: [
@@ -556,18 +582,20 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
             ],
           ),
         ),
-        if (!topic.isLocked) _buildReplyBar(topic),
-        if (topic.isLocked) _buildLockedBanner(topic),
+        if (!topic.isLocked) _buildReplyBar(topic, inset),
+        if (topic.isLocked) _buildLockedBanner(topic, inset),
       ],
+    );
+      },
     );
   }
 
-  Widget _buildLockedBanner(ForumTopic topic) {
+  Widget _buildLockedBanner(ForumTopic topic, double inset) {
     return PortalHighlightPanel(
       variant: PortalHighlightVariant.attention,
       margin: EdgeInsets.zero,
-      padding: const EdgeInsets.symmetric(
-        horizontal: PortalTheme.space4,
+      padding: EdgeInsets.symmetric(
+        horizontal: inset + 4,
         vertical: PortalTheme.space3,
       ),
       child: Row(
@@ -705,10 +733,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
               PopupMenuButton<String>(
                 tooltip: 'Actions',
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
-                ),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 onSelected: (value) async {
                   switch (value) {
                     case 'bookmark':
@@ -821,12 +846,13 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
             Wrap(
               spacing: 6,
               runSpacing: 4,
-              children:
-                  topic.tags.map((t) => ForumTagChip(label: t.label)).toList(),
+              children: topic.tags
+                  .map((t) => ForumTagChip(label: t.label))
+                  .toList(),
             ),
           ],
           const SizedBox(height: PortalTheme.space3),
-          SafeLinkText(
+          ForumFormattedText(
             topic.body,
             style: PortalTheme.body.copyWith(fontSize: 15, height: 1.5),
           ),
@@ -1034,13 +1060,13 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                     ),
                   ),
                   child: SafeLinkText(
-                    post.quotedExcerpt!,
+                    ForumFormattedText.plain(post.quotedExcerpt!),
                     style: PortalTheme.caption.copyWith(height: 1.35),
                   ),
                 ),
               ],
               const SizedBox(height: 10),
-              SafeLinkText(
+              ForumFormattedText(
                 post.body,
                 style: PortalTheme.body.copyWith(fontSize: 14, height: 1.45),
               ),
@@ -1052,10 +1078,8 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
-                    onPressed: () => _forumService.toggleHelpful(
-                      post.id,
-                      post.helpfulByMe,
-                    ),
+                    onPressed: () =>
+                        _forumService.toggleHelpful(post.id, post.helpfulByMe),
                     icon: Icon(
                       post.helpfulByMe
                           ? Icons.thumb_up
@@ -1102,7 +1126,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     );
   }
 
-  Widget _buildReplyBar(ForumTopic topic) {
+  Widget _buildReplyBar(ForumTopic topic, double inset) {
     return Material(
       elevation: 2,
       shadowColor: ForumTheme.navy.withValues(alpha: 0.08),
@@ -1110,10 +1134,10 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            PortalTheme.space3,
+          padding: EdgeInsets.fromLTRB(
+            inset,
             PortalTheme.space2,
-            PortalTheme.space3,
+            inset,
             PortalTheme.space2,
           ),
           child: Column(
@@ -1135,7 +1159,8 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Quoting ${_quoting!.authorName}: ${_quoting!.body}',
+                          'Quoting ${_quoting!.authorName}: '
+                          '${ForumFormattedText.plain(_quoting!.body)}',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: PortalTheme.caption,
@@ -1189,18 +1214,21 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                         filled: true,
                         fillColor: ForumTheme.surfaceMuted,
                         border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(PortalTheme.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            PortalTheme.radiusMd,
+                          ),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(PortalTheme.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            PortalTheme.radiusMd,
+                          ),
                           borderSide: BorderSide.none,
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(PortalTheme.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            PortalTheme.radiusMd,
+                          ),
                           borderSide: const BorderSide(
                             color: ForumTheme.navy,
                             width: 1.2,
@@ -1221,16 +1249,18 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _replyController,
                     builder: (context, value, _) {
-                      final canSend =
-                          !_sending && value.text.trim().isNotEmpty;
+                      final canSend = !_sending && value.text.trim().isNotEmpty;
                       return FilledButton(
                         onPressed: canSend ? () => _sendReply(topic) : null,
                         style: PortalTheme.primaryButton(dense: true).copyWith(
-                          minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+                          minimumSize: const WidgetStatePropertyAll(
+                            Size(48, 48),
+                          ),
                           shape: WidgetStatePropertyAll(
                             RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(PortalTheme.radiusMd),
+                              borderRadius: BorderRadius.circular(
+                                PortalTheme.radiusMd,
+                              ),
                             ),
                           ),
                         ),
@@ -1288,10 +1318,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       ),
     );
     if (ok == true && mounted) {
-      await _forumService.deleteTopic(
-        widget.topicId,
-        reason: reason,
-      );
+      await _forumService.deleteTopic(widget.topicId, reason: reason);
       widget.onChanged?.call();
       if (!mounted) return;
       if (widget.embedded) {

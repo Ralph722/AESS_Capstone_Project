@@ -4,6 +4,7 @@ import 'package:alumni_system/features/notifications/models/notification_model.d
 import 'package:alumni_system/features/notifications/models/notification_preferences.dart';
 import 'package:alumni_system/features/notifications/presentation/widgets/notification_tile.dart';
 import 'package:alumni_system/features/notifications/push/push_service.dart';
+import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -66,9 +67,11 @@ class _NotificationPreferencesScreenState
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(
-            content: Text('Could not update alerts for this device.'),
-          ));
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Could not update alerts for this device.'),
+            ),
+          );
       }
     }
     if (!mounted) return;
@@ -79,12 +82,14 @@ class _NotificationPreferencesScreenState
     if (enable && state == PushDeviceState.blocked) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(
-          content: Text(
-            'Notifications are blocked. Allow them in your browser or '
-            'phone settings, then try again.',
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Notifications are blocked. Allow them in your browser or '
+              'phone settings, then try again.',
+            ),
           ),
-        ));
+        );
     }
   }
 
@@ -146,8 +151,7 @@ class _NotificationPreferencesScreenState
   }
 
   String _formatMinutes(int minutes) {
-    return TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60)
-        .format(context);
+    return TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60).format(context);
   }
 
   @override
@@ -170,7 +174,10 @@ class _NotificationPreferencesScreenState
             ),
         ],
       ),
-      body: _buildBody(),
+      body: PortalContentFrame(
+        maxWidth: PortalBreakpoints.chatMax,
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -184,10 +191,7 @@ class _NotificationPreferencesScreenState
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
-        _sectionTitle(
-          'In the app',
-          'What appears in your notification list.',
-        ),
+        _sectionTitle('In the app', 'What appears in your notification list.'),
         _card([
           for (final type in NotificationType.values)
             _switchRow(
@@ -313,7 +317,8 @@ class _NotificationPreferencesScreenState
       case PushDeviceState.unsupported:
         subtitle = 'This device or browser does not support alerts.';
     }
-    final canToggle = !_deviceBusy &&
+    final canToggle =
+        !_deviceBusy &&
         (state == PushDeviceState.on ||
             state == PushDeviceState.off ||
             state == PushDeviceState.blocked);

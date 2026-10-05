@@ -49,39 +49,39 @@ class ForumStatusChip extends StatelessWidget {
   final IconData? icon;
 
   factory ForumStatusChip.pinned() => const ForumStatusChip(
-        label: 'Pinned',
-        foreground: ForumTheme.pinned,
-        background: ForumTheme.pinnedBg,
-        icon: Icons.push_pin_outlined,
-      );
+    label: 'Pinned',
+    foreground: ForumTheme.pinned,
+    background: ForumTheme.pinnedBg,
+    icon: Icons.push_pin_outlined,
+  );
 
   factory ForumStatusChip.locked() => const ForumStatusChip(
-        label: 'Locked',
-        foreground: ForumTheme.locked,
-        background: ForumTheme.lockedBg,
-        icon: Icons.lock_outline,
-      );
+    label: 'Locked',
+    foreground: ForumTheme.locked,
+    background: ForumTheme.lockedBg,
+    icon: Icons.lock_outline,
+  );
 
   factory ForumStatusChip.solved() => const ForumStatusChip(
-        label: 'Solved',
-        foreground: ForumTheme.solved,
-        background: ForumTheme.solvedBg,
-        icon: Icons.check_circle_outline,
-      );
+    label: 'Solved',
+    foreground: ForumTheme.solved,
+    background: ForumTheme.solvedBg,
+    icon: Icons.check_circle_outline,
+  );
 
   factory ForumStatusChip.announcement() => const ForumStatusChip(
-        label: 'Announcement',
-        foreground: ForumTheme.announcement,
-        background: ForumTheme.announcementBg,
-        icon: Icons.campaign_outlined,
-      );
+    label: 'Announcement',
+    foreground: ForumTheme.announcement,
+    background: ForumTheme.announcementBg,
+    icon: Icons.campaign_outlined,
+  );
 
   factory ForumStatusChip.needsResponse() => const ForumStatusChip(
-        label: 'Needs Response',
-        foreground: ForumTheme.needsResponse,
-        background: ForumTheme.needsResponseBg,
-        icon: Icons.mark_chat_unread_outlined,
-      );
+    label: 'Needs Response',
+    foreground: ForumTheme.needsResponse,
+    background: ForumTheme.needsResponseBg,
+    icon: Icons.mark_chat_unread_outlined,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -131,11 +131,7 @@ class ForumStatusChipRow extends StatelessWidget {
     if (topic.isSolved) chips.add(ForumStatusChip.solved());
     if (topic.needsResponse) chips.add(ForumStatusChip.needsResponse());
     if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: chips,
-    );
+    return Wrap(spacing: 6, runSpacing: 6, children: chips);
   }
 }
 
@@ -313,9 +309,9 @@ class ForumTopicCard extends StatelessWidget {
                     runSpacing: 6,
                     children: [
                       ..._statusChips(topic),
-                      ...topic.tags.take(4).map(
-                            (t) => ForumTagChip(label: t.label),
-                          ),
+                      ...topic.tags
+                          .take(4)
+                          .map((t) => ForumTagChip(label: t.label)),
                     ],
                   ),
                 ],
@@ -483,9 +479,7 @@ class ForumEmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: PortalTheme.cardTitle.copyWith(
-              fontSize: compact ? 16 : 18,
-            ),
+            style: PortalTheme.cardTitle.copyWith(fontSize: compact ? 16 : 18),
           ),
           const SizedBox(height: 8),
           Text(
@@ -544,16 +538,13 @@ class ForumErrorState extends StatelessWidget {
   }
 }
 
-Future<void> copyForumTopicLink(
-  BuildContext context,
-  String topicId,
-) async {
+Future<void> copyForumTopicLink(BuildContext context, String topicId) async {
   final link = ForumService.topicDeepLink(topicId);
   await Clipboard.setData(ClipboardData(text: link));
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Link copied')),
-  );
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(const SnackBar(content: Text('Link copied')));
 }
 
 Future<String?> showForumModerationReasonDialog(
@@ -587,7 +578,10 @@ Future<String?> showForumModerationReasonDialog(
                 children: [
                   const Text(
                     'Optional reason (visible to alumni when relevant)',
-                    style: TextStyle(fontSize: 13, color: ForumTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: ForumTheme.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Wrap(

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/alumni/tracer/data/tracer_reminder_service.dart';
 import 'package:alumni_system/features/alumni/tracer/presentation/tracer_reminder_sheet.dart';
+import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_wizard.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
@@ -143,24 +144,27 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
     }
     final choice = await showDialog<_LeaveChoice>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Save your progress?'),
-        content: const Text(
-          'You have unsaved answers. Save a draft so you can continue '
-          'where you left off.',
-        ),
+      builder: (ctx) => PortalActionDialog(
+        title: 'Save your progress?',
+        message:
+            'You have unsaved answers. Save a draft so you can continue '
+            'where you left off.',
         actions: [
-          TextButton(
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, _LeaveChoice.save),
+            style: PortalTheme.primaryButton(),
+            icon: const Icon(Icons.save_outlined, size: 18),
+            label: const Text('Save draft'),
+          ),
+          OutlinedButton(
             onPressed: () => Navigator.pop(ctx, _LeaveChoice.discard),
-            style: PortalTheme.ghostButton(dense: true).copyWith(
-              foregroundColor: const WidgetStatePropertyAll(PortalTheme.danger),
-            ),
+            style: PortalActionDialog.dangerOutlinedButton(),
             child: const Text('Leave without saving'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, _LeaveChoice.save),
-            style: PortalTheme.primaryButton(dense: true),
-            child: const Text('Save draft'),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: PortalActionDialog.quietButton(),
+            child: const Text('Keep answering'),
           ),
         ],
       ),

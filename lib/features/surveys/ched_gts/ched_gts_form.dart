@@ -837,7 +837,8 @@ class _DateField extends StatelessWidget {
   }
 }
 
-/// Horizontal scroll with an always-visible scrollbar (shown only on overflow).
+/// Horizontal scroll with a visible scrollbar that has arrow buttons at both
+/// ends (shown only on overflow).
 class _VisibleHorizontalScroll extends StatefulWidget {
   const _VisibleHorizontalScroll({required this.child});
 
@@ -849,7 +850,18 @@ class _VisibleHorizontalScroll extends StatefulWidget {
 }
 
 class _VisibleHorizontalScrollState extends State<_VisibleHorizontalScroll> {
+  static const _barHeight = 10.0;
+  static const _minThumb = 40.0;
+
   final _controller = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
@@ -857,32 +869,159 @@ class _VisibleHorizontalScrollState extends State<_VisibleHorizontalScroll> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return ScrollbarTheme(
-      data: ScrollbarThemeData(
-        thickness: const WidgetStatePropertyAll(6),
-        radius: const Radius.circular(999),
-        thumbColor: const WidgetStatePropertyAll(PortalTheme.navy),
-        trackColor: WidgetStatePropertyAll(
-          PortalTheme.navy.withValues(alpha: 0.06),
-        ),
-        trackBorderColor: const WidgetStatePropertyAll(Colors.transparent),
-      ),
-      child: Scrollbar(
-        controller: _controller,
-        thumbVisibility: true,
-        trackVisibility: true,
-        child: ScrollConfiguration(
-          // Avoids a second, hover-only scrollbar on desktop/web.
-          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-          child: SingleChildScrollView(
-            controller: _controller,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.only(bottom: 14),
-            child: widget.child,
+  bool get _overflows =>
+      _controller.hasClients &&
+      _controller.position.hasContentDimensions &&
+      _controller.position.maxScrollExtent > 0;
+
+  void _step(int direction) {
+    final p = _controller.position;
+    final target = (p.pixels + direction * p.viewportDimension * 0.6).clamp(
+      0.0,
+      p.maxScrollExtent,
+    );
+    _controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _arrow({required bool left, required bool enabled}) {
+    return Material(
+      color: enabled
+          ? PortalTheme.navy.withValues(alpha: 0.08)
+          : PortalTheme.surfaceMuted,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: enabled ? () => _step(left ? -1 : 1) : null,
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Icon(
+            left ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+            size: 20,
+            color: enabled ? PortalTheme.navy : PortalTheme.textMuted,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _track() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final p = _controller.position;
+        final trackWidth = constraints.maxWidth;
+        final content = p.viewportDimension + p.maxScrollExtent;
+        final thumbWidth = (trackWidth * p.viewportDimension / content).clamp(
+          _minThumb,
+          trackWidth,
+        );
+        final travel = trackWidth - thumbWidth;
+        final fraction = p.maxScrollExtent == 0
+            ? 0.0
+            : (p.pixels / p.maxScrollExtent).clamp(0.0, 1.0);
+
+        void dragBy(double dx) {
+          if (travel <= 0) return;
+          _controller.jumpTo(
+            (p.pixels + dx * p.maxScrollExtent / travel).clamp(
+              0.0,
+              p.maxScrollExtent,
+            ),
+          );
+        }
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (d) {
+            final thumbLeft = travel * fraction;
+            if (d.localPosition.dx < thumbLeft) _step(-1);
+            if (d.localPosition.dx > thumbLeft + thumbWidth) _step(1);
+          },
+          onHorizontalDragUpdate: (d) => dragBy(d.delta.dx),
+          child: SizedBox(
+            height: 28,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                Container(
+                  height: _barHeight,
+                  decoration: BoxDecoration(
+                    color: PortalTheme.navy.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Positioned(
+                  left: travel * fraction,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Container(
+                      width: thumbWidth,
+                      height: _barHeight,
+                      decoration: BoxDecoration(
+                        color: PortalTheme.navy,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+        return false;
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ScrollConfiguration(
+            // Avoids Flutter's own hover-only scrollbar on desktop/web.
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: SingleChildScrollView(
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              child: widget.child,
+            ),
+          ),
+          if (_overflows)
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final p = _controller.position;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    children: [
+                      _arrow(left: true, enabled: p.pixels > 1),
+                      const SizedBox(width: 8),
+                      Expanded(child: _track()),
+                      const SizedBox(width: 8),
+                      _arrow(
+                        left: false,
+                        enabled: p.pixels < p.maxScrollExtent - 1,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
       ),
     );
   }

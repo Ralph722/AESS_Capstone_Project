@@ -25,7 +25,9 @@ class TracerHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = PortalBreakpoints.widthOf(context);
-    final padding = PortalBreakpoints.pagePadding(width);
+    final padding = PortalBreakpoints.pagePadding(
+      width,
+    ).copyWith(left: 16, right: 16);
 
     return Scaffold(
       backgroundColor: PortalTheme.pageBg,
@@ -42,27 +44,31 @@ class TracerHistoryScreen extends StatelessWidget {
                   'Submitted CHED Graduate Tracer responses will appear here '
                   'for your records.',
             )
-          : ListView.builder(
-              padding: padding.copyWith(
-                bottom: 40 + MediaQuery.paddingOf(context).bottom,
+          : PortalContentFrame(
+              child: ListView.builder(
+                padding: padding.copyWith(
+                  bottom: 40 + MediaQuery.paddingOf(context).bottom,
+                ),
+                itemCount: history.length,
+                itemBuilder: (context, index) {
+                  final item = history[index];
+                  final submitted = item.response.submittedAt;
+                  return _HistoryResponseCard(
+                    title: item.surveyTitle,
+                    submittedLabel: submitted != null
+                        ? DateFormat.yMMMd().add_jm().format(
+                            submitted.toLocal(),
+                          )
+                        : null,
+                    onTap: () => ChedResponseScreen.open(
+                      context,
+                      surveyTitle: item.surveyTitle,
+                      answers: item.response.answers,
+                      submittedAt: submitted,
+                    ),
+                  );
+                },
               ),
-              itemCount: history.length,
-              itemBuilder: (context, index) {
-                final item = history[index];
-                final submitted = item.response.submittedAt;
-                return _HistoryResponseCard(
-                  title: item.surveyTitle,
-                  submittedLabel: submitted != null
-                      ? DateFormat.yMMMd().add_jm().format(submitted.toLocal())
-                      : null,
-                  onTap: () => ChedResponseScreen.open(
-                    context,
-                    surveyTitle: item.surveyTitle,
-                    answers: item.response.answers,
-                    submittedAt: submitted,
-                  ),
-                );
-              },
             ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Alumni portal layout breakpoints (phone → tablet → wide web).
@@ -45,6 +47,15 @@ abstract final class PortalBreakpoints {
     if (width >= expanded) return 2;
     return 1;
   }
+
+  /// Side padding that centers content in a [maxWidth] column (with
+  /// [minInset] on each side) while the scroll view itself stays full width,
+  /// so the wheel scrolls from anywhere and the scrollbar stays at the edge.
+  static double centeredInset(
+    double width, {
+    double maxWidth = contentMax,
+    double minInset = 16,
+  }) => math.max(minInset, (width - maxWidth) / 2 + minInset);
 
   static EdgeInsets pagePadding(double width) {
     if (width >= expanded) {

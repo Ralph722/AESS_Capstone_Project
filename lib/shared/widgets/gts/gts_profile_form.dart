@@ -17,8 +17,9 @@ class GtsProfileFormState {
     telephoneController = TextEditingController();
     mobileController = TextEditingController();
     provinceController = TextEditingController();
-    collegeController =
-        TextEditingController(text: GtsConstants.defaultCollegeUniversity);
+    collegeController = TextEditingController(
+      text: GtsConstants.defaultCollegeUniversity,
+    );
     yearGraduatedController = TextEditingController();
     honorsController = TextEditingController();
   }
@@ -88,8 +89,9 @@ class GtsProfileFormState {
       displayName: displayNameController.text.trim(),
       studentId: studentId,
       program: program,
-      batchYear:
-          batchYear.isNotEmpty ? batchYear : yearGraduatedController.text.trim(),
+      batchYear: batchYear.isNotEmpty
+          ? batchYear
+          : yearGraduatedController.text.trim(),
       yearGraduated: yearGraduatedController.text.trim(),
       telephoneNumber: telephoneController.text.trim(),
       mobileNumber: mobileController.text.trim(),
@@ -140,6 +142,7 @@ class GtsProfileFormFields extends StatelessWidget {
     this.showEmploymentStatus = false,
     this.showProgress = false,
     this.enabled = true,
+    this.chedStyleLabels = true,
   });
 
   final GtsProfileFormState state;
@@ -148,6 +151,13 @@ class GtsProfileFormFields extends StatelessWidget {
   final bool showEmploymentStatus;
   final bool showProgress;
   final bool enabled;
+
+  /// CHED paper-form headings ("A. General Information", "Item 12") and `*`
+  /// on required labels. Off for the Profile screen's plainer look; required
+  /// fields still validate either way.
+  final bool chedStyleLabels;
+
+  String _req(String label) => chedStyleLabels ? '$label *' : label;
 
   static const _fieldStyle = TextStyle(
     fontSize: 15,
@@ -173,23 +183,25 @@ class GtsProfileFormFields extends StatelessWidget {
         if (showProgress)
           OnboardingProfileProgress(filled: filled, total: total),
         OnboardingSectionGroup(
-          title: 'A. General Information',
+          title: chedStyleLabels
+              ? 'A. General Information'
+              : 'General information',
           icon: Icons.person_outline,
           children: [
             _text(
               controller: state.displayNameController,
-              label: '${GtsConstants.labelName} *',
+              label: _req(GtsConstants.labelName),
               icon: Icons.person_outline,
             ),
             _text(
               controller: state.addressController,
-              label: '${GtsConstants.labelPermanentAddress} *',
+              label: _req(GtsConstants.labelPermanentAddress),
               icon: Icons.home_outlined,
               maxLines: 2,
             ),
             _text(
               controller: state.emailController,
-              label: '${GtsConstants.labelEmail} *',
+              label: _req(GtsConstants.labelEmail),
               icon: Icons.email_outlined,
               readOnly: emailReadOnly,
               helperText: emailReadOnly ? 'From your account' : null,
@@ -197,18 +209,18 @@ class GtsProfileFormFields extends StatelessWidget {
             ),
             _text(
               controller: state.telephoneController,
-              label: '${GtsConstants.labelTelephone} *',
+              label: _req(GtsConstants.labelTelephone),
               icon: Icons.phone_outlined,
               keyboard: TextInputType.phone,
             ),
             _text(
               controller: state.mobileController,
-              label: '${GtsConstants.labelMobile} *',
+              label: _req(GtsConstants.labelMobile),
               icon: Icons.smartphone_outlined,
               keyboard: TextInputType.phone,
             ),
             _dropdown(
-              label: '${GtsConstants.labelCivilStatus} *',
+              label: _req(GtsConstants.labelCivilStatus),
               value: state.civilStatus,
               items: GtsConstants.civilStatuses,
               icon: Icons.favorite_outline,
@@ -218,7 +230,7 @@ class GtsProfileFormFields extends StatelessWidget {
               },
             ),
             _dropdown(
-              label: '${GtsConstants.labelSex} *',
+              label: _req(GtsConstants.labelSex),
               value: state.gender,
               items: GtsConstants.sexOptions,
               icon: Icons.wc_outlined,
@@ -228,7 +240,7 @@ class GtsProfileFormFields extends StatelessWidget {
               },
             ),
             OnboardingDateTile(
-              label: '${GtsConstants.labelBirthday} *',
+              label: _req(GtsConstants.labelBirthday),
               valueText: state.birthDate != null
                   ? DateFormat.yMMMd().format(state.birthDate!)
                   : 'Tap to choose date',
@@ -248,15 +260,16 @@ class GtsProfileFormFields extends StatelessWidget {
               },
             ),
             _dropdown(
-              label: '${GtsConstants.labelRegionOfOrigin} *',
+              label: _req(GtsConstants.labelRegionOfOrigin),
               value: state.regionOfOrigin,
               items: PhilippineLocationConstants.regions,
               icon: Icons.map_outlined,
               onChanged: (v) {
                 final region = v ?? '';
                 state.regionOfOrigin = region;
-                final allowed =
-                    PhilippineLocationConstants.provincesForRegion(region);
+                final allowed = PhilippineLocationConstants.provincesForRegion(
+                  region,
+                );
                 if (state.provinceController.text.isNotEmpty &&
                     !allowed.contains(state.provinceController.text)) {
                   state.provinceController.clear();
@@ -266,7 +279,7 @@ class GtsProfileFormFields extends StatelessWidget {
             ),
             _provinceField(context),
             _dropdown(
-              label: '${GtsConstants.labelLocationOfResidence} *',
+              label: _req(GtsConstants.labelLocationOfResidence),
               value: state.locationOfResidence,
               items: GtsConstants.locationOfResidenceOptions,
               icon: Icons.location_city_outlined,
@@ -278,11 +291,13 @@ class GtsProfileFormFields extends StatelessWidget {
           ],
         ),
         OnboardingSectionGroup(
-          title: 'B. Educational Background — Item 12',
+          title: chedStyleLabels
+              ? 'B. Educational Background — Item 12'
+              : 'Educational background',
           icon: Icons.school_outlined,
           children: [
             _dropdown(
-              label: '${GtsConstants.labelDegreeSpecialization} *',
+              label: _req(GtsConstants.labelDegreeSpecialization),
               value: state.program.isEmpty ? null : state.program,
               items: CourseConstants.courses,
               icon: Icons.menu_book_outlined,
@@ -293,14 +308,14 @@ class GtsProfileFormFields extends StatelessWidget {
             ),
             _text(
               controller: state.collegeController,
-              label: '${GtsConstants.labelCollegeUniversity} *',
+              label: _req(GtsConstants.labelCollegeUniversity),
               icon: Icons.school_outlined,
               minLines: 1,
               maxLines: 4,
             ),
             _text(
               controller: state.yearGraduatedController,
-              label: '${GtsConstants.labelYearGraduated} *',
+              label: _req(GtsConstants.labelYearGraduated),
               icon: Icons.calendar_today_outlined,
               hint: 'e.g. 2024',
               keyboard: TextInputType.number,
@@ -315,7 +330,7 @@ class GtsProfileFormFields extends StatelessWidget {
         ),
         if (showEmploymentStatus)
           OnboardingSectionGroup(
-            title: '${GtsConstants.labelEmploymentStatus} *',
+            title: _req(GtsConstants.labelEmploymentStatus),
             icon: Icons.work_outline,
             children: [
               OnboardingGtsEmploymentStatus(
@@ -370,23 +385,23 @@ class GtsProfileFormFields extends StatelessWidget {
                   },
             borderRadius: BorderRadius.circular(OnboardingSpacing.inputRadius),
             child: InputDecorator(
-              decoration: onboardingFieldDecoration(
-                label: '${GtsConstants.labelProvince} *',
-                icon: Icons.location_on_outlined,
-                hint: 'Search and select province',
-              ).copyWith(
-                errorText: field.errorText,
-                suffixIcon: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: OnboardingTheme.muted,
-                ),
-              ),
+              decoration:
+                  onboardingFieldDecoration(
+                    label: _req(GtsConstants.labelProvince),
+                    icon: Icons.location_on_outlined,
+                    hint: 'Search and select province',
+                  ).copyWith(
+                    errorText: field.errorText,
+                    suffixIcon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: OnboardingTheme.muted,
+                    ),
+                  ),
               child: Text(
                 value.isEmpty ? 'Search and select province' : value,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight:
-                      value.isEmpty ? FontWeight.w400 : FontWeight.w500,
+                  fontWeight: value.isEmpty ? FontWeight.w400 : FontWeight.w500,
                   color: value.isEmpty
                       ? OnboardingTheme.muted
                       : OnboardingTheme.navy,
@@ -441,6 +456,7 @@ class GtsProfileFormFields extends StatelessWidget {
     required List<String> items,
     required ValueChanged<String?> onChanged,
     IconData icon = Icons.list_alt_outlined,
+    bool required = true,
   }) {
     final selected = value != null && value.isNotEmpty && items.contains(value)
         ? value
@@ -470,7 +486,7 @@ class GtsProfileFormFields extends StatelessWidget {
               ),
             )
             .toList(),
-        validator: label.contains('*')
+        validator: required
             ? (v) => v == null || v.isEmpty ? 'Required' : null
             : null,
         onChanged: enabled ? onChanged : null,
@@ -535,9 +551,7 @@ class OnboardingGtsEmploymentStatus extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        selected
-                            ? Icons.check_circle
-                            : _iconFor(status),
+                        selected ? Icons.check_circle : _iconFor(status),
                         size: 18,
                         color: selected
                             ? OnboardingTheme.navy

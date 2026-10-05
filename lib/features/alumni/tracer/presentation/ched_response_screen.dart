@@ -86,11 +86,13 @@ class ChedResponseScreen extends StatelessWidget {
         body: TabBarView(
           children: [
             for (final s in ChedGtsSection.values)
-              _SectionAnswers(
-                section: s,
-                answers: answers,
-                visible: visible,
-                submittedLabel: submittedLabel,
+              PortalContentFrame(
+                child: _SectionAnswers(
+                  section: s,
+                  answers: answers,
+                  visible: visible,
+                  submittedLabel: submittedLabel,
+                ),
               ),
           ],
         ),
@@ -133,7 +135,9 @@ class _SectionAnswers extends StatelessWidget {
         .where((i) => !isSurveyAnswerEmpty(answers[i.id]))
         .length;
     final width = PortalBreakpoints.widthOf(context);
-    final padding = PortalBreakpoints.pagePadding(width);
+    final padding = PortalBreakpoints.pagePadding(
+      width,
+    ).copyWith(left: 16, right: 16);
 
     return ListView(
       padding: padding.copyWith(

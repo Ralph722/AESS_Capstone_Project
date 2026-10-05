@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:alumni_system/core/constants/gts_constants.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/features/jobs/data/favorite_job_service.dart';
@@ -12,6 +13,7 @@ import 'package:alumni_system/features/jobs/data/job_recommendation.dart';
 import 'package:alumni_system/features/jobs/data/job_service.dart';
 import 'package:alumni_system/features/jobs/models/job_category_constants.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
+import 'package:alumni_system/features/jobs/widgets/job_cover_photo.dart';
 import 'package:alumni_system/features/jobs/widgets/job_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
@@ -43,6 +45,15 @@ class JobPostingScreenState extends State<JobPostingScreen> {
   bool _loading = true;
   Object? _loadError;
   String? _alumniCourse;
+
+  /// Profile employment status is Unemployed / Never employed.
+  bool _lookingForWork = false;
+
+  /// Never employed or graduated within the last year: entry-level first.
+  bool _preferEntryLevel = false;
+
+  /// "Looking for work?" card closed for this app session.
+  static bool _lookingForWorkDismissed = false;
   bool _handledInitialJob = false;
 
   String _category = 'all';
@@ -83,6 +94,13 @@ class JobPostingScreenState extends State<JobPostingScreen> {
       if (uid != null) {
         final profile = await UserProfileService().getTracerProfile(uid);
         _alumniCourse = profile?.program;
+        final status = profile?.employmentStatus.trim() ?? '';
+        final neverEmployed = status == GtsConstants.neverEmployed;
+        _lookingForWork = neverEmployed || status == GtsConstants.unemployed;
+        final graduated = int.tryParse(profile?.yearGraduated.trim() ?? '');
+        _preferEntryLevel =
+            neverEmployed ||
+            (graduated != null && graduated >= DateTime.now().year - 1);
       }
     } catch (_) {}
     await _load();
@@ -101,6 +119,7 @@ class JobPostingScreenState extends State<JobPostingScreen> {
       final rec = JobRecommendation.pick(
         activeJobs: jobs,
         alumniCourse: _alumniCourse,
+        preferEntryLevel: _preferEntryLevel,
       );
       if (!mounted) return;
       setState(() {
@@ -121,11 +140,56 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     }
   }
 
+  Set<String> get _openJobIds =>
+      _jobs.where((j) => j.isActiveForAlumni).map((j) => j.id).toSet();
+
+  /// Saved jobs that are still open (closed/expired/archived ones stay saved
+  /// in case they reopen, but aren't counted or listed).
+  int get _savedOpenCount {
+    final open = _openJobIds;
+    return _favoriteIds.where(open.contains).length;
+  }
+
+  List<String> get _savedClosedIds {
+    if (_loading || _loadError != null) return const [];
+    final open = _openJobIds;
+    return _favoriteIds.where((id) => !open.contains(id)).toList();
+  }
+
+  bool _clearingClosed = false;
+
+  Future<void> _clearClosedSaved() async {
+    final ids = _savedClosedIds;
+    if (ids.isEmpty || _clearingClosed) return;
+    setState(() => _clearingClosed = true);
+    try {
+      for (final id in ids) {
+        await _favService.removeFromFavorites(id);
+      }
+      if (!mounted) return;
+      setState(() {
+        _favoriteIds = {..._favoriteIds}..removeAll(ids);
+        _favoriteDates = Map<String, DateTime>.from(_favoriteDates)
+          ..removeWhere((id, _) => ids.contains(id));
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not clear closed saved jobs')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _clearingClosed = false);
+    }
+  }
+
   List<JobPosting> get _filtered {
     final q = _search.text.trim().toLowerCase();
     var list = List<JobPosting>.from(_jobs);
     if (_showSavedOnly) {
-      list = list.where((j) => _favoriteIds.contains(j.id)).toList();
+      list = list
+          .where((j) => _favoriteIds.contains(j.id) && j.isActiveForAlumni)
+          .toList();
     }
     if (_showRecommendedOnly) {
       final ids = _recommended.map((j) => j.id).toSet();
@@ -238,7 +302,6 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     }
   }
 
-
   void _openInitialJobIfNeeded() {
     if (_handledInitialJob) return;
     final targetId = widget.initialJobId?.trim();
@@ -264,9 +327,9 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     match ??= await _jobService.getJobPosting(id);
     if (!mounted) return;
     if (match == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Job not found')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Job not found')));
       return;
     }
 
@@ -320,7 +383,7 @@ class JobPostingScreenState extends State<JobPostingScreen> {
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_border_rounded,
             tooltip: _showSavedOnly ? 'Show all jobs' : 'Saved jobs',
-            badgeCount: _favoriteIds.length,
+            badgeCount: _savedOpenCount,
             onPressed: () => setState(() {
               _showSavedOnly = !_showSavedOnly;
               _showRecommendedOnly = false;
@@ -341,11 +404,17 @@ class JobPostingScreenState extends State<JobPostingScreen> {
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _filterBar()),
+              if (_showSavedOnly && _savedClosedIds.isNotEmpty)
+                SliverToBoxAdapter(child: _closedSavedNote()),
               if (!_loading &&
                   !_showSavedOnly &&
                   _recommended.isNotEmpty &&
                   !_showRecommendedOnly)
-                SliverToBoxAdapter(child: _recommendedSection()),
+                SliverToBoxAdapter(
+                  child: _lookingForWork && !_lookingForWorkDismissed
+                      ? _lookingForWorkSection()
+                      : _recommendedSection(),
+                ),
               if (_loading)
                 const SliverFillRemaining(child: JobListSkeleton())
               else if (_loadError != null)
@@ -419,8 +488,9 @@ class JobPostingScreenState extends State<JobPostingScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         IconButton(
-                          onPressed:
-                              _page > 0 ? () => setState(() => _page--) : null,
+                          onPressed: _page > 0
+                              ? () => setState(() => _page--)
+                              : null,
                           icon: const Icon(Icons.chevron_left),
                         ),
                         Text('Page ${_page + 1} / $pages'),
@@ -436,6 +506,47 @@ class JobPostingScreenState extends State<JobPostingScreen> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _closedSavedNote() {
+    final count = _savedClosedIds.length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+        decoration: BoxDecoration(
+          color: JobUiTheme.surfaceMuted,
+          borderRadius: BorderRadius.circular(JobUiTheme.radiusLg),
+          border: Border.all(color: JobUiTheme.border),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: JobUiTheme.textSecondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                count == 1
+                    ? '1 saved job is no longer open'
+                    : '$count saved jobs are no longer open',
+                style: PortalTheme.meta.copyWith(
+                  color: JobUiTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _clearingClosed ? null : _clearClosedSaved,
+              style: PortalTheme.ghostButton(dense: true),
+              child: Text(_clearingClosed ? 'Clearing…' : 'Clear'),
+            ),
+          ],
         ),
       ),
     );
@@ -605,6 +716,137 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     );
   }
 
+  /// Highlighted recommendations for alumni whose profile says they are not
+  /// currently employed.
+  Widget _lookingForWorkSection() {
+    final count = _recommended.length.clamp(0, 8);
+    final matched = !JobRecommendation.usedFallback(
+      activeJobs: _jobs,
+      alumniCourse: _alumniCourse,
+    );
+    final program = _alumniCourse?.trim() ?? '';
+    final subtitle = StringBuffer(
+      matched && program.isNotEmpty
+          ? 'Here are openings for $program alumni'
+          : 'Here are the latest openings to get you started',
+    )..write(_preferEntryLevel ? ', entry-level roles first.' : '.');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 6, 10),
+        decoration: BoxDecoration(
+          gradient: PortalTheme.heroGradient,
+          borderRadius: BorderRadius.circular(JobUiTheme.radius2xl),
+          boxShadow: JobUiTheme.cardShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: JobUiTheme.gold.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.work_outline_rounded,
+                    color: JobUiTheme.gold,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Looking for work?',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle.toString(),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.82),
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Hide',
+                  visualDensity: VisualDensity.compact,
+                  color: Colors.white.withValues(alpha: 0.7),
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: () =>
+                      setState(() => _lookingForWorkDismissed = true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 86,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(right: 10),
+                itemCount: count,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, i) {
+                  final job = _recommended[i];
+                  return _RecommendedMiniCard(
+                    job: job,
+                    onTap: () => _openDetails(job),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Shown because your profile says you are not currently '
+                    'employed.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => setState(() {
+                    _showRecommendedOnly = true;
+                    _showSavedOnly = false;
+                    _page = 0;
+                  }),
+                  style: TextButton.styleFrom(
+                    foregroundColor: JobUiTheme.gold,
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child: const Text('See all'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _recommendedSection() {
     final count = _recommended.length.clamp(0, 8);
     return Padding(
@@ -647,7 +889,8 @@ class JobPostingScreenState extends State<JobPostingScreen> {
   Widget _emptyState() {
     final saved = _showSavedOnly;
     final searching = _search.text.trim().isNotEmpty;
-    final filtered = _category != 'all' ||
+    final filtered =
+        _category != 'all' ||
         _type != 'all' ||
         _remoteOnly == true ||
         _showRecommendedOnly;
@@ -655,33 +898,33 @@ class JobPostingScreenState extends State<JobPostingScreen> {
       icon: saved
           ? Icons.bookmark_border_rounded
           : searching
-              ? Icons.search_off_rounded
-              : Icons.work_off_outlined,
+          ? Icons.search_off_rounded
+          : Icons.work_off_outlined,
       title: saved
           ? 'No saved jobs yet'
           : searching
-              ? 'No jobs found'
-              : filtered
-                  ? 'No opportunities match your filters'
-                  : 'No openings right now',
+          ? 'No jobs found'
+          : filtered
+          ? 'No opportunities match your filters'
+          : 'No openings right now',
       subtitle: saved
           ? 'Bookmark jobs to find them here later.'
           : searching
-              ? 'Try a different title, company, or location.'
-              : filtered
-                  ? 'Clear filters to see more openings.'
-                  : 'New alumni job postings will appear here.',
+          ? 'Try a different title, company, or location.'
+          : filtered
+          ? 'Clear filters to see more openings.'
+          : 'New alumni job postings will appear here.',
       actionLabel: (searching || filtered) && !saved ? 'Clear filters' : null,
       onAction: (searching || filtered) && !saved
           ? () => setState(() {
-                _search.clear();
-                _category = 'all';
-                _type = 'all';
-                _remoteOnly = null;
-                _showRecommendedOnly = false;
-                _sort = 'newest';
-                _page = 0;
-              })
+              _search.clear();
+              _category = 'all';
+              _type = 'all';
+              _remoteOnly = null;
+              _showRecommendedOnly = false;
+              _sort = 'newest';
+              _page = 0;
+            })
           : null,
     );
   }
@@ -887,17 +1130,12 @@ class _AlumniJobCard extends StatelessWidget {
                 tooltip: isFavorite ? 'Remove saved' : 'Save job',
                 onPressed: onFavorite,
                 visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 icon: Icon(
                   isFavorite
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_border_rounded,
-                  color: isFavorite
-                      ? JobUiTheme.gold
-                      : JobUiTheme.textMuted,
+                  color: isFavorite ? JobUiTheme.gold : JobUiTheme.textMuted,
                   size: 24,
                 ),
               ),
@@ -937,7 +1175,7 @@ class _AlumniJobCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
-                          Icons.star_rounded,
+                          Icons.trending_up_rounded,
                           size: 15,
                           color: _levelOrange,
                         ),
@@ -977,9 +1215,7 @@ class _AlumniJobCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Saved ${DateFormat.MMMd().format(savedAt!)}',
-              style: PortalTheme.caption.copyWith(
-                color: JobUiTheme.textMuted,
-              ),
+              style: PortalTheme.caption.copyWith(color: JobUiTheme.textMuted),
             ),
           ],
         ],
@@ -1052,6 +1288,24 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
               controller: widget.scrollController,
               padding: EdgeInsets.zero,
               children: [
+                if (job.hasCoverImage)
+                  JobCoverPhoto(
+                    job: job,
+                    overlay: Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 10),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 4),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
@@ -1059,15 +1313,17 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                   ),
                   child: Column(
                     children: [
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(999),
+                      if (!job.hasCoverImage) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                         ),
-                      ),
+                      ],
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
                         child: Row(
@@ -1107,7 +1363,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                   Text(
                                     job.companyName,
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.85),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.85,
+                                      ),
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1119,14 +1377,18 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                         Icon(
                                           Icons.place_outlined,
                                           size: 14,
-                                          color: Colors.white.withValues(alpha: 0.7),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.7,
+                                          ),
                                         ),
                                         const SizedBox(width: 4),
                                         Expanded(
                                           child: Text(
                                             locationLabel,
                                             style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.7),
+                                              color: Colors.white.withValues(
+                                                alpha: 0.7,
+                                              ),
                                               fontSize: 12.5,
                                             ),
                                           ),
@@ -1151,7 +1413,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                   Text(
                                     jobPostedAgo(job.postedDate),
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.65),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.65,
+                                      ),
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1273,8 +1537,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                               child: JobOverviewCell(
                                 icon: Icons.event_outlined,
                                 label: 'Deadline',
-                                value: DateFormat.yMMMd()
-                                    .format(job.applicationDeadline),
+                                value: DateFormat.yMMMd().format(
+                                  job.applicationDeadline,
+                                ),
                               ),
                             ),
                             SizedBox(
@@ -1282,7 +1547,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                               child: JobOverviewCell(
                                 icon: Icons.schedule_rounded,
                                 label: 'Posted',
-                                value: DateFormat.yMMMd().format(job.postedDate),
+                                value: DateFormat.yMMMd().format(
+                                  job.postedDate,
+                                ),
                               ),
                             ),
                           ];
@@ -1325,7 +1592,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                         ...job.benefits.map(
                           (e) => _bulletRow(
                             e,
-                            Icons.star_rounded,
+                            Icons.redeem_rounded,
                             JobUiTheme.gold,
                           ),
                         ),
@@ -1338,8 +1605,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: JobUiTheme.card,
-                          borderRadius:
-                              BorderRadius.circular(JobUiTheme.radius2xl),
+                          borderRadius: BorderRadius.circular(
+                            JobUiTheme.radius2xl,
+                          ),
                           border: Border.all(
                             color: JobUiTheme.border.withValues(alpha: 0.75),
                           ),
@@ -1373,8 +1641,9 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                               ),
                                             );
                                             if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text('Email copied'),
                                                 ),
@@ -1470,8 +1739,8 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                     onPressed: _onInterest,
                     icon: Icon(
                       _interested
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
                       size: 18,
                     ),
                     label: Text(

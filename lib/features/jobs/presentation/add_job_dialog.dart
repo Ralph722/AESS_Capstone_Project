@@ -49,6 +49,9 @@ class _AddJobDialogState extends State<AddJobDialog> {
   DateTime _applicationDeadline = DateTime.now().add(const Duration(days: 30));
   String _companyLogoUrl = '';
   Uint8List? _pendingLogoBytes;
+  String _coverUrl = '';
+  Uint8List? _pendingCoverBytes;
+  bool _coverRemoved = false;
   final Set<String> _targetPrograms = {};
   bool _saving = false;
 
@@ -98,6 +101,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
     _applicationDeadline = job.applicationDeadline;
     _deadlineController.text = _formatDeadline();
     _companyLogoUrl = job.companyLogo;
+    _coverUrl = job.coverImage;
     _targetPrograms
       ..clear()
       ..addAll(job.targetPrograms);
@@ -139,6 +143,44 @@ class _AddJobDialogState extends State<AddJobDialog> {
       ).showSnackBar(SnackBar(content: Text('Could not pick logo: $e')));
     }
   }
+
+  Future<void> _pickCover() async {
+    try {
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2400,
+        imageQuality: 90,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      var compressed = await FlutterImageCompress.compressWithList(
+        bytes,
+        minWidth: 1280,
+        minHeight: 720,
+        quality: 75,
+        format: CompressFormat.jpeg,
+      );
+      if (compressed.length > ImageStorageService.maxUploadBytes) {
+        compressed = await FlutterImageCompress.compressWithList(
+          compressed,
+          quality: 55,
+          format: CompressFormat.jpeg,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _pendingCoverBytes = compressed;
+        _coverRemoved = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not pick cover photo: $e')));
+    }
+  }
+
+  bool get _hasCover => _pendingCoverBytes != null || _coverUrl.isNotEmpty;
 
   Future<void> _pickDeadline() async {
     final picked = await showDatePicker(
@@ -188,11 +230,22 @@ class _AddJobDialogState extends State<AddJobDialog> {
           bytes: _pendingLogoBytes!,
         );
       }
+      var coverUrl = _coverUrl;
+      if (_pendingCoverBytes != null) {
+        coverUrl = await _imageStorage.uploadJobCoverImage(
+          jobId: jobId,
+          bytes: _pendingCoverBytes!,
+        );
+      } else if (_coverRemoved) {
+        coverUrl = '';
+        await _imageStorage.deleteJobCoverImage(jobId);
+      }
 
       final posting = JobPosting(
         id: jobId,
         companyName: _companyNameController.text.trim(),
         companyLogo: logoUrl,
+        coverImage: coverUrl,
         jobTitle: _jobTitleController.text.trim(),
         jobType: _selectedJobType,
         location: _locationController.text.trim(),
@@ -369,7 +422,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
                   ),
                   AdminFormSection(
                     title: 'Company',
-                    subtitle: 'Employer identity and logo',
+                    subtitle: 'Employer identity, logo and cover photo',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -421,6 +474,46 @@ class _AddJobDialogState extends State<AddJobDialog> {
                                 ],
                               ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: AdminDensity.space3),
+                        Text(
+                          'Cover photo (optional)',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'A wide photo shown at the top of the job details. '
+                          'Alumni can view and download it.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: AdminDensity.space2),
+                        _coverPreview(),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _saving ? null : _pickCover,
+                              icon: const Icon(Icons.image_outlined, size: 18),
+                              label: Text(
+                                _hasCover
+                                    ? 'Replace cover photo'
+                                    : 'Upload cover photo',
+                              ),
+                            ),
+                            if (_hasCover)
+                              TextButton(
+                                onPressed: _saving
+                                    ? null
+                                    : () => setState(() {
+                                        _pendingCoverBytes = null;
+                                        _coverUrl = '';
+                                        _coverRemoved = true;
+                                      }),
+                                child: const Text('Remove'),
+                              ),
                           ],
                         ),
                       ],
@@ -586,6 +679,44 @@ class _AddJobDialogState extends State<AddJobDialog> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _coverPreview() {
+    Widget child;
+    if (_pendingCoverBytes != null) {
+      child = Image.memory(_pendingCoverBytes!, fit: BoxFit.cover);
+    } else if (_coverUrl.isNotEmpty) {
+      child = AppImage.widget(_coverUrl, fit: BoxFit.cover);
+    } else {
+      child = const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.panorama_outlined, color: Color(0xFF64748B), size: 28),
+            SizedBox(height: 6),
+            Text(
+              'No cover photo',
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        ),
       ),
     );
   }

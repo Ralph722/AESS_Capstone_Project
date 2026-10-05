@@ -8,6 +8,7 @@ import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/surveys/data/classic_survey_visibility.dart';
 import 'package:alumni_system/features/surveys/data/survey_answer_display.dart';
 import 'package:alumni_system/features/surveys/presentation/widgets/survey_take_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
@@ -277,254 +278,329 @@ class _UserSurveyTakeScreenState extends State<UserSurveyTakeScreen> {
         Navigator.of(context).pop();
       },
       child: Scaffold(
-      backgroundColor: PortalTheme.pageBg,
-      appBar: PortalAppBar(
-        title: _survey?.title ?? 'Survey',
-      ),
-      body: _isLoading && _questions.isEmpty
-          ? const SurveyFormSkeleton()
-          : Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.only(bottom: 24),
+        backgroundColor: PortalTheme.pageBg,
+        appBar: PortalAppBar(title: _survey?.title ?? 'Survey'),
+        body: _isLoading && _questions.isEmpty
+            ? const PortalContentFrame(
+                maxWidth: PortalBreakpoints.chatMax,
+                child: SurveyFormSkeleton(),
+              )
+            : Form(
+                key: _formKey,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Children carry their own 16 px inset.
+                    final extra =
+                        PortalBreakpoints.centeredInset(
+                          constraints.maxWidth,
+                          maxWidth: PortalBreakpoints.chatMax,
+                        ) -
+                        16;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                          child: SurveyTakeHeaderCard(
-                            title: _survey?.title ?? 'Survey',
-                            description: _survey?.description ?? '',
-                            totalQuestions: visible.length,
-                            answeredCount: answered,
-                            showProgress: !_isSubmitted,
+                        Expanded(
+                          child: ListView(
+                            padding: EdgeInsets.fromLTRB(extra, 0, extra, 24),
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  4,
+                                ),
+                                child: SurveyTakeHeaderCard(
+                                  title: _survey?.title ?? 'Survey',
+                                  description: _survey?.description ?? '',
+                                  totalQuestions: visible.length,
+                                  answeredCount: answered,
+                                  showProgress: !_isSubmitted,
+                                ),
+                              ),
+                              if (_survey?.isFromTemplate == true &&
+                                  !_isSubmitted)
+                                Container(
+                                  margin: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    0,
+                                  ),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: PortalTheme.sky.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      PortalTheme.radiusMd,
+                                    ),
+                                    border: Border.all(
+                                      color: PortalTheme.sky.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline,
+                                        size: 18,
+                                        color: PortalTheme.sky,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'Some answers may be prefilled from your '
+                                          'Alumni Tracer employment profile. Update '
+                                          'Tracer if anything changed.',
+                                          style: PortalTheme.meta.copyWith(
+                                            color: PortalTheme.navy,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (_survey != null &&
+                                  !_isSubmitted &&
+                                  !_survey!.acceptsResponses)
+                                Container(
+                                  margin: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    0,
+                                  ),
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: PortalTheme.gold.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      PortalTheme.radiusMd,
+                                    ),
+                                    border: Border.all(
+                                      color: PortalTheme.gold.withValues(
+                                        alpha: 0.45,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        _survey!.isNotYetOpen
+                                            ? Icons.lock_clock_outlined
+                                            : Icons.lock_outline,
+                                        size: 20,
+                                        color: PortalTheme.navy,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _survey!.isNotYetOpen &&
+                                                  _survey!.openAt != null
+                                              ? 'This survey opens on '
+                                                    '${DateFormat.yMMMd().add_jm().format(_survey!.openAt!)}. '
+                                                    'You can answer once the schedule begins.'
+                                              : 'This survey is closed and no longer '
+                                                    'accepts responses.',
+                                          style: PortalTheme.meta.copyWith(
+                                            color: PortalTheme.navy,
+                                            height: 1.4,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (_isSubmitted)
+                                Container(
+                                  margin: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    0,
+                                  ),
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: SurveyTakeTheme.successSoft,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: SurveyTakeTheme.success.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.verified_outlined,
+                                        size: 20,
+                                        color: SurveyTakeTheme.success,
+                                      ),
+                                      SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'You have already submitted this survey. '
+                                          'Thank you for your response!',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: SurveyTakeTheme.success,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(height: 12),
+                              for (var i = 0; i < visible.length; i++) ...[
+                                if (surveyTakeShowsSectionHeader(visible, i))
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      4,
+                                      16,
+                                      8,
+                                    ),
+                                    child: SurveySectionBanner(
+                                      label: visible[i].sectionLabel,
+                                    ),
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    0,
+                                    16,
+                                    12,
+                                  ),
+                                  child: _isSubmitted
+                                      ? _buildSubmittedAnswer(visible[i], i + 1)
+                                      : SurveyQuestionCard(
+                                          question: visible[i],
+                                          number: i + 1,
+                                          answer: _answers[visible[i].id],
+                                          textController:
+                                              _textControllers[visible[i].id],
+                                          textValidator: visible[i].required
+                                              ? (v) =>
+                                                    v == null ||
+                                                        v.trim().isEmpty
+                                                    ? 'Required'
+                                                    : null
+                                              : null,
+                                          onAnswerChanged: (v) => setState(() {
+                                            _answers[visible[i].id] = v;
+                                            if (!_isSubmitted) _dirty = true;
+                                          }),
+                                        ),
+                                ),
+                              ],
+                              if (visible.isEmpty && !_isLoading)
+                                const Padding(
+                                  padding: EdgeInsets.all(32),
+                                  child: Center(
+                                    child: Text(
+                                      'This survey has no questions yet.',
+                                      style: TextStyle(
+                                        color: SurveyTakeTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        if (_survey?.isFromTemplate == true && !_isSubmitted)
+                        if (!_isSubmitted &&
+                            (_survey?.acceptsResponses ?? false))
                           Container(
-                            margin:
-                                const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                            padding: const EdgeInsets.all(12),
+                            padding: EdgeInsets.fromLTRB(
+                              16 + extra,
+                              12,
+                              16 + extra,
+                              14,
+                            ),
                             decoration: BoxDecoration(
-                              color: PortalTheme.sky.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-                              border: Border.all(
-                                color: PortalTheme.sky.withValues(alpha: 0.3),
+                              color: PortalTheme.card,
+                              border: const Border(
+                                top: BorderSide(color: PortalTheme.border),
                               ),
+                              boxShadow: PortalTheme.softShadow,
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.info_outline,
-                                  size: 18,
-                                  color: PortalTheme.sky,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Some answers may be prefilled from your '
-                                    'Alumni Tracer employment profile. Update '
-                                    'Tracer if anything changed.',
-                                    style: PortalTheme.meta.copyWith(
-                                      color: PortalTheme.navy,
-                                      height: 1.4,
+                            child: SafeArea(
+                              top: false,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isSaving
+                                          ? null
+                                          : () => _save(submit: false),
+                                      icon: const Icon(
+                                        Icons.save_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Save draft'),
+                                      style:
+                                          PortalTheme.secondaryButton(
+                                            dense: true,
+                                          ).copyWith(
+                                            minimumSize:
+                                                WidgetStateProperty.all(
+                                                  const Size(0, 48),
+                                                ),
+                                          ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (_survey != null &&
-                            !_isSubmitted &&
-                            !_survey!.acceptsResponses)
-                          Container(
-                            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: PortalTheme.gold.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(
-                                PortalTheme.radiusMd,
-                              ),
-                              border: Border.all(
-                                color: PortalTheme.gold.withValues(alpha: 0.45),
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  _survey!.isNotYetOpen
-                                      ? Icons.lock_clock_outlined
-                                      : Icons.lock_outline,
-                                  size: 20,
-                                  color: PortalTheme.navy,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _survey!.isNotYetOpen &&
-                                            _survey!.openAt != null
-                                        ? 'This survey opens on '
-                                            '${DateFormat.yMMMd().add_jm().format(_survey!.openAt!)}. '
-                                            'You can answer once the schedule begins.'
-                                        : 'This survey is closed and no longer '
-                                            'accepts responses.',
-                                    style: PortalTheme.meta.copyWith(
-                                      color: PortalTheme.navy,
-                                      height: 1.4,
-                                      fontWeight: FontWeight.w600,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: FilledButton.icon(
+                                      onPressed: _isSaving
+                                          ? null
+                                          : _confirmAndSubmit,
+                                      icon: _isSaving
+                                          ? const SizedBox(
+                                              height: 18,
+                                              width: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.send_rounded,
+                                              size: 18,
+                                            ),
+                                      label: Text(
+                                        _isSaving ? 'Saving…' : 'Submit',
+                                      ),
+                                      style:
+                                          PortalTheme.primaryButton(
+                                            dense: true,
+                                          ).copyWith(
+                                            minimumSize:
+                                                WidgetStateProperty.all(
+                                                  const Size(0, 48),
+                                                ),
+                                          ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (_isSubmitted)
-                          Container(
-                            margin:
-                                const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: SurveyTakeTheme.successSoft,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: SurveyTakeTheme.success
-                                    .withValues(alpha: 0.35),
-                              ),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.verified_outlined,
-                                  size: 20,
-                                  color: SurveyTakeTheme.success,
-                                ),
-                                SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'You have already submitted this survey. '
-                                    'Thank you for your response!',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: SurveyTakeTheme.success,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 12),
-                        for (var i = 0; i < visible.length; i++) ...[
-                          if (surveyTakeShowsSectionHeader(visible, i))
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                              child: SurveySectionBanner(
-                                label: visible[i].sectionLabel,
-                              ),
-                            ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                            child: _isSubmitted
-                                ? _buildSubmittedAnswer(visible[i], i + 1)
-                                : SurveyQuestionCard(
-                                    question: visible[i],
-                                    number: i + 1,
-                                    answer: _answers[visible[i].id],
-                                    textController:
-                                        _textControllers[visible[i].id],
-                                    textValidator: visible[i].required
-                                        ? (v) =>
-                                            v == null || v.trim().isEmpty
-                                                ? 'Required'
-                                                : null
-                                        : null,
-                                    onAnswerChanged: (v) => setState(
-                                      () {
-                                        _answers[visible[i].id] = v;
-                                        if (!_isSubmitted) _dirty = true;
-                                      },
-                                    ),
-                                  ),
-                          ),
-                        ],
-                        if (visible.isEmpty && !_isLoading)
-                          const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(
-                              child: Text(
-                                'This survey has no questions yet.',
-                                style: TextStyle(
-                                  color: SurveyTakeTheme.textSecondary,
-                                ),
+                                ],
                               ),
                             ),
                           ),
                       ],
-                    ),
-                  ),
-                  if (!_isSubmitted && (_survey?.acceptsResponses ?? false))
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                      decoration: BoxDecoration(
-                        color: PortalTheme.card,
-                        border: const Border(
-                          top: BorderSide(color: PortalTheme.border),
-                        ),
-                        boxShadow: PortalTheme.softShadow,
-                      ),
-                      child: SafeArea(
-                        top: false,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _isSaving
-                                    ? null
-                                    : () => _save(submit: false),
-                                icon: const Icon(Icons.save_outlined, size: 18),
-                                label: const Text('Save draft'),
-                                style: PortalTheme.secondaryButton(dense: true).copyWith(
-                                  minimumSize: WidgetStateProperty.all(
-                                    const Size(0, 48),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed:
-                                    _isSaving ? null : _confirmAndSubmit,
-                                icon: _isSaving
-                                    ? const SizedBox(
-                                        height: 18,
-                                        width: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Icon(Icons.send_rounded, size: 18),
-                                label:
-                                    Text(_isSaving ? 'Saving…' : 'Submit'),
-                                style: PortalTheme.primaryButton(dense: true).copyWith(
-                                  minimumSize: WidgetStateProperty.all(
-                                    const Size(0, 48),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+                    );
+                  },
+                ),
               ),
-            ),
       ),
     );
   }

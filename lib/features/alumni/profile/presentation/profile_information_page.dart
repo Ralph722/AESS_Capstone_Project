@@ -128,10 +128,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
     final completion = TracerProfile.computeCompletion(
       _formState.completionPayload(),
     );
-    final hPad = PortalBreakpoints.pagePadding(
-          PortalBreakpoints.widthOf(context),
-        ).horizontal /
-        2;
+    const hPad = 16.0;
 
     return PopScope(
       canPop: !_dirty,
@@ -151,11 +148,11 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
               : '${completion.toStringAsFixed(0)}% complete',
           automaticallyImplyLeading: true,
         ),
-        body: _isLoading
-            ? const ProfileSkeleton()
-            : PortalContentFrame(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 40),
+        body: PortalContentFrame(
+          child: _isLoading
+              ? const ProfileSkeleton()
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(hPad, 12, hPad, 40),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -163,8 +160,9 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                         padding: const EdgeInsets.all(PortalTheme.space4),
                         decoration: BoxDecoration(
                           color: PortalTheme.card,
-                          borderRadius:
-                              BorderRadius.circular(PortalTheme.radius2xl),
+                          borderRadius: BorderRadius.circular(
+                            PortalTheme.radius2xl,
+                          ),
                           border: Border.all(
                             color: PortalTheme.border.withValues(alpha: 0.75),
                           ),
@@ -193,6 +191,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                                 state: _formState,
                                 emailReadOnly: true,
                                 showEmploymentStatus: true,
+                                chedStyleLabels: false,
                                 enabled: !_isSaving,
                                 onChanged: () {
                                   _markDirty();
@@ -221,7 +220,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                     ],
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }

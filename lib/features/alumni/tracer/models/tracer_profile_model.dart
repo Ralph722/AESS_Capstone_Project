@@ -146,7 +146,6 @@ class TracerProfile {
   factory TracerProfile.fromSupabaseRow(Map<String, dynamic> row) {
     final program = (row['program'] as String? ?? '').trim();
     final mobile = (row['mobile_number'] as String? ?? '').trim();
-    final batchYear = (row['batch_year'] as String? ?? '').trim();
     final yearGraduated = (row['year_graduated'] as String? ?? '').trim();
 
     final completionData = {
@@ -165,7 +164,7 @@ class TracerProfile {
       'locationOfResidence': row['location_of_residence'],
       'program': program,
       'collegeUniversity': row['college_university'],
-      'yearGraduated': yearGraduated.isNotEmpty ? yearGraduated : batchYear,
+      'yearGraduated': yearGraduated,
       'employmentStatus': row['employment_status'],
     };
 
@@ -182,8 +181,8 @@ class TracerProfile {
       displayName: row['display_name'] as String? ?? '',
       studentId: row['student_id'] as String? ?? '',
       program: program,
-      batchYear: batchYear,
-      yearGraduated: yearGraduated.isNotEmpty ? yearGraduated : batchYear,
+      batchYear: yearGraduated,
+      yearGraduated: yearGraduated,
       telephoneNumber: row['telephone_number'] as String? ?? '',
       mobileNumber: mobile,
       address: row['address'] as String? ?? '',
@@ -234,7 +233,6 @@ class TracerProfile {
       'display_name': displayName.trim(),
       'student_id': studentId.trim(),
       'program': program.trim(),
-      'batch_year': batchYear.trim().isNotEmpty ? batchYear.trim() : year,
       'year_graduated': year,
       'telephone_number': telephoneNumber.trim(),
       'mobile_number': mobile,

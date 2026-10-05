@@ -149,13 +149,10 @@ main.dart → Supabase.initialize() → AuthGate
 |------|-------------|
 | 1. Verify Alumni Status | Enter name, course, student ID → `AlumniEligibilityService.validate()` checks official roster |
 | 2. Account Details | Set password (6+ chars) once verified |
-| 3. Email OTP | 6-digit code sent via Gmail SMTP through Supabase Edge Function → verify |
-| 4. Create Account | `register-account` Edge Function creates Supabase Auth user → links to roster → audit log |
+| 3. Email OTP | Supabase Auth `signUp` sends a 6-digit code (Gmail SMTP) → `verifyOTP` confirms the email |
+| 4. Link Account | RPC `link_alumni_registration` re-checks the roster, links `alumni_members.auth_uid` and creates the `users` row → audit log |
 
-**Edge Function (`register-account`)**:
-- If email exists AND actively registered → 409 error
-- If email exists but unlinked → purges stale data, resets credentials, returns "recovered"
-- If new → creates Auth user with `email_confirm: true`
+The link RPC refuses unconfirmed emails, roster mismatches, deactivated roster rows, and ID numbers already linked to another account.
 
 ### Role-Based Access Control
 | Role | Onboarding | Destination |
@@ -340,7 +337,7 @@ The alumni portal (`MainNavigation`) uses 6-tab bottom navigation.
 - **Comments**: View and add comments on events
 - **Event detail**: Full event info, agenda, attendee count, status badge
 - **Search**: Filter by category, date range
-- **Reminders**: Session-based event reminders
+- **Reminders**: Local device reminders when Going, plus server day-before and day-of reminders (`run_event_reminders`, based on `events.starts_at`)
 
 **Model** (`AlumniEvent`): id, theme, batchYear, venue, status, date, startTime, endTime, description, coverImageUrl, category, capacity, agenda, commentsCount, viewsCount
 
@@ -358,9 +355,7 @@ The alumni portal (`MainNavigation`) uses 6-tab bottom navigation.
 - Submit with confirmation
 - CHED GTS form rendering with section headers and compliance fields
 
-**Employment tracer** (`id_tracer_page.dart`):
-- Demographics + Employment tabs
-- Saves to `id_tracer` table
+**Employment status**: comes only from submitted CHED GTS answers. `IdTracerService` reads the view `gts_employment_records` (latest submission per alumnus); there is no separate employment form.
 
 **Service**: `SurveyService` handles assignment loading, response saving, draft management, and submission
 
@@ -448,6 +443,9 @@ The alumni portal (`MainNavigation`) uses 6-tab bottom navigation.
 ## 6. Database Structure
 
 All tables are in Supabase PostgreSQL with Row-Level Security (RLS) enabled.
+The tables below are a summary; the generated, always-current reference is in
+[docs/database/](docs/database/) (columns, constraints, indexes, policies,
+functions, triggers).
 
 ### Core Tables
 
@@ -460,8 +458,7 @@ All tables are in Supabase PostgreSQL with Row-Level Security (RLS) enabled.
 | `email` | text | |
 | `student_id` | text | |
 | `program` / `course` | text | Academic program |
-| `batch_year` | text | Graduation batch |
-| `year_graduated` | text | |
+| `year_graduated` | text | Graduation year = batch (follows the roster) |
 | `gender`, `civil_status`, `birth_date` | text/date | |
 | `contact_number`, `phone_number` | text | |
 | `address` | text | |
@@ -482,10 +479,9 @@ All tables are in Supabase PostgreSQL with Row-Level Security (RLS) enabled.
 | `registered_email` | text | |
 | `is_registered_user` | boolean | |
 | `is_deactivated` | boolean | |
-| `batch_year` | text | |
-| `gender`, `civil_status`, `birth_date`, `year_graduated` | text/date | |
-| `current_position`, `current_company` | text | |
-| `employment_status` | text | Latest from tracer |
+| `year_graduated` | text | Graduation year = batch (source of truth) |
+| `gender`, `civil_status`, `birth_date` | text/date | |
+| `employment_status` | text | Legacy; current status comes from `gts_employment_records` |
 | `profile_image_url` | text | |
 | `last_active_at` | timestamptz | |
 | `tracer_profile_complete` | boolean | |
@@ -499,6 +495,7 @@ All tables are in Supabase PostgreSQL with Row-Level Security (RLS) enabled.
 | `batch_year`, `venue` | text |
 | `status` | text |
 | `date`, `start_time`, `end_time` | timestamptz/text |
+| `starts_at`, `ends_at` | timestamptz (set by trigger from date + time text, Manila time; an end before the start means past midnight) |
 | `description`, `cover_image_url`, `category` | text |
 | `capacity` | int |
 | `registration_deadline` | timestamptz |
@@ -597,17 +594,17 @@ All tables are in Supabase PostgreSQL with Row-Level Security (RLS) enabled.
 | `device_category`, `platform_family`, `browser_family` | text |
 | `created_at` | timestamptz |
 
-#### `public.employment_records` — Graduate tracer data
+#### `public.gts_employment_records` — Employment view (read-only)
+Latest submitted CHED GTS response per alumnus.
 | Column | Type |
 |--------|------|
-| `id` | uuid |
-| `user_id` | uuid FK |
-| `status`, `company`, `position` | text |
-| `start_date` | date |
-| `data` | jsonb (userName, industry, employmentType, salaryRange, city, province, country, contactNumber) |
-| `verification_status` | text |
-| `verified_by`, `verified_at` | uuid/timestamptz |
-| `created_at`, `updated_at` | timestamptz |
+| `user_id` | uuid |
+| `status` | text (Employed / Unemployed / Never Employed) |
+| `position` | text (CHED item 19) |
+| `data` | jsonb (source, surveyId, userName, userEmail, schoolId, contactNumber, industry, employmentType, jobLevel, salaryRange, placeOfWork, country) |
+| `verification_status` | text (always `Submitted`) |
+
+`gts_respondent_facts` (one typed row per submitted CHED response) and `gts_metric(...)` back the DSS metrics.
 
 #### `public.forum_topics`
 | Column | Type |
@@ -669,16 +666,21 @@ All tables are in Supabase PostgreSQL with Row-Level Security (RLS) enabled.
 | `data` | jsonb (priority, targetPrograms, targetBatchYears, notifyInApp, notifyEmail, createdBy, recipientCount) |
 | `created_at`, `updated_at` | timestamptz |
 
-#### `public.notifications`
+#### `public.user_notifications`
+Created only by database triggers and server functions; alumni can read and mark their own as read.
 | Column | Type |
 |--------|------|
 | `id` | uuid |
 | `user_id` | uuid FK |
 | `title`, `body` | text |
 | `type` | text (event/job/message/announcement/survey/feedback/forum/system) |
-| `is_read` | boolean |
+| `priority`, `route`, `dedupe_key` | text |
+| `is_read`, `read_at` | boolean / timestamptz |
 | `data` | jsonb (relatedId) |
-| `created_at`, `updated_at` | timestamptz |
+| `expires_at`, `created_at`, `updated_at` | timestamptz |
+
+#### `public.notification_deliveries`
+One log for push alerts (`channel = 'push'`, per device token) and emails (`channel = 'email'`, per recipient address). Admins can read it. See [docs/notifications.md](docs/notifications.md).
 
 #### `public.feedback`
 | Column | Type |
@@ -725,9 +727,11 @@ All tables are in Supabase PostgreSQL with Row-Level Security (RLS) enabled.
 ### Edge Functions
 | Function | Purpose |
 |----------|---------|
-| `register-account` | Creates Supabase Auth user with service role, handles stale account cleanup |
-| `send-email` | Sends OTP/reminder emails via Gmail SMTP |
-| `admin-delete-user` | Admin account deletion with data cleanup |
+| `send-email` | Admin-only reminder emails via Gmail SMTP; logs each send in `notification_deliveries` |
+| `send-push` | Sends queued push alerts (Web Push / Firebase Cloud Messaging) |
+| `tracer-help` | AI suggestions for CHED GTS occupation (Q19) and line of business (Q20); alumni must accept them |
+
+Removing an alumnus is the RPC `admin_remove_alumni_account` (deactivate + anonymize; tracer answers kept).
 
 ---
 
@@ -739,10 +743,9 @@ RegisterScreen
   → Enter: name, course, student ID
   → Step 1: AlumniEligibilityService.validate() → RPC or local check
   → Step 2: Set password (6+ chars)
-  → Step 3: EmailService.sendOtpEmail() → OTP via Gmail SMTP
-  → Verify 6-digit code
-  → authService.registerWithEmailPassword() → Edge Function creates auth user
-  → eligibilityService.linkRegistration() → links auth user to roster
+  → Step 3: Supabase Auth signUp → 6-digit OTP email via Gmail SMTP
+  → Verify 6-digit code (verifyOTP)
+  → eligibilityService.linkRegistration() → RPC link_alumni_registration links roster + creates users row
   → Audit log: REGISTER
   → AlumniHomeGate → AlumniOnboardingScreen (if incomplete)
   → 4-step wizard: Welcome → Profile → Photo → Done
@@ -1057,9 +1060,10 @@ All colors, typography, spacing, motion, and component styles are centralized he
 | File | Purpose |
 |------|---------|
 | `supabase/migrations/20260716100001_phase1_schema_rls.sql` | Phase 1 schema + RLS |
-| `supabase/functions/register-account/index.ts` | Account creation Edge Function |
+| `supabase/migrations/20261005*_phase*.sql` | Database audit phases 1–7 (integrity, RLS, performance, GTS analytics, notifications, legacy cleanup) |
 | `supabase/functions/send-email/index.ts` | Email delivery Edge Function |
-| `supabase/functions/admin-delete-user/index.ts` | Admin account deletion |
+| `supabase/functions/send-push/index.ts` | Push alert Edge Function |
+| `supabase/functions/tracer-help/index.ts` | CHED GTS AI help Edge Function |
 
 ---
 

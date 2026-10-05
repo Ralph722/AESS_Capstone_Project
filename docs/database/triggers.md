@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-74 triggers on tables in the `public` and `auth` schemas.
+73 triggers on tables in the `public` and `auth` schemas.
 
 
 ## auth.users
@@ -74,6 +74,7 @@
 
 | Trigger | Definition |
 |---|---|
+| trg_events_set_times | `BEFORE INSERT OR UPDATE OF date, start_time, end_time, starts_at, ends_at ON public.events FOR EACH ROW EXECUTE FUNCTION events_set_times()` |
 | trg_events_updated_at | `BEFORE UPDATE ON public.events FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 | trg_notify_event_changes | `AFTER INSERT OR UPDATE ON public.events FOR EACH ROW EXECUTE FUNCTION notify_event_changes()` |
 
@@ -133,18 +134,6 @@
 | Trigger | Definition |
 |---|---|
 | trg_notification_preferences_updated_at | `BEFORE UPDATE ON public.notification_preferences FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
-
-## public.notifications
-
-| Trigger | Definition |
-|---|---|
-| trg_notifications_updated_at | `BEFORE UPDATE ON public.notifications FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
-
-## public.reminders
-
-| Trigger | Definition |
-|---|---|
-| trg_reminders_updated_at | `BEFORE UPDATE ON public.reminders FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 
 ## public.survey_assignments
 
@@ -214,7 +203,7 @@
 | Trigger | Definition |
 |---|---|
 | trg_notify_admins_new_registration | `AFTER INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION notify_admins_new_registration()` |
-| trg_users_auto_assign_surveys | `AFTER INSERT OR UPDATE OF program, batch_year, year_graduated, role ON public.users FOR EACH ROW EXECUTE FUNCTION trg_users_auto_assign_surveys()` |
+| trg_users_auto_assign_surveys | `AFTER INSERT OR UPDATE OF program, year_graduated, role ON public.users FOR EACH ROW EXECUTE FUNCTION trg_users_auto_assign_surveys()` |
 | trg_users_fill_roster_year | `AFTER INSERT OR UPDATE OF year_graduated ON public.users FOR EACH ROW EXECUTE FUNCTION users_fill_roster_year()` |
 | trg_users_guard_protected_columns | `BEFORE INSERT OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION users_guard_protected_columns()` |
 | trg_users_updated_at | `BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |

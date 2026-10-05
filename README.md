@@ -6,8 +6,9 @@ Flutter + Supabase alumni portal with official roster, gated registration, gradu
 
 - [docs/full-system-overview.md](docs/full-system-overview.md) - **Current** full system overview (features, screens, flows, admin + alumni)
 - [docs/admin-survey-screens.md](docs/admin-survey-screens.md) - Admin survey UI deep dive
-- [docs/alumni-roster-complete.md](docs/alumni-roster-complete.md) - Roster feature notes
-- [docs/system-overview.md](docs/system-overview.md) - Older overview (may still mention Firebase; prefer full-system-overview)
+- [docs/notifications.md](docs/notifications.md) - In-app notifications, push alerts and the delivery log
+- [docs/database/](docs/database/) - Generated database reference (tables, constraints, policies, functions)
+- [docs/archive/](docs/archive/) - Older notes from the Firebase era, kept for history only
 
 ## Quick start
 

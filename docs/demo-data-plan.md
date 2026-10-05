@@ -36,8 +36,8 @@ data goes into the real database. Everything must be marked and removable.
 ## The 50 alumni
 
 10 per course (`BSIT`, `BFPT`, `BTLED-IA`, `BTLED-ICT`, `BTLED-HE`), 2 per
-batch year 2021–2025. Set `alumni_members.batch_year` explicitly (DSS and
-Reports group by it).
+batch year 2021–2025. Set `alumni_members.year_graduated` explicitly (batch
+is the graduation year; DSS and Reports group by it).
 
 | Group | Count | Details |
 |---|---|---|
@@ -99,7 +99,7 @@ For each, matching what registration and onboarding create:
 1. `auth.users` (+ `auth.identities`) with confirmed email and the shared
    password. Trigger `handle_new_user` inserts `public.users`.
 2. `public.users`: `role='user'`, `display_name`, `email`, `student_id`,
-   `program`, `batch_year`, `year_graduated`, profile fields,
+   `program`, `year_graduated`, profile fields,
    `onboarding_complete=true`, `tracer_profile_completion=100`,
    `tracer_profile_complete=true`, varied `last_active_at`.
 3. `alumni_members`: `auth_uid`, `is_registered_user=true`,
@@ -178,7 +178,6 @@ Verify these are restored after cleanup:
 | `announcements` | 10 |
 | `messages` | 8 |
 | `feedback` | 0 |
-| `employment_records` | 1 |
 | `surveys` | 11 (8 published) |
 
 `user_notifications` (58) and `audit_logs` (510) grow over time, so compare
@@ -186,19 +185,13 @@ them by demo markers rather than totals.
 
 ## Known issues the demo will show
 
-- Employment is counted from three places:
-  - Reports Tracer tab and DSS: `ched_16` answers.
-  - Dashboard "Employment records" card and Reports Overview employment rate:
-    `employment_records` (not filled by the CHED GTS, so these stay empty).
-  - Directory employment: `alumni_members.employment_status`.
+- Employment comes from CHED GTS answers everywhere (`gts_employment_records`
+  for lists and cards, `gts_metric` for DSS), so demo answers show up in all
+  employment figures.
 - DSS has no survey filter, so it includes demo answers until cleanup.
   Reports has a survey filter, so the demo tracer can be viewed alone.
 - "Not tracked" is not an employment status; it appears as "Registered, no
   tracer" in the tracer coverage figures.
-- Side findings (not fixed): `alumni_eligibility_service.dart` checks
-  `data['success']` but `link_alumni_registration` returns `ok`, so the local
-  fallback always runs; an old 6-argument overload of
-  `link_alumni_registration` was never dropped.
 
 ## Steps when resuming
 

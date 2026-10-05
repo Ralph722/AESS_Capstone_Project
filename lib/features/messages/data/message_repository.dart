@@ -208,13 +208,12 @@ class MessageRepository {
         final id = row['id']?.toString();
         if (id == null) continue;
         final program = (row['program'] as String? ?? '').trim();
-        final batch = (row['batch_year'] as String? ?? '').trim();
         final year = (row['year_graduated'] as String? ?? '').trim();
         result[id] = UserProfileLite(
           displayName: row['display_name'] as String?,
           email: row['email'] as String?,
           program: program,
-          batch: batch.isNotEmpty ? batch : year,
+          batch: year,
           tracerComplete: row['tracer_profile_complete'] == true,
           lastActive: row['updated_at'] != null
               ? parseMessageDateTime(row['updated_at'])
@@ -303,7 +302,7 @@ class MessageRepository {
           .from('alumni_members')
           .select(
             'id, full_name, auth_uid, registered_email, email_address, '
-            'course, batch_year, year_graduated, profile_image_url, '
+            'course, year_graduated, profile_image_url, '
             'tracer_profile_complete, last_active_at',
           )
           .eq('is_registered_user', true)
@@ -332,7 +331,6 @@ class MessageRepository {
             authUid == excludeAuthUid) {
           continue;
         }
-        final batch = (row['batch_year'] as String? ?? '').trim();
         final year = (row['year_graduated'] as String? ?? '').trim();
         final email = (row['registered_email'] as String? ?? '').trim().isNotEmpty
             ? (row['registered_email'] as String).trim()
@@ -346,7 +344,7 @@ class MessageRepository {
                 : 'Alumni',
             email: email,
             program: (row['course'] as String? ?? '').trim(),
-            batch: batch.isNotEmpty ? batch : year,
+            batch: year,
             avatarUrl: (row['profile_image_url'] as String?)?.trim(),
             tracerComplete: row['tracer_profile_complete'] == true,
             lastActive: row['last_active_at'] != null

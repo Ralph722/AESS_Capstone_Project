@@ -206,44 +206,6 @@ class EventService {
     });
   }
 
-  Future<void> addReminder(String userId, String eventId) async {
-    try {
-      await _supabase.from('reminders').upsert({
-        'user_id': userId,
-        'title': 'event:$eventId',
-        'data': {'eventId': eventId},
-      });
-    } catch (e) {
-      throw Exception('Error adding reminder: $e');
-    }
-  }
-
-  Future<void> removeReminder(String userId, String eventId) async {
-    try {
-      await _supabase
-          .from('reminders')
-          .delete()
-          .eq('user_id', userId)
-          .eq('title', 'event:$eventId');
-    } catch (e) {
-      throw Exception('Error removing reminder: $e');
-    }
-  }
-
-  Future<bool> hasReminder(String userId, String eventId) async {
-    try {
-      final row = await _supabase
-          .from('reminders')
-          .select('title')
-          .eq('user_id', userId)
-          .eq('title', 'event:$eventId')
-          .maybeSingle();
-      return row != null;
-    } catch (e) {
-      return false;
-    }
-  }
-
   Future<List<AlumniEvent>> _fetchActiveFromSupabase() async {
     try {
       final rows = await _supabase

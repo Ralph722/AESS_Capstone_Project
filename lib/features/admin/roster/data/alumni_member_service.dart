@@ -173,8 +173,8 @@ class AlumniMemberService {
     }
   }
 
-  /// Registered accounts often store batch only on `users`, while the roster
-  /// mirror `alumni_members.batch_year` stays blank. Fill in-memory for filters.
+  /// Roster rows without a graduation year fall back to the year on the
+  /// linked `users` profile. Fill in-memory for filters.
   Future<List<AlumniMember>> _hydrateBatchYearsFromUsers(
     List<AlumniMember> members,
   ) async {
@@ -189,17 +189,15 @@ class AlumniMemberService {
     try {
       final rows = await _supabase
           .from('users')
-          .select('id, batch_year, year_graduated')
+          .select('id, year_graduated')
           .inFilter('id', needUids);
 
       final batchByUid = <String, String>{};
       for (final row in rows) {
         final id = row['id']?.toString();
         if (id == null || id.isEmpty) continue;
-        final batch = (row['batch_year'] as String? ?? '').trim();
         final grad = (row['year_graduated'] as String? ?? '').trim();
-        final value = batch.isNotEmpty ? batch : grad;
-        if (value.isNotEmpty) batchByUid[id] = value;
+        if (grad.isNotEmpty) batchByUid[id] = grad;
       }
       if (batchByUid.isEmpty) return members;
 
@@ -432,39 +430,6 @@ class AlumniMemberService {
     }
   }
 
-  /// Mirrors the latest employment tracer status onto the roster row.
-  Future<void> mirrorEmploymentStatusForAuthUid(
-    String authUid, {
-    required String employmentStatus,
-    String? companyName,
-    String? position,
-  }) async {
-    final member = await findRosterMemberForAuthUid(authUid);
-    if (member == null) return;
-
-    final payload = <String, dynamic>{
-      'employment_status': employmentStatus,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    };
-    if (employmentStatus == 'Employed') {
-      if (companyName != null && companyName.isNotEmpty) {
-        payload['current_company'] = companyName;
-      }
-      if (position != null && position.isNotEmpty) {
-        payload['current_position'] = position;
-      }
-    }
-
-    try {
-      await _supabase
-          .from('alumni_members')
-          .update(payload)
-          .eq('id', member.id);
-    } catch (_) {
-      // Best-effort roster mirror.
-    }
-  }
-
   /// Mirrors contact details from a saved tracer profile onto the linked
   /// roster row. Name, course, ID number and year belong to the alumni office
   /// and are never written from here.
@@ -551,7 +516,7 @@ class AlumniMemberService {
             .from('users')
             .select(
               'id, tracer_profile_complete, tracer_profile_completion, '
-              'display_name, student_id, program, batch_year, '
+              'display_name, student_id, program, year_graduated, '
               'mobile_number, address, gender',
             )
             .inFilter('id', authIds);
@@ -822,8 +787,7 @@ class AlumniMemberService {
           'id, full_name, course, student_id, auth_uid, registered_email, '
           'is_registered_user, is_deactivated, profile_image_url, last_active_at, '
           'has_profile_updates, admin_viewed_at, created_at, updated_at, '
-          'batch_year, contact_number, email_address, current_position, '
-          'current_company, address, gender, civil_status, birth_date, '
+          'contact_number, email_address, address, gender, civil_status, birth_date, '
           'year_graduated, tracer_profile_complete, employment_status',
         )
         .order('created_at', ascending: false);

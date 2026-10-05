@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-120 indexes, including the ones that back primary keys and unique constraints.
+114 indexes, including the ones that back primary keys and unique constraints.
 
 
 ## alumni_members
@@ -19,14 +19,6 @@
 | Index | Kind | Definition |
 |---|---|---|
 | announcements_pkey | PK | `btree (id)` |
-
-## archived_employment_records
-
-| Index | Kind | Definition |
-|---|---|---|
-| employment_records_pkey | PK | `btree (id)` |
-| idx_employment_records_user |  | `btree (user_id)` |
-| idx_employment_records_verified_by |  | `btree (verified_by)` |
 
 ## audit_logs
 
@@ -101,6 +93,7 @@
 | events_category_idx |  | `btree (category)` |
 | events_date_status_idx |  | `btree (date, status)` |
 | events_pkey | PK | `btree (id)` |
+| events_starts_at_idx |  | `btree (starts_at)` |
 
 ## favorite_jobs
 
@@ -227,13 +220,6 @@
 |---|---|---|
 | notification_preferences_pkey | PK | `btree (user_id)` |
 
-## notifications
-
-| Index | Kind | Definition |
-|---|---|---|
-| idx_notifications_user |  | `btree (user_id, created_at DESC)` |
-| notifications_pkey | PK | `btree (id)` |
-
 ## programs
 
 | Index | Kind | Definition |
@@ -247,13 +233,6 @@
 | push_tokens_pkey | PK | `btree (id)` |
 | push_tokens_token_key | UNIQUE | `btree (token)` |
 | push_tokens_user_active_idx |  | `btree (user_id) WHERE (disabled_at IS NULL)` |
-
-## reminders
-
-| Index | Kind | Definition |
-|---|---|---|
-| idx_reminders_user_id |  | `btree (user_id)` |
-| reminders_pkey | PK | `btree (id)` |
 
 ## survey_assignments
 

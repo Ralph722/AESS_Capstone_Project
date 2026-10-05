@@ -2,13 +2,12 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Public schema: 43 tables, 478 columns.
+Public schema: 40 tables, 445 columns.
 
 | Table | Columns | Row level security |
 |---|---|---|
-| [alumni_members](#alumni_members) | 26 | enabled=true, forced=false |
+| [alumni_members](#alumni_members) | 23 | enabled=true, forced=false |
 | [announcements](#announcements) | 8 | enabled=true, forced=false |
-| [archived_employment_records](#archived_employment_records) | 13 | enabled=true, forced=false |
 | [audit_logs](#audit_logs) | 8 | enabled=true, forced=false |
 | [dss_flag_checks](#dss_flag_checks) | 11 | enabled=true, forced=false |
 | [dss_flag_notes](#dss_flag_notes) | 10 | enabled=true, forced=false |
@@ -17,7 +16,7 @@ Public schema: 43 tables, 478 columns.
 | [event_comments](#event_comments) | 6 | enabled=true, forced=false |
 | [event_replies](#event_replies) | 7 | enabled=true, forced=false |
 | [event_rsvps](#event_rsvps) | 6 | enabled=true, forced=false |
-| [events](#events) | 21 | enabled=true, forced=false |
+| [events](#events) | 23 | enabled=true, forced=false |
 | [favorite_jobs](#favorite_jobs) | 3 | enabled=true, forced=false |
 | [feedback](#feedback) | 8 | enabled=true, forced=false |
 | [forum_bookmarks](#forum_bookmarks) | 3 | enabled=true, forced=false |
@@ -34,10 +33,8 @@ Public schema: 43 tables, 478 columns.
 | [messages](#messages) | 15 | enabled=true, forced=false |
 | [notification_deliveries](#notification_deliveries) | 14 | enabled=true, forced=false |
 | [notification_preferences](#notification_preferences) | 9 | enabled=true, forced=false |
-| [notifications](#notifications) | 9 | enabled=true, forced=false |
 | [programs](#programs) | 5 | enabled=true, forced=false |
 | [push_tokens](#push_tokens) | 12 | enabled=true, forced=false |
-| [reminders](#reminders) | 9 | enabled=true, forced=false |
 | [survey_assignments](#survey_assignments) | 10 | enabled=true, forced=false |
 | [survey_questions](#survey_questions) | 15 | enabled=true, forced=false |
 | [survey_response_events](#survey_response_events) | 10 | enabled=true, forced=false |
@@ -48,7 +45,7 @@ Public schema: 43 tables, 478 columns.
 | [tracer_draft_reminders](#tracer_draft_reminders) | 10 | enabled=true, forced=false |
 | [tracer_help_usage](#tracer_help_usage) | 4 | enabled=true, forced=false |
 | [user_notifications](#user_notifications) | 15 | enabled=true, forced=false |
-| [users](#users) | 29 | enabled=true, forced=false |
+| [users](#users) | 28 | enabled=true, forced=false |
 
 ## alumni_members
 
@@ -66,11 +63,8 @@ Public schema: 43 tables, 478 columns.
 | last_active_at | timestamp with time zone |  |  |  |
 | has_profile_updates | boolean | yes | `false` |  |
 | admin_viewed_at | timestamp with time zone |  |  |  |
-| batch_year | text | yes | `''::text` |  |
 | contact_number | text | yes | `''::text` |  |
 | email_address | text | yes | `''::text` |  |
-| current_position | text |  |  |  |
-| current_company | text |  |  |  |
 | address | text |  |  |  |
 | gender | text |  |  |  |
 | civil_status | text |  |  |  |
@@ -91,24 +85,6 @@ Public schema: 43 tables, 478 columns.
 | status | text | yes | `'draft'::text` |  |
 | published_at | timestamp with time zone |  |  |  |
 | data | jsonb | yes | `'{}'::jsonb` |  |
-| created_at | timestamp with time zone | yes | `now()` |  |
-| updated_at | timestamp with time zone | yes | `now()` |  |
-
-## archived_employment_records
-
-| Column | Type | Not null | Default | Generated |
-|---|---|---|---|---|
-| id | uuid | yes | `gen_random_uuid()` |  |
-| user_id | uuid | yes |  |  |
-| status | text | yes | `''::text` |  |
-| company | text | yes | `''::text` |  |
-| position | text | yes | `''::text` |  |
-| start_date | date |  |  |  |
-| end_date | date |  |  |  |
-| data | jsonb | yes | `'{}'::jsonb` |  |
-| verification_status | text | yes | `'Pending'::text` |  |
-| verified_by | uuid |  |  |  |
-| verified_at | timestamp with time zone |  |  |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
 
@@ -272,6 +248,8 @@ Public schema: 43 tables, 478 columns.
 | cancelled | boolean | yes | `false` |  |
 | venue_latitude | double precision |  |  |  |
 | venue_longitude | double precision |  |  |  |
+| starts_at | timestamp with time zone | yes |  |  |
+| ends_at | timestamp with time zone | yes |  |  |
 
 ## favorite_jobs
 
@@ -489,20 +467,6 @@ Public schema: 43 tables, 478 columns.
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
 
-## notifications
-
-| Column | Type | Not null | Default | Generated |
-|---|---|---|---|---|
-| id | uuid | yes | `gen_random_uuid()` |  |
-| user_id | uuid | yes |  |  |
-| title | text | yes | `''::text` |  |
-| body | text | yes | `''::text` |  |
-| type | text | yes | `''::text` |  |
-| is_read | boolean | yes | `false` |  |
-| data | jsonb | yes | `'{}'::jsonb` |  |
-| created_at | timestamp with time zone | yes | `now()` |  |
-| updated_at | timestamp with time zone | yes | `now()` |  |
-
 ## programs
 
 | Column | Type | Not null | Default | Generated |
@@ -527,20 +491,6 @@ Public schema: 43 tables, 478 columns.
 | failure_count | integer | yes | `0` |  |
 | disabled_at | timestamp with time zone |  |  |  |
 | last_seen_at | timestamp with time zone | yes | `now()` |  |
-| created_at | timestamp with time zone | yes | `now()` |  |
-| updated_at | timestamp with time zone | yes | `now()` |  |
-
-## reminders
-
-| Column | Type | Not null | Default | Generated |
-|---|---|---|---|---|
-| id | uuid | yes | `gen_random_uuid()` |  |
-| user_id | uuid | yes |  |  |
-| title | text | yes | `''::text` |  |
-| body | text | yes | `''::text` |  |
-| scheduled_at | timestamp with time zone |  |  |  |
-| sent_at | timestamp with time zone |  |  |  |
-| data | jsonb | yes | `'{}'::jsonb` |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
 
@@ -719,7 +669,6 @@ Public schema: 43 tables, 478 columns.
 | email | text | yes | `''::text` |  |
 | student_id | text | yes | `''::text` |  |
 | program | text | yes | `''::text` |  |
-| batch_year | text | yes | `''::text` |  |
 | year_graduated | text | yes | `''::text` |  |
 | address | text | yes | `''::text` |  |
 | gender | text | yes | `''::text` |  |

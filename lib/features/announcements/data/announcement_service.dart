@@ -106,7 +106,7 @@ class AnnouncementService {
   Future<List<TracerProfile>> _fetchEligibleAlumni() async {
     final rows = await _supabase
         .from('users')
-        .select('id, display_name, email, program, batch_year, year_graduated')
+        .select('id, display_name, email, program, year_graduated')
         .neq('role', 'admin')
         .isFilter('deactivated_at', null);
     return rows.map(TracerProfile.fromSupabaseRow).toList();

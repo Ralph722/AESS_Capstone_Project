@@ -7,9 +7,9 @@ Complete reference for what the system is, who uses it, every major screen, how 
 |---|---|
 | **Last audited** | July 2026 |
 | **Stack** | Flutter (Dart) · Supabase (Auth, Postgres, Storage, Edge Functions) |
-| **Related docs** | [admin-survey-screens.md](admin-survey-screens.md) · [ched-survey-templates.md](ched-survey-templates.md) · [alumni-roster-complete.md](alumni-roster-complete.md) · [README.md](../README.md) |
+| **Related docs** | [admin-survey-screens.md](admin-survey-screens.md) · [ched-survey-templates.md](ched-survey-templates.md) · [notifications.md](notifications.md) · [database/](database/) · [README.md](../README.md) |
 
-> Older docs such as `system-overview.md` and `complete-system-inventory.md` may still mention Firebase. **This file is the current source of truth.** The app no longer uses Firebase.
+> Older Firebase-era notes are kept in [archive/](archive/) for history only. **This file is the current source of truth.** The app no longer uses Firebase (except Firebase Cloud Messaging to deliver Android push alerts).
 
 ---
 
@@ -57,7 +57,7 @@ The platform helps a college/university stay connected with graduates and run CH
 | Auth | Supabase Auth | Email + password |
 | Database | Supabase Postgres | RLS; realtime on messages (and related) |
 | Storage | Supabase Storage bucket `images` | Avatars, message attachments |
-| Edge Functions | `send-email`, `register-account`, `admin-delete-user` | OTP/reminders; secure register; admin user delete |
+| Edge Functions | `send-email`, `send-push`, `tracer-help` | Admin reminder emails (logged); push alerts; AI suggestions for CHED GTS Q19/Q20 |
 | Charts | `fl_chart` | Dashboard & reports |
 | Export | `excel`, `pdf`, `printing` | Roster, surveys, CHED GTS packs, report packs |
 | Email | Gmail SMTP via `send-email` | Secrets on Supabase, not in the client |
@@ -116,9 +116,9 @@ Register
   → Enter full name + course + student ID + Gmail
   → validate_alumni_eligibility (RPC) or local roster match
   → If not on roster / already registered / deactivated → blocked
-  → Set password → send 6-digit OTP email (Edge Function)
-  → Confirm OTP → register-account Edge Function → Auth user + users row
-  → link_alumni_registration → alumni_members.auth_uid, is_registered_user
+  → Set password → Supabase Auth sign-up sends a 6-digit OTP email (Gmail SMTP)
+  → Confirm OTP (Supabase verifyOTP) → Auth user confirmed
+  → link_alumni_registration (RPC) → alumni_members.auth_uid, is_registered_user + users row
   → AlumniHomeGate → Onboarding (required)
   → MainNavigation (Home)
 ```
@@ -208,7 +208,7 @@ Bottom navigation + `IndexedStack` (tabs keep state after first visit). Opening 
 
 **Shows:** Searchable event list with filters (All / This Week / This Month / Newest).
 
-**Actions:** Open detail; set/cancel reminder (DB `reminders` + local notification); post/read comments and replies.
+**Actions:** Open detail; RSVP (Going schedules local device reminders; the server also sends day-before and day-of reminders to everyone Going); post/read comments and replies.
 
 ### 5.5 Messages (alumni)
 
@@ -232,9 +232,6 @@ Bottom navigation + `IndexedStack` (tabs keep state after first visit). Opening 
 | **History** | Submitted responses; CHED rendered read-only. |
 
 Draft/submit go through `SurveyService.saveResponse` → `survey_responses`. On first interactive load (take page or Tracer inline CHED), `SurveyService.recordSurveyOpened` calls RPC `record_survey_opened` (idempotent). Draft saves append `draft_saved` events; first submission appends one `submitted` event. Device metadata stored is coarse only (`device_category`, `platform_family`, `browser_family`) — no IP, raw user agent, or fingerprinting. On CHED submit, answers can merge back into the live profile on `users`.
-
-> `id_tracer_page.dart` (legacy demographics/employment UI writing `employment_records`) still exists in the tree but is **not** the current bottom-nav Tracer tab.
-
 ### 5.8 Profile
 
 **Shows:** Same live GTS profile form used in onboarding (editable anytime).
@@ -366,7 +363,9 @@ Stream of tickets; filter by status; detail: change status + admin response.
 | **Live profile** | `users` columns (demographics, contact, employment status, completion flags) | Onboarding + Profile tab (`GtsProfileForm`) |
 | **Survey waves** | `surveys` + `survey_assignments` + `survey_responses` | Tracer tab / My Surveys when admin publishes |
 
-Employment history helpers still use `employment_records` (e.g. CHED prefill).
+Employment status comes from submitted CHED GTS answers. The read-only view `gts_employment_records` exposes each alumnus's latest submission (used by reports, profile lookups and CHED exports); DSS metrics use `gts_respondent_facts` / `gts_metric`.
+
+Batch means graduation year: `users.year_graduated` and `alumni_members.year_graduated`. The roster is the source of truth for name, course, ID number and year.
 
 ### 7.2 Survey flavors
 
@@ -425,11 +424,13 @@ Primary schema: `supabase/migrations/` (phase1 schema/RLS and follow-ups).
 | `users` | Portal profiles, role, onboarding, GTS live fields, avatar URL |
 | `alumni_members` | Official roster; registration gate; link to Auth |
 | `audit_logs` | Admin/system action trail |
-| `events`, `event_comments`, `event_replies`, `reminders` | Events + discussion + reminders |
+| `events`, `event_rsvps`, `event_comments`, `event_replies` | Events + RSVPs + discussion (`starts_at` / `ends_at` are derived from the date and time text) |
 | `jobs`, `favorite_jobs` | Careers |
 | `messages` | Alumni ↔ admin chat |
-| `user_notifications` / `notifications` | In-app alerts |
-| `employment_records` | Employment history / tracer support |
+| `user_notifications`, `notification_preferences` | In-app alerts and per-user settings |
+| `push_tokens`, `notification_deliveries` | Device tokens; push and email delivery log |
+| `programs` | Official program list (roster courses) |
+| `dss_flags`, `dss_flag_notes`, `dss_flag_checks` | Decision-support flags, notes and nightly re-checks |
 | `survey_templates`, `survey_template_questions` | Template packs |
 | `surveys`, `survey_questions` | Survey definitions |
 | `survey_assignments`, `survey_responses` | Who must answer & what they answered |
@@ -466,7 +467,7 @@ Logic lives in Dart services (client talks to Supabase under RLS). One-line map:
 | `LoginPreferencesService` | Remember-me email |
 | `OnboardingService` | Read/write onboarding completion |
 | `UserProfileService` | Live tracer profile on `users` (+ roster sync) |
-| `IdTracerService` | Employment records |
+| `IdTracerService` | Read-only employment status from `gts_employment_records` |
 | `AlumniMemberService` | Roster CRUD / activity |
 | `AlumniDirectoryDetailService` | Admin member detail aggregation |
 | `AlumniRosterImportService` | Excel roster import |
@@ -491,11 +492,13 @@ Logic lives in Dart services (client talks to Supabase under RLS). One-line map:
 | Channel | When used |
 |---------|-----------|
 | **In-app** (`user_notifications`) | Survey assigned, event created, messages, feedback updates, etc. |
-| **Email OTP** | Registration verification |
-| **Email reminders** | Survey / announcement follow-ups (admin-triggered; requires Edge Function secrets) |
+| **Push alerts** | Queued from `user_notifications`, sent by `send-push` (see [notifications.md](notifications.md)) |
+| **Email OTP** | Registration verification (Supabase Auth, Gmail SMTP) |
+| **Email reminders** | Survey / announcement follow-ups (admin-triggered via `send-email`; each send is logged in `notification_deliveries`) |
+| **Scheduled** | `pg_cron` jobs: event day-before/day-of reminders, job deadlines, survey opening/closing, admin digest |
 | **Local device** | Event reminders via `ReminderService` |
 
-If email secrets are missing, OTP/reminders fail gracefully with a clear configuration error.
+If email secrets are missing, reminder emails fail gracefully with a clear configuration error.
 
 ---
 
@@ -505,8 +508,8 @@ If email secrets are missing, OTP/reminders fail gracefully with a clear configu
 |---------|----------|
 | Client keys | **Anon** key only; never service-role in the Flutter app |
 | Authorization | Supabase Auth + Postgres **RLS**; role on `users` |
-| Registration | Edge Function `register-account` + roster RPCs |
-| Admin user delete | Edge Function `admin-delete-user` (privileged) |
+| Registration | Supabase Auth email OTP + roster RPCs (`validate_alumni_eligibility`, `link_alumni_registration`) |
+| Removing alumni | RPC `admin_remove_alumni_account` (deactivate + anonymize; tracer answers kept) |
 | Deactivated alumni | Login blocked even with valid password |
 | AI | Optional Gemini key; assistant disabled/prompts for setup if missing |
 | Migration flags | `MigrationConfig` — Firebase dual-write/fallback off; Supabase is primary |
@@ -540,7 +543,7 @@ lib/
   shared/widgets/                    # GTS form, skeletons, onboarding UI
 supabase/
   migrations/                        # Schema + RLS
-  functions/                         # send-email, register-account, admin-delete-user
+  functions/                         # send-email, send-push, tracer-help
 docs/
   full-system-overview.md            # This file
   admin-survey-screens.md            # Survey UI deep dive
@@ -556,7 +559,9 @@ docs/
 | Understand whole product | **This document** |
 | Admin survey UI only | [admin-survey-screens.md](admin-survey-screens.md) |
 | CHED question schema | [ched-survey-templates.md](ched-survey-templates.md) |
-| Roster migration history | [alumni-roster-complete.md](alumni-roster-complete.md) |
+| Database reference (generated) | [database/](database/) |
+| Notifications & push | [notifications.md](notifications.md) |
+| Old Firebase-era notes | [archive/](archive/) |
 | Run the app | [README.md](../README.md) |
 
 ---

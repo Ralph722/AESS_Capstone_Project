@@ -137,7 +137,7 @@ class JobInterestService {
       final users = await _supabase
           .from('users')
           .select(
-            'id, display_name, email, program, batch_year, year_graduated, '
+            'id, display_name, email, program, year_graduated, '
             'profile_image_base64',
           )
           .inFilter('id', userIds);
@@ -151,7 +151,7 @@ class JobInterestService {
       final members = await _supabase
           .from('alumni_members')
           .select(
-            'auth_uid, full_name, registered_email, course, batch_year, '
+            'auth_uid, full_name, registered_email, course, '
             'year_graduated, employment_status, profile_image_url',
           )
           .inFilter('auth_uid', userIds);
@@ -167,7 +167,6 @@ class JobInterestService {
             'email': row['registered_email'],
           if ((row['course'] as String?)?.trim().isNotEmpty == true)
             'program': row['course'],
-          'batch_year': row['batch_year'] ?? existing['batch_year'],
           'year_graduated': row['year_graduated'] ?? existing['year_graduated'],
           'employment_status': row['employment_status'],
           if ((row['profile_image_url'] as String?)?.trim().isNotEmpty == true)
@@ -178,9 +177,7 @@ class JobInterestService {
 
     return interests.map((i) {
       final p = profiles[i.userId] ?? {};
-      final batch = ((p['batch_year'] as String?) ?? '').trim().isNotEmpty
-          ? (p['batch_year'] as String).trim()
-          : ((p['year_graduated'] as String?) ?? '').trim();
+      final batch = ((p['year_graduated'] as String?) ?? '').trim();
       return JobInterestedAlumni(
         userId: i.userId,
         name: (p['display_name'] as String?)?.trim().isNotEmpty == true

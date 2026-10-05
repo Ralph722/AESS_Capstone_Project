@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/events/data/event_comment_service.dart';
 import 'package:alumni_system/features/events/data/event_rsvp_service.dart';
 import 'package:alumni_system/features/events/data/event_service.dart';
@@ -287,18 +286,11 @@ class EventsScreenState extends State<EventsScreen>
 
     try {
       await _rsvpService.setRsvp(eventId: event.id, status: status);
-      final userId = AppSession.userId;
 
       if (status == EventRsvpStatus.going) {
         await _reminderService.scheduleEventReminder(event);
-        if (userId != null) {
-          await _eventService.addReminder(userId, event.id);
-        }
       } else if (previous == EventRsvpStatus.going) {
         await _reminderService.cancelEventReminders(event.id);
-        if (userId != null) {
-          await _eventService.removeReminder(userId, event.id);
-        }
       }
 
       await _refreshRsvpMeta();

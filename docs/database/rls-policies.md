@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-134 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+129 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
@@ -217,15 +217,6 @@
 | notification_preferences_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | notification_preferences_update_own | UPDATE | public | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
-## public.notifications
-
-| Policy | Command | Roles | USING | WITH CHECK |
-|---|---|---|---|---|
-| notifications_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
-| notifications_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
-| notifications_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
-| notifications_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
-
 ## public.programs
 
 | Policy | Command | Roles | USING | WITH CHECK |
@@ -241,12 +232,6 @@
 |---|---|---|---|---|
 | push_tokens_delete_own | DELETE | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | push_tokens_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
-
-## public.reminders
-
-| Policy | Command | Roles | USING | WITH CHECK |
-|---|---|---|---|---|
-| reminders_owner_rw | ALL | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.survey_assignments
 
@@ -408,14 +393,10 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | notification_deliveries | authenticated | SELECT |
 | notification_preferences | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | notification_preferences | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| notifications | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| notifications | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | programs | anon | SELECT |
 | programs | authenticated | DELETE, INSERT, SELECT, UPDATE |
 | push_tokens | anon | DELETE, REFERENCES, SELECT, TRIGGER, TRUNCATE |
 | push_tokens | authenticated | DELETE, REFERENCES, SELECT, TRIGGER, TRUNCATE |
-| reminders | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| reminders | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | survey_assignments | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | survey_assignments | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | survey_questions | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |

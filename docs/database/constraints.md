@@ -2,14 +2,13 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 157 constraints in total.
+Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 148 constraints in total.
 
 
 ## alumni_members
 
 | Constraint | Kind | Definition |
 |---|---|---|
-| alumni_members_batch_year_matches | Check | `CHECK ((batch_year = COALESCE(year_graduated, ''::text)))` |
 | alumni_members_year_graduated_format | Check | `CHECK (((year_graduated IS NULL) OR (year_graduated ~ '^(19\|20)[0-9]{2}$'::text)))` |
 | alumni_members_auth_uid_fkey | Foreign key | `FOREIGN KEY (auth_uid) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | alumni_members_course_fkey | Foreign key | `FOREIGN KEY (course) REFERENCES programs(code) ON UPDATE CASCADE` |
@@ -21,14 +20,6 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 |---|---|---|
 | announcements_status_check | Check | `CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])))` |
 | announcements_pkey | Primary key | `PRIMARY KEY (id)` |
-
-## archived_employment_records
-
-| Constraint | Kind | Definition |
-|---|---|---|
-| employment_records_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
-| employment_records_verified_by_fkey | Foreign key | `FOREIGN KEY (verified_by) REFERENCES auth.users(id) ON DELETE SET NULL` |
-| employment_records_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## audit_logs
 
@@ -245,13 +236,6 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | notification_preferences_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | notification_preferences_pkey | Primary key | `PRIMARY KEY (user_id)` |
 
-## notifications
-
-| Constraint | Kind | Definition |
-|---|---|---|
-| notifications_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
-| notifications_pkey | Primary key | `PRIMARY KEY (id)` |
-
 ## programs
 
 | Constraint | Kind | Definition |
@@ -269,13 +253,6 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | push_tokens_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | push_tokens_pkey | Primary key | `PRIMARY KEY (id)` |
 | push_tokens_token_key | Unique | `UNIQUE (token)` |
-
-## reminders
-
-| Constraint | Kind | Definition |
-|---|---|---|
-| reminders_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
-| reminders_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## survey_assignments
 
@@ -371,7 +348,6 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
-| users_batch_year_matches | Check | `CHECK ((batch_year = year_graduated))` |
 | users_role_check | Check | `CHECK ((role = ANY (ARRAY['user'::text, 'admin'::text])))` |
 | users_year_graduated_format | Check | `CHECK (((year_graduated = ''::text) OR (year_graduated ~ '^(19\|20)[0-9]{2}$'::text)))` |
 | users_id_fkey | Foreign key | `FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE` |

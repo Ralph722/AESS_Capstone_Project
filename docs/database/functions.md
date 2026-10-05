@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-109 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
+110 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
 
 | Function | Arguments | Returns | Security | Settings | anon can run | authenticated can run | Language |
 |---|---|---|---|---|---|---|---|
@@ -31,11 +31,13 @@
 | enforce_message_insert |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | enforce_message_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | enqueue_notifications | `p_user_ids uuid[], p_type text, p_title text, p_body text, p_data jsonb, p_priority text, p_dedupe_key text, p_route text, p_push boolean, p_expires_at timestamp with time zone` | `integer` | definer | `search_path=public` | false | false | plpgsql |
+| event_clock_time | `p_text text` | `time without time zone` | invoker | `search_path=public` | false | true | plpgsql |
+| events_set_times |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | forum_posts_guard_author_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | forum_posts_maintain_topic_counts |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | forum_topics_guard_author_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | forum_topics_guard_insert |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
-| get_public_profiles | `p_ids uuid[]` | `TABLE(id uuid, display_name text, profile_image_base64 text, program text, year_graduated text, batch_year text, role text, email text)` | definer | `search_path=public` | false | true | sql |
+| get_public_profiles | `p_ids uuid[]` | `TABLE(id uuid, display_name text, profile_image_base64 text, program text, year_graduated text, role text, email text)` | definer | `search_path=public` | false | true | sql |
 | gts_job_level | `v jsonb` | `text` | invoker | `search_path=public` | false | true | sql |
 | gts_metric | `p_metric_key text, p_survey_id uuid, p_course text, p_year text, p_previous_survey_id uuid` | `TABLE(metric_key text, hits integer, total integer, value numeric, sample_n integer, eligible_n integer, metric_version integer)` | invoker | `search_path=public` | false | true | plpgsql |
 | gts_salary_rank | `bracket text` | `integer` | invoker | `search_path=public` | false | true | sql |
@@ -83,7 +85,6 @@
 | notify_survey_assignment_created |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_survey_published |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_survey_submitted |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
-| profile_batch_year_digits | `p_batch_year text, p_year_graduated text` | `text` | invoker | `search_path=public` | false | true | sql |
 | program_targets_include | `p_targets text[], p_program text` | `boolean` | invoker | `search_path=public` | false | true | sql |
 | purge_expired_audit_logs |  | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | queue_notification_push |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
@@ -99,7 +100,7 @@
 | run_tracer_draft_reminders |  | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | search_forum_mention_users | `p_query text` | `TABLE(id uuid, display_name text, program text)` | definer | `search_path=public` | false | true | plpgsql |
 | set_updated_at |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
-| survey_audience_matches | `p_target_programs text[], p_target_batch_years text[], p_program text, p_batch_year text, p_year_graduated text` | `boolean` | invoker | `search_path=public` | false | true | plpgsql |
+| survey_audience_matches | `p_target_programs text[], p_target_batch_years text[], p_program text, p_year_graduated text` | `boolean` | invoker | `search_path=public` | false | true | plpgsql |
 | survey_children_recount |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | survey_responses_guard_owner_update |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | surveys_block_delete_with_submissions |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |

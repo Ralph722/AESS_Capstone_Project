@@ -18,12 +18,13 @@ class AlumniMember {
   final DateTime createdAt;
   final DateTime? updatedAt;
 
-  // Legacy fields (older manual directory rows)
+  /// Batch is the graduation year (`year_graduated`); kept as its own field
+  /// for filters and exports.
   final String batchYear;
+
+  // Legacy fields (older manual directory rows)
   final String contactNumber;
   final String emailAddress;
-  final String? currentPosition;
-  final String? currentCompany;
   final String? address;
   final String? gender;
   final String? civilStatus;
@@ -52,8 +53,6 @@ class AlumniMember {
     this.batchYear = '',
     this.contactNumber = '',
     this.emailAddress = '',
-    this.currentPosition,
-    this.currentCompany,
     this.address,
     this.gender,
     this.civilStatus,
@@ -65,8 +64,7 @@ class AlumniMember {
 
   String get program => course;
 
-  /// Batch year used for filters/exports. Prefer roster `batch_year`, then
-  /// `year_graduated` (legacy / profile-synced rows often leave one blank).
+  /// Batch year used for filters/exports.
   String get effectiveBatchYear {
     final batch = batchYear.trim();
     if (batch.isNotEmpty) return batch;
@@ -102,11 +100,9 @@ class AlumniMember {
       updatedAt: row['updated_at'] != null
           ? _parseDateTime(row['updated_at'])
           : null,
-      batchYear: row['batch_year'] as String? ?? '',
+      batchYear: (row['year_graduated'] as String? ?? '').trim(),
       contactNumber: row['contact_number'] as String? ?? '',
       emailAddress: row['email_address'] as String? ?? '',
-      currentPosition: row['current_position'] as String?,
-      currentCompany: row['current_company'] as String?,
       address: row['address'] as String?,
       gender: row['gender'] as String?,
       civilStatus: row['civil_status'] as String?,
@@ -133,11 +129,8 @@ class AlumniMember {
       'last_active_at': lastActiveAt?.toUtc().toIso8601String(),
       'has_profile_updates': hasProfileUpdates,
       'admin_viewed_at': adminViewedAt?.toUtc().toIso8601String(),
-      'batch_year': batchYear,
       'contact_number': contactNumber,
       'email_address': emailAddress,
-      'current_position': currentPosition,
-      'current_company': currentCompany,
       'address': address,
       'gender': gender,
       'civil_status': civilStatus,
@@ -203,8 +196,6 @@ class AlumniMember {
       batchYear: batchYear ?? this.batchYear,
       contactNumber: contactNumber ?? this.contactNumber,
       emailAddress: emailAddress ?? this.emailAddress,
-      currentPosition: currentPosition ?? this.currentPosition,
-      currentCompany: currentCompany ?? this.currentCompany,
       address: address ?? this.address,
       gender: gender ?? this.gender,
       civilStatus: civilStatus ?? this.civilStatus,

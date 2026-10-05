@@ -12,7 +12,8 @@ alerts, and what is needed to turn on Android alerts.
 | Scheduled notices | `pg_cron` jobs `aess-notify-*` (deadlines, survey closing/opening, event reminders, admin digest, cleanup) |
 | In-app list | Bell panel (Home / admin header), full history in Profile → Notifications |
 | Preferences | `public.notification_preferences` (Profile → Notifications → settings) |
-| Alerts | `push_tokens` + `notification_push_deliveries`, sent by the `send-push` edge function |
+| Alerts | `push_tokens` + `notification_deliveries` (channel `push`), sent by the `send-push` edge function |
+| Email log | `notification_deliveries` rows with channel `email`, written by the `send-email` edge function |
 
 ## Alert delivery
 
@@ -100,9 +101,9 @@ Status: set up for project `aess-alumni`; server-side delivery verified on
 ## Checking delivery
 
 ```sql
--- Recent alert attempts (admins can also read this table through the API)
-select status, attempts, last_error, scheduled_at, sent_at
-from public.notification_push_deliveries
+-- Recent alert and email attempts (admins can also read this table through the API)
+select channel, status, attempts, last_error, scheduled_at, sent_at
+from public.notification_deliveries
 order by scheduled_at desc
 limit 50;
 
@@ -115,6 +116,6 @@ limit 20;
 
 ## Rollout note
 
-Older app builds that still create notifications from the client keep
-working; those notifications also produce alerts. Once every user is on the
-new build, the database is the only source of notifications.
+Clients cannot insert notifications at all; the database is the only source.
+Older app builds that still try to create notifications from the client get a
+permission error, which those builds ignore.

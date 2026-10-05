@@ -42,9 +42,9 @@ Tables: `dss_rules`, `dss_flags`, `dss_flag_notes`
 3. Response-rate denominator counts every active roster alumnus (registered
    or not), while a comment says "registered preferred". Decide deliberately
    and label it on screen (e.g. "coverage of the whole roster").
-4. Employment differs between screens: DSS uses `ched_16`, the dashboard card
-   and Reports Overview use `employment_records`, the directory uses
-   `alumni_members.employment_status`.
+4. Employment differed between screens. Resolved in the database audit
+   (Phase 5): every screen now reads CHED GTS answers through
+   `gts_employment_records` / `gts_metric`, and `employment_records` is gone.
 5. Evaluation only runs when an admin presses Refresh, in the admin's
    browser. Addressed by improvement 5.
 
@@ -101,5 +101,6 @@ Recommended first: 1, 2 and 4.
 
 - `docs/access-link-plan.md`
 - `docs/demo-data-plan.md`
-- Registration security fix (server-side email code, roster check in
-  `register-account`, no reset/wipe of existing accounts): do this first.
+- Registration security fix (server-side email code, roster check, no
+  reset/wipe of existing accounts): done in the database audit (Phase 1);
+  registration now uses Supabase Auth email OTP and `link_alumni_registration`.

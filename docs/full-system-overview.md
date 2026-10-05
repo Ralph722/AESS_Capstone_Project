@@ -511,6 +511,7 @@ If email secrets are missing, reminder emails fail gracefully with a clear confi
 | Registration | Supabase Auth email OTP + roster RPCs (`validate_alumni_eligibility`, `link_alumni_registration`) |
 | Removing alumni | RPC `admin_remove_alumni_account` (deactivate + anonymize; tracer answers kept) |
 | Deactivated alumni | Login blocked even with valid password; restrictive RLS policy `active_caller_only` also denies any token issued before deactivation |
+| Unlinked accounts | An account created through Supabase Auth without the roster link gets no data access (`active_caller_only`, `caller_is_active()`), even through direct API calls |
 | AI | Optional Gemini key; assistant disabled/prompts for setup if missing |
 | Migration flags | `MigrationConfig` — Firebase dual-write/fallback off; Supabase is primary |
 

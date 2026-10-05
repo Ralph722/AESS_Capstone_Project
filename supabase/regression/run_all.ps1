@@ -1,4 +1,5 @@
-# Database regression suites from the 2026-10 audit (phases 1-8).
+# Database regression suites from the 2026-10 audit (phases 1-8) and the
+# linked-alumni-only fix (phase 9).
 #
 # Every suite runs inside a transaction that is rolled back, so nothing is
 # changed on the linked project. They use three fixed test accounts (alumnus A,

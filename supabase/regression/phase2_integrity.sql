@@ -194,6 +194,9 @@ insert into t select 30, 'hard-deleting B''s auth user (tracer evidence)', 'bloc
 -- Forum SET NULL: author deletion keeps other people's replies
 insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, raw_user_meta_data)
 values ('00000000-0000-4000-8000-00000000f2a2', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'phase2-test@example.invalid', now(), '{"display_name":"Forum Tester"}');
+-- Only roster-linked alumni may post (phase 9).
+insert into public.alumni_members (full_name, course, student_id, year_graduated, auth_uid, is_registered_user)
+values ('Forum Tester', 'BSIT', '9999-0002', '2030', '00000000-0000-4000-8000-00000000f2a2', true);
 insert into t select 31, 'test user creates topic', '1',
   pg_temp.try_as('authenticated', '00000000-0000-4000-8000-00000000f2a2',
     $q$with i as (insert into public.forum_topics (id, title, body, author_uid, author_name) values ('00000000-0000-4000-8000-0000000f0000', 'T', 'B', '00000000-0000-4000-8000-00000000f2a2', 'Forum Tester') returning 1) select count(*)::text from i$q$);

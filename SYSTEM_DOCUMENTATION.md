@@ -714,7 +714,7 @@ One log for push alerts (`channel = 'push'`, per device token) and emails (`chan
 | `events` | Authenticated read; admin CRUD |
 | `announcements` | Authenticated read published; admin CRUD |
 
-Every RLS table (and `storage.objects`) also has the restrictive policy `active_caller_only`: a deactivated user is denied everything, even with an access token issued before deactivation. New tables must add the same policy.
+Every RLS table (and `storage.objects`) also has the restrictive policy `active_caller_only`: only admins and alumni linked to an active roster row get any access. A deactivated user, or an account created directly through Supabase Auth without the roster link, is denied everything, even with a valid access token. SECURITY DEFINER functions called by signed-in users check `caller_is_active()` themselves. New tables must add the same policy.
 
 ### Key Database Functions
 | Function | Purpose |
@@ -1062,7 +1062,7 @@ All colors, typography, spacing, motion, and component styles are centralized he
 | File | Purpose |
 |------|---------|
 | `supabase/migrations/20260716100001_phase1_schema_rls.sql` | Phase 1 schema + RLS |
-| `supabase/migrations/20261005*_phase*.sql` | Database audit phases 1–8 (integrity, RLS, performance, GTS analytics, notifications, legacy cleanup, validation fixes) |
+| `supabase/migrations/20261005*_phase*.sql` | Database audit phases 1–8 (integrity, RLS, performance, GTS analytics, notifications, legacy cleanup, validation fixes), plus `20261006010000_linked_alumni_only.sql` |
 | `supabase/functions/send-email/index.ts` | Email delivery Edge Function |
 | `supabase/functions/send-push/index.ts` | Push alert Edge Function |
 | `supabase/functions/tracer-help/index.ts` | CHED GTS AI help Edge Function |

@@ -1,0 +1,25 @@
+﻿n,test,expected,actual
+1,confirmed outsider still gets a users row,1 user,1 user
+2,"outsider: every table, view and storage blocked",all blocked,all blocked
+3,outsider: caller_is_active,false,false
+4,outsider: get_public_profiles,0,0
+5,outsider: mention search,refused,ERROR: not authenticated
+6,outsider: increment_job_views changes nothing,unchanged,unchanged
+7,outsider: edit_forum_post,not authorized,ERROR: not authorized
+8,outsider: notify_forum_mentions,refused,ERROR: not authenticated
+9,outsider: record_survey_opened,not authorized,ERROR: not authorized
+10,outsider: register_push_token,not authorized,ERROR: not authorized
+11,outsider: forum topic insert,blocked,"ERROR: new row violates row-level security policy ""active_caller_only"" for table ""forum_topics"""
+12,outsider: event comment insert,blocked,"ERROR: new row violates row-level security policy ""active_caller_only"" for table ""event_comments"""
+13,eligibility check still open to signed-in users,eligible,eligible
+14,link to roster row,true,true
+15,linked: caller_is_active,true,true
+16,linked: reads announcements,same as alumnus A,same as alumnus A
+17,linked: get_public_profiles,2,2
+18,roster link flag cleared: blocked again,false,false
+19,alumnus A: caller_is_active,true,true
+20,admin: caller_is_active,true,true
+21,mention search no longer matches emails,0,0
+22,mention search returns no email-shaped names,0,0
+23,"mention search: % is literal, not a wildcard",0,0
+24,anon cannot execute caller_is_active,no,no

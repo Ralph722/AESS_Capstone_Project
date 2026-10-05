@@ -9,11 +9,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Admin-only reminder email. Registration codes are sent by Supabase Auth.
 type EmailRequest = {
-  kind?: "otp" | "reminder";
+  kind?: "reminder";
   toEmail?: string;
   userName?: string;
-  otp?: string;
   title?: string;
   message?: string;
 };
@@ -30,39 +30,31 @@ serve(async (req) => {
   }
 
   try {
-    const body = (await req.json()) as EmailRequest;
-    const kind = body.kind;
-    const toEmail = body.toEmail?.trim();
-
-    if (kind !== "otp" && kind !== "reminder") {
-      return json({ error: "Invalid email kind" }, 400);
+    const authResult = await requireAdmin(req);
+    if (!authResult.ok) {
+      return json({ error: authResult.error }, authResult.status);
     }
 
+    const body = (await req.json()) as EmailRequest;
+    const toEmail = body.toEmail?.trim();
+    const title = body.title?.trim();
+    const message = body.message?.trim();
+
+    if (body.kind !== "reminder") {
+      return json({ error: "Invalid email kind" }, 400);
+    }
     if (!toEmail || !emailPattern.test(toEmail)) {
       return json({ error: "Valid recipient email is required" }, 400);
     }
-
-    if (kind === "otp" && !body.otp?.trim()) {
-      return json({ error: "OTP code is required" }, 400);
-    }
-
-    if (kind === "reminder") {
-      const authResult = await requireAdmin(req);
-      if (!authResult.ok) {
-        return json({ error: authResult.error }, authResult.status);
-      }
-      if (!body.title?.trim() || !body.message?.trim()) {
-        return json({ error: "Reminder title and message are required" }, 400);
-      }
+    if (!title || !message) {
+      return json({ error: "Reminder title and message are required" }, 400);
     }
 
     await sendWithGmailSmtp({
-      kind,
       toEmail,
       userName: body.userName?.trim() || "Alumni",
-      otp: body.otp?.trim(),
-      title: body.title?.trim(),
-      message: body.message?.trim(),
+      title,
+      message,
     });
 
     return json({ ok: true });
@@ -114,12 +106,10 @@ async function requireAdmin(req: Request): Promise<
 }
 
 async function sendWithGmailSmtp(params: {
-  kind: "otp" | "reminder";
   toEmail: string;
   userName: string;
-  otp?: string;
-  title?: string;
-  message?: string;
+  title: string;
+  message: string;
 }) {
   const gmailUser = Deno.env.get("GMAIL_USER");
   const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD");
@@ -129,15 +119,9 @@ async function sendWithGmailSmtp(params: {
     throw new Error("Gmail SMTP is not configured (GMAIL_USER / GMAIL_APP_PASSWORD)");
   }
 
-  const subject = params.kind === "otp"
-    ? "Your Alumni System verification code"
-    : params.title!;
-  const html = params.kind === "otp"
-    ? otpHtml(params.userName, params.otp!)
-    : reminderHtml(params.userName, params.title!, params.message!);
-  const text = params.kind === "otp"
-    ? `Hello ${params.userName}, your Alumni System verification code is ${params.otp}.`
-    : `Hello ${params.userName},\n\n${params.message}`;
+  const subject = params.title;
+  const html = reminderHtml(params.userName, params.title, params.message);
+  const text = `Hello ${params.userName},\n\n${params.message}`;
 
   const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -154,15 +138,6 @@ async function sendWithGmailSmtp(params: {
     text,
     html,
   });
-}
-
-function otpHtml(userName: string, otp: string) {
-  return `
-    <p>Hello ${escapeHtml(userName)},</p>
-    <p>Your Alumni System verification code is:</p>
-    <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">${escapeHtml(otp)}</p>
-    <p>If you did not request this code, you can ignore this email.</p>
-  `;
 }
 
 function reminderHtml(userName: string, title: string, message: string) {

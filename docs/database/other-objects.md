@@ -9,7 +9,8 @@ Enums, views, storage buckets, Realtime publications, scheduled jobs and extensi
 
 | Name | Settings |
 |---|---|
-| images | public=true, size_limit=none, mime=any |
+| images | public=true, size_limit=2097152, mime=image/jpeg |
+| message-attachments | public=false, size_limit=2097152, mime=image/jpeg |
 
 ## Tables published to Realtime
 

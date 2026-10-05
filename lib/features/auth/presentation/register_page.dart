@@ -1,13 +1,12 @@
-import 'dart:math';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:alumni_system/core/config/email_delivery_config.dart';
 import 'package:alumni_system/core/constants/course_constants.dart';
+import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/auth/presentation/auth_shell.dart';
 import 'package:alumni_system/features/onboarding/presentation/alumni_home_gate.dart';
 import 'package:alumni_system/features/auth/data/alumni_eligibility_service.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
-import 'package:alumni_system/core/services/email_service.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
@@ -36,11 +35,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _eligibilityVerified = false;
   String? _eligibilityErrorMessage;
   String? _rosterMemberId;
-  String? _generatedOtp;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  int _resendSeconds = 0;
+  Timer? _resendTimer;
 
-  late final EmailService _emailService;
   final AuthService _authService = AuthService();
   final AlumniEligibilityService _eligibilityService =
       AlumniEligibilityService();
@@ -55,13 +54,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _emailService = EmailService();
-  }
-
-  @override
   void dispose() {
+    _resendTimer?.cancel();
     _fullNameController.dispose();
     _studentIdController.dispose();
     _emailController.dispose();
@@ -153,11 +147,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 autofillHints: const [AutofillHints.email],
-                enabled: !_identityLocked,
+                enabled: !_otpSent,
                 decoration: authFieldDecoration(
                   label: 'Gmail address',
                   icon: Icons.email_outlined,
-                  enabled: !_identityLocked,
+                  enabled: !_otpSent,
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
@@ -180,7 +174,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   label: 'Password',
                   icon: Icons.lock_outline,
                   enabled: _eligibilityVerified && !_otpSent,
-                  helperText: 'At least 6 characters',
+                  helperText: 'At least 8 characters, with letters and numbers',
                   suffixIcon: _visibilityToggle(
                     obscured: _obscurePassword,
                     onPressed: () =>
@@ -189,8 +183,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: (v) {
                   if (!_eligibilityVerified) return null;
-                  if (v == null || v.length < 6) {
-                    return 'At least 6 characters';
+                  if (v == null || v.length < 8) {
+                    return 'At least 8 characters';
+                  }
+                  if (!RegExp(r'[A-Za-z]').hasMatch(v) ||
+                      !RegExp(r'[0-9]').hasMatch(v)) {
+                    return 'Use both letters and numbers';
                   }
                   return null;
                 },
@@ -255,11 +253,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     icon: Icons.verified_user_outlined,
                   ),
                   validator: (v) {
-                    if (v == null || v.length != 6) {
-                      return 'Enter the 6-digit OTP';
+                    if (v == null || !RegExp(r'^\d{6}$').hasMatch(v.trim())) {
+                      return 'Enter the 6-digit code';
                     }
                     return null;
                   },
+                ),
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: _isLoading || _resendSeconds > 0
+                          ? null
+                          : _resendCode,
+                      style: PortalTheme.ghostButton(dense: true),
+                      child: Text(
+                        _resendSeconds > 0
+                            ? 'Resend code in ${_resendSeconds}s'
+                            : 'Resend code',
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _isLoading ? null : _useDifferentEmail,
+                      style: PortalTheme.ghostButton(dense: true),
+                      child: const Text('Use a different email'),
+                    ),
+                  ],
                 ),
               ],
               const SizedBox(height: PortalTheme.space4),
@@ -312,9 +332,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String get _submitLabel {
     if (_otpSent) {
-      return 'Verify OTP & create account';
+      return 'Verify code & create account';
     } else if (_eligibilityVerified) {
-      return 'Send OTP to Gmail';
+      return 'Send code to Gmail';
     } else {
       return 'Verify alumni status';
     }
@@ -373,16 +393,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     if (!_otpSent) {
-      await _sendOtp();
+      await _startRegistration();
       return;
     }
 
-    if (_otpController.text.trim() != _generatedOtp) {
-      _showError('Invalid OTP. Please try again.');
-      return;
-    }
-
-    await _createAccount();
+    await _verifyCode();
   }
 
   Future<void> _verifyEligibility() async {
@@ -470,37 +485,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Future<void> _sendOtp() async {
-    if (!EmailDeliveryConfig.isConfigured) {
-      _showError(
-        'Email verification is not configured. Check Gmail SMTP / Supabase secrets.',
-      );
-      return;
-    }
-
+  Future<void> _startRegistration() async {
     setState(() => _isLoading = true);
-    final otp = _generateOtp();
-
     try {
-      await _emailService.sendOtpEmail(
-        toEmail: _emailController.text.trim(),
-        otp: otp,
-        username: _fullNameController.text.trim(),
+      final result = await _authService.startRegistration(
+        email: _emailController.text,
+        password: _passwordController.text,
+        fullName: _fullNameController.text,
       );
+      if (result == RegistrationStart.signedIn) {
+        await _completeRegistration();
+        return;
+      }
       if (!mounted) return;
-      setState(() {
-        _generatedOtp = otp;
-        _otpSent = true;
-      });
-      showAuthFeedback(context, 'OTP sent to your Gmail.', error: false);
+      setState(() => _otpSent = true);
+      _startResendCooldown();
+      showAuthFeedback(
+        context,
+        'We emailed a 6-digit code to your Gmail.',
+        error: false,
+      );
     } catch (e) {
-      _showError('Failed to send OTP: $e');
+      _showError(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _createAccount() async {
+  Future<void> _verifyCode() async {
+    setState(() => _isLoading = true);
+    try {
+      await _authService.verifyRegistrationCode(
+        email: _emailController.text,
+        code: _otpController.text,
+        password: _passwordController.text,
+      );
+    } catch (e) {
+      _showError(e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    await _completeRegistration();
+  }
+
+  Future<void> _resendCode() async {
+    setState(() => _isLoading = true);
+    try {
+      await _authService.resendRegistrationCode(_emailController.text);
+      _startResendCooldown();
+      if (!mounted) return;
+      showAuthFeedback(context, 'A new code is on its way.', error: false);
+    } catch (e) {
+      _showError(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _useDifferentEmail() {
+    _resendTimer?.cancel();
+    setState(() {
+      _otpSent = false;
+      _resendSeconds = 0;
+      _otpController.clear();
+    });
+  }
+
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendSeconds = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _resendSeconds <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _resendSeconds = 0);
+        return;
+      }
+      setState(() => _resendSeconds--);
+    });
+  }
+
+  /// Links the now signed-in, email-verified account to its roster record.
+  Future<void> _completeRegistration() async {
     if (_rosterMemberId == null) {
       _showError('Please verify alumni status again.');
       return;
@@ -515,12 +580,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _studentIdController.text,
       );
 
-      final user = await _authService.registerWithEmailPassword(
-        email,
-        _passwordController.text,
-        fullName,
-      );
-
+      final user = AppSession.currentUser;
       if (user == null) {
         throw Exception('Account creation failed.');
       }
@@ -569,11 +629,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  String _generateOtp() {
-    final random = Random.secure();
-    return (random.nextInt(900000) + 100000).toString();
   }
 
   void _showError(String message) {

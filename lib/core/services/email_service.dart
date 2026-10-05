@@ -7,26 +7,6 @@ class EmailService {
 
   final SupabaseClient _supabase;
 
-  Future<void> sendOtpEmail({
-    required String toEmail,
-    required String otp,
-    required String username,
-  }) async {
-    try {
-      await _supabase.functions.invoke(
-        EmailDeliveryConfig.functionName,
-        body: {
-          'kind': 'otp',
-          'toEmail': toEmail,
-          'userName': username,
-          'otp': otp,
-        },
-      );
-    } catch (e) {
-      throw Exception('Error sending OTP: $e');
-    }
-  }
-
   /// Tracer survey / announcement reminder via Gmail SMTP.
   Future<void> sendSurveyReminderEmail({
     required String toEmail,

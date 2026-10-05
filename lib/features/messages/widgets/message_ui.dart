@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'package:alumni_system/features/messages/widgets/message_image_download.dart';
+import 'package:alumni_system/features/messages/widgets/resolved_message_image.dart';
 
 /// Fullscreen zoomable image viewer for chat attachments.
 Future<void> showMessageImageViewer({
@@ -33,13 +34,22 @@ Future<void> showMessageImageViewer({
                         return _brokenImage();
                       },
                     )
-                  : Image.network(
-                      imageUrl,
-                      fit: BoxFit.contain,
-                      gaplessPlayback: true,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _brokenImage();
-                      },
+                  : ResolvedMessageImage(
+                      imageRef: imageUrl,
+                      placeholder: const SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                      error: _brokenImage(),
+                      builder: (url) => Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        gaplessPlayback: true,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _brokenImage();
+                        },
+                      ),
                     ),
             ),
           ),

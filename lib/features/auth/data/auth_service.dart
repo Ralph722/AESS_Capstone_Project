@@ -5,6 +5,8 @@ import 'package:alumni_system/features/home/data/survey_attention_reminder.dart'
 
 enum UserRole { admin, user }
 
+enum RegistrationStart { codeSent, signedIn }
+
 /// Authentication — Supabase Auth only (Firebase removed).
 class AuthService {
   AuthService({SupabaseClient? supabase})
@@ -62,28 +64,6 @@ class AuthService {
     return getUserRole(id);
   }
 
-  /// Creates or updates the alumni profile row after registration.
-  Future<void> createAlumniUserProfile({
-    required String uid,
-    required String displayName,
-    required String email,
-    required String studentId,
-    required String course,
-  }) async {
-    await _supabase.from('users').upsert({
-      'id': uid,
-      'role': 'user',
-      'display_name': displayName,
-      'email': email.trim(),
-      'student_id': studentId,
-      'program': course,
-      'onboarding_complete': false,
-      'tracer_profile_completion': 0,
-      'tracer_profile_complete': false,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }, onConflict: 'id');
-  }
-
   Future<void> setUserRole(
     String uid,
     UserRole role, {
@@ -134,65 +114,104 @@ class AuthService {
     }
   }
 
-  /// Creates the Auth user (or recovers an orphan Auth row with no profile),
-  /// then signs in and upserts the alumni profile.
-  Future<User?> registerWithEmailPassword(
-    String email,
-    String password,
-    String fullName,
-  ) async {
+  /// Starts sign-up through Supabase Auth, which emails a 6-digit code.
+  ///
+  /// Returns [RegistrationStart.signedIn] when no code is needed: the email
+  /// already belongs to a confirmed account and [password] is its password,
+  /// or email confirmation is turned off for the project.
+  Future<RegistrationStart> startRegistration({
+    required String email,
+    required String password,
+    required String fullName,
+  }) async {
     final normalizedEmail = email.trim().toLowerCase();
     try {
-      final invoke = await _supabase.functions.invoke(
-        'register-account',
-        body: {
-          'email': normalizedEmail,
-          'password': password,
-          'displayName': fullName,
-        },
-      );
-
-      final data = invoke.data;
-      if (data is Map && data['error'] != null) {
-        throw Exception(data['error'].toString());
-      }
-      if (invoke.status >= 400) {
-        final message = data is Map && data['error'] != null
-            ? data['error'].toString()
-            : 'Account creation failed.';
-        throw Exception(message);
-      }
-
-      final response = await _supabase.auth.signInWithPassword(
+      final response = await _supabase.auth.signUp(
         email: normalizedEmail,
         password: password,
+        data: {'display_name': fullName.trim()},
       );
-      final user = response.user ?? AppSession.currentUser;
-      if (user == null) {
-        throw Exception('Account creation failed.');
+      if (response.session != null) return RegistrationStart.signedIn;
+      // Supabase hides existing confirmed accounts behind a user with no
+      // identities instead of returning an error.
+      final identities = response.user?.identities;
+      if (identities != null && identities.isEmpty) {
+        return _signInExistingAccount(normalizedEmail, password);
       }
+      return RegistrationStart.codeSent;
+    } on AuthException catch (e) {
+      final message = e.message.toLowerCase();
+      if (e.code == 'user_already_exists' ||
+          message.contains('already registered') ||
+          message.contains('already been registered')) {
+        return _signInExistingAccount(normalizedEmail, password);
+      }
+      throw Exception(_handleAuthException(e));
+    }
+  }
 
-      await createAlumniUserProfile(
-        uid: user.id,
-        displayName: fullName,
-        email: normalizedEmail,
-        studentId: '',
-        course: '',
-      );
-      return user;
-    } on FunctionException catch (e) {
-      final details = e.details;
-      if (details is Map && details['error'] != null) {
-        throw Exception(details['error'].toString());
-      }
+  Future<RegistrationStart> _signInExistingAccount(
+    String email,
+    String password,
+  ) async {
+    try {
+      await _supabase.auth.signInWithPassword(email: email, password: password);
+      return RegistrationStart.signedIn;
+    } on AuthException {
       throw Exception(
-        e.reasonPhrase?.isNotEmpty == true
-            ? e.reasonPhrase!
-            : 'Account creation failed.',
+        'An account already exists for this email. '
+        'Log in with your existing password instead.',
+      );
+    }
+  }
+
+  Future<void> resendRegistrationCode(String email) async {
+    try {
+      await _supabase.auth.resend(
+        type: OtpType.signup,
+        email: email.trim().toLowerCase(),
       );
     } on AuthException catch (e) {
       throw Exception(_handleAuthException(e));
     }
+  }
+
+  /// Confirms the emailed code, which signs the user in.
+  Future<User> verifyRegistrationCode({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    final AuthResponse response;
+    try {
+      response = await _supabase.auth.verifyOTP(
+        email: email.trim().toLowerCase(),
+        token: code.trim(),
+        type: OtpType.signup,
+      );
+    } on AuthException catch (e) {
+      final message = e.message.toLowerCase();
+      if (e.code == 'otp_expired' ||
+          message.contains('expired') ||
+          message.contains('invalid')) {
+        throw Exception(
+          'That code is invalid or has expired. '
+          'Use the latest code we emailed, or request a new one.',
+        );
+      }
+      throw Exception(_handleAuthException(e));
+    }
+
+    final user = response.user ?? AppSession.currentUser;
+    if (user == null) {
+      throw Exception('Verification failed. Request a new code and try again.');
+    }
+    // Repeating a sign-up for an unconfirmed email keeps the first password,
+    // so set the one this person just chose.
+    try {
+      await _supabase.auth.updateUser(UserAttributes(password: password));
+    } on AuthException catch (_) {}
+    return user;
   }
 
   Future<void> logout() async {
@@ -268,6 +287,14 @@ class AuthService {
     }
     if (message.contains('email not confirmed')) {
       return 'Please confirm your email before signing in.';
+    }
+    if (message.contains('banned')) {
+      return 'This alumni account has been deactivated. '
+          'Please contact the alumni office.';
+    }
+    if (e.code == 'over_email_send_rate_limit' ||
+        message.contains('rate limit')) {
+      return 'Too many emails were sent. Please wait a few minutes and try again.';
     }
     if (message.contains('already registered') ||
         message.contains('already been registered')) {

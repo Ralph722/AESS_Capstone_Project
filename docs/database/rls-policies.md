@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-123 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+126 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
@@ -11,9 +11,8 @@
 |---|---|---|---|---|
 | alumni_members_delete_admin_only | DELETE | authenticated | `is_admin()` |  |
 | alumni_members_insert_admin_only | INSERT | authenticated |  | `is_admin()` |
-| alumni_members_select_anon_unclaimed | SELECT | anon | `(is_registered_user = false)` |  |
-| alumni_members_select_auth_admin_or_owner_or_unclaimed | SELECT | authenticated | `(is_admin() OR (auth_uid = auth.uid()) OR (is_registered_user = false))` |  |
-| alumni_members_update_admin_or_owner | UPDATE | authenticated | `(is_admin() OR (auth_uid = auth.uid()) OR ((auth_uid IS NULL) AND (is_registered_user = false)))` | `(is_admin() OR (auth_uid = auth.uid()))` |
+| alumni_members_select_admin_or_owner | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (auth_uid = ( SELECT auth.uid() AS uid)))` |  |
+| alumni_members_update_admin_or_owner | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (auth_uid = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (auth_uid = ( SELECT auth.uid() AS uid)))` |
 
 ## public.announcements
 
@@ -324,9 +323,13 @@
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
 | images_owner_delete | DELETE | authenticated | `((bucket_id = 'images'::text) AND (is_admin() OR (((storage.foldername(name))[1] = 'messages'::text) AND ((storage.foldername(name))[2] = (auth.uid())::text)) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (auth.uid())::text) \|\| '%'::text)))))` |  |
-| images_owner_insert | INSERT | authenticated |  | `((bucket_id = 'images'::text) AND (is_admin() OR (((storage.foldername(name))[1] = 'messages'::text) AND ((storage.foldername(name))[2] = (auth.uid())::text)) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (auth.uid())::text) \|\| '%'::text)))))` |
-| images_public_read | SELECT | public | `(bucket_id = 'images'::text)` |  |
-| images_owner_update | UPDATE | authenticated | `((bucket_id = 'images'::text) AND (is_admin() OR (((storage.foldername(name))[1] = 'messages'::text) AND ((storage.foldername(name))[2] = (auth.uid())::text)) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (auth.uid())::text) \|\| '%'::text)))))` | `((bucket_id = 'images'::text) AND (is_admin() OR (((storage.foldername(name))[1] = 'messages'::text) AND ((storage.foldername(name))[2] = (auth.uid())::text)) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (auth.uid())::text) \|\| '%'::text)))))` |
+| message_attachments_delete_own_or_admin | DELETE | authenticated | `((bucket_id = 'message-attachments'::text) AND (((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text) OR ( SELECT is_admin() AS is_admin)))` |  |
+| images_owner_insert | INSERT | authenticated |  | `((bucket_id = 'images'::text) AND (( SELECT is_admin() AS is_admin) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (( SELECT auth.uid() AS uid))::text) \|\| '%'::text)))))` |
+| message_attachments_insert_own | INSERT | authenticated |  | `((bucket_id = 'message-attachments'::text) AND ((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text))` |
+| images_public_read | SELECT | authenticated | `(bucket_id = 'images'::text)` |  |
+| message_attachments_select_participants | SELECT | authenticated | `((bucket_id = 'message-attachments'::text) AND (((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text) OR ( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1 FROM messages m WHERE ((m.image_base64 = ('message-attachments/'::text \|\| objects.name)) AND (m.recipient_id = ( SELECT auth.uid() AS uid)))))))` |  |
+| images_owner_update | UPDATE | authenticated | `((bucket_id = 'images'::text) AND (( SELECT is_admin() AS is_admin) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (( SELECT auth.uid() AS uid))::text) \|\| '%'::text)))))` | `((bucket_id = 'images'::text) AND (( SELECT is_admin() AS is_admin) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (( SELECT auth.uid() AS uid))::text) \|\| '%'::text)))))` |
+| message_attachments_update_own | UPDATE | authenticated | `((bucket_id = 'message-attachments'::text) AND ((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text))` | `((bucket_id = 'message-attachments'::text) AND ((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text))` |
 
 ## Table grants
 

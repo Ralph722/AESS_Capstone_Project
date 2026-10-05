@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 import 'package:alumni_system/features/messages/models/message_filters.dart';
 import 'package:alumni_system/features/messages/widgets/message_a11y.dart';
 import 'package:alumni_system/features/messages/widgets/message_theme.dart';
@@ -622,9 +623,25 @@ Future<void> copyAdminImageLink(BuildContext context, String? url) async {
     );
     return;
   }
-  await Clipboard.setData(ClipboardData(text: url));
+  final String link;
+  try {
+    link = await ImageStorageService.resolveMessageImageUrl(url);
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not create an image link')),
+    );
+    return;
+  }
+  await Clipboard.setData(ClipboardData(text: link));
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Image link copied')),
+    SnackBar(
+      content: Text(
+        ImageStorageService.isMessageAttachmentRef(url)
+            ? 'Image link copied (works for 1 hour)'
+            : 'Image link copied',
+      ),
+    ),
   );
 }

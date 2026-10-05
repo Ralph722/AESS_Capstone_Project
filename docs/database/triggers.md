@@ -2,19 +2,21 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-58 triggers on tables in the `public` and `auth` schemas.
+60 triggers on tables in the `public` and `auth` schemas.
 
 
 ## auth.users
 
 | Trigger | Definition |
 |---|---|
-| on_auth_user_created | `AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()` |
+| on_auth_user_created | `AFTER INSERT OR UPDATE OF email_confirmed_at ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()` |
 
 ## public.alumni_members
 
 | Trigger | Definition |
 |---|---|
+| trg_alumni_members_guard_owner_update | `BEFORE UPDATE ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION alumni_members_guard_owner_update()` |
+| trg_alumni_members_sync_auth_ban | `AFTER UPDATE OF is_deactivated ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION alumni_members_sync_auth_ban()` |
 | trg_alumni_members_updated_at | `BEFORE UPDATE ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 
 ## public.announcements

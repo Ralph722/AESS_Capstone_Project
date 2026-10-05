@@ -3,10 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Uploads images to Supabase Storage and returns public URLs.
+/// Uploads images to Supabase Storage.
 ///
-/// Replaces the previous base64-in-database approach: only a short URL is
-/// stored in Postgres, files live in the public `images` bucket.
+/// Avatars, event covers and job logos live in the public `images` bucket and
+/// are stored as public URLs. Chat images live in the private
+/// `message-attachments` bucket and are stored as a reference
+/// (`message-attachments/<uid>/<messageId>.jpg`) that is turned into a
+/// short-lived signed URL when displayed.
 class ImageStorageService {
   ImageStorageService({SupabaseClient? supabase})
     : _supabase = supabase ?? Supabase.instance.client;
@@ -14,6 +17,10 @@ class ImageStorageService {
   final SupabaseClient _supabase;
 
   static const String bucket = 'images';
+  static const String messageBucket = 'message-attachments';
+  static const String messageRefPrefix = '$messageBucket/';
+  static const Duration _signedUrlLifetime = Duration(hours: 1);
+  static final Map<String, ({String url, DateTime expiresAt})> _signedUrls = {};
   static const int maxUploadBytes = 1024 * 1024;
   static final RegExp _safePathSegment = RegExp(r'^[a-zA-Z0-9_-]{1,128}$');
 
@@ -77,14 +84,36 @@ class ImageStorageService {
     return compressed;
   }
 
-  /// True when [url] is a Storage message attachment (not raw base64).
-  static bool isAllowedMessageImageUrl(String? url) {
-    if (url == null || url.trim().isEmpty) return true;
-    final clean = url.trim();
-    if (clean.startsWith('data:')) return false;
-    if (clean.length > 2048) return false;
-    return clean.contains('/object/public/$bucket/messages/') ||
-        clean.startsWith('messages/');
+  /// True when [ref] is a private chat attachment reference (or empty).
+  static bool isAllowedMessageImageUrl(String? ref) {
+    if (ref == null || ref.trim().isEmpty) return true;
+    return isMessageAttachmentRef(ref.trim());
+  }
+
+  static bool isMessageAttachmentRef(String? ref) =>
+      ref != null && ref.startsWith(messageRefPrefix);
+
+  /// Returns a URL that can be displayed or downloaded for a stored chat image.
+  ///
+  /// Private attachment references become signed URLs (cached until shortly
+  /// before they expire); legacy URLs and data URLs are returned unchanged.
+  static Future<String> resolveMessageImageUrl(
+    String ref, {
+    SupabaseClient? client,
+  }) async {
+    if (!isMessageAttachmentRef(ref)) return ref;
+    final cached = _signedUrls[ref];
+    final now = DateTime.now();
+    if (cached != null &&
+        cached.expiresAt.isAfter(now.add(const Duration(minutes: 5)))) {
+      return cached.url;
+    }
+    final path = ref.substring(messageRefPrefix.length);
+    final url = await (client ?? Supabase.instance.client).storage
+        .from(messageBucket)
+        .createSignedUrl(path, _signedUrlLifetime.inSeconds);
+    _signedUrls[ref] = (url: url, expiresAt: now.add(_signedUrlLifetime));
+    return url;
   }
 
   static String sanitizePathSegment(String raw, {required String label}) {
@@ -103,6 +132,22 @@ class ImageStorageService {
     required String path,
     String contentType = 'image/jpeg',
   }) async {
+    await _uploadJpeg(
+      bucketId: bucket,
+      bytes: bytes,
+      path: path,
+      contentType: contentType,
+    );
+    final url = _supabase.storage.from(bucket).getPublicUrl(path);
+    return '$url?v=${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  Future<void> _uploadJpeg({
+    required String bucketId,
+    required Uint8List bytes,
+    required String path,
+    required String contentType,
+  }) async {
     if (bytes.isEmpty) {
       throw ArgumentError('Cannot upload empty image.');
     }
@@ -119,14 +164,12 @@ class ImageStorageService {
     }
 
     await _supabase.storage
-        .from(bucket)
+        .from(bucketId)
         .uploadBinary(
           path,
           jpeg,
           fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
         );
-    final url = _supabase.storage.from(bucket).getPublicUrl(path);
-    return '$url?v=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   /// Uploads a profile avatar for [userId]. Stable path so it overwrites.
@@ -138,18 +181,23 @@ class ImageStorageService {
     return uploadImage(bytes: bytes, path: 'avatars/$uid.jpg');
   }
 
-  /// Uploads a chat image under the authenticated user's folder only.
+  /// Uploads a chat image under the authenticated user's folder of the
+  /// private bucket and returns its stored reference.
   Future<String> uploadMessageImage({
     required String userId,
     required String messageId,
     required Uint8List bytes,
-  }) {
+  }) async {
     final uid = _requireAuthUidMatching(userId);
     final safeMessageId = sanitizePathSegment(messageId, label: 'messageId');
-    return uploadImage(
+    final path = messageImagePath(uid, safeMessageId);
+    await _uploadJpeg(
+      bucketId: messageBucket,
       bytes: bytes,
-      path: messageImagePath(uid, safeMessageId),
+      path: path,
+      contentType: 'image/jpeg',
     );
+    return '$messageRefPrefix$path';
   }
 
   String _requireAuthUidMatching(String userId) {
@@ -165,10 +213,20 @@ class ImageStorageService {
   }
 
   static String messageImagePath(String userId, String messageId) =>
-      'messages/$userId/$messageId.jpg';
+      '$userId/$messageId.jpg';
 
-  /// Best-effort delete for a chat attachment URL or storage path.
+  /// Best-effort delete for a chat attachment reference or legacy URL.
   Future<void> deleteMessageImageByUrl(String? imageUrl) async {
+    if (isMessageAttachmentRef(imageUrl)) {
+      final ref = imageUrl!;
+      _signedUrls.remove(ref);
+      try {
+        await _supabase.storage.from(messageBucket).remove([
+          ref.substring(messageRefPrefix.length),
+        ]);
+      } catch (_) {}
+      return;
+    }
     final path = storagePathFromPublicUrl(imageUrl);
     if (path == null) return;
     try {
@@ -181,7 +239,7 @@ class ImageStorageService {
     required String messageId,
   }) async {
     try {
-      await _supabase.storage.from(bucket).remove([
+      await _supabase.storage.from(messageBucket).remove([
         messageImagePath(userId, messageId),
       ]);
     } catch (_) {}

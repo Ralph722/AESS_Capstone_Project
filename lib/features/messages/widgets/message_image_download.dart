@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/web_file_download.dart';
+import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 
 /// Downloads a chat attachment (web file save) or opens it (mobile).
 Future<void> downloadMessageImage({
@@ -29,7 +30,8 @@ Future<void> downloadMessageImage({
         if (mimePart.startsWith('image/')) mime = mimePart;
         bytes = base64Decode(imageUrl.substring(comma + 1));
       } else {
-        final response = await http.get(Uri.parse(imageUrl));
+        final url = await ImageStorageService.resolveMessageImageUrl(imageUrl);
+        final response = await http.get(Uri.parse(url));
         if (response.statusCode < 200 || response.statusCode >= 300) {
           throw StateError('HTTP ${response.statusCode}');
         }
@@ -61,7 +63,9 @@ Future<void> downloadMessageImage({
 
     // Mobile / desktop: open the image URL when remote; otherwise save via web-only path.
     if (!imageUrl.startsWith('data:')) {
-      final uri = Uri.tryParse(imageUrl);
+      final uri = Uri.tryParse(
+        await ImageStorageService.resolveMessageImageUrl(imageUrl),
+      );
       if (uri != null && await canLaunchUrl(uri)) {
         final launched = await launchUrl(
           uri,

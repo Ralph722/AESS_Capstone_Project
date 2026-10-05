@@ -5,6 +5,7 @@ import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/messages/widgets/message_a11y.dart';
 import 'package:alumni_system/features/messages/widgets/message_image_download.dart';
 import 'package:alumni_system/features/messages/widgets/message_theme.dart';
+import 'package:alumni_system/features/messages/widgets/resolved_message_image.dart';
 import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 
 enum MessageSendStatus { sent, sending, failed }
@@ -663,21 +664,26 @@ class _ImageThumb extends StatelessWidget {
     } else if (imageUrl.startsWith('data:')) {
       image = _broken();
     } else {
-      image = Image.network(
-        imageUrl,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        // Width-only cache keeps original aspect ratio of decoded pixels.
-        cacheWidth: 720,
-        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-          if (wasSynchronouslyLoaded || frame != null) return child;
-          return _placeholder();
-        },
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return _placeholder();
-        },
-        errorBuilder: (_, __, ___) => _broken(),
+      image = ResolvedMessageImage(
+        imageRef: imageUrl,
+        placeholder: _placeholder(),
+        error: _broken(),
+        builder: (url) => Image.network(
+          url,
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          // Width-only cache keeps original aspect ratio of decoded pixels.
+          cacheWidth: 720,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded || frame != null) return child;
+            return _placeholder();
+          },
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return _placeholder();
+          },
+          errorBuilder: (_, __, ___) => _broken(),
+        ),
       );
     }
 

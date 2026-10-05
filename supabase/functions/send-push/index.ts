@@ -1,4 +1,4 @@
-// Sends queued push deliveries (public.notification_push_deliveries).
+// Sends queued push deliveries (public.notification_deliveries, channel 'push').
 //
 // Invoked by the database (pg_net) with the shared x-dispatch-secret header,
 // never by the app. Provider credentials are Edge Function secrets:

@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-110 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
+109 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
 
 | Function | Arguments | Returns | Security | Settings | anon can run | authenticated can run | Language |
 |---|---|---|---|---|---|---|---|
@@ -80,7 +80,6 @@
 | notify_forum_topic_removed |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_job_changes |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_message_recipient |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
-| notify_new_message | `p_recipient_id uuid, p_message_id uuid, p_sender_name text, p_sender_id uuid, p_sender_role text, p_preview text` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | notify_survey_assignment_created |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_survey_published |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_survey_submitted |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |

@@ -210,22 +210,22 @@
 | idx_messages_recipient_id |  | `btree (recipient_id)` |
 | messages_pkey | PK | `btree (id)` |
 
+## notification_deliveries
+
+| Index | Kind | Definition |
+|---|---|---|
+| idx_notification_deliveries_token_id |  | `btree (token_id)` |
+| idx_notification_deliveries_user_id |  | `btree (user_id)` |
+| notification_deliveries_created_idx |  | `btree (created_at DESC)` |
+| notification_deliveries_due_idx |  | `btree (scheduled_at) WHERE ((channel = 'push'::text) AND (status = ANY (ARRAY['queued'::text, 'sending'::text])))` |
+| notification_deliveries_notification_id_token_id_key | UNIQUE | `btree (notification_id, token_id)` |
+| notification_deliveries_pkey | PK | `btree (id)` |
+
 ## notification_preferences
 
 | Index | Kind | Definition |
 |---|---|---|
 | notification_preferences_pkey | PK | `btree (user_id)` |
-
-## notification_push_deliveries
-
-| Index | Kind | Definition |
-|---|---|---|
-| idx_notification_push_deliveries_token_id |  | `btree (token_id)` |
-| idx_notification_push_deliveries_user_id |  | `btree (user_id)` |
-| notification_push_deliveries_created_idx |  | `btree (created_at DESC)` |
-| notification_push_deliveries_due_idx |  | `btree (scheduled_at) WHERE (status = ANY (ARRAY['queued'::text, 'sending'::text]))` |
-| notification_push_deliveries_notification_id_token_id_key | UNIQUE | `btree (notification_id, token_id)` |
-| notification_push_deliveries_pkey | PK | `btree (id)` |
 
 ## notifications
 

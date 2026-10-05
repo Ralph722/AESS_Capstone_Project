@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-135 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+134 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
@@ -203,6 +203,12 @@
 | messages_select_participant_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)) OR (recipient_id = ( SELECT auth.uid() AS uid)))` |  |
 | messages_update_participant_or_admin | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)) OR (recipient_id = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)) OR (recipient_id = ( SELECT auth.uid() AS uid)))` |
 
+## public.notification_deliveries
+
+| Policy | Command | Roles | USING | WITH CHECK |
+|---|---|---|---|---|
+| notification_deliveries_admin_select | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+
 ## public.notification_preferences
 
 | Policy | Command | Roles | USING | WITH CHECK |
@@ -210,12 +216,6 @@
 | notification_preferences_insert_own | INSERT | public |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | notification_preferences_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | notification_preferences_update_own | UPDATE | public | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
-
-## public.notification_push_deliveries
-
-| Policy | Command | Roles | USING | WITH CHECK |
-|---|---|---|---|---|
-| notification_push_deliveries_admin_select | SELECT | public | `( SELECT is_admin() AS is_admin)` |  |
 
 ## public.notifications
 
@@ -324,7 +324,6 @@
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
 | user_notifications_delete_owner | DELETE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
-| user_notifications_insert_admin_or_owner | INSERT | authenticated |  | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |
 | user_notifications_select_owner | SELECT | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | user_notifications_update_delete_owner | UPDATE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
@@ -406,10 +405,9 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | jobs | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | messages | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | messages | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| notification_deliveries | authenticated | SELECT |
 | notification_preferences | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | notification_preferences | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| notification_push_deliveries | anon | REFERENCES, SELECT, TRIGGER, TRUNCATE |
-| notification_push_deliveries | authenticated | REFERENCES, SELECT, TRIGGER, TRUNCATE |
 | notifications | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | notifications | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | programs | anon | SELECT |
@@ -434,7 +432,6 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | surveys | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | tracer_draft_reminders | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | tracer_draft_reminders | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| user_notifications | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE |
-| user_notifications | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE |
+| user_notifications | authenticated | DELETE, REFERENCES, SELECT, TRIGGER, TRUNCATE |
 | users | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | users | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |

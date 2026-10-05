@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Public schema: 43 tables, 475 columns.
+Public schema: 43 tables, 478 columns.
 
 | Table | Columns | Row level security |
 |---|---|---|
@@ -32,8 +32,8 @@ Public schema: 43 tables, 475 columns.
 | [job_interests](#job_interests) | 3 | enabled=true, forced=false |
 | [jobs](#jobs) | 10 | enabled=true, forced=false |
 | [messages](#messages) | 15 | enabled=true, forced=false |
+| [notification_deliveries](#notification_deliveries) | 14 | enabled=true, forced=false |
 | [notification_preferences](#notification_preferences) | 9 | enabled=true, forced=false |
-| [notification_push_deliveries](#notification_push_deliveries) | 11 | enabled=true, forced=false |
 | [notifications](#notifications) | 9 | enabled=true, forced=false |
 | [programs](#programs) | 5 | enabled=true, forced=false |
 | [push_tokens](#push_tokens) | 12 | enabled=true, forced=false |
@@ -456,6 +456,25 @@ Public schema: 43 tables, 475 columns.
 | sender_email | text | yes | `''::text` |  |
 | edited_at | timestamp with time zone |  |  |  |
 
+## notification_deliveries
+
+| Column | Type | Not null | Default | Generated |
+|---|---|---|---|---|
+| id | uuid | yes | `gen_random_uuid()` |  |
+| notification_id | uuid |  |  |  |
+| user_id | uuid |  |  |  |
+| token_id | uuid |  |  |  |
+| status | text | yes | `'queued'::text` |  |
+| scheduled_at | timestamp with time zone | yes | `now()` |  |
+| attempts | integer | yes | `0` |  |
+| last_error | text |  |  |  |
+| created_at | timestamp with time zone | yes | `now()` |  |
+| claimed_at | timestamp with time zone |  |  |  |
+| sent_at | timestamp with time zone |  |  |  |
+| channel | text | yes | `'push'::text` |  |
+| recipient | text |  |  |  |
+| data | jsonb | yes | `'{}'::jsonb` |  |
+
 ## notification_preferences
 
 | Column | Type | Not null | Default | Generated |
@@ -469,22 +488,6 @@ Public schema: 43 tables, 475 columns.
 | timezone | text | yes | `'Asia/Manila'::text` |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
-
-## notification_push_deliveries
-
-| Column | Type | Not null | Default | Generated |
-|---|---|---|---|---|
-| id | uuid | yes | `gen_random_uuid()` |  |
-| notification_id | uuid | yes |  |  |
-| user_id | uuid | yes |  |  |
-| token_id | uuid | yes |  |  |
-| status | text | yes | `'queued'::text` |  |
-| scheduled_at | timestamp with time zone | yes | `now()` |  |
-| attempts | integer | yes | `0` |  |
-| last_error | text |  |  |  |
-| created_at | timestamp with time zone | yes | `now()` |  |
-| claimed_at | timestamp with time zone |  |  |  |
-| sent_at | timestamp with time zone |  |  |  |
 
 ## notifications
 

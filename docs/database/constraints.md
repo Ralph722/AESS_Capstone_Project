@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 155 constraints in total.
+Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 157 constraints in total.
 
 
 ## alumni_members
@@ -225,23 +225,25 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | messages_sender_id_fkey | Foreign key | `FOREIGN KEY (sender_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | messages_pkey | Primary key | `PRIMARY KEY (id)` |
 
+## notification_deliveries
+
+| Constraint | Kind | Definition |
+|---|---|---|
+| notification_deliveries_channel_check | Check | `CHECK ((channel = ANY (ARRAY['push'::text, 'email'::text, 'sms'::text])))` |
+| notification_deliveries_status_check | Check | `CHECK ((status = ANY (ARRAY['queued'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'skipped'::text])))` |
+| notification_deliveries_target_check | Check | `CHECK ( CASE channel WHEN 'push'::text THEN ((token_id IS NOT NULL) AND (notification_id IS NOT NULL) AND (user_id IS NOT NULL)) ELSE ((recipient IS NOT NULL) AND (token_id IS NULL)) END)` |
+| notification_deliveries_notification_id_fkey | Foreign key | `FOREIGN KEY (notification_id) REFERENCES user_notifications(id) ON DELETE CASCADE` |
+| notification_deliveries_token_id_fkey | Foreign key | `FOREIGN KEY (token_id) REFERENCES push_tokens(id) ON DELETE CASCADE` |
+| notification_deliveries_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
+| notification_deliveries_pkey | Primary key | `PRIMARY KEY (id)` |
+| notification_deliveries_notification_id_token_id_key | Unique | `UNIQUE (notification_id, token_id)` |
+
 ## notification_preferences
 
 | Constraint | Kind | Definition |
 |---|---|---|
 | notification_preferences_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | notification_preferences_pkey | Primary key | `PRIMARY KEY (user_id)` |
-
-## notification_push_deliveries
-
-| Constraint | Kind | Definition |
-|---|---|---|
-| notification_push_deliveries_status_check | Check | `CHECK ((status = ANY (ARRAY['queued'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'skipped'::text])))` |
-| notification_push_deliveries_notification_id_fkey | Foreign key | `FOREIGN KEY (notification_id) REFERENCES user_notifications(id) ON DELETE CASCADE` |
-| notification_push_deliveries_token_id_fkey | Foreign key | `FOREIGN KEY (token_id) REFERENCES push_tokens(id) ON DELETE CASCADE` |
-| notification_push_deliveries_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
-| notification_push_deliveries_pkey | Primary key | `PRIMARY KEY (id)` |
-| notification_push_deliveries_notification_id_token_id_key | Unique | `UNIQUE (notification_id, token_id)` |
 
 ## notifications
 

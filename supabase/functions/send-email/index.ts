@@ -50,13 +50,24 @@ serve(async (req) => {
       return json({ error: "Reminder title and message are required" }, 400);
     }
 
-    await sendWithGmailSmtp({
-      toEmail,
-      userName: body.userName?.trim() || "Alumni",
-      title,
-      message,
-    });
+    try {
+      await sendWithGmailSmtp({
+        toEmail,
+        userName: body.userName?.trim() || "Alumni",
+        title,
+        message,
+      });
+    } catch (error) {
+      await logEmailDelivery({
+        toEmail,
+        title,
+        sentBy: authResult.userId,
+        error: errorMessage(error),
+      });
+      throw error;
+    }
 
+    await logEmailDelivery({ toEmail, title, sentBy: authResult.userId });
     return json({ ok: true });
   } catch (error) {
     return json({ error: errorMessage(error) }, 500);
@@ -64,7 +75,7 @@ serve(async (req) => {
 });
 
 async function requireAdmin(req: Request): Promise<
-  | { ok: true }
+  | { ok: true; userId: string }
   | { ok: false; status: number; error: string }
 > {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -102,7 +113,46 @@ async function requireAdmin(req: Request): Promise<
     return { ok: false, status: 403, error: "Admin role required" };
   }
 
-  return { ok: true };
+  return { ok: true, userId: authData.user.id };
+}
+
+// One row per email in public.notification_deliveries (channel 'email').
+// Logging problems never block or fail the send itself.
+async function logEmailDelivery(params: {
+  toEmail: string;
+  title: string;
+  sentBy: string;
+  error?: string;
+}) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) return;
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    const { data: recipient } = await admin
+      .from("users")
+      .select("id")
+      .eq("email", params.toEmail.toLowerCase())
+      .maybeSingle();
+
+    const now = new Date().toISOString();
+    await admin.from("notification_deliveries").insert({
+      channel: "email",
+      user_id: recipient?.id ?? null,
+      recipient: params.toEmail,
+      status: params.error ? "failed" : "sent",
+      attempts: 1,
+      scheduled_at: now,
+      sent_at: params.error ? null : now,
+      last_error: params.error ? params.error.slice(0, 500) : null,
+      data: { kind: "reminder", title: params.title, sent_by: params.sentBy },
+    });
+  } catch (error) {
+    console.warn("send-email: delivery log failed", errorMessage(error));
+  }
 }
 
 async function sendWithGmailSmtp(params: {

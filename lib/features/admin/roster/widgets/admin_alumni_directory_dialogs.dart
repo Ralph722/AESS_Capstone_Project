@@ -96,7 +96,7 @@ Future<void> showAlumniAddChooserDialog(
                   icon: Icons.upload_file_outlined,
                   title: 'Import from file',
                   subtitle:
-                      'Upload an Excel file (Full Name, Course, ID Number).',
+                      'Upload an Excel file (Full Name, Course, ID Number, optional Year Graduated).',
                   onTap: () {
                     Navigator.pop(ctx);
                     onImportFile();

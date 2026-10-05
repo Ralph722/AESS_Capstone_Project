@@ -92,34 +92,14 @@ class SurveyService {
   }
 
   /// Admin list — merges live submission counts into survey models.
-  Future<List<Survey>> getAllSurveysForAdmin({
-    bool syncDenormalized = true,
-  }) async {
+  Future<List<Survey>> getAllSurveysForAdmin() async {
     final surveys = await getAllSurveys();
     final liveCounts = await countSubmittedResponsesBySurvey();
-    final merged = surveys
+    return surveys
         .map(
           (s) => s.copyWith(responseCount: liveCounts[s.id] ?? s.responseCount),
         )
         .toList();
-
-    if (syncDenormalized) {
-      unawaited(_syncDenormalizedResponseCounts(surveys, liveCounts));
-    }
-    return merged;
-  }
-
-  Future<void> _syncDenormalizedResponseCounts(
-    List<Survey> surveys,
-    Map<String, int> liveCounts,
-  ) async {
-    for (final survey in surveys) {
-      final live = liveCounts[survey.id];
-      if (live == null || live == survey.responseCount) continue;
-      try {
-        await setSurveyResponseCount(survey.id, live);
-      } catch (_) {}
-    }
   }
 
   Future<Survey?> getSurvey(String surveyId) async {
@@ -480,7 +460,6 @@ class SurveyService {
 
       final patch = <String, dynamic>{
         'status': SurveyStatus.published.name,
-        'assignment_count': matchedUserIds.length,
         'updated_at': publishedAtIso,
         'data': data,
       };
@@ -748,21 +727,6 @@ class SurveyService {
           })
           .eq('survey_id', surveyId)
           .eq('user_id', userSupabaseId);
-      if (submit && !wasSubmitted) {
-        final row = await _supabase
-            .from('surveys')
-            .select('response_count')
-            .eq('id', surveyId)
-            .maybeSingle();
-        final current = row?['response_count'] as int? ?? 0;
-        await _supabase
-            .from('surveys')
-            .update({
-              'response_count': current + 1,
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', surveyId);
-      }
 
       if (submit) {
         if (survey?.isChedGtsBuiltin == true) {
@@ -928,21 +892,6 @@ class SurveyService {
     return counts;
   }
 
-  /// Align denormalized [Survey.responseCount] with live submissions (fixes stale dashboard counts).
-  Future<void> setSurveyResponseCount(String surveyId, int count) async {
-    try {
-      await _supabase
-          .from('surveys')
-          .update({
-            'response_count': count,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', surveyId);
-    } catch (e) {
-      throw Exception('Error setting survey response count: $e');
-    }
-  }
-
   Future<List<SurveyAssignment>> getSurveyAssignments(String surveyId) async {
     try {
       final rows = await _supabase
@@ -999,7 +948,7 @@ class SurveyService {
   >
   getAdminDashboardSurveyStats() async {
     try {
-      final surveys = await getAllSurveysForAdmin(syncDenormalized: false);
+      final surveys = await getAllSurveysForAdmin();
       final activeAssignments = await countAssignmentsBySurvey(
         activeRegisteredOnly: true,
       );

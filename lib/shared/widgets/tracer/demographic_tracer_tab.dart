@@ -29,8 +29,8 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
 
   final _nameController = TextEditingController();
   final _studentIdController = TextEditingController();
-  final _batchController = TextEditingController();
   final _yearGraduatedController = TextEditingController();
+  bool _yearLocked = false;
   final _contactController = TextEditingController();
   final _addressController = TextEditingController();
 
@@ -52,7 +52,6 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
   void dispose() {
     _nameController.dispose();
     _studentIdController.dispose();
-    _batchController.dispose();
     _yearGraduatedController.dispose();
     _contactController.dispose();
     _addressController.dispose();
@@ -73,8 +72,8 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
       _nameController.text = profile.displayName;
       _studentIdController.text = profile.studentId;
       _program = CourseConstants.normalize(profile.program) ?? profile.program;
-      _batchController.text = profile.batchYear;
       _yearGraduatedController.text = profile.yearGraduated;
+      _yearLocked = profile.yearGraduated.trim().isNotEmpty;
       _contactController.text = profile.contactNumber;
       _addressController.text = profile.address;
       _gender = profile.gender;
@@ -125,7 +124,7 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
         displayName: _nameController.text.trim(),
         studentId: _studentIdController.text.trim(),
         program: _program,
-        batchYear: _batchController.text.trim(),
+        batchYear: _yearGraduatedController.text.trim(),
         yearGraduated: _yearGraduatedController.text.trim(),
         mobileNumber: _contactController.text.trim(),
         address: _addressController.text.trim(),
@@ -209,18 +208,18 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
                   onChanged: null,
                 ),
                 _field(
-                  controller: _batchController,
-                  label: 'Batch year *',
-                  icon: Icons.calendar_today_outlined,
-                  hint: 'e.g. 2024',
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Required' : null,
-                ),
-                _field(
                   controller: _yearGraduatedController,
-                  label: 'Year graduated',
-                  icon: Icons.school_outlined,
-                  hint: 'Same as batch if applicable',
+                  label: 'Year graduated *',
+                  icon: Icons.calendar_today_outlined,
+                  hint: _yearLocked
+                      ? 'Contact the alumni office to change this'
+                      : 'e.g. 2024',
+                  keyboard: TextInputType.number,
+                  readOnly: _yearLocked,
+                  validator: (v) =>
+                      RegExp(r'^(19|20)\d{2}$').hasMatch(v?.trim() ?? '')
+                      ? null
+                      : 'Enter a 4-digit year',
                 ),
                 _field(
                   controller: _contactController,

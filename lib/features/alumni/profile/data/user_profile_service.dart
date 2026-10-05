@@ -128,16 +128,12 @@ class UserProfileService {
 
     await AlumniMemberService().syncRosterFromTracerProfile(
       authUid: profile.uid,
-      displayName: profile.displayName,
-      course: profile.program,
-      studentId: profile.studentId,
       contactNumber: profile.mobileNumber,
       email: profile.email,
       address: profile.address,
       gender: profile.gender,
       civilStatus: profile.civilStatus,
       birthDate: profile.birthDate,
-      yearGraduated: profile.yearGraduated,
       tracerProfileComplete: profile.isComplete,
       profileImageUrl:
           (imageUrl != null && imageUrl.trim().isNotEmpty) ? imageUrl : null,

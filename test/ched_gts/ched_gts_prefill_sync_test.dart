@@ -5,7 +5,8 @@ import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('mergeIntoProfile updates Section A, B.12, and item 16', () {
+  test('mergeIntoProfile updates Section A, B.12, and item 16 '
+      'but keeps the official program and year', () {
     const current = TracerProfile(
       uid: 'u1',
       email: 'old@school.edu',
@@ -54,8 +55,9 @@ void main() {
     expect(synced.regionOfOrigin, 'Region 10');
     expect(synced.province, 'Misamis Occidental');
     expect(synced.locationOfResidence, 'City');
-    expect(synced.program, 'BS Computer Science');
-    expect(synced.yearGraduated, '2024');
+    expect(synced.program, 'BSIT');
+    expect(synced.yearGraduated, '2023');
+    expect(synced.batchYear, '2023');
     expect(synced.honorsAwards, 'Cum Laude');
     expect(synced.employmentStatus, GtsConstants.employed);
     expect(synced.studentId, '2023001');

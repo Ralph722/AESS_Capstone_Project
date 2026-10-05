@@ -2,14 +2,17 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 142 constraints in total.
+Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 152 constraints in total.
 
 
 ## alumni_members
 
 | Constraint | Kind | Definition |
 |---|---|---|
+| alumni_members_batch_year_matches | Check | `CHECK ((batch_year = COALESCE(year_graduated, ''::text)))` |
+| alumni_members_year_graduated_format | Check | `CHECK (((year_graduated IS NULL) OR (year_graduated ~ '^(19\|20)[0-9]{2}$'::text)))` |
 | alumni_members_auth_uid_fkey | Foreign key | `FOREIGN KEY (auth_uid) REFERENCES auth.users(id) ON DELETE SET NULL` |
+| alumni_members_course_fkey | Foreign key | `FOREIGN KEY (course) REFERENCES programs(code) ON UPDATE CASCADE` |
 | alumni_members_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## announcements
@@ -182,6 +185,14 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | forum_topics_author_uid_fkey | Foreign key | `FOREIGN KEY (author_uid) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | forum_topics_pkey | Primary key | `PRIMARY KEY (id)` |
 
+## gts_question_catalog
+
+| Constraint | Kind | Definition |
+|---|---|---|
+| gts_question_catalog_field_type_check | Check | `CHECK ((field_type = ANY (ARRAY['text'::text, 'longText'::text, 'single'::text, 'multi'::text, 'date'::text, 'matrix'::text, 'tableRows'::text])))` |
+| gts_question_catalog_section_check | Check | `CHECK ((section = ANY (ARRAY['a'::text, 'b'::text, 'c'::text, 'd'::text])))` |
+| gts_question_catalog_pkey | Primary key | `PRIMARY KEY (schema_version, item_id)` |
+
 ## job_interests
 
 | Constraint | Kind | Definition |
@@ -195,6 +206,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | Constraint | Kind | Definition |
 |---|---|---|
 | jobs_status_check | Check | `CHECK ((status = ANY (ARRAY['active'::text, 'expired'::text, 'closed'::text, 'archived'::text])))` |
+| jobs_views_nonnegative | Check | `CHECK ((views >= 0))` |
 | jobs_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## messages
@@ -229,6 +241,12 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 |---|---|---|
 | notifications_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | notifications_pkey | Primary key | `PRIMARY KEY (id)` |
+
+## programs
+
+| Constraint | Kind | Definition |
+|---|---|---|
+| programs_pkey | Primary key | `PRIMARY KEY (code)` |
 
 ## push_tokens
 
@@ -343,6 +361,8 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
+| users_batch_year_matches | Check | `CHECK ((batch_year = year_graduated))` |
 | users_role_check | Check | `CHECK ((role = ANY (ARRAY['user'::text, 'admin'::text])))` |
+| users_year_graduated_format | Check | `CHECK (((year_graduated = ''::text) OR (year_graduated ~ '^(19\|20)[0-9]{2}$'::text)))` |
 | users_id_fkey | Foreign key | `FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | users_pkey | Primary key | `PRIMARY KEY (id)` |

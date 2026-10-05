@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-67 triggers on tables in the `public` and `auth` schemas.
+77 triggers on tables in the `public` and `auth` schemas.
 
 
 ## auth.users
@@ -17,7 +17,9 @@
 | Trigger | Definition |
 |---|---|
 | trg_alumni_members_guard_owner_update | `BEFORE UPDATE ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION alumni_members_guard_owner_update()` |
+| trg_alumni_members_normalize_year | `BEFORE INSERT OR UPDATE ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION alumni_members_normalize_year()` |
 | trg_alumni_members_sync_auth_ban | `AFTER UPDATE OF is_deactivated ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION alumni_members_sync_auth_ban()` |
+| trg_alumni_members_sync_user_identity | `AFTER INSERT OR UPDATE OF course, student_id, year_graduated, auth_uid ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION alumni_members_sync_user_identity()` |
 | trg_alumni_members_updated_at | `BEFORE UPDATE ON public.alumni_members FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 
 ## public.announcements
@@ -120,6 +122,7 @@
 
 | Trigger | Definition |
 |---|---|
+| trg_jobs_sync_columns | `BEFORE INSERT OR UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION jobs_sync_columns()` |
 | trg_jobs_updated_at | `BEFORE UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 | trg_notify_job_changes | `AFTER INSERT OR UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION notify_job_changes()` |
 
@@ -157,6 +160,8 @@
 |---|---|
 | trg_assignment_owner_update | `BEFORE UPDATE ON public.survey_assignments FOR EACH ROW EXECUTE FUNCTION enforce_assignment_owner_update()` |
 | trg_notify_survey_assignment_created | `AFTER INSERT ON public.survey_assignments FOR EACH ROW EXECUTE FUNCTION notify_survey_assignment_created()` |
+| trg_survey_assignments_recount_del | `AFTER DELETE ON public.survey_assignments REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION survey_children_recount()` |
+| trg_survey_assignments_recount_ins | `AFTER INSERT ON public.survey_assignments REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION survey_children_recount()` |
 | trg_survey_assignments_updated_at | `BEFORE UPDATE ON public.survey_assignments FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 
 ## public.survey_questions
@@ -171,6 +176,9 @@
 |---|---|
 | trg_notify_survey_submitted | `AFTER INSERT OR UPDATE OF status ON public.survey_responses FOR EACH ROW EXECUTE FUNCTION notify_survey_submitted()` |
 | trg_survey_responses_guard_owner_update | `BEFORE UPDATE ON public.survey_responses FOR EACH ROW EXECUTE FUNCTION survey_responses_guard_owner_update()` |
+| trg_survey_responses_recount_del | `AFTER DELETE ON public.survey_responses REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION survey_children_recount()` |
+| trg_survey_responses_recount_ins | `AFTER INSERT ON public.survey_responses REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION survey_children_recount()` |
+| trg_survey_responses_recount_upd | `AFTER UPDATE ON public.survey_responses REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION survey_children_recount()` |
 | trg_survey_responses_updated_at | `BEFORE UPDATE ON public.survey_responses FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 
 ## public.survey_template_questions
@@ -191,6 +199,7 @@
 |---|---|
 | trg_notify_survey_published | `AFTER UPDATE OF status ON public.surveys FOR EACH ROW EXECUTE FUNCTION notify_survey_published()` |
 | trg_surveys_block_delete_with_submissions | `BEFORE DELETE ON public.surveys FOR EACH ROW EXECUTE FUNCTION surveys_block_delete_with_submissions()` |
+| trg_surveys_guard_counters | `BEFORE INSERT OR UPDATE ON public.surveys FOR EACH ROW EXECUTE FUNCTION surveys_guard_counters()` |
 | trg_surveys_updated_at | `BEFORE UPDATE ON public.surveys FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |
 
 ## public.tracer_draft_reminders
@@ -214,5 +223,6 @@
 |---|---|
 | trg_notify_admins_new_registration | `AFTER INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION notify_admins_new_registration()` |
 | trg_users_auto_assign_surveys | `AFTER INSERT OR UPDATE OF program, batch_year, year_graduated, role ON public.users FOR EACH ROW EXECUTE FUNCTION trg_users_auto_assign_surveys()` |
+| trg_users_fill_roster_year | `AFTER INSERT OR UPDATE OF year_graduated ON public.users FOR EACH ROW EXECUTE FUNCTION users_fill_roster_year()` |
 | trg_users_guard_protected_columns | `BEFORE INSERT OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION users_guard_protected_columns()` |
 | trg_users_updated_at | `BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION set_updated_at()` |

@@ -893,12 +893,12 @@ class ForumService {
   Future<Map<String, String>> _authorAvatars(List<String> userIds) async {
     if (userIds.isEmpty) return {};
     try {
-      final rows = await _supabase
-          .from('users')
-          .select('id, profile_image_base64')
-          .inFilter('id', userIds);
+      final rows = await _supabase.rpc(
+        'get_public_profiles',
+        params: {'p_ids': userIds},
+      ) as List<dynamic>;
       final out = <String, String>{};
-      for (final row in rows) {
+      for (final row in rows.cast<Map<String, dynamic>>()) {
         final id = row['id']?.toString() ?? '';
         final url = (row['profile_image_base64'] as String?)?.trim() ?? '';
         if (id.isNotEmpty && url.isNotEmpty) out[id] = url;

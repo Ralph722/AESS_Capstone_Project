@@ -95,6 +95,7 @@ abstract final class ChedGtsPrefill {
   }
 
   /// Merge submitted CHED answers into the live profile (Section A + B.12 + item 16).
+  /// Program stays as the roster has it; the year only fills a blank profile.
   static TracerProfile mergeIntoProfile({
     required TracerProfile current,
     required Map<String, dynamic> answers,
@@ -112,7 +113,6 @@ abstract final class ChedGtsPrefill {
       birthday = DateTime.tryParse(rawDate);
     }
 
-    var program = current.program;
     var college = current.collegeUniversity;
     var yearGraduated = current.yearGraduated;
     var honors = current.honorsAwards;
@@ -131,15 +131,14 @@ abstract final class ChedGtsPrefill {
         }
       }
       if (firstFilled != null) {
-        final degree =
-            firstFilled['Degree(s) & Specialization(s)']?.toString().trim();
         final uni = firstFilled['College or University']?.toString().trim();
         final year = firstFilled['Year Graduated']?.toString().trim();
         final award =
             firstFilled['Honor(s) or Award(s) Received']?.toString().trim();
-        if (degree != null && degree.isNotEmpty) program = degree;
         if (uni != null && uni.isNotEmpty) college = uni;
-        if (year != null && year.isNotEmpty) yearGraduated = year;
+        if (yearGraduated.trim().isEmpty && year != null && year.isNotEmpty) {
+          yearGraduated = year;
+        }
         if (award != null) honors = award;
       }
     }
@@ -158,10 +157,9 @@ abstract final class ChedGtsPrefill {
       regionOfOrigin: text('ched_9') ?? current.regionOfOrigin,
       province: text('ched_10') ?? current.province,
       locationOfResidence: text('ched_11') ?? current.locationOfResidence,
-      program: program,
       collegeUniversity: college,
       yearGraduated: yearGraduated,
-      batchYear: yearGraduated.isNotEmpty ? yearGraduated : current.batchYear,
+      batchYear: yearGraduated,
       honorsAwards: honors,
       employmentStatus: employment ?? current.employmentStatus,
     );

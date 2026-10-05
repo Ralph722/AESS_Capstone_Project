@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Public schema: 40 tables, 442 columns.
+Public schema: 42 tables, 464 columns.
 
 | Table | Columns | Row level security |
 |---|---|---|
@@ -27,12 +27,14 @@ Public schema: 40 tables, 442 columns.
 | [forum_tags](#forum_tags) | 5 | enabled=true, forced=false |
 | [forum_topic_tags](#forum_topic_tags) | 2 | enabled=true, forced=false |
 | [forum_topics](#forum_topics) | 19 | enabled=true, forced=false |
+| [gts_question_catalog](#gts_question_catalog) | 16 | enabled=true, forced=false |
 | [job_interests](#job_interests) | 3 | enabled=true, forced=false |
-| [jobs](#jobs) | 9 | enabled=true, forced=false |
+| [jobs](#jobs) | 10 | enabled=true, forced=false |
 | [messages](#messages) | 15 | enabled=true, forced=false |
 | [notification_preferences](#notification_preferences) | 9 | enabled=true, forced=false |
 | [notification_push_deliveries](#notification_push_deliveries) | 11 | enabled=true, forced=false |
 | [notifications](#notifications) | 9 | enabled=true, forced=false |
+| [programs](#programs) | 5 | enabled=true, forced=false |
 | [push_tokens](#push_tokens) | 12 | enabled=true, forced=false |
 | [reminders](#reminders) | 9 | enabled=true, forced=false |
 | [survey_assignments](#survey_assignments) | 10 | enabled=true, forced=false |
@@ -373,6 +375,27 @@ Public schema: 40 tables, 442 columns.
 | moderation_reason | text |  |  |  |
 | view_count | integer | yes | `0` |  |
 
+## gts_question_catalog
+
+| Column | Type | Not null | Default | Generated |
+|---|---|---|---|---|
+| schema_version | text | yes |  |  |
+| item_id | text | yes |  |  |
+| ched_number | text | yes |  |  |
+| section | text | yes |  |  |
+| field_type | text | yes |  |  |
+| prompt | text | yes |  |  |
+| help_text | text |  |  |  |
+| options | jsonb | yes | `'[]'::jsonb` |  |
+| matrix_rows | jsonb | yes | `'[]'::jsonb` |  |
+| matrix_columns | jsonb | yes | `'[]'::jsonb` |  |
+| table_columns | jsonb | yes | `'[]'::jsonb` |  |
+| required | boolean | yes | `false` |  |
+| others_specify_id | text |  |  |  |
+| is_others_specify | boolean | yes | `false` |  |
+| sort_order | integer | yes |  |  |
+| created_at | timestamp with time zone | yes | `now()` |  |
+
 ## job_interests
 
 | Column | Type | Not null | Default | Generated |
@@ -394,6 +417,7 @@ Public schema: 40 tables, 442 columns.
 | data | jsonb | yes | `'{}'::jsonb` |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
+| views | integer | yes | `0` |  |
 
 ## messages
 
@@ -458,6 +482,16 @@ Public schema: 40 tables, 442 columns.
 | data | jsonb | yes | `'{}'::jsonb` |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
+
+## programs
+
+| Column | Type | Not null | Default | Generated |
+|---|---|---|---|---|
+| code | text | yes |  |  |
+| name | text | yes |  |  |
+| active | boolean | yes | `true` |  |
+| sort_order | integer | yes | `0` |  |
+| created_at | timestamp with time zone | yes | `now()` |  |
 
 ## push_tokens
 
@@ -602,7 +636,7 @@ Public schema: 40 tables, 442 columns.
 | target_batch_years | ARRAY (_text) | yes | `'{}'::text[]` |  |
 | open_at | timestamp with time zone |  |  |  |
 | close_at | timestamp with time zone |  |  |  |
-| created_by | uuid | yes |  |  |
+| created_by | uuid |  |  |  |
 | assignment_count | integer | yes | `0` |  |
 | response_count | integer | yes | `0` |  |
 | template_id | uuid |  |  |  |

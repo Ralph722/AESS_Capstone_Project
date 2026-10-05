@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-88 indexes, including the ones that back primary keys and unique constraints.
+90 indexes, including the ones that back primary keys and unique constraints.
 
 
 ## alumni_members
@@ -158,6 +158,12 @@
 | idx_forum_topics_reply_count |  | `btree (reply_count DESC)` |
 | idx_forum_topics_solved |  | `btree (is_solved) WHERE (is_solved = true)` |
 
+## gts_question_catalog
+
+| Index | Kind | Definition |
+|---|---|---|
+| gts_question_catalog_pkey | PK | `btree (schema_version, item_id)` |
+
 ## job_interests
 
 | Index | Kind | Definition |
@@ -199,6 +205,12 @@
 |---|---|---|
 | idx_notifications_user |  | `btree (user_id, created_at DESC)` |
 | notifications_pkey | PK | `btree (id)` |
+
+## programs
+
+| Index | Kind | Definition |
+|---|---|---|
+| programs_pkey | PK | `btree (code)` |
 
 ## push_tokens
 

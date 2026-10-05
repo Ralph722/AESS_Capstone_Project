@@ -42,7 +42,9 @@ class GtsProfileFormState {
   String program = '';
   String employmentStatus = '';
   String studentId = '';
-  String batchYear = '';
+
+  /// Once a graduation year is on file only the alumni office can change it.
+  bool yearLocked = false;
 
   void dispose() {
     displayNameController.dispose();
@@ -76,7 +78,7 @@ class GtsProfileFormState {
     program = CourseConstants.normalize(profile.program) ?? profile.program;
     employmentStatus = profile.employmentStatus;
     studentId = profile.studentId;
-    batchYear = profile.batchYear;
+    yearLocked = profile.yearGraduated.trim().isNotEmpty;
   }
 
   TracerProfile toTracerProfile({required String uid, required String email}) {
@@ -89,9 +91,7 @@ class GtsProfileFormState {
       displayName: displayNameController.text.trim(),
       studentId: studentId,
       program: program,
-      batchYear: batchYear.isNotEmpty
-          ? batchYear
-          : yearGraduatedController.text.trim(),
+      batchYear: yearGraduatedController.text.trim(),
       yearGraduated: yearGraduatedController.text.trim(),
       telephoneNumber: telephoneController.text.trim(),
       mobileNumber: mobileController.text.trim(),
@@ -296,15 +296,24 @@ class GtsProfileFormFields extends StatelessWidget {
               : 'Educational background',
           icon: Icons.school_outlined,
           children: [
-            _dropdown(
-              label: _req(GtsConstants.labelDegreeSpecialization),
-              value: state.program.isEmpty ? null : state.program,
-              items: CourseConstants.courses,
-              icon: Icons.menu_book_outlined,
-              onChanged: (v) {
-                state.program = v ?? '';
-                onChanged();
-              },
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: OnboardingSpacing.fieldGap,
+              ),
+              child: TextFormField(
+                key: ValueKey<String>('program|${state.program}'),
+                initialValue: state.program,
+                readOnly: true,
+                enabled: enabled,
+                style: _fieldStyle,
+                decoration: onboardingFieldDecoration(
+                  label: GtsConstants.labelDegreeSpecialization,
+                  hint: 'Not set yet',
+                  icon: Icons.menu_book_outlined,
+                  readOnly: true,
+                  helperText: 'Set by the alumni office',
+                ),
+              ),
             ),
             _text(
               controller: state.collegeController,
@@ -319,6 +328,10 @@ class GtsProfileFormFields extends StatelessWidget {
               icon: Icons.calendar_today_outlined,
               hint: 'e.g. 2024',
               keyboard: TextInputType.number,
+              readOnly: state.yearLocked,
+              helperText: state.yearLocked
+                  ? 'Contact the alumni office to change this'
+                  : null,
             ),
             _text(
               controller: state.honorsController,

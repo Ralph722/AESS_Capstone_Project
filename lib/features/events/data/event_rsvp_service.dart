@@ -176,11 +176,11 @@ class EventRsvpService {
     final infoById = <String, Map<String, dynamic>>{};
     if (userIds.isNotEmpty) {
       try {
-        final users = await _supabase
-            .from('users')
-            .select('id, display_name, email, profile_image_base64')
-            .inFilter('id', userIds);
-        for (final u in users) {
+        final users = await _supabase.rpc(
+          'get_public_profiles',
+          params: {'p_ids': userIds},
+        ) as List<dynamic>;
+        for (final u in users.cast<Map<String, dynamic>>()) {
           infoById[u['id'] as String] = u;
         }
       } catch (_) {}

@@ -161,7 +161,6 @@ class JobPosting {
         'contactEmail': contactEmail,
         'applicationMethod': applicationMethod,
         'isActive': normalizedStatus == 'active',
-        'views': views,
         'applications': applications,
         'adminId': adminId,
         'isRemote': isRemote,
@@ -187,34 +186,36 @@ class JobPosting {
       return fallback;
     }
 
+    String text(String column, String dataKey) {
+      final value = row[column] as String?;
+      if (value != null && value.isNotEmpty) return value;
+      return data[dataKey] as String? ?? '';
+    }
+
     final now = DateTime.now();
-    final status =
-        ((data['status'] as String?) ?? (row['status'] as String? ?? 'active'))
-            .toLowerCase();
+    final status = text('status', 'status').toLowerCase();
 
     return JobPosting(
       id: row['id']?.toString() ?? '',
-      companyName:
-          (data['companyName'] as String?) ?? (row['company'] as String? ?? ''),
+      companyName: text('company', 'companyName'),
       companyLogo: data['companyLogo'] as String? ?? '',
       coverImage: data['coverImage'] as String? ?? '',
-      jobTitle:
-          (data['jobTitle'] as String?) ?? (row['title'] as String? ?? ''),
+      jobTitle: text('title', 'jobTitle'),
       jobType: data['jobType'] as String? ?? '',
-      location:
-          (data['location'] as String?) ?? (row['location'] as String? ?? ''),
+      location: text('location', 'location'),
       salaryRange: data['salaryRange'] as String? ?? '',
-      description:
-          (data['description'] as String?) ??
-          (row['description'] as String? ?? ''),
+      description: text('description', 'description'),
       requirements: List<String>.from(data['requirements'] ?? const []),
       benefits: List<String>.from(data['benefits'] ?? const []),
       postedDate: parseDate(data['postedDate'], now),
       applicationDeadline: parseDate(data['applicationDeadline'], now),
       contactEmail: data['contactEmail'] as String? ?? '',
       applicationMethod: data['applicationMethod'] as String? ?? 'email',
-      isActive: data['isActive'] as bool? ?? (status == 'active'),
-      views: (data['views'] as num?)?.toInt() ?? 0,
+      isActive: status == 'active',
+      views:
+          (row['views'] as num?)?.toInt() ??
+          (data['views'] as num?)?.toInt() ??
+          0,
       applications: (data['applications'] as num?)?.toInt() ?? 0,
       adminId: data['adminId'] as String? ?? '',
       isRemote: data['isRemote'] as bool? ?? false,

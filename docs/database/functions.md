@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-97 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
+106 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
 
 | Function | Arguments | Returns | Security | Settings | anon can run | authenticated can run | Language |
 |---|---|---|---|---|---|---|---|
@@ -10,7 +10,9 @@
 | admin_remove_alumni_account | `p_member_id uuid` | `jsonb` | definer | `search_path=public` | false | true | plpgsql |
 | admin_send_survey_reminders | `p_survey_id uuid, p_user_ids uuid[]` | `integer` | definer | `search_path=public` | false | true | plpgsql |
 | alumni_members_guard_owner_update |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| alumni_members_normalize_year |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | alumni_members_sync_auth_ban |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| alumni_members_sync_user_identity |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | audit_logs_stamp_actor |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | auto_assign_open_surveys | `p_user_id uuid` | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | batch_targets_include | `p_targets text[], p_year text` | `boolean` | invoker | `search_path=public` | false | true | plpgsql |
@@ -32,15 +34,18 @@
 | forum_posts_maintain_topic_counts |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | forum_topics_guard_author_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | forum_topics_guard_insert |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| get_public_profiles | `p_ids uuid[]` | `TABLE(id uuid, display_name text, profile_image_base64 text, program text, year_graduated text, batch_year text, role text, email text)` | definer | `search_path=public` | false | true | sql |
 | handle_new_user |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | increment_forum_topic_views | `p_topic_id uuid` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | increment_job_views | `p_job_id uuid` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | is_admin |  | `boolean` | definer | `search_path=public` | true | true | sql |
 | is_signed_in |  | `boolean` | invoker | `search_path=public` | true | true | sql |
+| jobs_sync_columns |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | kick_notification_push |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | link_alumni_registration | `p_member_id text, p_full_name text, p_student_id text, p_course text, p_email text` | `jsonb` | definer | `search_path=public` | false | true | plpgsql |
 | messages_set_edited_at |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | normalize_course | `raw text` | `text` | invoker | `search_path=public` | false | true | plpgsql |
+| normalize_grad_year | `raw text` | `text` | invoker | `search_path=public` | false | true | sql |
 | normalize_person_name | `raw text` | `text` | invoker | `search_path=public` | false | true | sql |
 | normalize_student_id | `raw text` | `text` | invoker | `search_path=public` | false | true | sql |
 | notification_active_alumni_ids |  | `uuid[]` | definer | `search_path=public` | false | false | sql |
@@ -92,8 +97,11 @@
 | search_forum_mention_users | `p_query text` | `TABLE(id uuid, display_name text, program text)` | definer | `search_path=public` | false | true | plpgsql |
 | set_updated_at |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | survey_audience_matches | `p_target_programs text[], p_target_batch_years text[], p_program text, p_batch_year text, p_year_graduated text` | `boolean` | invoker | `search_path=public` | false | true | plpgsql |
+| survey_children_recount |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | survey_responses_guard_owner_update |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | surveys_block_delete_with_submissions |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| surveys_guard_counters |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| surveys_recount | `p_survey_ids uuid[]` | `void` | definer | `search_path=public` | false | false | plpgsql |
 | sync_event_comments_count |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | sync_user_email_from_auth |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | tracer_help_consume | `p_user_id uuid, p_limit integer` | `integer` | definer | `search_path=public` | false | false | plpgsql |
@@ -101,5 +109,6 @@
 | trg_users_auto_assign_surveys |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | unregister_push_token | `p_token text` | `void` | definer | `search_path=public` | false | true | sql |
 | user_notifications_track_read |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| users_fill_roster_year |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | users_guard_protected_columns |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | validate_alumni_eligibility | `p_full_name text, p_student_id text, p_course text` | `jsonb` | definer | `search_path=public` | true | true | plpgsql |

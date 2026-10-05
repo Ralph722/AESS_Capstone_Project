@@ -13,12 +13,14 @@ class RosterImportRow {
     required this.fullName,
     required this.course,
     required this.studentId,
+    this.yearGraduated = '',
   });
 
   final int rowNumber;
   final String fullName;
   final String course;
   final String studentId;
+  final String yearGraduated;
 }
 
 class RosterImportResult {
@@ -63,7 +65,8 @@ class AlumniRosterImportService {
         return _parseWithExcelPackage(bytes);
       } catch (_) {
         throw FormatException(
-          'Could not read the Excel file. Use columns: Full Name, Course, ID Number. ($e)',
+          'Could not read the Excel file. Use columns: Full Name, Course, '
+          'ID Number, and optionally Year Graduated. ($e)',
         );
       }
     }
@@ -83,6 +86,7 @@ class AlumniRosterImportService {
     int? nameCol;
     int? courseCol;
     int? idCol;
+    int? yearCol;
     int dataStartRow = 0;
 
     for (var r = 0; r < sheet.maxRows && r < 10; r++) {
@@ -97,6 +101,7 @@ class AlumniRosterImportService {
             (text.contains('number') || text.contains('no') || text == 'id')) {
           idCol = c;
         }
+        if (_isYearHeader(text)) yearCol ??= c;
       }
       if (nameCol != null && courseCol != null && idCol != null) {
         dataStartRow = r + 1;
@@ -108,19 +113,31 @@ class AlumniRosterImportService {
       nameCol ??= 0;
       courseCol ??= 1;
       idCol ??= 2;
+      yearCol = null;
       dataStartRow = 1;
     }
 
     return _rowsFromGrid(
-      _gridFromExcelSheet(sheet, nameCol, courseCol, idCol, dataStartRow),
+      _gridFromExcelSheet(
+        sheet,
+        nameCol,
+        courseCol,
+        idCol,
+        yearCol,
+        dataStartRow,
+      ),
     );
   }
+
+  static bool _isYearHeader(String text) =>
+      text.contains('year') || text.contains('batch');
 
   static List<List<String>> _gridFromExcelSheet(
     Sheet sheet,
     int nameCol,
     int courseCol,
     int idCol,
+    int? yearCol,
     int dataStartRow,
   ) {
     final grid = <List<String>>[];
@@ -137,6 +154,12 @@ class AlumniRosterImportService {
         _packageCellText(
           sheet.cell(CellIndex.indexByColumnRow(columnIndex: idCol, rowIndex: r)),
         ),
+        if (yearCol != null)
+          _packageCellText(
+            sheet.cell(
+              CellIndex.indexByColumnRow(columnIndex: yearCol, rowIndex: r),
+            ),
+          ),
       ]);
     }
     return grid;
@@ -180,6 +203,7 @@ class AlumniRosterImportService {
           _cellAt(row, header.nameCol),
           _cellAt(row, header.courseCol),
           _cellAt(row, header.idCol),
+          _cellAt(row, header.yearCol),
         ];
       }).toList(),
       rowOffset: header.dataStartIndex + 1,
@@ -296,13 +320,18 @@ class AlumniRosterImportService {
     return col - 1;
   }
 
-  static ({int nameCol, int courseCol, int idCol, int dataStartIndex})
-      _detectHeaderColumns(
-    List<List<String>> grid,
-  ) {
+  static ({
+    int nameCol,
+    int courseCol,
+    int idCol,
+    int yearCol,
+    int dataStartIndex,
+  })
+  _detectHeaderColumns(List<List<String>> grid) {
     int? nameCol;
     int? courseCol;
     int? idCol;
+    int? yearCol;
     var dataStartIndex = 0;
 
     for (var r = 0; r < grid.length && r < 10; r++) {
@@ -316,17 +345,20 @@ class AlumniRosterImportService {
             (text.contains('number') || text.contains('no') || text == 'id')) {
           idCol = c;
         }
+        if (_isYearHeader(text)) yearCol ??= c;
       }
       if (nameCol != null && courseCol != null && idCol != null) {
         dataStartIndex = r + 1;
         break;
       }
     }
+    final headerFound = nameCol != null && courseCol != null && idCol != null;
 
     return (
       nameCol: nameCol ?? 0,
       courseCol: courseCol ?? 1,
       idCol: idCol ?? 2,
+      yearCol: headerFound ? (yearCol ?? -1) : -1,
       dataStartIndex: dataStartIndex == 0 &&
               nameCol == null &&
               courseCol == null &&
@@ -351,6 +383,7 @@ class AlumniRosterImportService {
       final name = parts.isNotEmpty ? parts[0] : '';
       final course = parts.length > 1 ? parts[1] : '';
       final id = parts.length > 2 ? parts[2] : '';
+      final year = parts.length > 3 ? parts[3] : '';
 
       if (name.isEmpty && course.isEmpty && id.isEmpty) continue;
 
@@ -360,6 +393,7 @@ class AlumniRosterImportService {
           fullName: name,
           course: course,
           studentId: id,
+          yearGraduated: year,
         ),
       );
     }
@@ -397,6 +431,7 @@ class AlumniRosterImportService {
           fullName: row.fullName,
           course: prog,
           studentId: row.studentId,
+          yearGraduated: row.yearGraduated,
           skipDuplicateCheck: true,
         );
         existingKeys.add(key);

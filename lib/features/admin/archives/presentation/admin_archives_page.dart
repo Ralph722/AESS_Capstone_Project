@@ -44,9 +44,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
       }
       List<Survey> surveys = [];
       try {
-        final all = await _surveyService.getAllSurveysForAdmin(
-          syncDenormalized: false,
-        );
+        final all = await _surveyService.getAllSurveysForAdmin();
         surveys = all.where((s) => s.archived).toList();
       } catch (_) {
         surveys = [];

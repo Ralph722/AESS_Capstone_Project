@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-124 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+127 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
@@ -171,6 +171,12 @@
 | forum_topics_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
 | forum_topics_update_admin_or_author | UPDATE | authenticated | `(is_admin() OR (author_uid = auth.uid()))` | `(is_admin() OR (author_uid = auth.uid()))` |
 
+## public.gts_question_catalog
+
+| Policy | Command | Roles | USING | WITH CHECK |
+|---|---|---|---|---|
+| gts_question_catalog_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+
 ## public.job_interests
 
 | Policy | Command | Roles | USING | WITH CHECK |
@@ -218,6 +224,13 @@
 |---|---|---|---|---|
 | notifications_write_admin_only | ALL | authenticated | `is_admin()` | `is_admin()` |
 | notifications_select_owner_or_admin | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
+
+## public.programs
+
+| Policy | Command | Roles | USING | WITH CHECK |
+|---|---|---|---|---|
+| programs_admin_write | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
+| programs_select_all | SELECT | anon,authenticated | `true` |  |
 
 ## public.push_tokens
 
@@ -377,6 +390,7 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | forum_topic_tags | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | forum_topics | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | forum_topics | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| gts_question_catalog | authenticated | SELECT |
 | job_interests | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | job_interests | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | jobs | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
@@ -389,6 +403,8 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | notification_push_deliveries | authenticated | REFERENCES, SELECT, TRIGGER, TRUNCATE |
 | notifications | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | notifications | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| programs | anon | SELECT |
+| programs | authenticated | DELETE, INSERT, SELECT, UPDATE |
 | push_tokens | anon | DELETE, REFERENCES, SELECT, TRIGGER, TRUNCATE |
 | push_tokens | authenticated | DELETE, REFERENCES, SELECT, TRIGGER, TRUNCATE |
 | reminders | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |

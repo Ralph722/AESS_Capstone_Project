@@ -322,11 +322,11 @@ class EventCommentService {
     final userInfoById = <String, Map<String, dynamic>>{};
     if (userIds.isNotEmpty) {
       try {
-        final users = await _supabase
-            .from('users')
-            .select('id, display_name, email, profile_image_base64, role')
-            .inFilter('id', userIds);
-        for (final u in users) {
+        final users = await _supabase.rpc(
+          'get_public_profiles',
+          params: {'p_ids': userIds},
+        ) as List<dynamic>;
+        for (final u in users.cast<Map<String, dynamic>>()) {
           userInfoById[u['id'] as String] = u;
         }
       } catch (_) {}

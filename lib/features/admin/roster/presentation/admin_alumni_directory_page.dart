@@ -331,6 +331,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       text: existing?.fullName ?? '',
     );
     final idController = TextEditingController(text: existing?.studentId ?? '');
+    final yearController = TextEditingController(
+      text: existing?.effectiveBatchYear ?? '',
+    );
     String? selectedCourse = existing != null && existing.course.isNotEmpty
         ? CourseConstants.normalize(existing.course)
         : CourseConstants.courses.first;
@@ -413,6 +416,15 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                   Icons.badge_outlined,
                 ),
               ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: yearController,
+                keyboardType: TextInputType.number,
+                decoration: _dialogFieldDecoration(
+                  'Year graduated (optional)',
+                  Icons.calendar_today_outlined,
+                ),
+              ),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -444,6 +456,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     if (saved != true || !mounted) {
       nameController.dispose();
       idController.dispose();
+      yearController.dispose();
       return;
     }
 
@@ -453,6 +466,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           fullName: nameController.text,
           course: selectedCourse!,
           studentId: idController.text,
+          yearGraduated: yearController.text,
         );
         await _auditService.logAction(
           action: 'CREATE_ROSTER_MEMBER',
@@ -467,6 +481,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           fullName: nameController.text,
           course: selectedCourse!,
           studentId: idController.text,
+          yearGraduated: yearController.text,
         );
         await _auditService.logAction(
           action: 'UPDATE_ROSTER_MEMBER',
@@ -484,6 +499,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     } finally {
       nameController.dispose();
       idController.dispose();
+      yearController.dispose();
     }
   }
 
@@ -1085,7 +1101,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           icon: Icons.groups_outlined,
           title: 'No alumni on the roster yet',
           subtitle:
-              'Add members one at a time or import an Excel file with columns: Full Name, Course, ID Number.',
+              'Add members one at a time or import an Excel file with columns: Full Name, Course, ID Number, and optionally Year Graduated.',
           primaryLabel: 'Add Alumni',
           primaryAction: _openAddAlumniChooser,
         );

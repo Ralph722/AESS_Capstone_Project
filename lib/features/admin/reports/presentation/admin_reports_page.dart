@@ -749,22 +749,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         );
         _surveys = adjustedSurveys;
       });
-      unawaited(_reconcileSurveyResponseCounts(surveys, submittedCounts));
       await _loadSurveyRollupsFor(adjustedSurveys);
     } catch (_) {}
-  }
-
-  Future<void> _reconcileSurveyResponseCounts(
-    List<Survey> surveys,
-    Map<String, int> submittedCounts,
-  ) async {
-    for (final s in surveys) {
-      final actual = submittedCounts[s.id];
-      if (actual == null || actual == s.responseCount) continue;
-      try {
-        await _surveyService.setSurveyResponseCount(s.id, actual);
-      } catch (_) {}
-    }
   }
 
   @override

@@ -71,10 +71,22 @@ class AlumniMemberService {
     }
   }
 
+  /// Four-digit graduation year, or '' when [raw] is blank.
+  static String normalizeGraduationYear(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return '';
+    final match = RegExp(r'(19|20)\d{2}').firstMatch(value);
+    if (match == null) {
+      throw Exception('Enter the year graduated as a 4-digit year.');
+    }
+    return match.group(0)!;
+  }
+
   Future<AlumniMember> createMember({
     required String fullName,
     required String course,
     required String studentId,
+    String yearGraduated = '',
     bool skipDuplicateCheck = false,
   }) async {
     final name = normalizeFullName(fullName);
@@ -87,6 +99,7 @@ class AlumniMemberService {
     if (prog == null || !CourseConstants.isValid(prog)) {
       throw Exception('Select a valid course.');
     }
+    final year = normalizeGraduationYear(yearGraduated);
 
     if (!skipDuplicateCheck) {
       await assertNotDuplicate(studentId: sid, course: prog);
@@ -97,6 +110,8 @@ class AlumniMemberService {
       fullName: name,
       course: prog,
       studentId: sid,
+      batchYear: year,
+      yearGraduated: year.isEmpty ? null : year,
     );
 
     await _upsertMemberToSupabase(member);
@@ -221,6 +236,7 @@ class AlumniMemberService {
     required String fullName,
     required String course,
     required String studentId,
+    required String yearGraduated,
   }) async {
     final name = normalizeFullName(fullName);
     final sid = normalizeStudentId(studentId);
@@ -232,6 +248,7 @@ class AlumniMemberService {
     if (prog == null || !CourseConstants.isValid(prog)) {
       throw Exception('Select a valid course.');
     }
+    final year = normalizeGraduationYear(yearGraduated);
 
     await assertNotDuplicate(studentId: sid, course: prog, excludeMemberId: id);
 
@@ -248,6 +265,8 @@ class AlumniMemberService {
               fullName: name,
               course: prog,
               studentId: sid,
+              batchYear: year,
+              yearGraduated: year,
               updatedAt: DateTime.now(),
             );
 
@@ -446,57 +465,39 @@ class AlumniMemberService {
     }
   }
 
-  /// Syncs roster fields from a saved tracer profile (used by profile save flow).
-  /// Prefers [authUid] match; falls back to student ID + course.
+  /// Mirrors contact details from a saved tracer profile onto the linked
+  /// roster row. Name, course, ID number and year belong to the alumni office
+  /// and are never written from here.
   Future<void> syncRosterFromTracerProfile({
     required String authUid,
-    required String displayName,
-    required String course,
-    required String studentId,
     String contactNumber = '',
     String email = '',
     String address = '',
     String gender = '',
     String civilStatus = '',
     DateTime? birthDate,
-    String yearGraduated = '',
     bool tracerProfileComplete = false,
     String? profileImageUrl,
   }) async {
-    if (displayName.trim().isEmpty) return;
+    if (authUid.trim().isEmpty) return;
 
-    AlumniMember? existing = await findByAuthUid(authUid);
-    existing ??= await findByStudentIdAndCourse(
-      studentId: studentId,
-      course: course,
-    );
-    if (existing == null) return;
-    if (existing.authUid != null &&
-        existing.authUid!.isNotEmpty &&
-        existing.authUid != authUid) {
-      return;
-    }
-
-    final updated = existing.copyWith(
-      authUid: authUid,
-      fullName: displayName,
-      batchYear: existing.batchYear,
-      contactNumber: contactNumber,
-      emailAddress: email,
-      address: address,
-      gender: gender,
-      civilStatus: civilStatus,
-      birthDate: birthDate,
-      yearGraduated: yearGraduated,
-      isRegisteredUser: true,
-      registeredEmail: email,
-      tracerProfileComplete: tracerProfileComplete,
-      profileImageUrl: profileImageUrl ?? existing.profileImageUrl,
-      updatedAt: DateTime.now(),
-    );
+    final patch = <String, dynamic>{
+      'contact_number': contactNumber,
+      'email_address': email,
+      'address': address,
+      'gender': gender,
+      'civil_status': civilStatus,
+      'birth_date': birthDate?.toIso8601String().split('T').first,
+      'tracer_profile_complete': tracerProfileComplete,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (profileImageUrl != null) patch['profile_image_url'] = profileImageUrl;
 
     try {
-      await _upsertMemberToSupabase(updated);
+      await _supabase
+          .from('alumni_members')
+          .update(patch)
+          .eq('auth_uid', authUid);
     } catch (_) {
       // Roster mirror is best-effort.
     }

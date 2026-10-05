@@ -2,15 +2,15 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-127 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+138 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| alumni_members_delete_admin_only | DELETE | authenticated | `is_admin()` |  |
-| alumni_members_insert_admin_only | INSERT | authenticated |  | `is_admin()` |
+| alumni_members_delete_admin_only | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| alumni_members_insert_admin_only | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | alumni_members_select_admin_or_owner | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (auth_uid = ( SELECT auth.uid() AS uid)))` |  |
 | alumni_members_update_admin_or_owner | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (auth_uid = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (auth_uid = ( SELECT auth.uid() AS uid)))` |
 
@@ -18,158 +18,161 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| announcements_admin_write | ALL | authenticated | `is_admin()` | `is_admin()` |
-| announcements_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
+| announcements_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| announcements_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| announcements_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| announcements_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.audit_logs
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| audit_logs_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| audit_logs_select_admin | SELECT | authenticated | `is_admin()` |  |
+| audit_logs_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| audit_logs_select_admin | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 
 ## public.dss_flag_notes
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| dss_flag_notes_admin_all | ALL | authenticated | `is_admin()` | `is_admin()` |
+| dss_flag_notes_admin_all | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.dss_flags
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| dss_flags_admin_all | ALL | authenticated | `is_admin()` | `is_admin()` |
+| dss_flags_admin_all | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.dss_rules
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| dss_rules_admin_all | ALL | authenticated | `is_admin()` | `is_admin()` |
+| dss_rules_admin_all | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.employment_records
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| employment_records_delete_admin | DELETE | authenticated | `is_admin()` |  |
-| employment_records_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| employment_records_select_owner_or_admin | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
-| employment_records_update_admin_or_owner | UPDATE | authenticated | `(is_admin() OR (user_id = auth.uid()))` | `(is_admin() OR (user_id = auth.uid()))` |
+| employment_records_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| employment_records_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| employment_records_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
+| employment_records_update_admin_or_owner | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |
 
 ## public.event_comments
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| event_comments_delete_admin_or_author | DELETE | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
-| event_comments_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| event_comments_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| event_comments_update_admin_or_author | UPDATE | authenticated | `(is_admin() OR (user_id = auth.uid()))` | `(is_admin() OR (user_id = auth.uid()))` |
+| event_comments_delete_admin_or_author | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
+| event_comments_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| event_comments_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| event_comments_update_admin_or_author | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |
 
 ## public.event_replies
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| event_replies_admin_delete | DELETE | authenticated | `is_admin()` |  |
-| event_replies_admin_insert | INSERT | authenticated |  | `is_admin()` |
-| event_replies_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| event_replies_admin_update | UPDATE | authenticated | `is_admin()` | `is_admin()` |
+| event_replies_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| event_replies_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| event_replies_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| event_replies_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.event_rsvps
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| event_rsvps_admin_all | ALL | authenticated | `is_admin()` | `is_admin()` |
-| event_rsvps_delete_own | DELETE | authenticated | `(user_id = auth.uid())` |  |
-| event_rsvps_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| event_rsvps_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| event_rsvps_update_own | UPDATE | authenticated | `(user_id = auth.uid())` | `(user_id = auth.uid())` |
+| event_rsvps_delete_own | DELETE | authenticated | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` |  |
+| event_rsvps_insert_own | INSERT | authenticated |  | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` |
+| event_rsvps_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| event_rsvps_update_own | UPDATE | authenticated | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` |
 
 ## public.events
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| events_admin_delete | DELETE | authenticated | `is_admin()` |  |
-| events_admin_write | INSERT | authenticated |  | `is_admin()` |
-| events_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| events_admin_update | UPDATE | authenticated | `is_admin()` | `is_admin()` |
+| events_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| events_admin_write | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| events_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| events_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.favorite_jobs
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| favorite_jobs_owner_rw | ALL | authenticated | `(user_id = auth.uid())` | `(user_id = auth.uid())` |
+| favorite_jobs_owner_rw | ALL | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.feedback
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| feedback_delete_admin_only | DELETE | authenticated | `is_admin()` |  |
-| feedback_insert_owner_constraints | INSERT | authenticated |  | `((user_id = auth.uid()) AND (status = 'submitted'::text) AND (length(message) >= 10))` |
-| feedback_select_owner_or_admin | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
-| feedback_update_delete_admin_only | UPDATE | authenticated | `is_admin()` | `is_admin()` |
+| feedback_delete_admin_only | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| feedback_insert_owner_constraints | INSERT | authenticated |  | `((user_id = ( SELECT auth.uid() AS uid)) AND (status = 'submitted'::text) AND (length(message) >= 10))` |
+| feedback_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
+| feedback_update_delete_admin_only | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.forum_bookmarks
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_bookmarks_delete_own | DELETE | authenticated | `(user_id = auth.uid())` |  |
-| forum_bookmarks_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| forum_bookmarks_select_own | SELECT | authenticated | `(user_id = auth.uid())` |  |
+| forum_bookmarks_delete_own | DELETE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| forum_bookmarks_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| forum_bookmarks_select_own | SELECT | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 
 ## public.forum_helpful_reactions
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_helpful_delete_own | DELETE | authenticated | `(user_id = auth.uid())` |  |
-| forum_helpful_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| forum_helpful_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
+| forum_helpful_delete_own | DELETE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| forum_helpful_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| forum_helpful_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
 
 ## public.forum_moderation_events
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_moderation_insert_admin | INSERT | authenticated |  | `(is_admin() AND (actor_uid = auth.uid()))` |
-| forum_moderation_select_admin | SELECT | authenticated | `is_admin()` |  |
+| forum_moderation_insert_admin | INSERT | authenticated |  | `(( SELECT is_admin() AS is_admin) AND (actor_uid = ( SELECT auth.uid() AS uid)))` |
+| forum_moderation_select_admin | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 
 ## public.forum_posts
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_posts_delete_admin_or_author | DELETE | authenticated | `(is_admin() OR (author_uid = auth.uid()))` |  |
-| forum_posts_insert_author_when_unlocked | INSERT | authenticated |  | `((author_uid = auth.uid()) AND (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_posts.topic_id) AND (t.is_locked = false)))))` |
-| forum_posts_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| forum_posts_update_admin_or_author | UPDATE | authenticated | `(is_admin() OR (author_uid = auth.uid()))` | `(is_admin() OR (author_uid = auth.uid()))` |
+| forum_posts_delete_admin_or_author | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` |  |
+| forum_posts_insert_author_when_unlocked | INSERT | authenticated |  | `((author_uid = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_posts.topic_id) AND (t.is_locked = false)))))` |
+| forum_posts_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| forum_posts_update_admin_or_author | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` |
 
 ## public.forum_reports
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_reports_insert_own | INSERT | authenticated |  | `(reporter_uid = auth.uid())` |
-| forum_reports_select_admin_or_reporter | SELECT | authenticated | `(is_admin() OR (reporter_uid = auth.uid()))` |  |
-| forum_reports_admin_update | UPDATE | authenticated | `is_admin()` | `is_admin()` |
+| forum_reports_insert_own | INSERT | authenticated |  | `(reporter_uid = ( SELECT auth.uid() AS uid))` |
+| forum_reports_select_admin_or_reporter | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (reporter_uid = ( SELECT auth.uid() AS uid)))` |  |
+| forum_reports_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.forum_tags
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_tags_admin_write | ALL | authenticated | `is_admin()` | `is_admin()` |
-| forum_tags_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
+| forum_tags_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| forum_tags_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| forum_tags_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| forum_tags_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.forum_topic_tags
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_topic_tags_delete_author_or_admin | DELETE | authenticated | `(is_admin() OR (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_topic_tags.topic_id) AND (t.author_uid = auth.uid())))))` |  |
-| forum_topic_tags_insert_author_or_admin | INSERT | authenticated |  | `(is_admin() OR (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_topic_tags.topic_id) AND (t.author_uid = auth.uid())))))` |
-| forum_topic_tags_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
+| forum_topic_tags_delete_author_or_admin | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_topic_tags.topic_id) AND (t.author_uid = ( SELECT auth.uid() AS uid))))))` |  |
+| forum_topic_tags_insert_author_or_admin | INSERT | authenticated |  | `(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_topic_tags.topic_id) AND (t.author_uid = ( SELECT auth.uid() AS uid))))))` |
+| forum_topic_tags_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
 
 ## public.forum_topics
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| forum_topics_delete_admin_or_author | DELETE | authenticated | `(is_admin() OR (author_uid = auth.uid()))` |  |
-| forum_topics_insert_author | INSERT | authenticated |  | `(author_uid = auth.uid())` |
-| forum_topics_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| forum_topics_update_admin_or_author | UPDATE | authenticated | `(is_admin() OR (author_uid = auth.uid()))` | `(is_admin() OR (author_uid = auth.uid()))` |
+| forum_topics_delete_admin_or_author | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` |  |
+| forum_topics_insert_author | INSERT | authenticated |  | `(author_uid = ( SELECT auth.uid() AS uid))` |
+| forum_topics_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| forum_topics_update_admin_or_author | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` |
 
 ## public.gts_question_catalog
 
@@ -181,153 +184,161 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| job_interests_admin_delete | DELETE | authenticated | `is_admin()` |  |
-| job_interests_delete_own | DELETE | authenticated | `(user_id = auth.uid())` |  |
-| job_interests_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| job_interests_select_own_or_admin | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
+| job_interests_delete_own | DELETE | authenticated | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` |  |
+| job_interests_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| job_interests_select_own_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
 
 ## public.jobs
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| jobs_admin_delete | DELETE | authenticated | `is_admin()` |  |
-| jobs_admin_insert | INSERT | authenticated |  | `is_admin()` |
-| jobs_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| jobs_admin_update | UPDATE | authenticated | `is_admin()` | `is_admin()` |
+| jobs_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| jobs_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| jobs_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| jobs_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.messages
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| messages_delete_sender_or_admin | DELETE | authenticated | `(is_admin() OR (sender_id = auth.uid()))` |  |
-| messages_insert_participant | INSERT | authenticated |  | `((sender_id = auth.uid()) AND (is_admin() OR (EXISTS ( SELECT 1 FROM users u WHERE ((u.id = messages.recipient_id) AND (u.role = 'admin'::text))))))` |
-| messages_select_participant_or_admin | SELECT | authenticated | `(is_admin() OR (sender_id = auth.uid()) OR (recipient_id = auth.uid()))` |  |
-| messages_update_participant_or_admin | UPDATE | authenticated | `(is_admin() OR (sender_id = auth.uid()) OR (recipient_id = auth.uid()))` | `(is_admin() OR (sender_id = auth.uid()) OR (recipient_id = auth.uid()))` |
+| messages_delete_sender_or_admin | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)))` |  |
+| messages_insert_participant | INSERT | authenticated |  | `((sender_id = ( SELECT auth.uid() AS uid)) AND (( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1 FROM users u WHERE ((u.id = messages.recipient_id) AND (u.role = 'admin'::text))))))` |
+| messages_select_participant_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)) OR (recipient_id = ( SELECT auth.uid() AS uid)))` |  |
+| messages_update_participant_or_admin | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)) OR (recipient_id = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)) OR (recipient_id = ( SELECT auth.uid() AS uid)))` |
 
 ## public.notification_preferences
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| notification_preferences_insert_own | INSERT | public |  | `(user_id = auth.uid())` |
-| notification_preferences_select_own | SELECT | public | `(user_id = auth.uid())` |  |
-| notification_preferences_update_own | UPDATE | public | `(user_id = auth.uid())` | `(user_id = auth.uid())` |
+| notification_preferences_insert_own | INSERT | public |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| notification_preferences_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| notification_preferences_update_own | UPDATE | public | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.notification_push_deliveries
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| notification_push_deliveries_admin_select | SELECT | public | `is_admin()` |  |
+| notification_push_deliveries_admin_select | SELECT | public | `( SELECT is_admin() AS is_admin)` |  |
 
 ## public.notifications
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| notifications_write_admin_only | ALL | authenticated | `is_admin()` | `is_admin()` |
-| notifications_select_owner_or_admin | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
+| notifications_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| notifications_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| notifications_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
+| notifications_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.programs
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| programs_admin_write | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
+| programs_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| programs_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | programs_select_all | SELECT | anon,authenticated | `true` |  |
+| programs_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.push_tokens
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| push_tokens_delete_own | DELETE | public | `(user_id = auth.uid())` |  |
-| push_tokens_select_own | SELECT | public | `(user_id = auth.uid())` |  |
+| push_tokens_delete_own | DELETE | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| push_tokens_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 
 ## public.reminders
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| reminders_owner_rw | ALL | authenticated | `(user_id = auth.uid())` | `(user_id = auth.uid())` |
+| reminders_owner_rw | ALL | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.survey_assignments
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| survey_assignments_delete_admin | DELETE | authenticated | `is_admin()` |  |
-| survey_assignments_insert_delete_admin | INSERT | authenticated |  | `is_admin()` |
-| survey_assignments_select_owner_or_admin | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
-| survey_assignments_update_admin_or_owner | UPDATE | authenticated | `(is_admin() OR (user_id = auth.uid()))` | `(is_admin() OR (user_id = auth.uid()))` |
+| survey_assignments_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| survey_assignments_insert_delete_admin | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| survey_assignments_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
+| survey_assignments_update_admin_or_owner | UPDATE | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |
 
 ## public.survey_questions
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| survey_questions_admin_write | ALL | authenticated | `is_admin()` | `is_admin()` |
-| survey_questions_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
+| survey_questions_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| survey_questions_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| survey_questions_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| survey_questions_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.survey_response_events
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| survey_response_events_delete_admin | DELETE | authenticated | `is_admin()` |  |
-| survey_response_events_insert_owner | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| survey_response_events_select_admin_or_owner | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
+| survey_response_events_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| survey_response_events_insert_owner | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| survey_response_events_select_admin_or_owner | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
 
 ## public.survey_responses
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| survey_responses_delete_admin | DELETE | authenticated | `is_admin()` |  |
-| survey_responses_insert_owner | INSERT | authenticated |  | `(user_id = auth.uid())` |
-| survey_responses_select_admin_or_owner | SELECT | authenticated | `(is_admin() OR (user_id = auth.uid()))` |  |
-| survey_responses_update_owner | UPDATE | authenticated | `(user_id = auth.uid())` | `(user_id = auth.uid())` |
+| survey_responses_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| survey_responses_insert_owner | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| survey_responses_select_admin_or_owner | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
+| survey_responses_update_owner | UPDATE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.survey_template_questions
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| survey_template_questions_admin_write | ALL | authenticated | `is_admin()` | `is_admin()` |
-| survey_template_questions_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
+| survey_template_questions_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| survey_template_questions_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| survey_template_questions_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| survey_template_questions_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.survey_templates
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| survey_templates_admin_write | ALL | authenticated | `is_admin()` | `is_admin()` |
-| survey_templates_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
+| survey_templates_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| survey_templates_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| survey_templates_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| survey_templates_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.surveys
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| surveys_delete_admin | DELETE | authenticated | `is_admin()` |  |
-| surveys_insert_admin | INSERT | authenticated |  | `is_admin()` |
-| surveys_select_signed_in | SELECT | authenticated | `is_signed_in()` |  |
-| surveys_update_admin | UPDATE | authenticated | `is_admin()` | `is_admin()` |
+| surveys_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| surveys_insert_admin | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
+| surveys_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
+| surveys_update_admin | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.tracer_draft_reminders
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| tracer_draft_reminders_delete_own | DELETE | public | `(user_id = auth.uid())` |  |
-| tracer_draft_reminders_insert_own | INSERT | public |  | `(user_id = auth.uid())` |
-| tracer_draft_reminders_select_own | SELECT | public | `(user_id = auth.uid())` |  |
-| tracer_draft_reminders_update_own | UPDATE | public | `(user_id = auth.uid())` | `(user_id = auth.uid())` |
+| tracer_draft_reminders_delete_own | DELETE | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| tracer_draft_reminders_insert_own | INSERT | public |  | `(user_id = ( SELECT auth.uid() AS uid))` |
+| tracer_draft_reminders_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| tracer_draft_reminders_update_own | UPDATE | public | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.user_notifications
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| user_notifications_delete_owner | DELETE | authenticated | `(user_id = auth.uid())` |  |
-| user_notifications_insert_admin_or_owner | INSERT | authenticated |  | `(is_admin() OR (user_id = auth.uid()))` |
-| user_notifications_select_owner | SELECT | authenticated | `(user_id = auth.uid())` |  |
-| user_notifications_update_delete_owner | UPDATE | authenticated | `(user_id = auth.uid())` | `(user_id = auth.uid())` |
+| user_notifications_delete_owner | DELETE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| user_notifications_insert_admin_or_owner | INSERT | authenticated |  | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |
+| user_notifications_select_owner | SELECT | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
+| user_notifications_update_delete_owner | UPDATE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.users
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| users_admin_write | ALL | authenticated | `is_admin()` | `is_admin()` |
-| users_delete_admin_only | DELETE | authenticated | `is_admin()` |  |
-| users_insert_self_user_role | INSERT | authenticated |  | `((id = auth.uid()) AND (role = 'user'::text))` |
-| users_select_owner_admin_or_admin_target | SELECT | authenticated | `(is_signed_in() AND ((id = auth.uid()) OR is_admin() OR (role = 'admin'::text)))` |  |
-| users_update_self_user_role | UPDATE | authenticated | `((id = auth.uid()) OR is_admin())` | `(((id = auth.uid()) AND (role = 'user'::text)) OR is_admin())` |
+| users_delete_admin_only | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
+| users_insert_self_user_role | INSERT | authenticated |  | `(((id = ( SELECT auth.uid() AS uid)) AND (role = 'user'::text)) OR ( SELECT is_admin() AS is_admin))` |
+| users_select_owner_admin_or_admin_target | SELECT | authenticated | `(( SELECT is_signed_in() AS is_signed_in) AND ((id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin) OR (role = 'admin'::text)))` |  |
+| users_update_self_user_role | UPDATE | authenticated | `((id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` | `(((id = ( SELECT auth.uid() AS uid)) AND (role = 'user'::text)) OR ( SELECT is_admin() AS is_admin))` |
 
 ## storage.objects
 

@@ -308,8 +308,9 @@ class IdTracerService {
   /// Get total count
   Future<int> getTotalRecordsCount() async {
     try {
-      final rows = await _supabase.from('employment_records').select('id');
-      return rows.length;
+      return await _supabase
+          .from('employment_records')
+          .count(CountOption.exact);
     } catch (e) {
       throw Exception('Error getting total count: $e');
     }
@@ -321,11 +322,10 @@ class IdTracerService {
           .getActiveRegisteredAuthUids();
       if (activeAuthUids.isEmpty) return 0;
 
-      final rows = await _supabase
+      return await _supabase
           .from('employment_records')
-          .select('id')
+          .count(CountOption.exact)
           .inFilter('user_id', activeAuthUids.toList());
-      return rows.length;
     } catch (e) {
       throw Exception('Error getting active registered employment count: $e');
     }

@@ -922,7 +922,7 @@ class SurveyService {
 
       var query = _supabase
           .from('survey_assignments')
-          .select('id')
+          .count(CountOption.exact)
           .inFilter('status', [
             SurveyAssignmentStatus.notStarted.name,
             SurveyAssignmentStatus.inProgress.name,
@@ -930,8 +930,7 @@ class SurveyService {
       if (activeIds != null) {
         query = query.inFilter('user_id', activeIds.toList());
       }
-      final rows = await query;
-      return rows.length;
+      return await query;
     } catch (_) {
       return 0;
     }

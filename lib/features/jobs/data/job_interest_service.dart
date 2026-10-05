@@ -105,8 +105,7 @@ class JobInterestService {
 
   Future<int> totalInterestCount() async {
     try {
-      final rows = await _supabase.from('job_interests').select('job_id');
-      return rows.length;
+      return await _supabase.from('job_interests').count(CountOption.exact);
     } catch (_) {
       return 0;
     }

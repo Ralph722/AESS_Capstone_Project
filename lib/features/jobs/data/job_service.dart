@@ -78,8 +78,7 @@ class JobService {
 
   Future<int> getTotalJobsCount() async {
     try {
-      final rows = await _supabase.from('jobs').select('id');
-      return rows.length;
+      return await _supabase.from('jobs').count(CountOption.exact);
     } catch (e) {
       throw Exception('Error fetching jobs count: $e');
     }
@@ -88,9 +87,10 @@ class JobService {
   Future<int> getActiveJobsCount() async {
     try {
       await expirePastDeadlineJobs();
-      final rows =
-          await _supabase.from('jobs').select('id').eq('status', 'active');
-      return rows.length;
+      return await _supabase
+          .from('jobs')
+          .count(CountOption.exact)
+          .eq('status', 'active');
     } catch (e) {
       throw Exception('Error fetching active jobs count: $e');
     }

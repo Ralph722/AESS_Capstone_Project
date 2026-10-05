@@ -115,8 +115,7 @@ class EventService {
 
   Future<int> getTotalEventsCount() async {
     try {
-      final rows = await _supabase.from('events').select('id');
-      return rows.length;
+      return await _supabase.from('events').count(CountOption.exact);
     } catch (_) {
       return 0;
     }

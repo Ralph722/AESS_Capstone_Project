@@ -25,11 +25,10 @@ class AnnouncementService {
 
   Future<int> countPublishedAnnouncements() async {
     try {
-      final rows = await _supabase
+      return await _supabase
           .from('announcements')
-          .select('id')
+          .count(CountOption.exact)
           .eq('status', AnnouncementStatus.published.name);
-      return rows.length;
     } catch (_) {
       final list = await getAllAnnouncements();
       return list
@@ -105,11 +104,12 @@ class AnnouncementService {
   }
 
   Future<List<TracerProfile>> _fetchEligibleAlumni() async {
-    final rows = await _supabase.from('users').select();
-    return rows
-        .where((row) => (row['role'] as String? ?? 'user').toLowerCase() != 'admin')
-        .map(TracerProfile.fromSupabaseRow)
-        .toList();
+    final rows = await _supabase
+        .from('users')
+        .select('id, display_name, email, program, batch_year, year_graduated')
+        .neq('role', 'admin')
+        .isFilter('deactivated_at', null);
+    return rows.map(TracerProfile.fromSupabaseRow).toList();
   }
 
   bool _matchesTarget(Announcement item, TracerProfile profile) {

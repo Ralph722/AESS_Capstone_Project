@@ -661,11 +661,10 @@ class ForumService {
 
   Future<int> getOpenReportCount() async {
     try {
-      final rows = await _supabase
+      return await _supabase
           .from('forum_reports')
-          .select('id')
+          .count(CountOption.exact)
           .eq('status', 'open');
-      return rows.length;
     } catch (_) {
       return 0;
     }
@@ -833,8 +832,7 @@ class ForumService {
 
   Future<int> getTopicCount() async {
     try {
-      final rows = await _supabase.from('forum_topics').select('id');
-      return rows.length;
+      return await _supabase.from('forum_topics').count(CountOption.exact);
     } catch (_) {
       return 0;
     }

@@ -20,9 +20,7 @@ Enums, views, storage buckets, Realtime publications, scheduled jobs and extensi
 - `public.event_rsvps`
 - `public.events`
 - `public.feedback`
-- `public.forum_helpful_reactions`
 - `public.forum_posts`
-- `public.forum_reports`
 - `public.forum_topics`
 - `public.messages`
 - `public.survey_assignments`

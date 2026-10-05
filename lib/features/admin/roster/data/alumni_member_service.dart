@@ -520,8 +520,9 @@ class AlumniMemberService {
 
   Future<int> getTotalMemberCount() async {
     try {
-      final rows = await _supabase.from('alumni_members').select('id');
-      return rows.length;
+      return await _supabase
+          .from('alumni_members')
+          .count(CountOption.exact);
     } catch (_) {
       return 0;
     }

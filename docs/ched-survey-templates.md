@@ -7,7 +7,7 @@ The official CHED GTS is a **locked, code-defined form** (`ched_gts_builtin` sch
 | Area | In app |
 |------|--------|
 | **A–D official items** | Built-in form with paper-accurate skip logic |
-| **Prefill** | Profile (A + B.12) + employment record when available |
+| **Prefill** | Profile (A + B.12) + latest submitted CHED GTS employment answers when available |
 | **Alumni UX** | Form appears **inline on Tracer → Active** as a section wizard (A → B → C → D → Review) after publish |
 | **Admin** | Title/description + audience (program/batch) + Publish only |
 

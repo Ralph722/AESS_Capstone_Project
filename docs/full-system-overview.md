@@ -454,7 +454,7 @@ Logic lives in Dart services (client talks to Supabase under RLS). One-line map:
 |---------|---------|
 | `AppSession` | Current Auth user helpers |
 | `AuditService` | Write/query `audit_logs` |
-| `EmailService` | OTP + reminder emails via Edge Function |
+| `EmailService` | Survey reminder emails via the `send-email` Edge Function (OTP is sent by Supabase Auth) |
 | `ChedGtsExportService` | Official CHED multi-sheet Excel |
 | `SupabaseUserBridge` | Resolve `public.users` by auth id |
 

@@ -86,7 +86,7 @@ lib/
 │   ├── ai/                            # Gemini AI chat assistant
 │   ├── alumni/
 │   │   ├── profile/                   # Alumni profile page
-│   │   └── tracer/                    # Graduate tracer (employment records)
+│   │   └── tracer/                    # Graduate tracer (CHED GTS employment, read-only)
 │   ├── community/                     # Community page (wraps forum)
 │   └── admin/
 │       ├── dashboard/                 # Admin overview + metrics + sidebar shell
@@ -429,7 +429,7 @@ The alumni portal (`MainNavigation`) uses 6-tab bottom navigation.
 **File**: `lib/features/notifications/`
 
 - **Types**: event, job, message, announcement, survey, feedback, forum, system
-- **Service**: CRUD, read/unread, bulk create, type-specific helpers
+- **Service**: read, mark read/unread, delete own. Notifications are created only by database triggers and server functions (see [docs/notifications.md](docs/notifications.md))
 - **No dedicated screen**: Consumed via badges and popups in other features
 
 ### 5.12 Onboarding
@@ -462,7 +462,7 @@ functions, triggers).
 | `gender`, `civil_status`, `birth_date` | text/date | |
 | `contact_number`, `phone_number` | text | |
 | `address` | text | |
-| `employment_status` | text | Mirrored from employment records |
+| `employment_status` | text | Live profile field; tracer employment comes from `gts_employment_records` |
 | `onboarding_complete` | boolean | Gates main app access |
 | `tracer_profile_completion` | integer | 0-100% |
 | `tracer_profile_complete` | boolean | |
@@ -973,7 +973,7 @@ All colors, typography, spacing, motion, and component styles are centralized he
 |---------|---------|
 | `AppSession` | Static wrapper for Supabase Auth state |
 | `AuditService` | Audit logging (CRUD, query, retention) |
-| `EmailService` | OTP/reminder emails via Supabase Edge Function |
+| `EmailService` | Survey reminder emails via the `send-email` Edge Function (OTP is sent by Supabase Auth) |
 | `ChedGtsExportService` | Multi-sheet Excel export aligned with CHED format |
 | `SupabaseUserBridge` | User ID validation against users table |
 

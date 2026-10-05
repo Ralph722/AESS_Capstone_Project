@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-110 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
+111 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
 
 | Function | Arguments | Returns | Security | Settings | anon can run | authenticated can run | Language |
 |---|---|---|---|---|---|---|---|
@@ -16,6 +16,7 @@
 | audit_logs_stamp_actor |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | auto_assign_open_surveys | `p_user_id uuid` | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | batch_targets_include | `p_targets text[], p_year text` | `boolean` | invoker | `search_path=public` | false | true | plpgsql |
+| caller_is_active |  | `boolean` | definer | `search_path=public` | false | true | sql |
 | claim_push_deliveries | `p_limit integer` | `TABLE(delivery_id uuid, notification_id uuid, provider text, platform text, token text, subscription jsonb, type text, priority text, title text, body text, route text, attempts integer)` | definer | `search_path=public` | false | false | plpgsql |
 | complete_push_deliveries | `p_results jsonb` | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | dss_ched_single | `p_answers jsonb, p_key text` | `text` | invoker | `search_path=public` | false | true | sql |

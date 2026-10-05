@@ -2,13 +2,14 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-129 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+170 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | alumni_members_delete_admin_only | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | alumni_members_insert_admin_only | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | alumni_members_select_admin_or_owner | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (auth_uid = ( SELECT auth.uid() AS uid)))` |  |
@@ -18,6 +19,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | announcements_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | announcements_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | announcements_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -27,6 +29,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | audit_logs_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | audit_logs_select_admin | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 
@@ -34,30 +37,35 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | dss_flag_checks_select_admin | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 
 ## public.dss_flag_notes
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | dss_flag_notes_admin_all | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.dss_flags
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | dss_flags_admin_all | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.dss_rules
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | dss_rules_admin_all | ALL | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
 
 ## public.event_comments
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | event_comments_delete_admin_or_author | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
 | event_comments_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | event_comments_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -67,6 +75,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | event_replies_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | event_replies_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | event_replies_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -76,6 +85,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | event_rsvps_delete_own | DELETE | authenticated | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` |  |
 | event_rsvps_insert_own | INSERT | authenticated |  | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` |
 | event_rsvps_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -85,6 +95,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | events_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | events_admin_write | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | events_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -94,12 +105,14 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | favorite_jobs_owner_rw | ALL | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
 ## public.feedback
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | feedback_delete_admin_only | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | feedback_insert_owner_constraints | INSERT | authenticated |  | `((user_id = ( SELECT auth.uid() AS uid)) AND (status = 'submitted'::text) AND (length(message) >= 10))` |
 | feedback_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
@@ -109,6 +122,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_bookmarks_delete_own | DELETE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | forum_bookmarks_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | forum_bookmarks_select_own | SELECT | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
@@ -117,6 +131,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_helpful_delete_own | DELETE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | forum_helpful_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | forum_helpful_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -125,6 +140,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_moderation_insert_admin | INSERT | authenticated |  | `(( SELECT is_admin() AS is_admin) AND (actor_uid = ( SELECT auth.uid() AS uid)))` |
 | forum_moderation_select_admin | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 
@@ -132,6 +148,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_posts_delete_admin_or_author | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` |  |
 | forum_posts_insert_author_when_unlocked | INSERT | authenticated |  | `((author_uid = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_posts.topic_id) AND (t.is_locked = false)))))` |
 | forum_posts_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -141,6 +158,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_reports_insert_own | INSERT | authenticated |  | `(reporter_uid = ( SELECT auth.uid() AS uid))` |
 | forum_reports_select_admin_or_reporter | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (reporter_uid = ( SELECT auth.uid() AS uid)))` |  |
 | forum_reports_admin_update | UPDATE | authenticated | `( SELECT is_admin() AS is_admin)` | `( SELECT is_admin() AS is_admin)` |
@@ -149,6 +167,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_tags_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | forum_tags_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | forum_tags_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -158,6 +177,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_topic_tags_delete_author_or_admin | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_topic_tags.topic_id) AND (t.author_uid = ( SELECT auth.uid() AS uid))))))` |  |
 | forum_topic_tags_insert_author_or_admin | INSERT | authenticated |  | `(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1 FROM forum_topics t WHERE ((t.id = forum_topic_tags.topic_id) AND (t.author_uid = ( SELECT auth.uid() AS uid))))))` |
 | forum_topic_tags_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -166,6 +186,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | forum_topics_delete_admin_or_author | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (author_uid = ( SELECT auth.uid() AS uid)))` |  |
 | forum_topics_insert_author | INSERT | authenticated |  | `(author_uid = ( SELECT auth.uid() AS uid))` |
 | forum_topics_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -175,12 +196,14 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | gts_question_catalog_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
 
 ## public.job_interests
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | job_interests_delete_own | DELETE | authenticated | `((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin))` |  |
 | job_interests_insert_own | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | job_interests_select_own_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
@@ -189,6 +212,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | jobs_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | jobs_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | jobs_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -198,6 +222,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | messages_delete_sender_or_admin | DELETE | authenticated | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)))` |  |
 | messages_insert_participant | INSERT | authenticated |  | `((sender_id = ( SELECT auth.uid() AS uid)) AND (( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1 FROM users u WHERE ((u.id = messages.recipient_id) AND (u.role = 'admin'::text))))))` |
 | messages_select_participant_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (sender_id = ( SELECT auth.uid() AS uid)) OR (recipient_id = ( SELECT auth.uid() AS uid)))` |  |
@@ -207,12 +232,14 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | notification_deliveries_admin_select | SELECT | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 
 ## public.notification_preferences
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | notification_preferences_insert_own | INSERT | public |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | notification_preferences_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | notification_preferences_update_own | UPDATE | public | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
@@ -221,6 +248,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | programs_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | programs_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | programs_select_all | SELECT | anon,authenticated | `true` |  |
@@ -230,6 +258,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | push_tokens_delete_own | DELETE | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | push_tokens_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 
@@ -237,6 +266,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | survey_assignments_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | survey_assignments_insert_delete_admin | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | survey_assignments_select_owner_or_admin | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
@@ -246,6 +276,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | survey_questions_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | survey_questions_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | survey_questions_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -255,6 +286,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | survey_response_events_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | survey_response_events_insert_owner | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | survey_response_events_select_admin_or_owner | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
@@ -263,6 +295,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | survey_responses_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | survey_responses_insert_owner | INSERT | authenticated |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | survey_responses_select_admin_or_owner | SELECT | authenticated | `(( SELECT is_admin() AS is_admin) OR (user_id = ( SELECT auth.uid() AS uid)))` |  |
@@ -272,6 +305,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | survey_template_questions_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | survey_template_questions_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | survey_template_questions_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -281,6 +315,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | survey_templates_admin_delete | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | survey_templates_admin_insert | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | survey_templates_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -290,6 +325,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | surveys_delete_admin | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | surveys_insert_admin | INSERT | authenticated |  | `( SELECT is_admin() AS is_admin)` |
 | surveys_select_signed_in | SELECT | authenticated | `( SELECT is_signed_in() AS is_signed_in)` |  |
@@ -299,15 +335,23 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | tracer_draft_reminders_delete_own | DELETE | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | tracer_draft_reminders_insert_own | INSERT | public |  | `(user_id = ( SELECT auth.uid() AS uid))` |
 | tracer_draft_reminders_select_own | SELECT | public | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | tracer_draft_reminders_update_own | UPDATE | public | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
 
+## public.tracer_help_usage
+
+| Policy | Command | Roles | USING | WITH CHECK |
+|---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
+
 ## public.user_notifications
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | user_notifications_delete_owner | DELETE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | user_notifications_select_owner | SELECT | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` |  |
 | user_notifications_update_delete_owner | UPDATE | authenticated | `(user_id = ( SELECT auth.uid() AS uid))` | `(user_id = ( SELECT auth.uid() AS uid))` |
@@ -316,6 +360,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | users_delete_admin_only | DELETE | authenticated | `( SELECT is_admin() AS is_admin)` |  |
 | users_insert_self_user_role | INSERT | authenticated |  | `(((id = ( SELECT auth.uid() AS uid)) AND (role = 'user'::text)) OR ( SELECT is_admin() AS is_admin))` |
 | users_select_owner_admin_or_admin_target | SELECT | authenticated | `(( SELECT is_signed_in() AS is_signed_in) AND ((id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin) OR (role = 'admin'::text)))` |  |
@@ -325,6 +370,7 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
+| active_caller_only (restrictive) | ALL | authenticated | `( SELECT caller_is_active() AS caller_is_active)` | `( SELECT caller_is_active() AS caller_is_active)` |
 | images_owner_delete | DELETE | authenticated | `((bucket_id = 'images'::text) AND (is_admin() OR (((storage.foldername(name))[1] = 'messages'::text) AND ((storage.foldername(name))[2] = (auth.uid())::text)) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (auth.uid())::text) \|\| '%'::text)))))` |  |
 | message_attachments_delete_own_or_admin | DELETE | authenticated | `((bucket_id = 'message-attachments'::text) AND (((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text) OR ( SELECT is_admin() AS is_admin)))` |  |
 | images_owner_insert | INSERT | authenticated |  | `((bucket_id = 'images'::text) AND (( SELECT is_admin() AS is_admin) OR (((storage.foldername(name))[1] = 'avatars'::text) AND (name ~~ (('avatars/'::text \|\| (( SELECT auth.uid() AS uid))::text) \|\| '%'::text)))))` |

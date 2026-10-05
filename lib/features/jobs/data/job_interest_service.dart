@@ -125,7 +125,8 @@ class JobInterestService {
     }
   }
 
-  /// Hydrate interest rows with user + roster profile fields.
+  /// Hydrate interest rows with user + roster profile fields and the latest
+  /// CHED GTS employment status.
   Future<List<JobInterestedAlumni>> listAlumniForJob(String jobId) async {
     final interests = await listForJob(jobId);
     if (interests.isEmpty) return [];
@@ -152,7 +153,7 @@ class JobInterestService {
           .from('alumni_members')
           .select(
             'auth_uid, full_name, registered_email, course, '
-            'year_graduated, employment_status, profile_image_url',
+            'year_graduated, profile_image_url',
           )
           .inFilter('auth_uid', userIds);
       for (final row in members) {
@@ -168,10 +169,22 @@ class JobInterestService {
           if ((row['course'] as String?)?.trim().isNotEmpty == true)
             'program': row['course'],
           'year_graduated': row['year_graduated'] ?? existing['year_graduated'],
-          'employment_status': row['employment_status'],
           if ((row['profile_image_url'] as String?)?.trim().isNotEmpty == true)
             'profile_image_base64': row['profile_image_url'],
         };
+      }
+    } catch (_) {}
+
+    final employment = <String, String>{};
+    try {
+      final rows = await _supabase
+          .from('gts_employment_records')
+          .select('user_id, status')
+          .inFilter('user_id', userIds);
+      for (final row in rows) {
+        final id = row['user_id']?.toString() ?? '';
+        final status = (row['status'] as String?)?.trim() ?? '';
+        if (id.isNotEmpty && status.isNotEmpty) employment[id] = status;
       }
     } catch (_) {}
 
@@ -186,7 +199,7 @@ class JobInterestService {
         email: (p['email'] as String?)?.trim() ?? '',
         course: (p['program'] as String?)?.trim() ?? '',
         batch: batch,
-        employmentStatus: (p['employment_status'] as String?)?.trim() ?? '',
+        employmentStatus: employment[i.userId] ?? '',
         avatarUrl: (p['profile_image_base64'] as String?)?.trim(),
         interestedAt: i.createdAt,
       );

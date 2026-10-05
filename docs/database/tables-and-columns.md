@@ -2,11 +2,11 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Public schema: 40 tables, 445 columns.
+Public schema: 40 tables, 444 columns.
 
 | Table | Columns | Row level security |
 |---|---|---|
-| [alumni_members](#alumni_members) | 23 | enabled=true, forced=false |
+| [alumni_members](#alumni_members) | 22 | enabled=true, forced=false |
 | [announcements](#announcements) | 8 | enabled=true, forced=false |
 | [audit_logs](#audit_logs) | 8 | enabled=true, forced=false |
 | [dss_flag_checks](#dss_flag_checks) | 11 | enabled=true, forced=false |
@@ -71,7 +71,6 @@ Public schema: 40 tables, 445 columns.
 | birth_date | date |  |  |  |
 | year_graduated | text |  |  |  |
 | tracer_profile_complete | boolean | yes | `false` |  |
-| employment_status | text |  |  |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
 

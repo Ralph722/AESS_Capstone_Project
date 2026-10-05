@@ -32,9 +32,6 @@ class AlumniMember {
   final String? yearGraduated;
   final bool tracerProfileComplete;
 
-  /// Latest employment tracer status (Employed / Unemployed), mirrored from submissions.
-  final String? employmentStatus;
-
   AlumniMember({
     required this.id,
     required this.fullName,
@@ -59,7 +56,6 @@ class AlumniMember {
     this.birthDate,
     this.yearGraduated,
     this.tracerProfileComplete = false,
-    this.employmentStatus,
   }) : createdAt = createdAt ?? DateTime.now();
 
   String get program => course;
@@ -111,7 +107,6 @@ class AlumniMember {
           : null,
       yearGraduated: row['year_graduated'] as String?,
       tracerProfileComplete: row['tracer_profile_complete'] == true,
-      employmentStatus: row['employment_status'] as String?,
     );
   }
 
@@ -137,7 +132,6 @@ class AlumniMember {
       'birth_date': birthDate?.toUtc().toIso8601String().split('T').first,
       'year_graduated': yearGraduated,
       'tracer_profile_complete': tracerProfileComplete,
-      'employment_status': employmentStatus,
       'created_at': createdAt.toUtc().toIso8601String(),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
@@ -169,8 +163,6 @@ class AlumniMember {
     String? batchYear,
     String? contactNumber,
     String? emailAddress,
-    String? currentPosition,
-    String? currentCompany,
     String? address,
     String? gender,
     String? civilStatus,
@@ -203,7 +195,6 @@ class AlumniMember {
       yearGraduated: yearGraduated ?? this.yearGraduated,
       tracerProfileComplete:
           tracerProfileComplete ?? this.tracerProfileComplete,
-      employmentStatus: employmentStatus ?? this.employmentStatus,
     );
   }
 }
@@ -234,5 +225,5 @@ enum AlumniRegistrationFilter { all, registered, notRegistered }
 
 enum AlumniActiveFilter { all, active7, active30, active90, inactive }
 
-/// Filter roster by latest employment tracer submission.
+/// Filter roster by the latest CHED GTS employment answer.
 enum AlumniEmploymentFilter { all, employed, unemployed }

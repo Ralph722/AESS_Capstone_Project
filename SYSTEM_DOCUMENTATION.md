@@ -202,7 +202,7 @@ The admin portal (`AdminDashboardWeb`) uses a collapsible navy sidebar with sect
 - Delete registered member account
 - Search by name, student ID, email
 
-**Model** (`AlumniMember`): id, fullName, course, studentId, authUid, registeredEmail, isRegisteredUser, isDeactivated, batchYear, employmentStatus, gender, civilStatus, birthDate, yearGraduated, tracerProfileComplete, profileImageUrl, lastActiveAt
+**Model** (`AlumniMember`): id, fullName, course, studentId, authUid, registeredEmail, isRegisteredUser, isDeactivated, batchYear, gender, civilStatus, birthDate, yearGraduated, tracerProfileComplete, profileImageUrl, lastActiveAt
 
 ### 4.3 Events
 **File**: `lib/features/admin/events/`
@@ -481,7 +481,6 @@ functions, triggers).
 | `is_deactivated` | boolean | |
 | `year_graduated` | text | Graduation year = batch (source of truth) |
 | `gender`, `civil_status`, `birth_date` | text/date | |
-| `employment_status` | text | Legacy; current status comes from `gts_employment_records` |
 | `profile_image_url` | text | |
 | `last_active_at` | timestamptz | |
 | `tracer_profile_complete` | boolean | |
@@ -715,11 +714,14 @@ One log for push alerts (`channel = 'push'`, per device token) and emails (`chan
 | `events` | Authenticated read; admin CRUD |
 | `announcements` | Authenticated read published; admin CRUD |
 
+Every RLS table (and `storage.objects`) also has the restrictive policy `active_caller_only`: a deactivated user is denied everything, even with an access token issued before deactivation. New tables must add the same policy.
+
 ### Key Database Functions
 | Function | Purpose |
 |----------|---------|
 | `is_admin()` | Returns true if current user has admin role |
 | `is_signed_in()` | Returns true if user is authenticated |
+| `caller_is_active()` | False when the signed-in user is deactivated; used by `active_caller_only` |
 | `set_updated_at()` | Trigger function — auto-sets updated_at on row change |
 | `validate_alumni_eligibility()` | RPC — checks name/course/ID against roster |
 | `link_alumni_registration()` | RPC — links auth user to alumni roster |
@@ -1060,7 +1062,7 @@ All colors, typography, spacing, motion, and component styles are centralized he
 | File | Purpose |
 |------|---------|
 | `supabase/migrations/20260716100001_phase1_schema_rls.sql` | Phase 1 schema + RLS |
-| `supabase/migrations/20261005*_phase*.sql` | Database audit phases 1–7 (integrity, RLS, performance, GTS analytics, notifications, legacy cleanup) |
+| `supabase/migrations/20261005*_phase*.sql` | Database audit phases 1–8 (integrity, RLS, performance, GTS analytics, notifications, legacy cleanup, validation fixes) |
 | `supabase/functions/send-email/index.ts` | Email delivery Edge Function |
 | `supabase/functions/send-push/index.ts` | Push alert Edge Function |
 | `supabase/functions/tracer-help/index.ts` | CHED GTS AI help Edge Function |

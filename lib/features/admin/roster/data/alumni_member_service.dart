@@ -716,11 +716,6 @@ class AlumniMemberService {
     AlumniMember member,
     EmploymentStatusIndex index,
   ) {
-    final onRoster = member.employmentStatus?.trim();
-    if (onRoster != null && onRoster.isNotEmpty) {
-      return onRoster.toLowerCase();
-    }
-
     final uid = member.authUid;
     if (uid != null && uid.isNotEmpty) {
       final byUid = index.byAuthUid[uid]?.trim();
@@ -788,7 +783,7 @@ class AlumniMemberService {
           'is_registered_user, is_deactivated, profile_image_url, last_active_at, '
           'has_profile_updates, admin_viewed_at, created_at, updated_at, '
           'contact_number, email_address, address, gender, civil_status, birth_date, '
-          'year_graduated, tracer_profile_complete, employment_status',
+          'year_graduated, tracer_profile_complete',
         )
         .order('created_at', ascending: false);
     return rows.map(AlumniMember.fromSupabaseRow).toList();

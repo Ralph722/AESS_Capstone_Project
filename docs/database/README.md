@@ -22,3 +22,15 @@ supabase db query --linked -f docs/database/queries/columns.sql -o csv
 ```
 
 If this snapshot and `supabase/migrations` disagree, the migrations win and the snapshot is out of date.
+
+## Restoring from a data backup
+
+A JSON data backup (one file per table) must be loaded into the schema it was taken from, not into today's schema. Later migrations transform the data; for example, `events.starts_at` and `ends_at` are filled by a trigger added in Phase 7 and are missing from older backups.
+
+1. Apply `supabase/migrations` up to the last migration that existed when the backup was taken.
+2. Restore `auth.users` and `auth.identities`.
+3. For each table, with `set session_replication_role = replica;`, run `insert into public.<table> select * from json_populate_recordset(null::public.<table>, '<json>');`.
+4. Re-upload storage objects, then apply the remaining migrations with `supabase db push`.
+5. Recreate secrets and Vault entries from [secrets-runbook.md](secrets-runbook.md) and check that the `cron.job` schedules exist.
+
+The Phase 8 drill (2026-10-06) loaded the 2026-10-05 backup into scratch copies of every surviving table inside a rolled-back transaction. All row IDs matched live, `events` loaded once its time trigger was attached, and the only storage differences were the two public message images moved or removed in Phase 1.

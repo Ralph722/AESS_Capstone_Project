@@ -2,15 +2,16 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-86 indexes, including the ones that back primary keys and unique constraints.
+88 indexes, including the ones that back primary keys and unique constraints.
 
 
 ## alumni_members
 
 | Index | Kind | Definition |
 |---|---|---|
+| alumni_members_auth_uid_key | UNIQUE | `btree (auth_uid) WHERE (auth_uid IS NOT NULL)` |
 | alumni_members_pkey | PK | `btree (id)` |
-| idx_alumni_members_student_course |  | `btree (student_id, course)` |
+| alumni_members_student_course_key | UNIQUE | `btree (normalize_student_id(student_id), COALESCE(normalize_course(course), upper(TRIM(BOTH FROM course)))) WHERE (normalize_student_id(student_id) <> ''::text)` |
 
 ## announcements
 
@@ -289,4 +290,5 @@
 
 | Index | Kind | Definition |
 |---|---|---|
+| users_email_lower_key | UNIQUE | `btree (lower(email)) WHERE (email <> ''::text)` |
 | users_pkey | PK | `btree (id)` |

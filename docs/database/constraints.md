@@ -2,27 +2,28 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 136 constraints in total.
+Primary keys, foreign keys (with their ON DELETE behaviour), unique and check constraints. 142 constraints in total.
 
 
 ## alumni_members
 
 | Constraint | Kind | Definition |
 |---|---|---|
-| alumni_members_auth_uid_fkey | Foreign key | `FOREIGN KEY (auth_uid) REFERENCES auth.users(id)` |
+| alumni_members_auth_uid_fkey | Foreign key | `FOREIGN KEY (auth_uid) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | alumni_members_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## announcements
 
 | Constraint | Kind | Definition |
 |---|---|---|
+| announcements_status_check | Check | `CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])))` |
 | announcements_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## audit_logs
 
 | Constraint | Kind | Definition |
 |---|---|---|
-| audit_logs_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id)` |
+| audit_logs_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | audit_logs_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## dss_flag_notes
@@ -62,7 +63,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | Constraint | Kind | Definition |
 |---|---|---|
 | employment_records_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
-| employment_records_verified_by_fkey | Foreign key | `FOREIGN KEY (verified_by) REFERENCES auth.users(id)` |
+| employment_records_verified_by_fkey | Foreign key | `FOREIGN KEY (verified_by) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | employment_records_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## event_comments
@@ -96,6 +97,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
+| events_status_check | Check | `CHECK ((status = ANY (ARRAY['Active'::text, 'Archived'::text])))` |
 | events_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## favorite_jobs
@@ -110,6 +112,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
+| feedback_status_check | Check | `CHECK ((status = ANY (ARRAY['submitted'::text, 'inReview'::text, 'resolved'::text, 'closed'::text])))` |
 | feedback_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | feedback_pkey | Primary key | `PRIMARY KEY (id)` |
 
@@ -141,7 +144,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
-| forum_posts_author_uid_fkey | Foreign key | `FOREIGN KEY (author_uid) REFERENCES auth.users(id) ON DELETE CASCADE` |
+| forum_posts_author_uid_fkey | Foreign key | `FOREIGN KEY (author_uid) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | forum_posts_parent_post_id_fkey | Foreign key | `FOREIGN KEY (parent_post_id) REFERENCES forum_posts(id) ON DELETE SET NULL` |
 | forum_posts_quoted_post_id_fkey | Foreign key | `FOREIGN KEY (quoted_post_id) REFERENCES forum_posts(id) ON DELETE SET NULL` |
 | forum_posts_topic_id_fkey | Foreign key | `FOREIGN KEY (topic_id) REFERENCES forum_topics(id) ON DELETE CASCADE` |
@@ -151,6 +154,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
+| forum_reports_status_check | Check | `CHECK ((status = ANY (ARRAY['open'::text, 'resolved'::text, 'dismissed'::text])))` |
 | forum_reports_post_id_fkey | Foreign key | `FOREIGN KEY (post_id) REFERENCES forum_posts(id) ON DELETE SET NULL` |
 | forum_reports_reporter_uid_fkey | Foreign key | `FOREIGN KEY (reporter_uid) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | forum_reports_topic_id_fkey | Foreign key | `FOREIGN KEY (topic_id) REFERENCES forum_topics(id) ON DELETE SET NULL` |
@@ -175,7 +179,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
-| forum_topics_author_uid_fkey | Foreign key | `FOREIGN KEY (author_uid) REFERENCES auth.users(id) ON DELETE CASCADE` |
+| forum_topics_author_uid_fkey | Foreign key | `FOREIGN KEY (author_uid) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | forum_topics_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## job_interests
@@ -190,6 +194,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 
 | Constraint | Kind | Definition |
 |---|---|---|
+| jobs_status_check | Check | `CHECK ((status = ANY (ARRAY['active'::text, 'expired'::text, 'closed'::text, 'archived'::text])))` |
 | jobs_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## messages
@@ -214,6 +219,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | notification_push_deliveries_status_check | Check | `CHECK ((status = ANY (ARRAY['queued'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'skipped'::text])))` |
 | notification_push_deliveries_notification_id_fkey | Foreign key | `FOREIGN KEY (notification_id) REFERENCES user_notifications(id) ON DELETE CASCADE` |
 | notification_push_deliveries_token_id_fkey | Foreign key | `FOREIGN KEY (token_id) REFERENCES push_tokens(id) ON DELETE CASCADE` |
+| notification_push_deliveries_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
 | notification_push_deliveries_pkey | Primary key | `PRIMARY KEY (id)` |
 | notification_push_deliveries_notification_id_token_id_key | Unique | `UNIQUE (notification_id, token_id)` |
 
@@ -249,7 +255,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 |---|---|---|
 | survey_assignments_status_check | Check | `CHECK ((status = ANY (ARRAY['notStarted'::text, 'inProgress'::text, 'completed'::text])))` |
 | survey_assignments_survey_id_fkey | Foreign key | `FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE` |
-| survey_assignments_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
+| survey_assignments_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE RESTRICT` |
 | survey_assignments_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## survey_questions
@@ -269,7 +275,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | survey_response_events_platform_family_check | Check | `CHECK (((platform_family IS NULL) OR (platform_family = ANY (ARRAY['android'::text, 'ios'::text, 'web'::text, 'windows'::text, 'macos'::text, 'linux'::text, 'other'::text]))))` |
 | survey_response_events_response_id_fkey | Foreign key | `FOREIGN KEY (response_id) REFERENCES survey_responses(id) ON DELETE SET NULL` |
 | survey_response_events_survey_id_fkey | Foreign key | `FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE` |
-| survey_response_events_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
+| survey_response_events_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE RESTRICT` |
 | survey_response_events_pkey | Primary key | `PRIMARY KEY (id)` |
 
 ## survey_responses
@@ -281,7 +287,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | survey_responses_platform_family_check | Check | `CHECK (((platform_family IS NULL) OR (platform_family = ANY (ARRAY['android'::text, 'ios'::text, 'web'::text, 'windows'::text, 'macos'::text, 'linux'::text, 'other'::text]))))` |
 | survey_responses_status_check | Check | `CHECK ((status = ANY (ARRAY['draft'::text, 'submitted'::text])))` |
 | survey_responses_survey_id_fkey | Foreign key | `FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE` |
-| survey_responses_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE` |
+| survey_responses_user_id_fkey | Foreign key | `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE RESTRICT` |
 | survey_responses_pkey | Primary key | `PRIMARY KEY (id)` |
 | survey_responses_survey_id_user_id_key | Unique | `UNIQUE (survey_id, user_id)` |
 
@@ -303,7 +309,7 @@ Primary keys, foreign keys (with their ON DELETE behaviour), unique and check co
 | Constraint | Kind | Definition |
 |---|---|---|
 | surveys_status_check | Check | `CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'closed'::text])))` |
-| surveys_created_by_fkey | Foreign key | `FOREIGN KEY (created_by) REFERENCES auth.users(id)` |
+| surveys_created_by_fkey | Foreign key | `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL` |
 | surveys_template_id_fkey | Foreign key | `FOREIGN KEY (template_id) REFERENCES survey_templates(id)` |
 | surveys_pkey | Primary key | `PRIMARY KEY (id)` |
 

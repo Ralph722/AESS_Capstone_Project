@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-126 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
+124 policies across the `public` and `storage` schemas. `USING` decides which existing rows a role can see or change; `WITH CHECK` decides which new or updated rows it may write.
 
 
 ## public.alumni_members
@@ -25,10 +25,8 @@
 
 | Policy | Command | Roles | USING | WITH CHECK |
 |---|---|---|---|---|
-| audit_logs_delete_admin | DELETE | authenticated | `is_admin()` |  |
 | audit_logs_insert_own | INSERT | authenticated |  | `(user_id = auth.uid())` |
 | audit_logs_select_admin | SELECT | authenticated | `is_admin()` |  |
-| audit_logs_update_delete_admin | UPDATE | authenticated | `is_admin()` | `is_admin()` |
 
 ## public.dss_flag_notes
 
@@ -341,8 +339,8 @@ Table privileges held by the `anon` and `authenticated` roles. Row level securit
 | alumni_members | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | announcements | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | announcements | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| audit_logs | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
-| audit_logs | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
+| audit_logs | anon | INSERT, REFERENCES, SELECT, TRIGGER |
+| audit_logs | authenticated | INSERT, REFERENCES, SELECT, TRIGGER |
 | dss_flag_notes | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | dss_flag_notes | authenticated | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | dss_flags | anon | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |

@@ -582,9 +582,12 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
               const SizedBox(height: 12),
               Text(
                 registered
-                    ? 'Deactivate keeps the roster record but excludes the alumnus '
-                          'from active analytics. Delete permanently removes the '
-                          'linked portal account, related user data, and this roster row.'
+                    ? 'Deactivate blocks sign-in and can be undone later. '
+                          'Remove account also erases their personal details '
+                          '(name, email, contact info, photo) from the portal. '
+                          'Their tracer answers stay in the statistics without '
+                          'identifying details, and the roster entry stays deactivated. '
+                          'This cannot be undone.'
                     : 'Remove ${member.fullName} from the official roster? '
                           'They will not be able to register.',
                 style: TextStyle(color: Colors.grey.shade700, height: 1.4),
@@ -610,7 +613,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red.shade600,
                     ),
-                    child: const Text('Delete'),
+                    child: Text(registered ? 'Remove account' : 'Delete'),
                   ),
                 ],
               ),
@@ -626,21 +629,22 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       if (action == 'deactivate') {
         await _memberService.deactivateMember(member.id);
         _showSnack('${member.fullName} deactivated');
+      } else if (registered) {
+        await _memberService.removeRegisteredMemberAccount(member);
+        _showSnack('${member.fullName}\'s portal account was removed');
       } else {
-        if (registered) {
-          await _memberService.deleteRegisteredMemberAccount(member);
-          _showSnack('${member.fullName} and linked account deleted');
-        } else {
-          await _memberService.deleteMember(member.id);
-          _showSnack('${member.fullName} removed from roster');
-        }
+        await _memberService.deleteMember(member.id);
+        _showSnack('${member.fullName} removed from roster');
       }
-      await _auditService.logAction(
-        action: action == 'deactivate' ? 'DEACTIVATE_ROSTER' : 'DELETE_ROSTER',
-        resource: 'AlumniMember',
-        resourceId: member.id,
-        description: '$action: ${member.fullName}',
-      );
+      if (action == 'deactivate' || !registered) {
+        await _auditService.logAction(
+          action: action == 'deactivate' ? 'DEACTIVATE_ROSTER' : 'DELETE_ROSTER',
+          resource: 'AlumniMember',
+          resourceId: member.id,
+          description: '$action: ${member.fullName}',
+          userRole: 'admin',
+        );
+      }
       await _loadMembers();
       if (_selectedMember?.id == member.id) {
         setState(() => _selectedMember = null);

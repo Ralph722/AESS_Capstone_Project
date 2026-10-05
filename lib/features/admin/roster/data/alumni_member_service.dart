@@ -6,6 +6,7 @@ import 'package:alumni_system/core/utils/local_id.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/services/supabase_user_bridge.dart';
+import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 
 class AlumniMemberDuplicateException implements Exception {
   AlumniMemberDuplicateException(this.message);
@@ -294,45 +295,33 @@ class AlumniMemberService {
     }
   }
 
-  Future<void> deleteRegisteredMemberAccount(AlumniMember member) async {
+  /// Deactivates and anonymizes the linked portal account. The roster row
+  /// stays (deactivated, unlinked) and tracer answers are kept with
+  /// identifying items blanked.
+  Future<void> removeRegisteredMemberAccount(AlumniMember member) async {
     final authUid = member.authUid?.trim() ?? '';
     if (authUid.isEmpty) {
       await deleteMember(member.id);
       return;
     }
 
+    final Object? data;
     try {
-      final response = await _supabase.functions.invoke(
-        'admin-delete-user',
-        body: {
-          'memberId': member.id,
-          'authUid': authUid,
-          'fullName': member.fullName,
-        },
+      data = await _supabase.rpc(
+        'admin_remove_alumni_account',
+        params: {'p_member_id': member.id},
       );
-      final data = response.data;
-      if (response.status >= 400) {
-        final message = data is Map && data['error'] != null
-            ? data['error'].toString()
-            : 'Could not delete registered account.';
-        throw Exception(message);
-      }
-      if (data is Map && data['error'] != null) {
-        throw Exception(data['error'].toString());
-      }
-    } on FunctionException catch (e) {
-      final details = e.details;
-      if (details is Map && details['error'] != null) {
-        throw Exception(details['error'].toString());
-      }
-      throw Exception(
-        e.reasonPhrase?.isNotEmpty == true
-            ? e.reasonPhrase!
-            : 'Could not delete registered account.',
-      );
-    } catch (e) {
-      throw Exception('Error deleting registered account: $e');
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
     }
+    if (data is! Map || data['ok'] != true) {
+      throw Exception('Could not remove the registered account.');
+    }
+
+    await ImageStorageService(supabase: _supabase).deleteProfileImage(
+      authUid,
+      avatarUrl: data['avatarUrl']?.toString(),
+    );
   }
 
   Future<void> markAdminViewed(String memberId) async {

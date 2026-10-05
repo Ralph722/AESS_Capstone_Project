@@ -114,71 +114,25 @@ class DssRepository {
     DateTime? verifyDueAt,
     bool clearResolvedAt = false,
   }) async {
-    final user = AppSession.currentUser;
-    final now = DateTime.now().toUtc().toIso8601String();
-    final updates = <String, dynamic>{
-      'status': status.dbValue,
-      'updated_by': user?.id,
-      'updated_at': now,
-    };
-    if (status == DssFlagStatus.resolved || status == DssFlagStatus.dismissed) {
-      updates['resolved_at'] = now;
-    }
-    if (clearResolvedAt ||
-        status == DssFlagStatus.open ||
-        status == DssFlagStatus.inProgress) {
-      if (flag.status == DssFlagStatus.resolved ||
-          flag.status == DssFlagStatus.dismissed) {
-        updates['resolved_at'] = null;
-        updates['verify_due_at'] = null;
-      }
-    }
-    if (interventionType != null) {
-      updates['intervention_type'] = interventionType;
-    }
-    if (interventionDetail != null) {
-      updates['intervention_detail'] = interventionDetail;
-    }
-    if (followupValue != null) {
-      updates['followup_value'] = followupValue;
-      updates['followup_at'] = now;
-    }
-    if (followupSampleN != null) {
-      updates['followup_sample_n'] = followupSampleN;
-    }
-    if (impactVerdict != null) {
-      updates['impact_verdict'] = impactVerdict;
-    }
-    if (verifyDueAt != null) {
-      updates['verify_due_at'] = verifyDueAt.toUtc().toIso8601String();
-    }
-
-    await _supabase.from('dss_flags').update(updates).eq('id', flag.id);
-
     final trimmed = note.trim();
-    if (trimmed.isNotEmpty || status != flag.status) {
-      final isReopen = (flag.status == DssFlagStatus.resolved ||
-              flag.status == DssFlagStatus.dismissed) &&
-          (status == DssFlagStatus.open || status == DssFlagStatus.inProgress);
-      await _insertNote(
-        flagId: flag.id,
-        note: trimmed.isEmpty
-            ? 'Status changed to ${status.label}'
-            : trimmed,
-        statusFrom: flag.status.dbValue,
-        statusTo: status.dbValue,
-        eventType: isReopen
-            ? DssNoteEventType.reopen
-            : DssNoteEventType.status,
-        metadata: {
-          if (interventionType != null) 'intervention': interventionType,
-          if (interventionDetail != null && interventionDetail.isNotEmpty)
-            'intervention_detail': interventionDetail,
-          if (impactVerdict != null) 'impact_verdict': impactVerdict,
-          if (followupValue != null) 'followup_value': followupValue,
-          if (followupSampleN != null) 'followup_sample_n': followupSampleN,
+    try {
+      await _supabase.rpc(
+        'dss_update_flag_status',
+        params: {
+          'p_flag_id': flag.id,
+          'p_status': status.dbValue,
+          'p_note': trimmed,
+          'p_intervention_type': interventionType,
+          'p_intervention_detail': interventionDetail,
+          'p_followup_value': followupValue,
+          'p_followup_sample_n': followupSampleN,
+          'p_impact_verdict': impactVerdict,
+          'p_verify_due_at': verifyDueAt?.toUtc().toIso8601String(),
+          'p_clear_resolved_at': clearResolvedAt,
         },
       );
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
     }
 
     await _audit.logAction(

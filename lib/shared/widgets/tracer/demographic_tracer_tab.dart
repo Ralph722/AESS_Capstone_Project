@@ -109,10 +109,6 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_program.isEmpty || !CourseConstants.isValid(_program)) {
-      _snack('Select your course.', isError: true);
-      return;
-    }
     if (_gender.isEmpty) {
       _snack('Select your gender.', isError: true);
       return;
@@ -200,17 +196,17 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
                 ),
                 _field(
                   controller: _studentIdController,
-                  label: 'ID number *',
+                  label: 'ID number',
                   icon: Icons.badge_outlined,
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Required' : null,
+                  hint: 'Set by the alumni office',
+                  readOnly: true,
                 ),
                 _dropdown(
-                  label: 'Course *',
+                  label: 'Course',
                   value: _program.isEmpty ? null : _program,
                   items: CourseConstants.courses,
                   icon: Icons.menu_book_outlined,
-                  onChanged: (v) => setState(() => _program = v ?? ''),
+                  onChanged: null,
                 ),
                 _field(
                   controller: _batchController,
@@ -370,11 +366,13 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
     int maxLines = 1,
     TextInputType? keyboard,
     String? Function(String?)? validator,
+    bool readOnly = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextFormField(
         controller: controller,
+        readOnly: readOnly,
         maxLines: maxLines,
         keyboardType: keyboard,
         validator: validator,
@@ -391,7 +389,7 @@ class _DemographicTracerTabState extends State<DemographicTracerTab>
     required String label,
     required String? value,
     required List<String> items,
-    required void Function(String?) onChanged,
+    required void Function(String?)? onChanged,
     IconData icon = Icons.list_alt_outlined,
   }) {
     final selected = value != null && items.contains(value) ? value : null;

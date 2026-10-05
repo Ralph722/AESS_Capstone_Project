@@ -2,56 +2,61 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-87 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
+97 functions in the `public` schema. `definer` functions run with their owner's rights and bypass row level security, so their `EXECUTE` grants matter. Full bodies live in `supabase/migrations`.
 
 | Function | Arguments | Returns | Security | Settings | anon can run | authenticated can run | Language |
 |---|---|---|---|---|---|---|---|
 | admin_conversation_inbox |  | `TABLE(messaging_id text, last_message text, last_message_time timestamp with time zone, last_message_from_role text, sender_name text, sender_email text, has_unread boolean, waiting_since timestamp with time zone)` | definer | `search_path=public` | false | true | plpgsql |
+| admin_remove_alumni_account | `p_member_id uuid` | `jsonb` | definer | `search_path=public` | false | true | plpgsql |
 | admin_send_survey_reminders | `p_survey_id uuid, p_user_ids uuid[]` | `integer` | definer | `search_path=public` | false | true | plpgsql |
-| alumni_members_guard_owner_update |  | `trigger` | invoker | `search_path=public` | false | true | plpgsql |
-| alumni_members_sync_auth_ban |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
+| alumni_members_guard_owner_update |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| alumni_members_sync_auth_ban |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| audit_logs_stamp_actor |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | auto_assign_open_surveys | `p_user_id uuid` | `integer` | definer | `search_path=public` | false | false | plpgsql |
-| batch_targets_include | `p_targets text[], p_year text` | `boolean` | invoker |  | false | true | plpgsql |
+| batch_targets_include | `p_targets text[], p_year text` | `boolean` | invoker | `search_path=public` | false | true | plpgsql |
 | claim_push_deliveries | `p_limit integer` | `TABLE(delivery_id uuid, notification_id uuid, provider text, platform text, token text, subscription jsonb, type text, priority text, title text, body text, route text, attempts integer)` | definer | `search_path=public` | false | false | plpgsql |
 | complete_push_deliveries | `p_results jsonb` | `integer` | definer | `search_path=public` | false | false | plpgsql |
-| dss_ched_single | `p_answers jsonb, p_key text` | `text` | invoker |  | false | true | sql |
+| dss_ched_single | `p_answers jsonb, p_key text` | `text` | invoker | `search_path=public` | false | true | sql |
+| dss_flag_notes_stamp_author |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| dss_flags_guard_status_transition |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | dss_run_flag_action | `p_flag_id uuid, p_action text, p_user_ids uuid[], p_job_ids uuid[]` | `jsonb` | definer | `search_path=public` | false | true | plpgsql |
+| dss_update_flag_status | `p_flag_id uuid, p_status text, p_note text, p_intervention_type text, p_intervention_detail text, p_followup_value numeric, p_followup_sample_n integer, p_impact_verdict text, p_verify_due_at timestamp with time zone, p_clear_resolved_at boolean` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | edit_forum_post | `p_post_id uuid, p_body text` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | edit_forum_topic | `p_topic_id uuid, p_title text, p_body text` | `void` | definer | `search_path=public` | false | true | plpgsql |
-| enforce_assignment_owner_update |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
-| enforce_employment_owner_update |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
-| enforce_message_insert |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
-| enforce_message_update |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
+| enforce_assignment_owner_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| enforce_employment_owner_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| enforce_message_insert |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| enforce_message_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | enqueue_notifications | `p_user_ids uuid[], p_type text, p_title text, p_body text, p_data jsonb, p_priority text, p_dedupe_key text, p_route text, p_push boolean, p_expires_at timestamp with time zone` | `integer` | definer | `search_path=public` | false | false | plpgsql |
-| forum_posts_guard_author_update |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
-| forum_posts_maintain_topic_counts |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
-| forum_topics_guard_author_update |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
-| forum_topics_guard_insert |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
-| handle_new_user |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
+| forum_posts_guard_author_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| forum_posts_maintain_topic_counts |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| forum_topics_guard_author_update |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| forum_topics_guard_insert |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| handle_new_user |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | increment_forum_topic_views | `p_topic_id uuid` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | increment_job_views | `p_job_id uuid` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | is_admin |  | `boolean` | definer | `search_path=public` | true | true | sql |
-| is_signed_in |  | `boolean` | invoker |  | true | true | sql |
+| is_signed_in |  | `boolean` | invoker | `search_path=public` | true | true | sql |
 | kick_notification_push |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | link_alumni_registration | `p_member_id text, p_full_name text, p_student_id text, p_course text, p_email text` | `jsonb` | definer | `search_path=public` | false | true | plpgsql |
-| messages_set_edited_at |  | `trigger` | invoker |  | false | true | plpgsql |
-| normalize_course | `raw text` | `text` | invoker |  | false | true | plpgsql |
-| normalize_person_name | `raw text` | `text` | invoker |  | false | true | sql |
-| normalize_student_id | `raw text` | `text` | invoker |  | false | true | sql |
+| messages_set_edited_at |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| normalize_course | `raw text` | `text` | invoker | `search_path=public` | false | true | plpgsql |
+| normalize_person_name | `raw text` | `text` | invoker | `search_path=public` | false | true | sql |
+| normalize_student_id | `raw text` | `text` | invoker | `search_path=public` | false | true | sql |
 | notification_active_alumni_ids |  | `uuid[]` | definer | `search_path=public` | false | false | sql |
 | notification_admin_ids |  | `uuid[]` | definer | `search_path=public` | false | false | sql |
 | notification_channel_allowed | `p_user uuid, p_type text, p_channel text, p_priority text` | `boolean` | definer | `search_path=public` | false | false | plpgsql |
 | notification_is_active_alumni | `p_user uuid` | `boolean` | definer | `search_path=public` | false | false | sql |
-| notification_job_fingerprint | `j jobs` | `text` | invoker |  | false | true | sql |
-| notification_jsonb_text_array | `p jsonb` | `text[]` | invoker |  | false | true | sql |
-| notification_manila_today |  | `date` | invoker |  | false | true | sql |
+| notification_job_fingerprint | `j jobs` | `text` | invoker | `search_path=public` | false | true | sql |
+| notification_jsonb_text_array | `p jsonb` | `text[]` | invoker | `search_path=public` | false | true | sql |
+| notification_manila_today |  | `date` | invoker | `search_path=public` | false | true | sql |
 | notification_push_dispatch |  | `boolean` | definer | `search_path=public` | false | false | plpgsql |
-| notification_push_text | `p_type text, p_title text, p_body text` | `TABLE(title text, body text)` | invoker |  | false | false | sql |
+| notification_push_text | `p_type text, p_title text, p_body text` | `TABLE(title text, body text)` | invoker | `search_path=public` | false | false | sql |
 | notification_quiet_until | `p_user uuid, p_priority text` | `timestamp with time zone` | definer | `search_path=public` | false | false | plpgsql |
-| notification_survey_accepting | `s surveys` | `boolean` | invoker |  | false | true | sql |
+| notification_survey_accepting | `s surveys` | `boolean` | invoker | `search_path=public` | false | true | sql |
 | notification_survey_assigned | `p_survey surveys, p_user_ids uuid[]` | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | notification_survey_route | `p_survey_id uuid` | `text` | definer | `search_path=public` | false | false | sql |
-| notification_try_timestamptz | `p text` | `timestamp with time zone` | invoker |  | false | true | plpgsql |
+| notification_try_timestamptz | `p text` | `timestamp with time zone` | invoker | `search_path=public` | false | true | plpgsql |
 | notify_admins_forum_report |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_admins_new_event_comment |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_admins_new_registration |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
@@ -70,8 +75,9 @@
 | notify_survey_assignment_created |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_survey_published |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | notify_survey_submitted |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
-| profile_batch_year_digits | `p_batch_year text, p_year_graduated text` | `text` | invoker |  | false | true | sql |
-| program_targets_include | `p_targets text[], p_program text` | `boolean` | invoker |  | false | true | sql |
+| profile_batch_year_digits | `p_batch_year text, p_year_graduated text` | `text` | invoker | `search_path=public` | false | true | sql |
+| program_targets_include | `p_targets text[], p_program text` | `boolean` | invoker | `search_path=public` | false | true | sql |
+| purge_expired_audit_logs |  | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | queue_notification_push |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | record_survey_opened | `p_survey_id uuid, p_device_category text, p_platform_family text, p_browser_family text` | `void` | definer | `search_path=public` | false | true | plpgsql |
 | register_push_token | `p_provider text, p_platform text, p_token text, p_subscription jsonb, p_device_label text` | `uuid` | definer | `search_path=public` | false | true | plpgsql |
@@ -84,12 +90,16 @@
 | run_survey_open_notifications |  | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | run_tracer_draft_reminders |  | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | search_forum_mention_users | `p_query text` | `TABLE(id uuid, display_name text, program text)` | definer | `search_path=public` | false | true | plpgsql |
-| set_updated_at |  | `trigger` | invoker |  | false | true | plpgsql |
-| survey_audience_matches | `p_target_programs text[], p_target_batch_years text[], p_program text, p_batch_year text, p_year_graduated text` | `boolean` | invoker |  | false | true | plpgsql |
-| sync_event_comments_count |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
+| set_updated_at |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| survey_audience_matches | `p_target_programs text[], p_target_batch_years text[], p_program text, p_batch_year text, p_year_graduated text` | `boolean` | invoker | `search_path=public` | false | true | plpgsql |
+| survey_responses_guard_owner_update |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| surveys_block_delete_with_submissions |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| sync_event_comments_count |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
+| sync_user_email_from_auth |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | tracer_help_consume | `p_user_id uuid, p_limit integer` | `integer` | definer | `search_path=public` | false | false | plpgsql |
 | tracer_help_refund | `p_user_id uuid` | `void` | definer | `search_path=public` | false | false | sql |
-| trg_users_auto_assign_surveys |  | `trigger` | definer | `search_path=public` | false | true | plpgsql |
+| trg_users_auto_assign_surveys |  | `trigger` | definer | `search_path=public` | false | false | plpgsql |
 | unregister_push_token | `p_token text` | `void` | definer | `search_path=public` | false | true | sql |
-| user_notifications_track_read |  | `trigger` | invoker |  | false | true | plpgsql |
+| user_notifications_track_read |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
+| users_guard_protected_columns |  | `trigger` | invoker | `search_path=public` | false | false | plpgsql |
 | validate_alumni_eligibility | `p_full_name text, p_student_id text, p_course text` | `jsonb` | definer | `search_path=public` | true | true | plpgsql |

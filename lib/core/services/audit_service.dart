@@ -8,7 +8,8 @@ class AuditService {
 
   final SupabaseClient _supabase;
 
-  // Log an action
+  /// Audit rows are append-only. The server stamps user id, name, email and
+  /// role, and a nightly job prunes old rows.
   Future<void> logAction({
     required String action,
     required String resource,
@@ -218,19 +219,6 @@ class AuditService {
     }
   }
 
-  // Delete old audit logs (retention policy)
-  Future<void> deleteOldAuditLogs(int daysToKeep) async {
-    try {
-      final cutoffDate = DateTime.now().subtract(Duration(days: daysToKeep));
-      await _supabase
-          .from('audit_logs')
-          .delete()
-          .lt('created_at', cutoffDate.toUtc().toIso8601String());
-    } catch (_) {
-      // Best-effort retention cleanup
-    }
-  }
-
   // Search audit logs
   Future<List<AuditLog>> searchAuditLogs(
     String query, {
@@ -256,26 +244,5 @@ class AuditService {
     } catch (_) {
       return [];
     }
-  }
-
-  // Delete a single audit log
-  Future<void> deleteAuditLog(String logId) async {
-    await _supabase.from('audit_logs').delete().eq('id', logId);
-  }
-
-  // Delete all audit logs before a specific date
-  Future<int> deleteAuditLogsBefore(DateTime beforeDate) async {
-    final rows = await _supabase
-        .from('audit_logs')
-        .select('id')
-        .lt('created_at', beforeDate.toUtc().toIso8601String());
-
-    if (rows.isEmpty) return 0;
-
-    await _supabase
-        .from('audit_logs')
-        .delete()
-        .lt('created_at', beforeDate.toUtc().toIso8601String());
-    return rows.length;
   }
 }

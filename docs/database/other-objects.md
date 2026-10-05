@@ -32,6 +32,7 @@ Enums, views, storage buckets, Realtime publications, scheduled jobs and extensi
 
 | Name | Schedule (UTC) |
 |---|---|
+| aess-audit-retention | `45 19 * * *` |
 | aess-notify-cleanup | `30 19 * * *` |
 | aess-notify-events | `0 23 * * *` |
 | aess-notify-frequent | `*/15 * * * *` |

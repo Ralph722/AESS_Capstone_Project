@@ -336,9 +336,11 @@ class SurveyService {
 
   Future<void> deleteSurvey(String surveyId) async {
     try {
-      // survey_questions / survey_assignments / survey_responses cascade-delete.
+      // Blocked server-side once the survey has submitted responses.
       await _supabase.from('surveys').delete().eq('id', surveyId);
       _notifyCatalogChanged();
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
     } catch (e) {
       throw Exception('Error deleting survey: $e');
     }
@@ -688,6 +690,11 @@ class SurveyService {
     final ctx = clientContext ?? SurveyClientContext.capture();
     final existing = await getResponse(surveyId, userId);
     final wasSubmitted = existing?.status == SurveyResponseStatus.submitted;
+    if (wasSubmitted) {
+      throw Exception(
+        'You already submitted this survey. Submitted answers can no longer be changed.',
+      );
+    }
     final response = SurveyResponse(
       surveyId: surveyId,
       userId: userId,

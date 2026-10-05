@@ -2,7 +2,7 @@
 
 > Snapshot of the live schema in the linked Supabase project, taken 2026-10-05 with read-only queries. It contains structure only, no row data. Regenerate it from `queries/` instead of editing by hand; the migrations in `supabase/migrations` remain the source of truth.
 
-Public schema: 40 tables, 440 columns.
+Public schema: 40 tables, 442 columns.
 
 | Table | Columns | Row level security |
 |---|---|---|
@@ -45,7 +45,7 @@ Public schema: 40 tables, 440 columns.
 | [tracer_draft_reminders](#tracer_draft_reminders) | 10 | enabled=true, forced=false |
 | [tracer_help_usage](#tracer_help_usage) | 4 | enabled=true, forced=false |
 | [user_notifications](#user_notifications) | 15 | enabled=true, forced=false |
-| [users](#users) | 27 | enabled=true, forced=false |
+| [users](#users) | 29 | enabled=true, forced=false |
 
 ## alumni_members
 
@@ -310,7 +310,7 @@ Public schema: 40 tables, 440 columns.
 | id | uuid | yes | `gen_random_uuid()` |  |
 | topic_id | uuid | yes |  |  |
 | body | text | yes | `''::text` |  |
-| author_uid | uuid | yes |  |  |
+| author_uid | uuid |  |  |  |
 | author_name | text | yes | `''::text` |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
@@ -356,7 +356,7 @@ Public schema: 40 tables, 440 columns.
 | id | uuid | yes | `gen_random_uuid()` |  |
 | title | text | yes | `''::text` |  |
 | body | text | yes | `''::text` |  |
-| author_uid | uuid | yes |  |  |
+| author_uid | uuid |  |  |  |
 | author_name | text | yes | `''::text` |  |
 | author_program | text | yes | `''::text` |  |
 | reply_count | integer | yes | `0` |  |
@@ -390,7 +390,7 @@ Public schema: 40 tables, 440 columns.
 | company | text | yes | `''::text` |  |
 | location | text | yes | `''::text` |  |
 | description | text | yes | `''::text` |  |
-| status | text | yes | `'Active'::text` |  |
+| status | text | yes | `'active'::text` |  |
 | data | jsonb | yes | `'{}'::jsonb` |  |
 | created_at | timestamp with time zone | yes | `now()` |  |
 | updated_at | timestamp with time zone | yes | `now()` |  |
@@ -686,3 +686,5 @@ Public schema: 40 tables, 440 columns.
 | college_university | text | yes | `''::text` |  |
 | honors_awards | text | yes | `''::text` |  |
 | employment_status | text | yes | `''::text` |  |
+| deactivated_at | timestamp with time zone |  |  |  |
+| anonymized_at | timestamp with time zone |  |  |  |

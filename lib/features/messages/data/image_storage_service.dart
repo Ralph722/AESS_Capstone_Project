@@ -215,6 +215,19 @@ class ImageStorageService {
   static String messageImagePath(String userId, String messageId) =>
       '$userId/$messageId.jpg';
 
+  /// Best-effort removal of a user's avatar (admin account removal).
+  Future<void> deleteProfileImage(String userId, {String? avatarUrl}) async {
+    final uid = sanitizePathSegment(userId, label: 'userId');
+    final paths = <String>{'avatars/$uid.jpg'};
+    final fromUrl = storagePathFromPublicUrl(avatarUrl);
+    if (fromUrl != null && fromUrl.startsWith('avatars/$uid')) {
+      paths.add(fromUrl);
+    }
+    try {
+      await _supabase.storage.from(bucket).remove(paths.toList());
+    } catch (_) {}
+  }
+
   /// Best-effort delete for a chat attachment reference or legacy URL.
   Future<void> deleteMessageImageByUrl(String? imageUrl) async {
     if (isMessageAttachmentRef(imageUrl)) {

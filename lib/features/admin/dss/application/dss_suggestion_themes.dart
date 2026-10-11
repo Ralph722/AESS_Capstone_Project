@@ -5,7 +5,6 @@ import 'package:alumni_system/features/admin/dss/application/dss_evaluation_serv
 import 'package:alumni_system/features/admin/dss/application/dss_metrics.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/ai/data/ai_assistant_service.dart';
-import 'package:alumni_system/features/ai/models/ai_chat_message.dart';
 
 /// Curriculum feedback for one flag's group: Q34 suggestions grouped into
 /// themes (quotes are always the alumni's own text) plus Q33 competency picks.
@@ -68,7 +67,7 @@ class DssSuggestionThemeService {
       byAi: ai != null,
     );
 
-    if (texts.length < 2 || !AiConfig.isConfigured) return result();
+    if (texts.length < 2 || !AiConfig.isEnabled) return result();
 
     final cacheKey = '${flag.id}:${texts.length}:${Object.hashAll(texts)}';
     final cached = _aiCache[cacheKey];
@@ -95,24 +94,12 @@ class DssSuggestionThemeService {
       numbered.writeln('${i + 1}. ${clipped.replaceAll('\n', ' ')}');
     }
     final raw = await _ai.sendMessage(
-      isAdmin: true,
-      history: const <AiChatMessage>[],
+      task: AiTask.dssThemes,
       userMessage:
           'Group these alumni curriculum suggestions into at most $maxThemes '
           'themes. Return JSON only, shaped like '
           '{"themes":[{"label":"Short theme","items":[1,4]}]}.\n'
           'Suggestions:\n$numbered',
-      systemInstructionOverride:
-          'You group free-text curriculum suggestions written by university '
-          'alumni. Use only the numbered suggestions supplied. A theme label '
-          'is a neutral noun phrase of at most 6 words describing what alumni '
-          'asked for. List a suggestion number under a theme only when that '
-          'suggestion clearly asks for it. Skip suggestions that fit no theme. '
-          'Never invent suggestions, quotes, or numbers. Output JSON only.',
-      temperature: 0.1,
-      maxOutputTokens: 2048,
-      responseMimeType: 'application/json',
-      disableThinking: true,
     );
     return parseAiThemes(raw, shown.length);
   }

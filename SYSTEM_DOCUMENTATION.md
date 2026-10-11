@@ -985,7 +985,7 @@ All colors, typography, spacing, motion, and component styles are centralized he
 | `SupabaseConfig` | URL + anon key (dart-define or defaults) |
 | `SupabaseDefaults` | Fallback Supabase credentials |
 | `EmailDeliveryConfig` | Email service toggle + function name |
-| `AiConfig` / `AiDefaults` | Gemini API key + model settings |
+| `AiConfig` | AI on/off switch (`AI_ENABLED`) and the `ai-assist` Edge Function name; the Gemini key is a server secret |
 | `MigrationConfig` | Schema migration flags |
 
 ### Core Utils (`lib/core/utils/`)

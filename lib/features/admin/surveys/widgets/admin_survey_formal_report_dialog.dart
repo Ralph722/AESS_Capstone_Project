@@ -234,7 +234,7 @@ class _SurveyFormalReportDialogState extends State<_SurveyFormalReportDialog> {
                 ],
               ),
             ),
-            if (!AiConfig.isConfigured)
+            if (!AiConfig.isEnabled)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.all(10),
@@ -244,8 +244,8 @@ class _SurveyFormalReportDialogState extends State<_SurveyFormalReportDialog> {
                   border: Border.all(color: const Color(0xFFFED7AA)),
                 ),
                 child: const Text(
-                  'Gemini API key not configured — a metric-based formal draft '
-                  'will still be generated for you to edit.',
+                  'AI is turned off in this build — a metric-based formal '
+                  'draft will still be generated for you to edit.',
                   style: TextStyle(fontSize: 12.5, height: 1.35),
                 ),
               ),

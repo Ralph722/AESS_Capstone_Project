@@ -2,7 +2,6 @@ import 'package:alumni_system/core/config/ai_config.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/ai/data/ai_assistant_service.dart';
-import 'package:alumni_system/features/ai/models/ai_chat_message.dart';
 
 /// An explanation of one flag. [byAi] is false when the rule-based text is
 /// shown instead (AI not configured, unavailable, or its reply rejected).
@@ -38,7 +37,7 @@ class DssAiService {
   final AiAssistantService _ai;
   final bool? _available;
 
-  static bool get isAvailable => AiConfig.isConfigured;
+  static bool get isAvailable => AiConfig.isEnabled;
 
   /// The rule-based explanation shown when AI is not used.
   static String fallbackText(DssFlag flag) =>
@@ -52,13 +51,8 @@ class DssAiService {
     String raw;
     try {
       raw = await _ai.sendMessage(
-        isAdmin: true,
-        history: const <AiChatMessage>[],
+        task: AiTask.dssExplain,
         userMessage: factsPrompt(flag),
-        systemInstructionOverride: systemInstruction,
-        temperature: 0.2,
-        maxOutputTokens: 2048,
-        disableThinking: true,
       );
     } catch (_) {
       return DssAiExplanation(text: fallback, byAi: false, unavailable: true);
@@ -78,20 +72,8 @@ class DssAiService {
     return DssAiExplanation(text: text, byAi: true);
   }
 
-  static const systemInstruction =
-      'You explain decision-support findings to university alumni-office '
-      'admins. The findings were produced by fixed rules; you only explain '
-      'them in plain words. Use only the facts supplied. Restate the '
-      'measured value and the number of answers exactly as given. If the '
-      'item is a Watch item or the evidence is limited, say so. Do not '
-      'prioritize, rank or compare it with other findings, do not judge how '
-      'severe or urgent it is, do not say it should be resolved, closed, '
-      'dismissed or ignored, do not say whether any intervention worked, and '
-      'do not suggest causes or actions beyond the fixed recommended action. '
-      'Write 2-4 short, complete sentences in plain text, with no markdown, '
-      'asterisks, hashtags or bullet symbols.';
-
-  /// The facts sent to the AI: computed values only, no names or answers.
+  /// The facts sent to the AI (instructions are in the `dss_explain` task of
+  /// the `ai-assist` Edge Function): computed values only, no names or answers.
   static String factsPrompt(DssFlag flag) {
     final evidence = DssCopy.evidenceLabel(flag);
     return [

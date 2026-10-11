@@ -32,15 +32,6 @@ class SurveyFormalReportService {
 
   final AiAssistantService _ai;
 
-  static const _systemInstruction = '''
-You are an institutional research writer for a university alumni office.
-Write formal, clear English suitable for a memo to administrators or CHED-related
-briefing. Use ONLY the factual numbers and findings provided. Do not invent
-percentages, counts, or conclusions not supported by the data. If the sample
-is small or incomplete, say so. Do not use markdown headings with #; use plain
-paragraphs with clear section titles on their own lines in Title Case.
-''';
-
   Future<SurveyFormalReportResult> generate({
     required Survey survey,
     required List<SurveyQuestion> questions,
@@ -56,23 +47,19 @@ paragraphs with clear section titles on their own lines in Title Case.
     final fallback = buildHeuristicReport(facts);
     final generatedAt = DateTime.now();
 
-    if (!AiConfig.isConfigured) {
+    if (!AiConfig.isEnabled) {
       return SurveyFormalReportResult(
         body: fallback,
         usedAi: false,
         generatedAt: generatedAt,
         disclaimer:
-            'Metric-based draft (AI key not configured) — review before official use.',
+            'Metric-based draft (AI turned off) — review before official use.',
       );
     }
 
     try {
       final text = await _ai.sendMessage(
-        isAdmin: true,
-        history: const [],
-        maxOutputTokens: 4096,
-        temperature: 0.35,
-        systemInstructionOverride: _systemInstruction,
+        task: AiTask.surveyReport,
         userMessage: buildUserPrompt(facts),
       );
       final cleaned = text.trim();

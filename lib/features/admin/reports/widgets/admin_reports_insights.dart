@@ -395,12 +395,12 @@ Future<List<ReportsInsightCardData>> generateReportInsights({
     chedResponses: chedResponses,
   );
 
-  if (!AiConfig.isConfigured) {
+  if (!AiConfig.isEnabled) {
     return heuristics
         .map(
           (c) => c.copyWith(
             body:
-                '${c.body}\n\n(AI key not configured — showing metric-based placeholders.)',
+                '${c.body}\n\n(AI turned off — showing metric-based placeholders.)',
           ),
         )
         .toList();
@@ -409,9 +409,7 @@ Future<List<ReportsInsightCardData>> generateReportInsights({
   try {
     final ai = service ?? AiAssistantService();
     final text = await ai.sendMessage(
-      isAdmin: true,
-      history: const [],
-      maxOutputTokens: 2048,
+      task: AiTask.reportsInsights,
       userMessage: buildReportsInsightsPrompt(
         analytics,
         chedPublished: chedPublished,
@@ -495,9 +493,9 @@ class ReportsInsightsPanel extends StatelessWidget {
           _InsightsStatusStrip(
             isAiGenerated: isAiGenerated,
             isGenerating: isGenerating,
-            apiConfigured: AiConfig.isConfigured,
+            apiConfigured: AiConfig.isEnabled,
           ),
-          if (!AiConfig.isConfigured)
+          if (!AiConfig.isEnabled)
             Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
@@ -507,9 +505,7 @@ class ReportsInsightsPanel extends StatelessWidget {
                 border: Border.all(color: const Color(0xFFFED7AA)),
               ),
               child: const Text(
-                'Gemini API key not configured. Placeholders use live KPIs. '
-                'Add a key in lib/core/config/ai_secrets.dart to enable '
-                'narrative generation.',
+                'AI is turned off in this build. Placeholders use live KPIs.',
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.4,

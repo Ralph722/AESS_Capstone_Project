@@ -38,21 +38,17 @@ class _FakeAi extends AiAssistantService {
   final String? reply;
   final bool error;
   String? lastPrompt;
+  AiTask? lastTask;
   int calls = 0;
 
   @override
   Future<String> sendMessage({
-    required bool isAdmin,
-    required List<AiChatMessage> history,
+    required AiTask task,
     required String userMessage,
-    String? userDisplayName,
-    int maxOutputTokens = 1024,
-    double temperature = 0.7,
-    String? systemInstructionOverride,
-    String? responseMimeType,
-    bool disableThinking = false,
+    List<AiChatMessage> history = const [],
   }) async {
     calls++;
+    lastTask = task;
     lastPrompt = userMessage;
     if (error) throw Exception('quota');
     return reply ?? '';
@@ -214,6 +210,7 @@ void main() {
       ).explainFlag(_flag());
       expect(result.byAi, isTrue);
       expect(result.text, _good);
+      expect(fake.lastTask, AiTask.dssExplain);
       expect(fake.lastPrompt, contains('Answers: 12'));
     });
 

@@ -346,7 +346,7 @@ Tabs: Archived Events | Archived Jobs | Archived Surveys — restore or permanen
 
 ### 6.12 AI Assistant (admin)
 
-Same chat UI as alumni, with an **admin-oriented** system prompt. Requires Gemini API key.
+Same chat UI as alumni, with an **admin-oriented** system prompt. Runs through the `ai-assist` Edge Function; the Gemini key is a server secret.
 
 ### 6.13 Feedback (admin)
 

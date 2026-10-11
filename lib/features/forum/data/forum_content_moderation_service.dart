@@ -98,45 +98,6 @@ class ForumContentModerationService {
     '7': 't',
   };
 
-  static const _systemInstruction = '''
-You are a strict content-safety reviewer for a university alumni portal forum
-in the Philippines (USTP alumni + alumni office).
-
-You MUST understand and evaluate content in:
-- English
-- Tagalog / Filipino
-- Bisaya / Cebuano
-- Mixed Taglish / Bislish
-
-BLOCK (verdict "block") when the text contains any of:
-- Profanity, swearing, vulgar or sexual slang (any of the languages above)
-- Insults, harassment, bullying, hate, threats
-- Explicit sexual content
-- Graphic violence or self-harm encouragement
-- Scams, phishing, malware / suspicious fraud links, doxxing, illegal activity
-
-Normal http/https links to jobs, events, forms, articles, or official sites are ALLOWED
-unless they clearly look like phishing or scams.
-
-WARN (verdict "warn") only for borderline sensitive topics that are not clearly vulgar
-but may still need user review (e.g. graphic health details, heated political attacks
-without swear words).
-
-ALLOW only if the post is appropriate for a professional alumni community.
-
-IMPORTANT:
-- Do NOT treat swear words as "mild slang". Swear words and insults must be "block".
-- Masked swear words (f*ck, p@ta, put@ngina, g@go) still count as block.
-- Abbreviations and acronyms of swear words still count as block
-  (wtf, stfu, gtfo, omfg, lmfao, fml, kys, fck, tngina, ptngina, pota, inamo).
-- Stretched, spaced or dotted spellings (fuuuck, w t f, s.h.i.t) still count as block.
-- Do not block normal academic abbreviations such as BS (Bachelor of Science).
-- If unsure between warn and block for vulgar language, choose "block".
-
-Respond with ONLY valid JSON (no markdown):
-{"verdict":"allow"|"warn"|"block","reasons":["short reason in English"]}
-''';
-
   Future<ForumModerationResult> reviewTopic({
     required String title,
     required String body,
@@ -184,19 +145,14 @@ Respond with ONLY valid JSON (no markdown):
     final local = _localReview(localText, noun: noun);
     if (local.isBlocked) return local;
 
-    if (!AiConfig.isConfigured) {
+    if (!AiConfig.isEnabled) {
       // Local pass only — still allow if no keyword hit.
       return ForumModerationResult.allowUnchecked;
     }
 
     try {
       final raw = await _ai.sendMessage(
-        isAdmin: false,
-        history: const [],
-        temperature: 0.0,
-        maxOutputTokens: 256,
-        responseMimeType: 'application/json',
-        systemInstructionOverride: _systemInstruction,
+        task: AiTask.forumModeration,
         userMessage: aiMessage,
       );
       final ai = _parse(raw);

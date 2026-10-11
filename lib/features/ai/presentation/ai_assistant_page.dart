@@ -6,16 +6,14 @@ import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 
-/// In-app AI chat (Google Gemini) for alumni and admins.
+/// In-app AI chat for alumni and admins, through the `ai-assist` Edge Function.
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({
     super.key,
     required this.isAdmin,
-    this.userDisplayName,
   });
 
   final bool isAdmin;
-  final String? userDisplayName;
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -58,8 +56,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             : 'Hello! I\'m your Alumni Portal assistant. Ask me how to update your tracer, complete surveys, find jobs, or use any part of the app.',
       ),
     );
-    if (!AiConfig.isConfigured) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showSetupDialog());
+    if (!AiConfig.isEnabled) {
+      _messages.add(
+        AiChatMessage(
+          role: AiMessageRole.assistant,
+          text: 'AI help is turned off in this version of the app.',
+          isError: true,
+        ),
+      );
     }
   }
 
@@ -68,31 +72,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _showSetupDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Set up AI'),
-        content: const SelectableText(
-          'To enable the assistant:\n\n'
-          '1. Open https://aistudio.google.com/apikey\n'
-          '2. Create a free API key\n'
-          '3. Paste it in lib/core/config/ai_secrets.dart\n'
-          '4. Hot restart the app\n\n'
-          'Or run with:\n'
-          '--dart-define-from-file=config/dart_defines.json',
-        ),
-        actions: [
-          FilledButton(
-            style: PortalTheme.primaryButton(dense: true),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _send([String? overrideText]) async {
@@ -112,10 +91,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           .where((m) => !m.isError)
           .toList();
       final reply = await _service.sendMessage(
-        isAdmin: widget.isAdmin,
+        task: AiTask.assistant,
         history: history,
         userMessage: text,
-        userDisplayName: widget.userDisplayName,
       );
       if (!mounted) return;
       setState(() {
@@ -134,7 +112,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         );
         _isLoading = false;
       });
-      _showSetupDialog();
     } on AiQuotaException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -182,14 +159,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         foreground: PortalAppBarTone.dark,
         title: widget.isAdmin ? 'Admin AI Assistant' : 'AI Help',
         automaticallyImplyLeading: true,
-        actions: [
-          if (!AiConfig.isConfigured)
-            PortalHeaderAction(
-              icon: Icons.settings_outlined,
-              tooltip: 'Setup required',
-              onPressed: _showSetupDialog,
-            ),
-        ],
       ),
       body: PortalContentFrame(
         maxWidth: PortalBreakpoints.chatMax,

@@ -11,8 +11,8 @@ Set with `supabase secrets set NAME=value --project-ref <ref>` or in Dashboard �
 | `GMAIL_USER` | `send-email` | The Gmail address that sends AESS email |
 | `GMAIL_APP_PASSWORD` | `send-email` | Google Account → Security → App passwords (requires 2-step verification) |
 | `GMAIL_SENDER_NAME` | `send-email` | Display name on outgoing email (falls back to "Alumni System") |
-| `GEMINI_API_KEY` | `tracer-help` | Google AI Studio |
-| `GEMINI_MODEL` | `tracer-help` | Optional; defaults to `gemini-2.5-flash` |
+| `GEMINI_API_KEY` | `tracer-help`, `ai-assist` | Google AI Studio. The only place the key lives; the Flutter app never holds it |
+| `GEMINI_MODEL` | `tracer-help`, `ai-assist` | Optional; defaults to `gemini-2.5-flash` |
 | `PUSH_DISPATCH_SECRET` | `send-push` | Any long random string; must equal the Vault secret `push_dispatch_secret` |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | `send-push` (web push) | Generate a VAPID key pair; the public key must match `lib/core/config/push_config.dart` |
 | `VAPID_SUBJECT` | `send-push` | A `mailto:` address or site URL; falls back to `SUPABASE_URL` |
@@ -41,7 +41,8 @@ select vault.create_secret('<secret>', 'push_dispatch_secret');
 | File | Holds |
 |---|---|
 | `supabase/.env` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` for local scripts |
-| `lib/core/config/ai_secrets.dart` | Local Gemini key for development (`ai_secrets.example.dart` shows the shape) |
+
+The app has no AI key file. All AI requests go through the `ai-assist` Edge Function, which checks the caller and a daily limit (`ai_usage` table: 30 requests a day for alumni, 200 for admins). Never put a Gemini key in Flutter code or `--dart-define`: anything compiled into the app can be read by its users.
 
 ## Dashboard-only settings
 

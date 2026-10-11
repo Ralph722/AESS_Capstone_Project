@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
+import 'package:alumni_system/features/admin/dss/application/dss_policy.dart';
 import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
@@ -88,12 +89,23 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
     }
     final isRate = rule.ruleId != 'SALARY_STAGNATION';
     final threshold = isRate ? thrRaw / 100.0 : thrRaw;
+    final error = DssPolicy.ruleEditError(
+      rule,
+      threshold: threshold,
+      minN: minN,
+    );
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
     try {
       await _repo.updateRule(rule.copyWith(threshold: threshold, minN: minN));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Saved ${rule.name}'),
+          content: Text('Saved ${rule.displayName}'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -223,7 +235,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              rule.name,
+                              rule.displayName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13.5,
@@ -273,9 +285,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                             label: _severityLabel(rule.severity),
                             color: sevColor,
                           ),
-                          DssMetaChip(
-                            label: _categoryLabel(rule.category),
-                          ),
+                          DssMetaChip(label: _categoryLabel(rule.category)),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -298,7 +308,8 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                             child: TextField(
                               controller: _controllers['${rule.ruleId}|minN'],
                               decoration: _fieldDecoration(
-                                'Minimum responses',
+                                'Minimum (at least '
+                                '${DssPolicy.minNFloor(rule.category)})',
                               ),
                               keyboardType: TextInputType.number,
                             ),

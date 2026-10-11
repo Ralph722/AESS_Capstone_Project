@@ -121,7 +121,8 @@ class _DssActionDialogState extends State<_DssActionDialog> {
   Widget build(BuildContext context) {
     final notifiable = _people.where((p) => p.canNotify).toList();
     final unregistered = _people.where((p) => !p.canNotify).toList();
-    final canSend = !_loading &&
+    final canSend =
+        !_loading &&
         !_sending &&
         _selectedPeople.isNotEmpty &&
         (!_isJobs || _selectedJobs.isNotEmpty);
@@ -175,7 +176,8 @@ class _DssActionDialogState extends State<_DssActionDialog> {
                     _sectionHeader(
                       _isJobs ? 'Recipients' : 'Can be notified in the app',
                       count: notifiable.length,
-                      allSelected: notifiable.isNotEmpty &&
+                      allSelected:
+                          notifiable.isNotEmpty &&
                           _selectedPeople.length == notifiable.length,
                       onToggleAll: notifiable.isEmpty
                           ? null
@@ -252,7 +254,7 @@ class _DssActionDialogState extends State<_DssActionDialog> {
             _sending
                 ? 'Sending…'
                 : 'Send to ${_selectedPeople.length} '
-                    '${_selectedPeople.length == 1 ? 'person' : 'people'}',
+                      '${_selectedPeople.length == 1 ? 'person' : 'people'}',
           ),
           style: dssFilledButtonStyle(),
         ),

@@ -446,10 +446,319 @@ decision → optional AI explanation.
 
 ## Part 10: Phase 0 re-inspection and implementation plan (Phases 0 to 10)
 
-Status: plan only, nothing applied. Phase 0 re-inspection done on 2026-10-08
-with read-only database queries. Each later phase waits for "PROCEED TO NEXT
-PHASE", and each phase's database changes must be approved before they are
-applied.
+Status: Phase 0 re-inspection done on 2026-10-08 with read-only database
+queries. Each later phase waits for "PROCEED TO NEXT PHASE", and each phase's
+database changes must be approved before they are applied.
+
+Progress:
+
+- **Phase 1 (guardrails): app code done 2026-10-11; migration written, not
+  applied.**
+  - Code: `dss_policy.dart` (Part 3 numbers, group mapping, Settings
+    validation) and `dss_evaluator.dart` (pure evaluation, tested on the
+    demo dataset); `dss_evaluation_service.dart` now only loads data, runs
+    the evaluator and saves. Watch items (5 valid answers up to the rule
+    minimum) are saved as open flags with `evidence_strength = watch` until
+    Phase 4 adds a status; Open and In progress counts show findings only.
+  - Decisions: zero-response data-quality checks run for the newest wave
+    only; respondents without a roster course are left out of institution
+    totals (revisit in Phase 3).
+  - Confidence is now "ok" only for strong evidence (30+ valid answers) with
+    at least 30% coverage; it was "ok" from 20 respondents before.
+  - Database: `supabase/migrations/20261011010000_dss_phase1_guardrails.sql`,
+    checked by `supabase/regression/phase12_dss_guardrails.sql`. Applied to
+    the demo project on 2026-10-11 after a rolled-back dry run (25 of 25
+    checks passed); the demo's outcome and opportunity rules were then set
+    from `min_n` 20 to 10. Not applied to live yet. Until it is applied, the
+    app falls back to today's roster for closed waves and the nightly
+    re-check keeps its version 1 rules.
+- **Phase 2 (Q17): app code done 2026-10-11; applied to the demo, not to
+  live.**
+  - Looking for work = Q16 "No" or "Never Employed" with Q17 "No job
+    opportunity" or "Lack of work experience". "Did not look for a job"
+    always means not looking; any other reason alone (further study,
+    family, health, other) also means not looking.
+  - New rule `SEEKING_WORK_HIGH`: looking ÷ (employed + looking), threshold
+    15%, minimum 10, severity warning, inserted switched off. Not-employed
+    alumni who are not looking or gave no Q17 reason are left out of it.
+  - `UNEMPLOYMENT_HIGH` keeps its meaning and stored name; the app shows it
+    as "Not currently employed". Its evidence and the flag page now show the
+    Q17 reasons (looking / not looking / no reason).
+  - Report card: "Looking for work" row and wave column.
+  - "Send matching jobs" stays on `UNEMPLOYMENT_HIGH` only (the database
+    action checks the rule); seeking-work flags get the Jobs shortcut.
+  - Database: `supabase/migrations/20261011020000_dss_phase2_q17.sql`
+    (`gts_multi`, `not_employed_reasons` as the last facts column,
+    `gts_metric` key `seeking_work_rate`, the rule row with
+    `on conflict do nothing`), checked by
+    `supabase/regression/phase13_dss_q17.sql`. Applied to the demo project
+    on 2026-10-11 after a rolled-back dry run (15 of 15 checks passed); SQL
+    and Dart agree on the demo (BTLED-ICT 2024, 2025 wave: 13 of 16 looking
+    for work). Not applied to live yet.
+- **Phase 3 (metric layer): code done 2026-10-11; applied to the demo, not
+  to live.**
+  - `dss_cohort_metrics(p_survey_id)` returns every group (institution,
+    course, recorded batch) and metric of one CHED wave: hits, total (valid
+    answers, or the roster for the response rate), value, respondents,
+    non-response, eligible and registered roster, roster basis, evidence
+    strength, coverage warning, 95% Wilson interval and metric version 2.
+    Groups without respondents get the response rate only. Trends come
+    from two waves' rows; the function itself is per wave.
+  - Same Part 3 policies as Phase 1: respondents count only through an
+    active roster record with a course (decision: unmatched respondents
+    stay excluded from institution totals too); a missing batch counts at
+    course level only; strength uses the strictest rule on the metric,
+    never below 10.
+  - Dart reference: `dss_cohort_metrics.dart` (`DssCohortMetrics.compute`).
+    The app still evaluates in Dart; Phase 8 switches over.
+  - Parity: `test/dss/dss_cohort_metrics_test.dart` and
+    `supabase/regression/phase14_dss_cohort_metrics.sql` share one fixture
+    and the same expected values; `supabase/regression/dss_cohort_parity.ps1`
+    compares SQL and Dart row by row on the demo database (read-only).
+  - Database: `supabase/migrations/20261011030000_dss_phase3_cohort_metrics.sql`
+    (`dss_wilson`, `dss_cohort_metrics`; read-only functions, admin and
+    service role only). Applied to the demo project on 2026-10-11 after a
+    rolled-back dry run (30 of 30 checks passed); the demo parity check
+    found all 230 rows identical between SQL and Dart. Not applied to live
+    yet.
+- **Phase 4 (finding identity): code done 2026-10-11; applied to the demo,
+  not to live.**
+  - A finding is rule × level × course × batch (`dss_flags.finding_key`).
+    Each wave can hold one active flag per finding (open, in progress or
+    Watch).
+  - New statuses, set only by Refresh insights:
+    - **Watch**: 5 answers up to the rule minimum. Monitored, not a
+      finding. It becomes a finding when a later Refresh finds enough
+      answers, and moves back to Watch if answers drop. Admins can only
+      dismiss it or add notes; a dismissed Watch item reopens as Watch.
+    - **Superseded**: a newer wave checked the same finding (with at least
+      Watch-level evidence), whether or not it crossed the rule. Final;
+      `superseded_by` links to the newer wave's active flag, or is empty
+      when that wave has none.
+  - Refresh raises only the newest checked wave of each finding. Older
+    open and Watch flags are superseded, including flags saved before
+    Phase 4 (decision). In-progress flags are never superseded or moved to
+    Watch, and keep being refreshed (decision). Closed and superseded flags
+    are not raised again for the same wave.
+  - `dss_evaluation_events` logs each Refresh: raised, updated, superseded,
+    or suppressed with a reason (newer wave, closed in that wave,
+    superseded in that wave, or fewer than 5 answers, one row per skipped
+    measure, decision). It holds keys and counts only. Admins can read and
+    append to it; nobody can edit it. No `suppression_reason` column on
+    flags (decision).
+  - App: Watch and Superseded status filters; a Watch card replaces "Small
+    samples"; superseded flags are hidden from "All" and are read-only,
+    with a link to the newer flag. History counts superseded flags
+    separately and leaves Watch items out of "Raised". Without the Phase 4
+    columns (live today), Refresh saves flags as before.
+  - Planner: `dss_finding_sync.dart` (`DssFindingSync.plan`, pure, tested
+    in `test/dss/dss_finding_sync_test.dart`).
+  - Database: `supabase/migrations/20261011040000_dss_phase4_finding_identity.sql`
+    (generated `finding_key` and index, `superseded_by` / `superseded_at`,
+    status check widened, status guard, `dss_update_flag_status`, active
+    index including Watch, `dss_recheck_open_flags` including Watch, the
+    events table), checked by
+    `supabase/regression/phase15_dss_finding_identity.sql`. Applied to the
+    demo project on 2026-10-11 after a rolled-back dry run (36 of 36 checks
+    passed). Existing demo flags are unchanged (23 open) until the next
+    Refresh insights, which may supersede the older-wave ones. Not applied
+    to live yet.
+- **Phase 5 (priority): done 2026-10-11 (app only, no database change).**
+  - `dss_priority.dart` (`DssPriorityCalc`) scores each active finding from
+    facts the flag already holds, with a reason for every point:
+    - rule severity: Critical +3, Warning +2, Info +1;
+    - distance past the threshold, relative to it: 50% or more beyond +2,
+      20–49% +1;
+    - strong evidence (30+ valid answers) +1;
+    - confirmed (the whole 95% range is past the threshold) +1;
+    - 10 or more alumni affected +1 (rate rules; for data quality, the
+      group members who have not answered);
+    - open and not started for 30+ days +1.
+  - Levels: Critical 7+, High 5–6, Medium 3–4, Low 0–2. Watch items and
+    small-sample flags show Watch. Opportunity findings are always Low
+    ("Opportunity, not a problem") (decision). Rule `severity` is
+    unchanged.
+  - The "AI prioritize" button and `DssAiService.prioritizeFlags` are
+    removed; AI keeps only the flag briefing. Priority is the default sort,
+    with a Priority filter (decision). The list card shows a priority chip
+    whose tooltip lists the reasons; the flag page has a Priority card; the
+    CSV export appends `priority`, `priority_score` and `priority_reasons`;
+    the report card lists open findings by priority with a Priority column.
+  - Tests: `test/dss/dss_priority_test.dart`.
+- **Phase 6 (accountability): done 2026-10-11.**
+  - Flags get an owner office (free text; seven suggested office names,
+    decision), a responsible person (who may not have an account), and
+    start, due and next-review dates. `assigned_to` stays the responsible
+    admin. Due and review dates cannot be before the start. Start fills in
+    today when work starts (Start or a one-click action) if it is empty
+    (decision). A superseded flag keeps its owner and dates.
+  - Evidence: `dss_flag_evidence` (meeting, event, communication,
+    document, report, other; title, date, description, web link; no
+    uploads). The server stamps the author, rejects future dates and
+    superseded flags, and logs every add and remove on the flag as an
+    `evidence` note. Removing hides an entry and keeps the row (decision);
+    nobody can edit or delete entries. Any evidence entry counts as proof
+    for Resolve (decision).
+  - Playbooks: steps in `dss_rules.playbook` may carry a `cause`; the app
+    picks the cause from facts on the flag (decision): data quality by the
+    stored reason (too few responses, low rate, both); not currently
+    employed by the Q17 majority (looking for work or not); looking for
+    work by the more common reason (no job opportunity or lack of work
+    experience). A tie or missing facts shows the `default` steps. Other
+    rules keep their steps; untagged playbooks (live today) show as before.
+  - App: Accountability and Evidence cards on the flag page; "Steps for"
+    line above the playbook; overdue / due-soon chip on list cards; Office
+    and Due filters; search covers office and person; the CSV export
+    appends `owner_office`, `responsible_name`, `start_date`, `due_date`,
+    `review_date`; the report card's actions include evidence. Priority
+    scoring is unchanged (overdue adds no points). Without the Phase 6
+    schema (live today), the cards are hidden.
+  - Database: `supabase/migrations/20261011050000_dss_phase6_accountability.sql`,
+    checked by `supabase/regression/phase16_dss_accountability.sql`.
+    Applied to the demo project on 2026-10-11 after a rolled-back dry run
+    (38 of 38 checks passed). Not applied to live yet.
+  - Tests: `test/dss/dss_accountability_test.dart`.
+- **Phase 7 (outcomes): done 2026-10-11.**
+  - `dss_interventions`: one row per intervention on a finding, linked to
+    earlier ones through `finding_key`. Holds the type, description,
+    expected outcome, success test (metric, operator, target), start date,
+    baseline (wave, value, count), follow-up (wave, value, count), one of
+    the 7 outcome statuses, the evaluation note and the decision with its
+    required note. At most one intervention per finding waits for a
+    decision. Rows are never deleted; a decided row is final; the plan
+    cannot change once the outcome is known.
+  - Success test defaults from the rule: problem rules below the
+    threshold, data quality at least the threshold, strengths at least the
+    threshold, the unemployment trend back to the previous wave's rate.
+    The admin may change the target before the outcome is known.
+  - Evaluation (`dss_evaluate_intervention`, server only, no AI): the
+    follow-up is the first CHED wave published after the start date
+    (decision), read through `dss_cohort_metrics` for the flag's group. No
+    group or fewer than 5 valid answers: No comparable data (no rate
+    stored). Watch range: Inconclusive. Target met: Successful. Moved at
+    least 5 points (0.5 salary brackets) toward it: Partially successful
+    (decision). Otherwise Unsuccessful. While the follow-up wave accepts
+    responses the result is a preview and only Pending follow-up is stored
+    (decision). Wording says the change is observed, not caused.
+  - Decisions (`dss_decide_intervention`): Resolve resolves the finding's
+    current flag if still open; Continue and Modify start a new
+    intervention today with the follow-up as its baseline (Modify takes a
+    new plan) and reopen a closed flag; Escalate records the office as the
+    flag's owner office and reopens a closed flag. Recording, each stored
+    outcome and each decision are logged as `outcome` notes.
+  - Resolve stays available any time (decision); resolving records an
+    intervention from the chosen type and note when none is waiting, so
+    its outcome is judged when the next wave closes.
+  - App: Intervention outcome card on the flag page (record, edit plan,
+    check outcome, preview, decision buttons, earlier interventions); the
+    old impact check is renamed "Coverage re-check (same wave)" everywhere
+    (flag page, notes, History tab, report card), so it never reads as a
+    second outcome. Flags closed without an intervention show "Not
+    evaluated (legacy)". Without the Phase 7 schema (live today), the card
+    is hidden and Resolve works as before.
+  - Database: `supabase/migrations/20261011060000_dss_phase7_outcomes.sql`,
+    checked by `supabase/regression/phase17_dss_outcomes.sql`. Applied to
+    the demo project on 2026-10-11 after a rolled-back dry run (53 of 53
+    checks passed). Not applied to live yet.
+  - Tests: `test/dss/dss_outcomes_test.dart`.
+- **Phase 8 (server evaluation): done 2026-10-11.**
+  - `dss_evaluate_all(p_trigger, p_dry_run)` runs one full Refresh in SQL,
+    in one transaction: the same waves, roster groups, data-quality,
+    outcome, opportunity and trend rules, roll-up, sample-size policy,
+    evidence, wording and finding sync as the Dart engine (decision: full
+    parity). It logs the run in `dss_evaluation_events` and saves the
+    roster snapshots of open waves. An advisory lock refuses a second run
+    while one is going ("Another DSS evaluation is running"). Callers in
+    the app must be admins and are always logged as `manual`; the
+    scheduled job runs as the database and is logged as `scheduled` with
+    no author. A dry run returns the planned rows and actions and writes
+    nothing. Notes written by the server are signed "DSS evaluation".
+  - Numbers are written exactly as the Dart doubles; wording uses a
+    `toStringAsFixed` port (`dss_fixed`), so stored text matches.
+  - Priority: `dss_flags.priority`, `priority_score`, `priority_reasons`
+    and `priority_at`, written by the server for active flags with the
+    Phase 5 rules (`dss_flag_priority`). The app still computes priority
+    live (decision); the stored columns serve reports, sorting and audit.
+    Flags saved by the app engine keep their last server priority until
+    the next server run.
+  - Refresh calls the server function and uses the app engine only when
+    the function is missing or fails (decision). It does not fall back
+    when another run holds the lock or the caller is not an admin. The
+    message after Refresh reads the same either way.
+  - Cron: `aess-dss-evaluate` at 19:25 UTC (03:25 Manila), after the
+    nightly re-check. Created switched off (decision); enabled on the demo
+    project on 2026-10-11 after parity passed and was confirmed.
+  - Parity on the demo data (3 waves, 221 responses): the server dry run
+    and the Dart engine agree on all 39 flag rows (every field, evidence
+    included), 60 checked findings, 68 sync actions and every count. The
+    check is `test/dss/dss_server_eval_parity_test.dart`, skipped unless
+    `DSS_EVAL_PARITY_DIR` points at an export. A demo run takes about
+    0.2 s, far below the 8 s limit for app calls.
+  - Database: `supabase/migrations/20261011070000_dss_phase8_server_evaluation.sql`,
+    checked by `supabase/regression/phase18_dss_server_eval.sql`. Applied
+    to the demo project on 2026-10-11 after a rolled-back dry run (42 of 42
+    checks passed). Not applied to live yet.
+  - Tests: `test/dss/dss_server_eval_test.dart`.
+- **Phase 9 (history): done 2026-10-11 (app only, no database change).**
+  - History tab: a period choice (last 12 months, the default, or all
+    time) for every section (decision). New "Intervention outcomes" card:
+    the 7 outcome statuses counted by intervention type and by rule
+    (decision), with types grouped ignoring case and spacing. It states
+    that outcomes show what changed after the next wave, not what caused
+    it. New "Evaluation runs" card: the latest 20 runs from
+    `dss_evaluation_events` (Refresh or nightly) with new, refreshed,
+    superseded, not-raised-again and too-few-answers counts (decision).
+  - History counts now read every flag in the period in pages; before, at
+    most 1,000 rows came back, so the old 2,000-row limit never applied.
+  - Report card: a "Whole institution (all programs)" choice in the
+    picker (decision). It shows the institution's latest-wave measures,
+    results across waves, the 15 most urgent open findings across programs
+    (by the Phase 5 priority), the Watch count, the 15 most recent closed
+    flags, intervention outcomes with a by-type table, and actions.
+    Program report cards stay program-only and gain an "Intervention
+    outcomes" table (started, finding, type, baseline, next wave, outcome,
+    decision; at most 25 rows).
+  - Notes for many flags are now fetched 100 flag ids per request, so
+    long `in (...)` lists stay within the request URL limit.
+  - Without the Phase 4 or Phase 7 schema (live today), the run and
+    outcome sections show their empty state.
+  - Tests: `test/dss/dss_history_test.dart`.
+- **Phase 10 (AI): done 2026-10-11 (app only, no database change).**
+  - The flag page always shows the rule-based explanation. AI is called
+    only when the admin clicks "Explain with AI" (decision); before, a
+    briefing was requested on every page open and looked identical to the
+    rule-based text.
+  - AI gets computed facts only: finding, group, status (with "not a
+    finding yet" for Watch), why it was raised, the value with its range,
+    the rule, the number of answers, evidence and certainty labels, roster
+    size and the fixed recommended action. No names, answers or free text.
+  - Every reply is checked before it is shown. It must restate the value
+    and the number of answers, and must not prioritize, rank, judge
+    severity, say the flag should be resolved, closed, dismissed or
+    ignored, call it a false alarm, or say an intervention worked. A reply
+    that fails, or a failed call, is discarded and the rule-based
+    explanation is shown with a short note saying why (decision).
+  - Accepted replies are labeled "AI explanation" with a note that they do
+    not change the finding, its priority or its status.
+  - Q34 suggestion grouping keeps using AI with the "Grouped by AI" label,
+    but emails, phone numbers and web links are replaced before sending
+    (decision). Quotes on the page are unchanged.
+  - Tests: `test/dss/dss_ai_boundary_test.dart`.
+- **Live rollout: Phases 1–8 applied to live on 2026-10-12.** This replaces
+  the "not applied to live yet" notes above.
+  - Before: the live DSS tables (8 rules, 9 flags, 37 notes, 7 checks) were
+    exported to a local temp folder (not committed). All 7 migrations were
+    then run on live inside a transaction that was rolled back; they ran
+    without error, and the no-write Refresh preview raised nothing new
+    (every outcome group on live has 1 answer).
+  - Applied with `supabase db push`; migration history is in sync.
+  - After: still 9 flags (5 open, 2 in progress, 2 resolved), 37 notes and
+    7 checks. Outcome and opportunity rules moved from `min_n` 1 to 10;
+    data quality stays at 2. `SEEKING_WORK_HIGH` added switched off. All
+    eight DSS tables have RLS; `dss_evaluate_all` is executable by signed-in
+    users (admin checked inside) and not by anonymous users.
+  - The nightly `aess-dss-evaluate` job exists on live but is switched off
+    until a manual Refresh on live has been reviewed.
 
 The plan rests on three findings:
 

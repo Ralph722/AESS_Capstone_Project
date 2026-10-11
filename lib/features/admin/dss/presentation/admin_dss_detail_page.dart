@@ -7,11 +7,14 @@ import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_evaluation_service.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_impact.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_metrics.dart';
+import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_suggestion_themes.dart';
 import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
+import 'package:alumni_system/features/admin/dss/widgets/dss_accountability_cards.dart';
 import 'package:alumni_system/features/admin/dss/widgets/dss_action_dialogs.dart';
+import 'package:alumni_system/features/admin/dss/widgets/dss_outcome_card.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 
@@ -43,16 +46,23 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
 
   DssFlag? _flag;
   List<DssFlagNote> _notes = [];
+  List<DssFlagEvidence> _evidence = [];
+  bool _hasAccountability = false;
+  List<DssIntervention> _interventions = [];
+  bool _hasOutcomes = false;
+  DssOutcomeCheck? _outcomeCheck;
   List<_AdminOption> _admins = [];
   bool _loading = true;
   bool _saving = false;
   bool _rechecking = false;
-  String? _aiPhrase;
+  DssAiExplanation? _aiExplanation;
+  bool _explaining = false;
   DssSuggestionSummary? _suggestions;
   bool _loadingSuggestions = false;
   String? _error;
   String? _intervention;
   String? _assignedTo;
+  late String _flagId = widget.flagId;
 
   @override
   void initState() {
@@ -73,15 +83,28 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       _error = null;
     });
     try {
-      final flag = await _repo.getFlag(widget.flagId);
+      final flag = await _repo.getFlag(_flagId);
       final notes = flag == null
           ? <DssFlagNote>[]
           : await _repo.listNotes(flag.id);
+      final hasAccountability = await _repo.hasAccountability();
+      final evidence = flag == null || !hasAccountability
+          ? <DssFlagEvidence>[]
+          : await _repo.listEvidence(flag.id);
+      final hasOutcomes = await _repo.hasOutcomes();
+      final interventions = flag == null || !hasOutcomes
+          ? <DssIntervention>[]
+          : await _repo.listInterventions(flag.findingKey);
       final admins = await _repo.listAdminUsers();
       if (!mounted) return;
       setState(() {
         _flag = flag;
         _notes = notes;
+        _evidence = evidence;
+        _hasAccountability = hasAccountability;
+        _interventions = interventions;
+        _hasOutcomes = hasOutcomes;
+        _outcomeCheck = null;
         _admins = admins
             .map(
               (a) => _AdminOption(
@@ -96,9 +119,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         // (except keep it so historical resolves still display).
         if (flag != null && _intervention != null) {
           final allowed = DssCopy.interventionsForRule(flag.ruleId);
-          if (!allowed.contains(_intervention) &&
-              flag.status != DssFlagStatus.resolved &&
-              flag.status != DssFlagStatus.dismissed) {
+          if (!allowed.contains(_intervention) && !flag.status.isClosed) {
             _intervention = null;
           }
         }
@@ -108,8 +129,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         _loading = false;
         if (flag == null) _error = 'Flag not found.';
       });
-      if (flag != null) _phraseAi(flag);
       if (flag != null && _suggestions == null) _loadSuggestions(flag);
+      final undecided = _undecidedIntervention;
+      if (undecided != null) _checkOutcome(undecided, silent: true);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -119,12 +141,16 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     }
   }
 
-  Future<void> _phraseAi(DssFlag flag) async {
+  /// Asks AI to explain the finding; only on request.
+  Future<void> _explainWithAi(DssFlag flag) async {
+    setState(() => _explaining = true);
     try {
-      final text = await _ai.phraseFlag(flag);
-      if (!mounted) return;
-      setState(() => _aiPhrase = text);
-    } catch (_) {}
+      final result = await _ai.explainFlag(flag);
+      if (!mounted || _flag?.id != flag.id) return;
+      setState(() => _aiExplanation = result);
+    } finally {
+      if (mounted) setState(() => _explaining = false);
+    }
   }
 
   Future<void> _loadSuggestions(DssFlag flag) async {
@@ -183,15 +209,15 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         );
         return;
       }
-      final hasLinked =
-          (flag.linkedAnnouncementId ?? '').trim().isNotEmpty;
-      final hasOfflineProof = intervention == 'Other' &&
+      final hasLinked = (flag.linkedAnnouncementId ?? '').trim().isNotEmpty;
+      final hasOfflineProof =
+          intervention == 'Other' &&
           _interventionDetailCtrl.text.trim().isNotEmpty;
-      if (!hasLinked && !hasOfflineProof) {
+      if (!hasLinked && !hasOfflineProof && _evidence.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Add proof first: Draft reminder, or choose Other and describe the offline action.',
+              'Add proof first: Draft reminder, an evidence entry, or choose Other and describe the offline action.',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -226,14 +252,27 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 ? null
                 : _interventionDetailCtrl.text.trim());
 
+      final recordOutcome =
+          status == DssFlagStatus.resolved &&
+          _hasOutcomes &&
+          _undecidedIntervention == null;
+      if (recordOutcome) {
+        await _repo.recordIntervention(
+          flag: flag,
+          interventionType: _intervention!.trim(),
+          description: detail ?? _noteCtrl.text.trim(),
+          startedOn: flag.startDate,
+        );
+      }
+
       await _repo.updateFlagStatus(
         flag: flag,
         status: status,
         note: _noteCtrl.text,
-        interventionType:
-            status == DssFlagStatus.resolved ? _intervention : null,
-        interventionDetail:
-            status == DssFlagStatus.resolved ? detail : null,
+        interventionType: status == DssFlagStatus.resolved
+            ? _intervention
+            : null,
+        interventionDetail: status == DssFlagStatus.resolved ? detail : null,
         followupValue: snap?.metricValue,
         followupSampleN: snap?.sampleN,
         impactVerdict: verdict?.dbValue,
@@ -246,7 +285,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         SnackBar(
           content: Text(
             status == DssFlagStatus.resolved && verdict != null
-                ? 'Resolved · ${verdict.label}. Recheck impact in 7 days.'
+                ? 'Resolved. Coverage re-check: ${verdict.label}.'
+                      '${_hasOutcomes ? ' The outcome is judged from the next tracer wave.' : ''}'
                 : 'Marked ${status.label}',
           ),
           behavior: SnackBarBehavior.floating,
@@ -318,7 +358,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         followup: snap.metricValue,
         sampleN: snap.sampleN,
       );
-      final nextDue = verdict == DssImpactVerdict.stillFlagged ||
+      final nextDue =
+          verdict == DssImpactVerdict.stillFlagged ||
               verdict == DssImpactVerdict.insufficientData
           ? DateTime.now().add(DssImpact.verifyDelay)
           : null;
@@ -333,7 +374,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Impact: ${verdict.label}'),
+          content: Text('Coverage re-check: ${verdict.label}'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -355,8 +396,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     if (flag == null) return;
     setState(() => _saving = true);
     try {
-      final title =
-          'Tracer reminder: ${flag.cohortLabel}';
+      final title = 'Tracer reminder: ${flag.cohortLabel}';
       final body =
           'Please complete the graduate tracer survey'
           '${flag.surveyTitle.trim().isEmpty ? '' : ' (“${flag.surveyTitle.trim()}”)'}'
@@ -392,6 +432,267 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _addEvidence() async {
+    final flag = _flag;
+    if (flag == null) return;
+    final draft = await showDssAddEvidenceDialog(context);
+    if (draft == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _repo.addEvidence(
+        flag: flag,
+        type: draft.type,
+        title: draft.title,
+        date: draft.date,
+        description: draft.description,
+        link: draft.link,
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not add evidence: '
+            '${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _removeEvidence(DssFlagEvidence entry) async {
+    final flag = _flag;
+    if (flag == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove evidence?'),
+        content: Text(
+          '"${entry.title}" will be hidden from this list. The action log '
+          'keeps a record that it was added and removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: dssFilledButtonStyle(background: AdminDssTheme.danger),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _repo.removeEvidence(flag: flag, entry: entry);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not remove evidence: '
+            '${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  List<Widget> _accountabilityCards(DssFlag flag) {
+    if (!_hasAccountability || flag.status == DssFlagStatus.watch) {
+      return const [];
+    }
+    return [
+      DssAccountabilityCard(
+        key: ValueKey('plan-${flag.id}-${flag.updatedAt.toIso8601String()}'),
+        flag: flag,
+        repository: _repo,
+        onSaved: _load,
+      ),
+      const SizedBox(height: AdminDssTheme.space2),
+      DssEvidenceCard(
+        entries: _evidence,
+        canEdit: _canAct(flag),
+        busy: _saving,
+        onAdd: _addEvidence,
+        onRemove: _removeEvidence,
+      ),
+      const SizedBox(height: AdminDssTheme.space2),
+    ];
+  }
+
+  DssIntervention? get _undecidedIntervention {
+    for (final i in _interventions) {
+      if (!i.isDecided) return i;
+    }
+    return null;
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  static String _errorText(Object e) =>
+      e.toString().replaceFirst('Exception: ', '');
+
+  Future<void> _checkOutcome(
+    DssIntervention intervention, {
+    bool silent = false,
+  }) async {
+    final flag = _flag;
+    if (flag == null) return;
+    if (!silent) setState(() => _saving = true);
+    try {
+      final check = await _repo.evaluateIntervention(intervention.id);
+      final interventions = await _repo.listInterventions(flag.findingKey);
+      final notes = await _repo.listNotes(flag.id);
+      if (!mounted || _flag?.id != flag.id) return;
+      setState(() {
+        _outcomeCheck = check;
+        _interventions = interventions;
+        _notes = notes;
+      });
+      if (!silent) {
+        final preview = check.provisional && check.previewStatus != null
+            ? ' (preview: ${check.previewStatus!.label})'
+            : '';
+        _showMessage('Outcome: ${check.outcomeStatus.label}$preview');
+      }
+    } catch (e) {
+      if (!silent && mounted) {
+        _showMessage('Could not check the outcome: ${_errorText(e)}');
+      }
+    } finally {
+      if (!silent && mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _recordIntervention() async {
+    final flag = _flag;
+    if (flag == null) return;
+    final draft = await showDssInterventionDialog(context, flag: flag);
+    if (draft == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _repo.recordIntervention(
+        flag: flag,
+        interventionType: draft.type,
+        description: draft.description,
+        expectedOutcome: draft.expectedOutcome,
+        successTarget: draft.target,
+        startedOn: draft.startedOn,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        _showMessage('Could not record the intervention: ${_errorText(e)}');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _editInterventionPlan(DssIntervention intervention) async {
+    final flag = _flag;
+    if (flag == null) return;
+    final draft = await showDssInterventionDialog(
+      context,
+      flag: flag,
+      existing: intervention,
+    );
+    if (draft == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _repo.updateInterventionPlan(
+        intervention: intervention,
+        interventionType: draft.type,
+        description: draft.description,
+        expectedOutcome: draft.expectedOutcome,
+        successTarget: draft.target ?? intervention.successTarget,
+        startedOn: draft.startedOn,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) _showMessage('Could not save the plan: ${_errorText(e)}');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _decide(
+    DssIntervention intervention,
+    DssOutcomeDecision decision,
+  ) async {
+    final flag = _flag;
+    if (flag == null) return;
+    final draft = await showDssDecisionDialog(
+      context,
+      flag: flag,
+      intervention: intervention,
+      decision: decision,
+    );
+    if (draft == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _repo.decideIntervention(
+        flag: flag,
+        intervention: intervention,
+        decision: decision,
+        note: draft.note,
+        office: draft.office,
+        interventionType: draft.type,
+        description: draft.description,
+        expectedOutcome: draft.expectedOutcome,
+        successTarget: draft.target,
+      );
+      await _load();
+      if (mounted) _showMessage('Decision recorded: ${decision.label}');
+    } catch (e) {
+      if (mounted) {
+        _showMessage('Could not record the decision: ${_errorText(e)}');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  List<Widget> _outcomeCards(DssFlag flag) {
+    if (!_hasOutcomes ||
+        (flag.status == DssFlagStatus.watch && _interventions.isEmpty)) {
+      return const [];
+    }
+    return [
+      DssOutcomeCard(
+        flag: flag,
+        interventions: _interventions,
+        check: _outcomeCheck,
+        busy: _saving,
+        canRecord:
+            flag.status == DssFlagStatus.open ||
+            flag.status == DssFlagStatus.inProgress ||
+            flag.status == DssFlagStatus.resolved,
+        onRecord: _recordIntervention,
+        onCheck: (i) => _checkOutcome(i),
+        onEditPlan: _editInterventionPlan,
+        onDecide: _decide,
+      ),
+      const SizedBox(height: AdminDssTheme.space2),
+    ];
   }
 
   Future<void> _addNoteOnly() async {
@@ -443,20 +744,20 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     final df = DateFormat.yMMMd().add_jm();
     final playbook = DssCopy.displayPlaybook(flag);
     final showSuggestions = DssSuggestionThemeService.appliesTo(flag);
-    final wide = MediaQuery.sizeOf(context).width >= AdminDensity.desktopSplitMin;
+    final wide =
+        MediaQuery.sizeOf(context).width >= AdminDensity.desktopSplitMin;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DssPageHeader(
           title: DssCopy.displayTitle(flag),
-          subtitle: flag.cohortLabel +
+          subtitle:
+              flag.cohortLabel +
               (flag.surveyTitle.isEmpty ? '' : ' · ${flag.surveyTitle}'),
           onBack: () => widget.onClose(),
           backTooltip: 'Back to recommendations',
-          actions: [
-            DssStatusChip(status: flag.status),
-          ],
+          actions: [DssStatusChip(status: flag.status)],
         ),
         const SizedBox(height: AdminDssTheme.space2),
         Expanded(
@@ -470,17 +771,22 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                         children: [
                           _findingCard(flag, playbook),
                           const SizedBox(height: AdminDssTheme.space2),
+                          if (flag.isActive) ...[
+                            _priorityCard(flag),
+                            const SizedBox(height: AdminDssTheme.space2),
+                          ],
                           if (showSuggestions) ...[
                             _suggestionsCard(),
                             const SizedBox(height: AdminDssTheme.space2),
                           ],
+                          ..._outcomeCards(flag),
                           if (flag.status == DssFlagStatus.resolved ||
                               flag.followupValue != null ||
                               flag.impactVerdict != null) ...[
                             _impactCard(flag),
                             const SizedBox(height: AdminDssTheme.space2),
                           ],
-                          _actCard(flag),
+                          if (_canAct(flag)) _actCard(flag),
                         ],
                       ),
                     ),
@@ -489,8 +795,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                       flex: 2,
                       child: ListView(
                         children: [
-                          _statusCard(flag),
+                          _statusPanel(flag),
                           const SizedBox(height: AdminDssTheme.space2),
+                          ..._accountabilityCards(flag),
                           _notesCard(df),
                         ],
                       ),
@@ -501,20 +808,28 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   children: [
                     _findingCard(flag, playbook),
                     const SizedBox(height: AdminDssTheme.space2),
+                    if (flag.isActive) ...[
+                      _priorityCard(flag),
+                      const SizedBox(height: AdminDssTheme.space2),
+                    ],
                     if (showSuggestions) ...[
                       _suggestionsCard(),
                       const SizedBox(height: AdminDssTheme.space2),
                     ],
+                    ..._outcomeCards(flag),
                     if (flag.status == DssFlagStatus.resolved ||
                         flag.followupValue != null ||
                         flag.impactVerdict != null) ...[
                       _impactCard(flag),
                       const SizedBox(height: AdminDssTheme.space2),
                     ],
-                    _actCard(flag),
+                    if (_canAct(flag)) ...[
+                      _actCard(flag),
+                      const SizedBox(height: AdminDssTheme.space2),
+                    ],
+                    _statusPanel(flag),
                     const SizedBox(height: AdminDssTheme.space2),
-                    _statusCard(flag),
-                    const SizedBox(height: AdminDssTheme.space2),
+                    ..._accountabilityCards(flag),
                     _notesCard(df),
                   ],
                 ),
@@ -523,19 +838,106 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     );
   }
 
+  /// "Explain with AI" and its result. AI text is always labeled and never
+  /// changes the finding; a rejected or failed reply shows the rule-based
+  /// explanation instead.
+  Widget _aiExplanationSection(DssFlag flag) {
+    const small = TextStyle(
+      fontSize: 11.5,
+      height: 1.35,
+      color: AdminDssTheme.textMuted,
+    );
+    final result = _aiExplanation;
+    if (result == null) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: _explaining ? null : () => _explainWithAi(flag),
+          icon: _explaining
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.auto_awesome_outlined, size: 16),
+          label: Text(_explaining ? 'Writing explanation…' : 'Explain with AI'),
+          style: dssOutlinedButtonStyle(),
+        ),
+      );
+    }
+    final String label;
+    final String? note;
+    if (result.byAi) {
+      label = 'AI explanation';
+      note =
+          'Written by AI from the figures on this page. It does not change '
+          'the finding, its priority or its status.';
+    } else {
+      label = 'Rule-based explanation';
+      note = result.rejectedReason != null
+          ? 'The AI reply was not used because ${result.rejectedReason}.'
+          : 'AI is unavailable right now.';
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AdminDssTheme.surface,
+        borderRadius: BorderRadius.circular(AdminDssTheme.radiusMd),
+        border: Border.all(color: AdminDssTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                result.byAi ? Icons.auto_awesome_outlined : Icons.rule,
+                size: 15,
+                color: AdminDssTheme.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AdminDssTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            result.text,
+            softWrap: true,
+            style: const TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              color: AdminDssTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(note, style: small),
+        ],
+      ),
+    );
+  }
+
   Widget _findingCard(DssFlag flag, List<DssPlaybookStep> playbook) {
-    final shownPlaybook =
-        playbook.isNotEmpty ? playbook : DssCopy.displayPlaybook(flag);
+    final shownPlaybook = playbook.isNotEmpty
+        ? playbook
+        : DssCopy.displayPlaybook(flag);
+    final cause = flag.playbook.any((s) => s.cause != null)
+        ? DssCopy.playbookCause(flag)
+        : null;
     final why = DssCopy.whyFlagged(flag);
     final next = DssCopy.displayRecommendedAction(flag);
     final headline = DssCopy.displayHeadline(flag);
     // Data-quality flags already explain the issue in [why] + chips;
     // the long headline mostly restates the same numbers.
-    final showHeadline = flag.ruleId != 'DATA_QUALITY_LOW' &&
-        !_isNearDuplicate(headline, why);
-    final showAi = _aiPhrase != null &&
-        !_isNearDuplicate(_aiPhrase!, why) &&
-        !_isNearDuplicate(_aiPhrase!, '$why $next');
+    final showHeadline =
+        flag.ruleId != 'DATA_QUALITY_LOW' && !_isNearDuplicate(headline, why);
 
     return DssSurfaceCard(
       child: Column(
@@ -550,6 +952,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             ),
           ),
           const SizedBox(height: 10),
+          if (_evidenceBanner(flag) case final banner?) ...[
+            banner,
+            const SizedBox(height: 10),
+          ],
           Text(
             why,
             style: const TextStyle(
@@ -570,17 +976,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ),
             ),
           ],
-          if (showAi) ...[
+          if (DssAiService.isAvailable) ...[
             const SizedBox(height: 10),
-            Text(
-              _aiPhrase!,
-              softWrap: true,
-              style: const TextStyle(
-                fontSize: 12.5,
-                color: AdminDssTheme.textSecondary,
-                height: 1.45,
-              ),
-            ),
+            _aiExplanationSection(flag),
           ],
           const SizedBox(height: 12),
           Wrap(
@@ -598,7 +996,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   icon: Icons.merge_type,
                   color: AdminDssTheme.info,
                 ),
-              if (flag.certainty != null) DssCertaintyChip(flag: flag),
+              DssEvidenceChip(flag: flag),
+              if (flag.certainty != null && flag.isFinding)
+                DssCertaintyChip(flag: flag),
             ],
           ),
           if (DssCopy.rollupNote(flag) case final note?) ...[
@@ -612,7 +1012,22 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ),
             ),
           ],
-          if (flag.certainty != null) ...[
+          for (final note in [
+            DssCopy.notEmployedReasonsNote(flag),
+            DssCopy.coverageNote(flag),
+            DssCopy.rosterBasisNote(flag),
+          ].nonNulls) ...[
+            const SizedBox(height: 8),
+            Text(
+              note,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: AdminDssTheme.textSecondary,
+              ),
+            ),
+          ],
+          if (flag.certainty != null && flag.isFinding) ...[
             const SizedBox(height: 8),
             Text(
               DssCopy.certaintyHint(flag),
@@ -648,7 +1063,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ),
             ),
           ],
-          if (flag.confidence == DssConfidence.low) ...[
+          if (flag.confidence == DssConfidence.low && flag.isFinding) ...[
             const SizedBox(height: 8),
             Text(
               DssCopy.confidenceLabel(flag),
@@ -678,6 +1093,17 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           ),
           if (shownPlaybook.isNotEmpty) ...[
             const SizedBox(height: 10),
+            if (cause != null) ...[
+              Text(
+                'Steps for: ${cause.label}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AdminDssTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
             ...shownPlaybook.asMap().entries.map(
               (e) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -713,11 +1139,61 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     );
   }
 
+  /// Explains Watch, Not enough data and Limited evidence above the finding.
+  Widget? _evidenceBanner(DssFlag flag) {
+    final label = DssCopy.evidenceLabel(flag);
+    final hint = DssCopy.evidenceHint(flag);
+    if (label == null || hint == null) return null;
+    final finding = flag.isFinding;
+    final color = finding ? AdminDssTheme.info : const Color(0xFFB45309);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            finding ? Icons.info_outline : Icons.visibility_outlined,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$label. ',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(text: hint),
+                ],
+              ),
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _suggestionsCard() {
     final s = _suggestions;
-    const muted = TextStyle(fontSize: 12, height: 1.35, color: AdminDssTheme.textMuted);
-    const secondary =
-        TextStyle(fontSize: 12, height: 1.35, color: AdminDssTheme.textSecondary);
+    const muted = TextStyle(
+      fontSize: 12,
+      height: 1.35,
+      color: AdminDssTheme.textMuted,
+    );
+    const secondary = TextStyle(
+      fontSize: 12,
+      height: 1.35,
+      color: AdminDssTheme.textSecondary,
+    );
 
     final children = <Widget>[
       const Text(
@@ -745,7 +1221,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   Text('Reading curriculum suggestions…', style: secondary),
                 ],
               )
-            : const Text('Could not load curriculum suggestions.', style: muted),
+            : const Text(
+                'Could not load curriculum suggestions.',
+                style: muted,
+              ),
       );
       return DssSurfaceCard(
         child: Column(
@@ -775,8 +1254,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         const SizedBox(height: 2),
         Text(
           s.byAi
-              ? 'Grouped by AI${aiLimited ? ' (first ${DssSuggestionThemeService.maxTexts} suggestions)' : ''}. '
-                    'Quotes are the alumni\'s own words.'
+              ? 'Grouped by AI${aiLimited ? ' (first ${DssSuggestionThemeService.maxTexts} suggestions)' : ''}; '
+                    'emails, phone numbers and links are removed before '
+                    'sending. Quotes are the alumni\'s own words.'
               : 'Grouped by keywords. Quotes are the alumni\'s own words.',
           style: muted,
         ),
@@ -893,7 +1373,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 '+${quotes.length - 12} more',
-                style: const TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: AdminDssTheme.textMuted,
+                ),
               ),
             ),
         ],
@@ -922,7 +1405,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     final df = DateFormat.yMMMd();
     final due = flag.verifyDueAt;
     final dueOverdue =
-        due != null && due.isBefore(DateTime.now()) && verdict != DssImpactVerdict.improved;
+        due != null &&
+        due.isBefore(DateTime.now()) &&
+        verdict != DssImpactVerdict.improved;
 
     Color verdictColor = AdminDssTheme.textSecondary;
     if (verdict == DssImpactVerdict.improved) {
@@ -941,7 +1426,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             children: [
               const Expanded(
                 child: Text(
-                  'Impact check',
+                  'Coverage re-check (same wave)',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13.5,
@@ -951,8 +1436,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ),
               if (verdict != null)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: verdictColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -968,13 +1455,20 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 ),
             ],
           ),
+          const SizedBox(height: 4),
+          const Text(
+            'Recomputed on the same tracer wave as the finding. It shows '
+            'whether more answers changed the numbers, not whether the '
+            'intervention worked; see Intervention outcome for that.',
+            style: TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
+          ),
           const SizedBox(height: 8),
           Text(
             followup == null
-                ? 'No follow-up metric yet. Recheck after you collect more data.'
+                ? 'No re-check yet. Re-check after more alumni answer this wave.'
                 : 'Before ${DssImpact.formatMetric(flag.ruleId, baseline)} → '
-                    'Now ${DssImpact.formatMetric(flag.ruleId, followup)}'
-                    '${flag.interventionType == null ? '' : ' · ${flag.interventionType}'}',
+                      'Now ${DssImpact.formatMetric(flag.ruleId, followup)}'
+                      '${flag.interventionType == null ? '' : ' · ${flag.interventionType}'}',
             style: const TextStyle(
               fontSize: 13,
               height: 1.4,
@@ -1016,7 +1510,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.refresh, size: 16),
-            label: Text(_rechecking ? 'Checking…' : 'Recheck now'),
+            label: Text(_rechecking ? 'Checking…' : 'Re-check coverage'),
             style: dssOutlinedButtonStyle(),
           ),
         ],
@@ -1047,8 +1541,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
   }
 
   Widget _actCard(DssFlag flag) {
-    final closed = flag.status == DssFlagStatus.resolved ||
-        flag.status == DssFlagStatus.dismissed;
+    final closed = flag.status.isClosed;
     final oneClick = switch (flag.ruleId) {
       'DATA_QUALITY_LOW' => (
         label: 'Send reminders',
@@ -1079,8 +1572,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             children: [
               if (oneClick != null)
                 FilledButton.icon(
-                  onPressed:
-                      _saving || closed ? null : () => _runOneClick(flag),
+                  onPressed: _saving || closed
+                      ? null
+                      : () => _runOneClick(flag),
                   icon: Icon(oneClick.icon, size: 16),
                   label: Text(oneClick.label),
                   style: dssFilledButtonStyle(),
@@ -1132,6 +1626,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 style: dssOutlinedButtonStyle(),
               ),
               if (flag.ruleId == 'UNEMPLOYMENT_HIGH' ||
+                  flag.ruleId == 'SEEKING_WORK_HIGH' ||
                   flag.ruleId == 'SALARY_STAGNATION')
                 OutlinedButton.icon(
                   onPressed: widget.onOpenAdminMenu == null
@@ -1158,18 +1653,211 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     );
   }
 
+  Widget _priorityCard(DssFlag flag) {
+    final p = DssPriorityCalc.of(flag, now: DateTime.now());
+    return DssSurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Priority',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  color: AdminDssTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              DssMetaChip(
+                label: p.level == DssPriority.watch
+                    ? p.level.label
+                    : '${p.level.label} · score ${p.score}',
+                icon: Icons.low_priority,
+                color: dssPriorityColor(p.level),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Set by the rules from the facts below, not by AI. Critical 7+, '
+            'High 5–6, Medium 3–4, Low 0–2.',
+            style: TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
+          ),
+          const SizedBox(height: 8),
+          for (final r in p.reasons)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 28,
+                    child: Text(
+                      r.points == 0 ? '·' : '+${r.points}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: r.points == 0
+                            ? AdminDssTheme.textMuted
+                            : AdminDssTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      r.text,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AdminDssTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static bool _canAct(DssFlag flag) =>
+      flag.status != DssFlagStatus.watch &&
+      flag.status != DssFlagStatus.superseded;
+
+  Widget _statusPanel(DssFlag flag) => switch (flag.status) {
+    DssFlagStatus.superseded => _supersededCard(flag),
+    DssFlagStatus.watch => _watchCard(flag),
+    _ => _statusCard(flag),
+  };
+
+  void _openFlag(String id) {
+    setState(() {
+      _flagId = id;
+      _flag = null;
+      _aiExplanation = null;
+      _explaining = false;
+      _suggestions = null;
+      _intervention = null;
+      _assignedTo = null;
+      _evidence = [];
+    });
+    _noteCtrl.clear();
+    _interventionDetailCtrl.clear();
+    _load();
+  }
+
+  Widget _statusCardShell({
+    required String title,
+    required String body,
+    required List<Widget> children,
+  }) {
+    return DssSurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
+              color: AdminDssTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            body,
+            style: const TextStyle(
+              fontSize: 11.5,
+              color: AdminDssTheme.textMuted,
+            ),
+          ),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _supersededCard(DssFlag flag) {
+    final at = flag.supersededAt;
+    final newer = flag.supersededBy;
+    return _statusCardShell(
+      title: 'Superseded',
+      body:
+          'A newer CHED GTS wave checked the same finding'
+          '${at == null ? '' : ' on ${DateFormat.yMMMd().format(at.toLocal())}'}'
+          '${newer == null ? ' and has no active flag for it' : ''}. '
+          'This flag is kept as history and can no longer change.',
+      children: [
+        if (newer != null) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _saving ? null : () => _openFlag(newer),
+            icon: const Icon(Icons.arrow_forward, size: 16),
+            label: const Text('Open newer flag'),
+            style: dssFilledButtonStyle(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _watchCard(DssFlag flag) {
+    return _statusCardShell(
+      title: 'Watch',
+      body:
+          'Too few valid answers for a finding. Refresh insights makes it a '
+          'finding once enough alumni answer; until then you can dismiss it '
+          'or add notes.',
+      children: [
+        const SizedBox(height: 10),
+        TextField(
+          controller: _noteCtrl,
+          minLines: 3,
+          maxLines: 5,
+          style: const TextStyle(fontSize: 13),
+          onChanged: (_) => setState(() {}),
+          decoration: _fieldDecoration(
+            'Admin note',
+          ).copyWith(alignLabelWithHint: true),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton(
+              onPressed: _saving
+                  ? null
+                  : () => _setStatus(DssFlagStatus.dismissed),
+              style: dssOutlinedButtonStyle(),
+              child: const Text('Dismiss'),
+            ),
+            OutlinedButton(
+              onPressed: _saving ? null : _addNoteOnly,
+              style: dssOutlinedButtonStyle(),
+              child: const Text('Add note'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _statusCard(DssFlag flag) {
-    final closed = flag.status == DssFlagStatus.resolved ||
-        flag.status == DssFlagStatus.dismissed;
+    final closed = flag.status.isClosed;
     final started = flag.status == DssFlagStatus.inProgress || closed;
     final hasIntervention = (_intervention ?? '').trim().isNotEmpty;
     final hasNote = _noteCtrl.text.trim().isNotEmpty;
     final hasAssigned = (_assignedTo ?? '').trim().isNotEmpty;
     final hasLinked = (flag.linkedAnnouncementId ?? '').trim().isNotEmpty;
-    final hasOfflineProof = _intervention == 'Other' &&
+    final hasOfflineProof =
+        _intervention == 'Other' &&
         _interventionDetailCtrl.text.trim().isNotEmpty;
-    final hasProof = hasLinked || hasOfflineProof;
-    final canResolve = flag.status == DssFlagStatus.inProgress &&
+    final hasProof = hasLinked || hasOfflineProof || _evidence.isNotEmpty;
+    final canResolve =
+        flag.status == DssFlagStatus.inProgress &&
         hasIntervention &&
         hasNote &&
         hasProof &&
@@ -1191,7 +1879,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           Text(
             closed
                 ? 'This flag is closed. Reopen if the issue returns.'
-                : 'Start → act → Resolve. Proof = reminder draft or Other + details.',
+                : 'Start → act → Resolve. Proof = reminder draft, an evidence '
+                      'entry, or Other + details.',
             style: const TextStyle(
               fontSize: 11.5,
               color: AdminDssTheme.textMuted,
@@ -1218,13 +1907,15 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   !options.contains(_intervention)) {
                 options.insert(0, _intervention!);
               }
-              final value =
-                  options.contains(_intervention) ? _intervention : null;
+              final value = options.contains(_intervention)
+                  ? _intervention
+                  : null;
               return DropdownButtonFormField<String>(
                 key: ValueKey('intervention-${flag.ruleId}-$value'),
                 initialValue: value,
-                decoration:
-                    _fieldDecoration('Intervention (required to resolve)'),
+                decoration: _fieldDecoration(
+                  'Intervention (required to resolve)',
+                ),
                 items: options
                     .map((i) => DropdownMenuItem(value: i, child: Text(i)))
                     .toList(),
@@ -1263,9 +1954,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                     final label = id == null
                         ? null
                         : _admins
-                            .where((a) => a.id == id)
-                            .map((a) => a.label)
-                            .firstOrNull;
+                              .where((a) => a.id == id)
+                              .map((a) => a.label)
+                              .firstOrNull;
                     setState(() {
                       _assignedTo = id;
                       _saving = true;
@@ -1299,9 +1990,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             onChanged: (_) => setState(() {}),
             decoration: _fieldDecoration(
               closed ? 'Admin note' : 'Admin note (required to resolve)',
-            ).copyWith(
-              alignLabelWithHint: true,
-            ),
+            ).copyWith(alignLabelWithHint: true),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -1321,7 +2010,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   onPressed: _saving || !canResolve
                       ? null
                       : () => _setStatus(DssFlagStatus.resolved),
-                  style: dssFilledButtonStyle(background: AdminDssTheme.success),
+                  style: dssFilledButtonStyle(
+                    background: AdminDssTheme.success,
+                  ),
                   child: const Text('Resolve'),
                 ),
               if (flag.status == DssFlagStatus.open)
@@ -1360,7 +2051,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             const SizedBox(height: 8),
             Text(
               !hasProof
-                  ? 'Resolve unlocks after Draft reminder (or Other + details) and a note.'
+                  ? 'Resolve unlocks after a reminder draft, an evidence entry '
+                        '(or Other + details) and a note.'
                   : 'Finish the checklist items above to unlock Resolve.',
               style: const TextStyle(
                 fontSize: 11.5,
@@ -1414,7 +2106,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         row(assigned, 'Owner assigned (recommended)'),
         row(intervention, 'Intervention chosen'),
         row(note, 'Resolution note ready'),
-        row(proof, 'Proof: reminder draft or Other details'),
+        row(proof, 'Proof: reminder draft, evidence entry or Other details'),
       ],
     );
   }
@@ -1445,11 +2137,11 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             )
           else
             Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
               child: Column(
-                children: [
-                  for (final n in _notes) _actionLogTile(n, df),
-                ],
+                children: [for (final n in _notes) _actionLogTile(n, df)],
               ),
             ),
         ],
@@ -1465,6 +2157,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       DssNoteEventType.announcement => AdminDssTheme.success,
       DssNoteEventType.reopen => AdminDssTheme.danger,
       DssNoteEventType.action => AdminDssTheme.navy,
+      DssNoteEventType.evidence => AdminDssTheme.success,
+      DssNoteEventType.outcome => AdminDssTheme.info,
       DssNoteEventType.note => AdminDssTheme.textSecondary,
     };
     final meta = n.metadata;
@@ -1566,7 +2260,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           if (verdict != null && verdict.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              'Impact: ${DssImpactVerdictX.fromDb(verdict)?.label ?? verdict}',
+              'Coverage re-check: ${DssImpactVerdictX.fromDb(verdict)?.label ?? verdict}',
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -1638,10 +2332,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
 
   /// Latest nightly server re-check; only for flags still awaiting action.
   String? _recheckNote(DssFlag flag) {
-    if (flag.status != DssFlagStatus.open &&
-        flag.status != DssFlagStatus.inProgress) {
-      return null;
-    }
+    if (!flag.isActive) return null;
     final at = flag.recheckedAt;
     if (flag.recheckState == null || at == null) return null;
     // Refreshing insights rewrites the flag; an older check is stale.
@@ -1681,7 +2372,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           children: [
             TextSpan(
               text: '$k: ',
-              style: const TextStyle(fontSize: 12, color: AdminDssTheme.textMuted),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AdminDssTheme.textMuted,
+              ),
             ),
             TextSpan(
               text: v,

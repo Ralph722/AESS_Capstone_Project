@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
+import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
@@ -44,23 +46,24 @@ ButtonStyle dssOutlinedButtonStyle() => OutlinedButton.styleFrom(
   ),
 );
 
-ButtonStyle dssFilledButtonStyle({Color? background}) =>
-    FilledButton.styleFrom(
-      backgroundColor: background ?? AdminDssTheme.primary,
-      foregroundColor: Colors.white,
-      minimumSize: const Size(0, AdminDssTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-      ),
-    );
+ButtonStyle dssFilledButtonStyle({Color? background}) => FilledButton.styleFrom(
+  backgroundColor: background ?? AdminDssTheme.primary,
+  foregroundColor: Colors.white,
+  minimumSize: const Size(0, AdminDssTheme.buttonHeight),
+  padding: const EdgeInsets.symmetric(horizontal: 16),
+  elevation: 0,
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+  ),
+);
 
 Color dssStatusColor(DssFlagStatus status) => switch (status) {
   DssFlagStatus.open => AdminDssTheme.danger,
   DssFlagStatus.inProgress => AdminDssTheme.warning,
   DssFlagStatus.resolved => AdminDssTheme.success,
   DssFlagStatus.dismissed => AdminDssTheme.textMuted,
+  DssFlagStatus.watch => AdminDssTheme.info,
+  DssFlagStatus.superseded => AdminDssTheme.textMuted,
 };
 
 Color dssSeverityColor(DssSeverity severity) => switch (severity) {
@@ -72,6 +75,7 @@ Color dssSeverityColor(DssSeverity severity) => switch (severity) {
 IconData dssRuleIcon(String ruleId) => switch (ruleId) {
   'DATA_QUALITY_LOW' => Icons.fact_check_outlined,
   'UNEMPLOYMENT_HIGH' => Icons.work_off_outlined,
+  'SEEKING_WORK_HIGH' => Icons.person_search_outlined,
   'RELATEDNESS_LOW' => Icons.school_outlined,
   'RELATEDNESS_HIGH' => Icons.emoji_events_outlined,
   'UNDEREMPLOYMENT' => Icons.trending_down,
@@ -163,6 +167,98 @@ class DssCertaintyChip extends StatelessWidget {
         label: certainty.label,
         icon: confirmed ? Icons.verified_outlined : Icons.help_outline,
         color: confirmed ? AdminDssTheme.navy : AdminDssTheme.textSecondary,
+      ),
+    );
+  }
+}
+
+/// Sample-size level of an outcome flag. Hidden for strong evidence and for
+/// data-quality checks.
+class DssEvidenceChip extends StatelessWidget {
+  const DssEvidenceChip({super.key, required this.flag});
+
+  final DssFlag flag;
+
+  @override
+  Widget build(BuildContext context) {
+    final strength = flag.evidenceStrength;
+    if (strength == null || strength == DssEvidenceStrength.strong) {
+      return const SizedBox.shrink();
+    }
+    final (icon, color) = switch (strength) {
+      DssEvidenceStrength.insufficient => (
+        Icons.block_outlined,
+        AdminDssTheme.textMuted,
+      ),
+      DssEvidenceStrength.watch => (
+        Icons.visibility_outlined,
+        const Color(0xFFB45309),
+      ),
+      _ => (Icons.info_outline, AdminDssTheme.textSecondary),
+    };
+    return Tooltip(
+      message: DssCopy.evidenceLabel(flag) ?? strength.label,
+      child: DssMetaChip(label: strength.label, icon: icon, color: color),
+    );
+  }
+}
+
+Color dssPriorityColor(DssPriority priority) => switch (priority) {
+  DssPriority.critical => AdminDssTheme.danger,
+  DssPriority.high => AdminDssTheme.warning,
+  DssPriority.medium => AdminDssTheme.info,
+  DssPriority.low => AdminDssTheme.textSecondary,
+  DssPriority.watch => AdminDssTheme.textMuted,
+};
+
+/// Rule-based priority of an active finding; the tooltip lists every reason.
+class DssPriorityChip extends StatelessWidget {
+  const DssPriorityChip({super.key, required this.flag});
+
+  final DssFlag flag;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!flag.isActive) return const SizedBox.shrink();
+    final p = DssPriorityCalc.of(flag, now: DateTime.now());
+    if (p.level == DssPriority.watch) return const SizedBox.shrink();
+    return Tooltip(
+      message: [
+        'Priority ${p.level.label} (score ${p.score})',
+        for (final r in p.reasons) '• ${r.display}',
+      ].join('\n'),
+      child: DssMetaChip(
+        label: p.level.label,
+        icon: Icons.low_priority,
+        color: dssPriorityColor(p.level),
+      ),
+    );
+  }
+}
+
+/// Overdue, or due within [soonDays], for open and in-progress flags.
+class DssDueChip extends StatelessWidget {
+  const DssDueChip({super.key, required this.flag, this.soonDays = 7});
+
+  final DssFlag flag;
+  final int soonDays;
+
+  @override
+  Widget build(BuildContext context) {
+    final due = flag.dueDate;
+    final days = flag.daysUntilDue(DateTime.now());
+    if (due == null || days == null || days > soonDays) {
+      return const SizedBox.shrink();
+    }
+    final label = days < 0
+        ? 'Overdue ${-days}d'
+        : (days == 0 ? 'Due today' : 'Due in ${days}d');
+    return Tooltip(
+      message: 'Due ${DateFormat.yMMMd().format(due)}',
+      child: DssMetaChip(
+        label: label,
+        icon: days < 0 ? Icons.event_busy : Icons.event,
+        color: days < 0 ? AdminDssTheme.danger : AdminDssTheme.warning,
       ),
     );
   }
@@ -323,7 +419,17 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
                                   ],
                                 ),
                               ),
-                              if (flag.certainty != null) ...[
+                              const SizedBox(width: 8),
+                              DssDueChip(flag: flag),
+                              const SizedBox(width: 8),
+                              DssPriorityChip(flag: flag),
+                              if (flag.evidenceStrength != null &&
+                                  flag.evidenceStrength !=
+                                      DssEvidenceStrength.strong) ...[
+                                const SizedBox(width: 8),
+                                DssEvidenceChip(flag: flag),
+                              ],
+                              if (flag.certainty != null && flag.isFinding) ...[
                                 const SizedBox(width: 8),
                                 DssCertaintyChip(flag: flag),
                               ],

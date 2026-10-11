@@ -1,3 +1,5 @@
+import 'package:alumni_system/features/admin/dss/application/dss_policy.dart';
+
 /// Which groups a rule is evaluated for once small groups are rolled up.
 class DssRollupPlan {
   const DssRollupPlan({
@@ -21,12 +23,17 @@ class DssRollupPlan {
 
 /// Roll-up for small schools: a course × batch below a rule's minimum
 /// responses is pooled into its whole course, and a course still below the
-/// minimum is pooled into the whole institution.
+/// minimum is pooled into the whole institution. Respondents whose batch is
+/// not recorded ([DssPolicy.batchNotRecorded]) never form a batch group;
+/// they count toward their course only.
 abstract final class DssRollup {
   /// Stored in `course` / `batch_year` for rolled-up flags.
   static const all = 'All';
 
   static String batchKey(String course, String batch) => '$course|$batch';
+
+  static bool _isBatch(String batch, int size, int minN) =>
+      batch != DssPolicy.batchNotRecorded && size >= minN;
 
   /// [sizes] is course → batch → respondent count for one wave.
   static DssRollupPlan plan(Map<String, Map<String, int>> sizes, int minN) {
@@ -40,7 +47,7 @@ abstract final class DssRollup {
       var hasSmallBatch = false;
       for (final batch in course.value.entries) {
         courseTotal += batch.value;
-        if (batch.value >= minN) {
+        if (_isBatch(batch.key, batch.value, minN)) {
           batches.add(batchKey(course.key, batch.key));
         } else {
           hasSmallBatch = true;
@@ -88,7 +95,8 @@ abstract final class DssRollup {
       previousTotal += sum(prev);
       var uncovered = false;
       for (final batch in {...cur.keys, ...prev.keys}) {
-        if ((cur[batch] ?? 0) >= minN && (prev[batch] ?? 0) >= minN) {
+        if (_isBatch(batch, cur[batch] ?? 0, minN) &&
+            _isBatch(batch, prev[batch] ?? 0, minN)) {
           batches.add(batchKey(course, batch));
         } else {
           uncovered = true;
@@ -110,14 +118,15 @@ abstract final class DssRollup {
     );
   }
 
-  /// Batches of [course] below [minN], e.g. `{'2023': 4, '2024': 6}`.
+  /// Batches of [course] pooled into the course: below [minN], or with no
+  /// batch recorded. E.g. `{'2023': 4, '2024': 6}`.
   static Map<String, int> smallBatches(
     Map<String, Map<String, int>> sizes,
     String course,
     int minN,
   ) => {
     for (final b in (sizes[course] ?? const <String, int>{}).entries)
-      if (b.value < minN) b.key: b.value,
+      if (!_isBatch(b.key, b.value, minN)) b.key: b.value,
   };
 
   /// Courses whose total responses are below [minN].

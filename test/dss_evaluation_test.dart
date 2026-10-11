@@ -273,7 +273,13 @@ void main() {
       ], roster: 6);
       expect(s.responseRate, 0.5);
       expect(s.notEmployed!.hits, 1);
-      expect(s.medianSalaryLabel, 'P15,000.00 to less than P20,000.00');
+      expect(s.salaryAnswers, 3);
+      expect(s.medianSalaryLabel, 'Not enough data');
+      final five = DssProgramSnapshot.from([
+        for (var i = 0; i < 5; i++)
+          _a(q16: 'Yes', q31: 'P15,000.00 to less than P20,000.00'),
+      ], roster: 5);
+      expect(five.medianSalaryLabel, 'P15,000.00 to less than P20,000.00');
       expect(DssProgramSnapshot.from([], roster: 0).medianSalaryLabel, '-');
     });
 

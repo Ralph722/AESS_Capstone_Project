@@ -88,8 +88,10 @@ class DssSuggestionThemeService {
     final shown = texts.take(maxTexts).toList();
     final numbered = StringBuffer();
     for (var i = 0; i < shown.length; i++) {
-      final t = shown[i];
-      final clipped = t.length > _maxChars ? '${t.substring(0, _maxChars)}…' : t;
+      final t = redactForAi(shown[i]);
+      final clipped = t.length > _maxChars
+          ? '${t.substring(0, _maxChars)}…'
+          : t;
       numbered.writeln('${i + 1}. ${clipped.replaceAll('\n', ' ')}');
     }
     final raw = await _ai.sendMessage(
@@ -113,6 +115,27 @@ class DssSuggestionThemeService {
       disableThinking: true,
     );
     return parseAiThemes(raw, shown.length);
+  }
+
+  /// Removes contact details before alumni text is sent to the AI provider.
+  /// Quotes shown to admins stay unchanged.
+  static String redactForAi(String text) {
+    var out = text.replaceAll(
+      RegExp(r'[\w.+-]+@[\w-]+(\.[\w-]+)+'),
+      '[email]',
+    );
+    out = out.replaceAll(
+      RegExp(r'\b(https?://|www\.)\S+', caseSensitive: false),
+      '[link]',
+    );
+    return out.replaceAllMapped(RegExp(r'\+?\d[\d\s().-]{5,}\d'), (m) {
+      final s = m.group(0)!;
+      final digits = s.replaceAll(RegExp(r'\D'), '').length;
+      final yearRange = RegExp(
+        r'^(19|20)\d{2}\s*[-–]\s*(19|20)\d{2}$',
+      ).hasMatch(s.trim());
+      return digits >= 7 && !yearRange ? '[phone]' : s;
+    });
   }
 
   /// Validates the AI reply: keeps only in-range suggestion numbers (as

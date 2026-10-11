@@ -35,7 +35,40 @@ class DssRelatedness {
 
   /// Complement of [mismatchShare] so RELATEDNESS_LOW and RELATEDNESS_HIGH
   /// always describe the same respondents.
-  DssProportion get alignedShare => DssProportion(hits: aligned, total: answered);
+  DssProportion get alignedShare =>
+      DssProportion(hits: aligned, total: answered);
+}
+
+/// Labour status from Q16 (presently employed) and Q17 (reasons not
+/// employed).
+enum DssLabourStatus { employed, seeking, notSeeking, reasonUnknown }
+
+/// Q17 summary for respondents who are not employed.
+class DssNotEmployedReasons {
+  const DssNotEmployedReasons({
+    required this.seeking,
+    required this.notSeeking,
+    required this.reasonUnknown,
+    required this.reasons,
+  });
+
+  final int seeking;
+  final int notSeeking;
+
+  /// Not employed but no Q17 reason recorded.
+  final int reasonUnknown;
+
+  /// Each ticked reason (respondents may tick several).
+  final Map<String, int> reasons;
+
+  int get notEmployed => seeking + notSeeking + reasonUnknown;
+
+  Map<String, dynamic> toEvidence() => {
+    'seeking': seeking,
+    'not_seeking': notSeeking,
+    'reason_unknown': reasonUnknown,
+    'reasons': reasons,
+  };
 }
 
 /// Pure CHED GTS metric calculations shared by evaluation and impact
@@ -81,8 +114,93 @@ abstract final class DssMetrics {
 
   static Map<String, int> employmentBreakdown(
     Iterable<Map<String, dynamic>> answers,
-  ) =>
-      counts(answers.map((a) => single(a['ched_16'])).whereType<String>());
+  ) => counts(answers.map((a) => single(a['ched_16'])).whereType<String>());
+
+  /// Q17 reasons that mean the respondent is looking for work.
+  static const seekingReasons = {
+    'No job opportunity',
+    'Lack of work experience',
+  };
+
+  /// Q17 reason that always means not looking, whatever else is ticked.
+  static const didNotLookReason = 'Did not look for a job';
+
+  /// Every ticked Q17 reason, trimmed.
+  static List<String> notEmployedReasons(Map<String, dynamic> answers) {
+    final raw = answers['ched_17'];
+    final values = raw is List ? raw : [if (raw != null) raw];
+    return [
+      for (final v in values)
+        if (v.toString().trim().isNotEmpty) v.toString().trim(),
+    ];
+  }
+
+  /// Q16 + Q17 labour status. Null when Q16 is unanswered.
+  static DssLabourStatus? labourStatus(Map<String, dynamic> answers) {
+    final q16 = single(answers['ched_16']);
+    if (q16 == ChedGtsBuiltin.yes) return DssLabourStatus.employed;
+    if (q16 != ChedGtsBuiltin.no && q16 != ChedGtsBuiltin.neverEmployed) {
+      return null;
+    }
+    final reasons = notEmployedReasons(answers);
+    if (reasons.isEmpty) return DssLabourStatus.reasonUnknown;
+    if (reasons.contains(didNotLookReason)) return DssLabourStatus.notSeeking;
+    return reasons.any(seekingReasons.contains)
+        ? DssLabourStatus.seeking
+        : DssLabourStatus.notSeeking;
+  }
+
+  /// Looking for work among the labour force (employed + looking), like the
+  /// official unemployment rate. Not-employed respondents who are not
+  /// looking, or gave no Q17 reason, are left out.
+  static DssProportion? seekingWork(Iterable<Map<String, dynamic>> answers) {
+    var seeking = 0;
+    var total = 0;
+    for (final a in answers) {
+      switch (labourStatus(a)) {
+        case DssLabourStatus.employed:
+          total++;
+        case DssLabourStatus.seeking:
+          seeking++;
+          total++;
+        default:
+          break;
+      }
+    }
+    if (total == 0) return null;
+    return DssProportion(hits: seeking, total: total);
+  }
+
+  /// Why not-employed respondents are not working (Q17).
+  static DssNotEmployedReasons notEmployedBreakdown(
+    Iterable<Map<String, dynamic>> answers,
+  ) {
+    var seeking = 0;
+    var notSeeking = 0;
+    var unknown = 0;
+    final reasons = <String, int>{};
+    for (final a in answers) {
+      switch (labourStatus(a)) {
+        case DssLabourStatus.seeking:
+          seeking++;
+        case DssLabourStatus.notSeeking:
+          notSeeking++;
+        case DssLabourStatus.reasonUnknown:
+          unknown++;
+        default:
+          continue;
+      }
+      for (final r in notEmployedReasons(a)) {
+        reasons[r] = (reasons[r] ?? 0) + 1;
+      }
+    }
+    return DssNotEmployedReasons(
+      seeking: seeking,
+      notSeeking: notSeeking,
+      reasonUnknown: unknown,
+      reasons: reasons,
+    );
+  }
 
   static DssRelatedness? relatedness(Iterable<Map<String, dynamic>> answers) {
     var mismatch = 0;
@@ -123,7 +241,8 @@ abstract final class DssMetrics {
     return DssProportion(hits: hits, total: total);
   }
 
-  /// Q29: one year or longer to land a first job.
+  /// Q29: one year or longer to land a first job, among answers that state
+  /// a duration.
   static DssProportion? longTimeToFirstJob(
     Iterable<Map<String, dynamic>> answers,
   ) {
@@ -135,10 +254,24 @@ abstract final class DssMetrics {
     );
   }
 
+  /// Q29 answers that state a duration. "Others, please specify" says
+  /// nothing about how long it took, so it is not a valid answer here.
   static List<String> timeToJobAnswers(
     Iterable<Map<String, dynamic>> answers,
-  ) =>
-      answers.map((a) => single(a['ched_29'])).whereType<String>().toList();
+  ) => answers
+      .map((a) => single(a['ched_29']))
+      .whereType<String>()
+      .where((v) => !_isOthers(v))
+      .toList();
+
+  /// Q29 "Others, please specify" answers (left out of [timeToJobAnswers]).
+  static int timeToJobOthers(Iterable<Map<String, dynamic>> answers) => answers
+      .map((a) => single(a['ched_29']))
+      .whereType<String>()
+      .where(_isOthers)
+      .length;
+
+  static bool _isOthers(String value) => value.startsWith('Others');
 
   /// Q31 salary ranks for respondents with a known bracket.
   static List<int> salaryRanks(Iterable<Map<String, dynamic>> answers) =>
@@ -275,14 +408,24 @@ abstract final class DssMetrics {
     return (list[mid - 1] + list[mid]) / 2;
   }
 
-  static List<String> themeHints(List<String> texts) => keywordThemes(texts)
-      .take(5)
-      .map((t) => '${t.label} (${t.count})')
-      .toList();
+  static List<String> themeHints(List<String> texts) => keywordThemes(
+    texts,
+  ).take(5).map((t) => '${t.label} (${t.count})').toList();
 
   static const _emptySuggestions = {
-    'none', 'n/a', 'na', 'nothing', 'no', 'no suggestion', 'no suggestions',
-    'nothing to suggest', 'none so far', '-', '.', 'ok', 'okay',
+    'none',
+    'n/a',
+    'na',
+    'nothing',
+    'no',
+    'no suggestion',
+    'no suggestions',
+    'nothing to suggest',
+    'none so far',
+    '-',
+    '.',
+    'ok',
+    'okay',
   };
 
   /// Q34 free-text curriculum suggestions, skipping placeholders like "N/A".
@@ -320,15 +463,76 @@ abstract final class DssMetrics {
   }
 
   static const _themeKeywords = {
-    'Internships / OJT': ['internship', 'ojt', 'on-the-job', 'on the job', 'practicum', 'immersion'],
-    'Industry exposure and partnerships': ['industry', 'company', 'companies', 'partner', 'field trip', 'seminar'],
-    'Hands-on and project-based learning': ['hands-on', 'hands on', 'practical', 'project', 'laboratory', 'lab '],
-    'Updated tools and technology': ['software', 'tools', 'technology', 'equipment', 'updated', 'modern', 'latest'],
-    'Programming and technical depth': ['coding', 'programming', 'technical', 'develop'],
-    'Communication and English': ['communication', 'english', 'speaking', 'writing', 'presentation'],
-    'Soft skills and work readiness': ['soft skill', 'leadership', 'teamwork', 'work ethic', 'interview', 'resume', 'career'],
-    'Certifications and licensure': ['certification', 'certificate', 'licensure', 'board exam', 'nc ii', 'tesda'],
-    'Teaching quality and faculty': ['teacher', 'instructor', 'faculty', 'professor', 'teaching'],
+    'Internships / OJT': [
+      'internship',
+      'ojt',
+      'on-the-job',
+      'on the job',
+      'practicum',
+      'immersion',
+    ],
+    'Industry exposure and partnerships': [
+      'industry',
+      'company',
+      'companies',
+      'partner',
+      'field trip',
+      'seminar',
+    ],
+    'Hands-on and project-based learning': [
+      'hands-on',
+      'hands on',
+      'practical',
+      'project',
+      'laboratory',
+      'lab ',
+    ],
+    'Updated tools and technology': [
+      'software',
+      'tools',
+      'technology',
+      'equipment',
+      'updated',
+      'modern',
+      'latest',
+    ],
+    'Programming and technical depth': [
+      'coding',
+      'programming',
+      'technical',
+      'develop',
+    ],
+    'Communication and English': [
+      'communication',
+      'english',
+      'speaking',
+      'writing',
+      'presentation',
+    ],
+    'Soft skills and work readiness': [
+      'soft skill',
+      'leadership',
+      'teamwork',
+      'work ethic',
+      'interview',
+      'resume',
+      'career',
+    ],
+    'Certifications and licensure': [
+      'certification',
+      'certificate',
+      'licensure',
+      'board exam',
+      'nc ii',
+      'tesda',
+    ],
+    'Teaching quality and faculty': [
+      'teacher',
+      'instructor',
+      'faculty',
+      'professor',
+      'teaching',
+    ],
   };
 
   /// Keyword grouping of [texts]; each theme lists the indexes it covers.

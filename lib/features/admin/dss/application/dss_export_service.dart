@@ -2,15 +2,14 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:alumni_system/core/utils/web_file_download.dart';
+import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class DssExportService {
   Future<void> exportFlagsCsv(List<DssFlag> flags) async {
     if (!kIsWeb) {
-      throw StateError(
-        'Export is only available in the web admin portal.',
-      );
+      throw StateError('Export is only available in the web admin portal.');
     }
     final buf = StringBuffer();
     buf.writeln(
@@ -39,9 +38,23 @@ class DssExportService {
         'followup_value',
         'created_at',
         'resolved_at',
+        'evidence_strength',
+        'valid_answers',
+        'coverage_warning',
+        'priority',
+        'priority_score',
+        'priority_reasons',
+        'owner_office',
+        'responsible_name',
+        'start_date',
+        'due_date',
+        'review_date',
       ].map(_csv).join(','),
     );
+    final now = DateTime.now();
     for (final f in flags) {
+      final hidden = f.evidenceStrength == DssEvidenceStrength.insufficient;
+      final priority = f.isActive ? DssPriorityCalc.of(f, now: now) : null;
       buf.writeln(
         [
           f.id,
@@ -52,9 +65,9 @@ class DssExportService {
           f.batchYear,
           f.surveyId,
           f.surveyTitle,
-          f.metricValue.toString(),
-          f.ciLow?.toString() ?? '',
-          f.ciHigh?.toString() ?? '',
+          hidden ? '' : f.metricValue.toString(),
+          hidden ? '' : f.ciLow?.toString() ?? '',
+          hidden ? '' : f.ciHigh?.toString() ?? '',
           f.certainty?.dbValue ?? '',
           f.thresholdSnapshot.toString(),
           f.sampleN.toString(),
@@ -68,6 +81,17 @@ class DssExportService {
           f.followupValue?.toString() ?? '',
           f.createdAt.toIso8601String(),
           f.resolvedAt?.toIso8601String() ?? '',
+          f.evidenceStrength?.dbValue ?? '',
+          f.isDataQuality ? '' : f.validAnswers.toString(),
+          f.coverageWarning ? 'true' : '',
+          priority?.level.label ?? '',
+          priority?.score.toString() ?? '',
+          priority?.reasons.map((r) => r.display).join('; ') ?? '',
+          f.ownerOffice ?? '',
+          f.responsibleName ?? '',
+          f.startDate == null ? '' : dssDateValue(f.startDate!),
+          f.dueDate == null ? '' : dssDateValue(f.dueDate!),
+          f.reviewDate == null ? '' : dssDateValue(f.reviewDate!),
         ].map(_csv).join(','),
       );
     }

@@ -1,7 +1,41 @@
 /// DSS recommendation models (rules, flags, notes).
 library;
 
-enum DssFlagStatus { open, inProgress, resolved, dismissed }
+import 'dart:math' as math;
+
+import 'package:alumni_system/features/admin/dss/application/dss_policy.dart';
+
+/// [watch]: 5–9 valid answers, monitored but not a finding. [superseded]:
+/// a newer wave checked the same finding; final.
+enum DssFlagStatus { open, inProgress, resolved, dismissed, watch, superseded }
+
+/// How much the answers behind a finding can carry (Part 3 sample-size
+/// policy): under 5 valid answers, 5–9, 10–29, 30 or more.
+enum DssEvidenceStrength { insufficient, watch, limited, strong }
+
+extension DssEvidenceStrengthX on DssEvidenceStrength {
+  String get dbValue => name;
+
+  String get label => switch (this) {
+    DssEvidenceStrength.insufficient => 'Not enough data',
+    DssEvidenceStrength.watch => 'Watch',
+    DssEvidenceStrength.limited => 'Limited evidence',
+    DssEvidenceStrength.strong => 'Strong evidence',
+  };
+
+  /// Watch and Not enough data are shown, but are not findings.
+  bool get isFinding =>
+      this == DssEvidenceStrength.limited || this == DssEvidenceStrength.strong;
+
+  static DssEvidenceStrength? fromDb(String? raw) =>
+      switch ((raw ?? '').trim().toLowerCase()) {
+        'insufficient' => DssEvidenceStrength.insufficient,
+        'watch' => DssEvidenceStrength.watch,
+        'limited' => DssEvidenceStrength.limited,
+        'strong' => DssEvidenceStrength.strong,
+        _ => null,
+      };
+}
 
 enum DssConfidence { ok, low }
 
@@ -54,6 +88,8 @@ extension DssFlagStatusX on DssFlagStatus {
     DssFlagStatus.inProgress => 'in_progress',
     DssFlagStatus.resolved => 'resolved',
     DssFlagStatus.dismissed => 'dismissed',
+    DssFlagStatus.watch => 'watch',
+    DssFlagStatus.superseded => 'superseded',
   };
 
   String get label => switch (this) {
@@ -61,8 +97,17 @@ extension DssFlagStatusX on DssFlagStatus {
     DssFlagStatus.inProgress => 'In Progress',
     DssFlagStatus.resolved => 'Resolved',
     DssFlagStatus.dismissed => 'Dismissed',
+    DssFlagStatus.watch => 'Watch',
+    DssFlagStatus.superseded => 'Superseded',
   };
 
+  /// No further action: closed by an admin or replaced by a newer wave.
+  bool get isClosed =>
+      this == DssFlagStatus.resolved ||
+      this == DssFlagStatus.dismissed ||
+      this == DssFlagStatus.superseded;
+
+  /// Unknown values read as open so a newer database never breaks parsing.
   static DssFlagStatus fromDb(String? raw) {
     switch ((raw ?? '').trim().toLowerCase()) {
       case 'in_progress':
@@ -71,6 +116,10 @@ extension DssFlagStatusX on DssFlagStatus {
         return DssFlagStatus.resolved;
       case 'dismissed':
         return DssFlagStatus.dismissed;
+      case 'watch':
+        return DssFlagStatus.watch;
+      case 'superseded':
+        return DssFlagStatus.superseded;
       default:
         return DssFlagStatus.open;
     }
@@ -88,6 +137,12 @@ extension DssConfidenceX on DssConfidence {
 
 extension DssSeverityX on DssSeverity {
   String get dbValue => name;
+
+  String get label => switch (this) {
+    DssSeverity.critical => 'Critical',
+    DssSeverity.warning => 'Warning',
+    DssSeverity.info => 'Info',
+  };
 
   static DssSeverity fromDb(String? raw) {
     switch ((raw ?? '').trim().toLowerCase()) {
@@ -124,19 +179,34 @@ extension DssRuleCategoryX on DssRuleCategory {
 }
 
 class DssPlaybookStep {
-  const DssPlaybookStep({required this.step});
+  const DssPlaybookStep({required this.step, this.cause});
 
   final String step;
 
+  /// Null: always shown. Otherwise shown only for that cause; `default`
+  /// steps show when no cause was detected.
+  final String? cause;
+
   factory DssPlaybookStep.fromJson(dynamic raw) {
     if (raw is Map) {
-      return DssPlaybookStep(step: (raw['step'] ?? '').toString());
+      final cause = raw['cause']?.toString().trim();
+      return DssPlaybookStep(
+        step: (raw['step'] ?? '').toString(),
+        cause: cause == null || cause.isEmpty ? null : cause,
+      );
     }
     return DssPlaybookStep(step: raw?.toString() ?? '');
   }
 
-  Map<String, dynamic> toJson() => {'step': step};
+  Map<String, dynamic> toJson() => {'step': step, 'cause': ?cause};
 }
+
+/// Rule label shown in the app. `UNEMPLOYMENT_HIGH` keeps its stored name
+/// and meaning (Q16 "No" or "Never Employed"); only its label changes.
+String dssRuleDisplayName(String ruleId, String stored) => switch (ruleId) {
+  'UNEMPLOYMENT_HIGH' => 'Not currently employed',
+  _ => stored,
+};
 
 class DssRule {
   const DssRule({
@@ -168,6 +238,9 @@ class DssRule {
   final List<DssPlaybookStep> playbook;
   final DssRuleCategory category;
   final int sortOrder;
+
+  /// Name shown in the app (the stored [name] is unchanged).
+  String get displayName => dssRuleDisplayName(ruleId, name);
 
   factory DssRule.fromSupabaseRow(Map<String, dynamic> row) {
     final playbookRaw = row['playbook'];
@@ -274,6 +347,14 @@ class DssFlag {
     this.recheckSampleN,
     this.recheckedAt,
     this.recoveredSince,
+    this.evidenceStrengthRaw,
+    this.supersededBy,
+    this.supersededAt,
+    this.ownerOffice,
+    this.responsibleName,
+    this.startDate,
+    this.dueDate,
+    this.reviewDate,
   });
 
   final String id;
@@ -325,6 +406,47 @@ class DssFlag {
   final DateTime? recheckedAt;
   final DateTime? recoveredSince;
 
+  /// `dss_flags.evidence_strength` (generated from the evidence); null on
+  /// databases without the column and on older flags.
+  final String? evidenceStrengthRaw;
+
+  /// The newer wave's flag for the same finding; null when that wave no
+  /// longer raised it.
+  final String? supersededBy;
+  final DateTime? supersededAt;
+
+  /// Office acting on the finding and the person responsible (who may not
+  /// have an account; [assignedTo] is the responsible admin).
+  final String? ownerOffice;
+  final String? responsibleName;
+
+  /// Dates only (local midnight). [reviewDate] is the next progress check
+  /// while the work is under way; [verifyDueAt] is the check after resolving.
+  final DateTime? startDate;
+  final DateTime? dueDate;
+  final DateTime? reviewDate;
+
+  /// Open or in progress with a due date before [now]'s day.
+  bool isOverdue(DateTime now) {
+    final due = dueDate;
+    if (due == null || !_hasPlan) return false;
+    return _dateOnly(due).isBefore(_dateOnly(now));
+  }
+
+  /// Days until the due date (0 = today); null without a due date or once
+  /// the flag is closed or on Watch.
+  int? daysUntilDue(DateTime now) {
+    final due = dueDate;
+    if (due == null || !_hasPlan) return null;
+    return _dateOnly(due).difference(_dateOnly(now)).inDays;
+  }
+
+  bool get _hasPlan =>
+      status == DssFlagStatus.open || status == DssFlagStatus.inProgress;
+
+  String get findingKey =>
+      dssFindingKey(ruleId, cohortLevel.dbValue, course, batchYear);
+
   bool get recheckRecovered => recheckState == 'recovered';
 
   String get cohortLabel {
@@ -348,10 +470,67 @@ class DssFlag {
   double? get ciHigh => _asDouble(evidence['ci_high']);
 
   DssCertainty? get certainty =>
-      DssCertaintyX.fromDb(evidence['certainty']?.toString());
+      evidenceStrength == DssEvidenceStrength.insufficient
+      ? null
+      : DssCertaintyX.fromDb(evidence['certainty']?.toString());
 
-  bool get isTrend => ruleCategory == DssRuleCategory.trend ||
+  bool get isTrend =>
+      ruleCategory == DssRuleCategory.trend ||
       ruleId == 'UNEMPLOYMENT_TREND_UP';
+
+  bool get isDataQuality =>
+      ruleId == 'DATA_QUALITY_LOW' ||
+      ruleCategory == DssRuleCategory.dataQuality;
+
+  /// Valid answers to the flag's question (its own denominator, not the
+  /// group size). Older flags stored it under per-rule keys.
+  int get validAnswers {
+    for (final key in const [
+      'valid_answers',
+      'answered',
+      'employed_with_level',
+    ]) {
+      final v = evidence[key];
+      if (v is num) return v.toInt();
+    }
+    final current = evidence['current_answered'];
+    final previous = evidence['previous_answered'];
+    if (current is num && previous is num) {
+      return math.min(current, previous).toInt();
+    }
+    return sampleN;
+  }
+
+  /// Null for data-quality flags (they measure coverage, not outcomes).
+  /// Flags raised before the policy existed get it from their stored counts.
+  DssEvidenceStrength? get evidenceStrength {
+    if (isDataQuality) return null;
+    return DssEvidenceStrengthX.fromDb(
+          (evidenceStrengthRaw ?? evidence['evidence_strength'])?.toString(),
+        ) ??
+        DssPolicy.strength(
+          validAnswers,
+          minN: ruleMinN ?? DssPolicy.findingMin,
+        );
+  }
+
+  /// Counts as an institutional finding (not Watch or Not enough data).
+  bool get isFinding =>
+      status != DssFlagStatus.watch && (evidenceStrength?.isFinding ?? true);
+
+  /// Open, in progress or Watch.
+  bool get isActive =>
+      status == DssFlagStatus.open ||
+      status == DssFlagStatus.inProgress ||
+      status == DssFlagStatus.watch;
+
+  /// Response rate of the group when the outcome was measured.
+  double? get groupResponseRate => _asDouble(evidence['response_rate']);
+
+  bool get coverageWarning => evidence['coverage_warning'] == true;
+
+  /// `current` when a closed wave's rate had to use today's roster.
+  String? get rosterBasis => evidence['roster_basis']?.toString();
 
   String get metricPercentLabel => metricLabelFor(metricValue);
 
@@ -393,8 +572,8 @@ class DssFlag {
     final check = checkRaw is Map
         ? checkRaw
         : (checkRaw is List && checkRaw.isNotEmpty && checkRaw.first is Map)
-            ? checkRaw.first as Map
-            : null;
+        ? checkRaw.first as Map
+        : null;
 
     return DssFlag(
       id: (row['id'] ?? '').toString(),
@@ -440,9 +619,26 @@ class DssFlag {
       recheckSampleN: _asInt(check?['sample_n']),
       recheckedAt: _asDate(check?['checked_at']),
       recoveredSince: _asDate(check?['recovered_since']),
+      evidenceStrengthRaw: row['evidence_strength']?.toString(),
+      supersededBy: row['superseded_by']?.toString(),
+      supersededAt: _asDate(row['superseded_at']),
+      ownerOffice: _asText(row['owner_office']),
+      responsibleName: _asText(row['responsible_name']),
+      startDate: _asDay(row['start_date']),
+      dueDate: _asDay(row['due_date']),
+      reviewDate: _asDay(row['review_date']),
     );
   }
 }
+
+/// Identity of a finding across waves: rule × level × course × batch
+/// (`dss_flags.finding_key`).
+String dssFindingKey(
+  String ruleId,
+  String cohortLevel,
+  String course,
+  String batchYear,
+) => '$ruleId|$cohortLevel|$course|$batchYear';
 
 class DssFlagNote {
   const DssFlagNote({
@@ -504,6 +700,8 @@ enum DssNoteEventType {
   announcement,
   reopen,
   action,
+  evidence,
+  outcome,
 }
 
 extension DssNoteEventTypeX on DssNoteEventType {
@@ -513,10 +711,12 @@ extension DssNoteEventTypeX on DssNoteEventType {
     DssNoteEventType.note => 'Note',
     DssNoteEventType.status => 'Status',
     DssNoteEventType.assign => 'Assigned',
-    DssNoteEventType.impact => 'Impact',
+    DssNoteEventType.impact => 'Coverage re-check',
     DssNoteEventType.announcement => 'Announcement',
     DssNoteEventType.reopen => 'Reopened',
     DssNoteEventType.action => 'Action',
+    DssNoteEventType.evidence => 'Evidence',
+    DssNoteEventType.outcome => 'Outcome',
   };
 
   static DssNoteEventType fromDb(String? raw) {
@@ -533,11 +733,317 @@ extension DssNoteEventTypeX on DssNoteEventType {
         return DssNoteEventType.reopen;
       case 'action':
         return DssNoteEventType.action;
+      case 'evidence':
+        return DssNoteEventType.evidence;
+      case 'outcome':
+        return DssNoteEventType.outcome;
       default:
         return DssNoteEventType.note;
     }
   }
 }
+
+/// Kind of offline evidence (`dss_flag_evidence.evidence_type`).
+enum DssEvidenceType { meeting, event, communication, document, report, other }
+
+extension DssEvidenceTypeX on DssEvidenceType {
+  String get dbValue => name;
+
+  String get label => switch (this) {
+    DssEvidenceType.meeting => 'Meeting / consultation',
+    DssEvidenceType.event => 'Event / activity',
+    DssEvidenceType.communication => 'Communication sent',
+    DssEvidenceType.document => 'Document / memo',
+    DssEvidenceType.report => 'Report / data',
+    DssEvidenceType.other => 'Other',
+  };
+
+  static DssEvidenceType fromDb(String? raw) {
+    final value = (raw ?? '').trim().toLowerCase();
+    return DssEvidenceType.values.firstWhere(
+      (t) => t.dbValue == value,
+      orElse: () => DssEvidenceType.other,
+    );
+  }
+}
+
+/// One offline evidence entry on a flag. Removed entries stay in the table
+/// with [removedAt] set and are hidden from the list.
+class DssFlagEvidence {
+  const DssFlagEvidence({
+    required this.id,
+    required this.flagId,
+    required this.type,
+    required this.title,
+    required this.date,
+    this.description = '',
+    this.link,
+    this.createdByName = '',
+    required this.createdAt,
+    this.removedAt,
+  });
+
+  final String id;
+  final String flagId;
+  final DssEvidenceType type;
+  final String title;
+  final DateTime date;
+  final String description;
+  final String? link;
+  final String createdByName;
+  final DateTime createdAt;
+  final DateTime? removedAt;
+
+  bool get isRemoved => removedAt != null;
+
+  factory DssFlagEvidence.fromSupabaseRow(Map<String, dynamic> row) =>
+      DssFlagEvidence(
+        id: (row['id'] ?? '').toString(),
+        flagId: (row['flag_id'] ?? '').toString(),
+        type: DssEvidenceTypeX.fromDb(row['evidence_type']?.toString()),
+        title: (row['title'] ?? '').toString(),
+        date: _asDay(row['evidence_date']) ?? DateTime.now(),
+        description: (row['description'] ?? '').toString(),
+        link: _asText(row['link']),
+        createdByName: (row['created_by_name'] ?? '').toString(),
+        createdAt: _asDate(row['created_at']) ?? DateTime.now(),
+        removedAt: _asDate(row['removed_at']),
+      );
+}
+
+/// Next-wave outcome of an intervention (`dss_interventions.outcome_status`).
+enum DssOutcomeStatus {
+  notEvaluated,
+  pendingFollowup,
+  successful,
+  partiallySuccessful,
+  unsuccessful,
+  inconclusive,
+  noComparableData,
+}
+
+extension DssOutcomeStatusX on DssOutcomeStatus {
+  String get dbValue => switch (this) {
+    DssOutcomeStatus.notEvaluated => 'not_evaluated',
+    DssOutcomeStatus.pendingFollowup => 'pending_followup',
+    DssOutcomeStatus.successful => 'successful',
+    DssOutcomeStatus.partiallySuccessful => 'partially_successful',
+    DssOutcomeStatus.unsuccessful => 'unsuccessful',
+    DssOutcomeStatus.inconclusive => 'inconclusive',
+    DssOutcomeStatus.noComparableData => 'no_comparable_data',
+  };
+
+  String get label => switch (this) {
+    DssOutcomeStatus.notEvaluated => 'Not evaluated',
+    DssOutcomeStatus.pendingFollowup => 'Pending follow-up',
+    DssOutcomeStatus.successful => 'Successful',
+    DssOutcomeStatus.partiallySuccessful => 'Partially successful',
+    DssOutcomeStatus.unsuccessful => 'Unsuccessful',
+    DssOutcomeStatus.inconclusive => 'Inconclusive',
+    DssOutcomeStatus.noComparableData => 'No comparable data',
+  };
+
+  /// The next wave has been judged; a decision can be recorded.
+  bool get isFinal =>
+      this != DssOutcomeStatus.notEvaluated &&
+      this != DssOutcomeStatus.pendingFollowup;
+
+  static DssOutcomeStatus fromDb(String? raw) {
+    final value = (raw ?? '').trim().toLowerCase();
+    return DssOutcomeStatus.values.firstWhere(
+      (s) => s.dbValue == value,
+      orElse: () => DssOutcomeStatus.notEvaluated,
+    );
+  }
+
+  static DssOutcomeStatus? tryFromDb(String? raw) {
+    final value = (raw ?? '').trim().toLowerCase();
+    for (final s in DssOutcomeStatus.values) {
+      if (s.dbValue == value) return s;
+    }
+    return null;
+  }
+}
+
+/// What the admin decided after an outcome (`dss_interventions.decision`).
+enum DssOutcomeDecision { resolve, continueWork, modify, escalate }
+
+extension DssOutcomeDecisionX on DssOutcomeDecision {
+  String get dbValue => switch (this) {
+    DssOutcomeDecision.resolve => 'resolve',
+    DssOutcomeDecision.continueWork => 'continue',
+    DssOutcomeDecision.modify => 'modify',
+    DssOutcomeDecision.escalate => 'escalate',
+  };
+
+  String get label => switch (this) {
+    DssOutcomeDecision.resolve => 'Resolve',
+    DssOutcomeDecision.continueWork => 'Continue',
+    DssOutcomeDecision.modify => 'Modify',
+    DssOutcomeDecision.escalate => 'Escalate',
+  };
+
+  static DssOutcomeDecision? fromDb(String? raw) {
+    final value = (raw ?? '').trim().toLowerCase();
+    for (final d in DssOutcomeDecision.values) {
+      if (d.dbValue == value) return d;
+    }
+    return null;
+  }
+}
+
+/// One intervention on a finding with its success test, baseline and
+/// next-wave outcome. Outcomes are written only by the server.
+class DssIntervention {
+  const DssIntervention({
+    required this.id,
+    required this.flagId,
+    required this.findingKey,
+    required this.ruleId,
+    this.continuesId,
+    required this.interventionType,
+    this.description = '',
+    this.expectedOutcome = '',
+    required this.successMetric,
+    required this.successOperator,
+    required this.successTarget,
+    required this.startedOn,
+    this.baselineSurveyTitle = '',
+    this.baselineValue,
+    this.baselineN,
+    this.followupSurveyId,
+    this.followupSurveyTitle,
+    this.followupValue,
+    this.followupN,
+    this.outcomeStatus = DssOutcomeStatus.notEvaluated,
+    this.evaluationNote,
+    this.evaluatedAt,
+    this.decision,
+    this.decisionNote,
+    this.escalatedTo,
+    this.decidedByName,
+    this.decidedAt,
+    this.createdByName = '',
+    required this.createdAt,
+  });
+
+  final String id;
+  final String flagId;
+  final String findingKey;
+  final String ruleId;
+  final String? continuesId;
+  final String interventionType;
+  final String description;
+  final String expectedOutcome;
+  final String successMetric;
+  final String successOperator;
+  final double successTarget;
+  final DateTime startedOn;
+  final String baselineSurveyTitle;
+  final double? baselineValue;
+  final int? baselineN;
+  final String? followupSurveyId;
+  final String? followupSurveyTitle;
+  final double? followupValue;
+  final int? followupN;
+  final DssOutcomeStatus outcomeStatus;
+  final String? evaluationNote;
+  final DateTime? evaluatedAt;
+  final DssOutcomeDecision? decision;
+  final String? decisionNote;
+  final String? escalatedTo;
+  final String? decidedByName;
+  final DateTime? decidedAt;
+  final String createdByName;
+  final DateTime createdAt;
+
+  bool get isDecided => decision != null;
+
+  /// An outcome is known and nothing was decided yet.
+  bool get canDecide => !isDecided && outcomeStatus.isFinal;
+
+  /// The plan can change until the outcome is known.
+  bool get canEditPlan => !isDecided && !outcomeStatus.isFinal;
+
+  factory DssIntervention.fromSupabaseRow(Map<String, dynamic> row) =>
+      DssIntervention(
+        id: (row['id'] ?? '').toString(),
+        flagId: (row['flag_id'] ?? '').toString(),
+        findingKey: (row['finding_key'] ?? '').toString(),
+        ruleId: (row['rule_id'] ?? '').toString(),
+        continuesId: _asText(row['continues_id']),
+        interventionType: (row['intervention_type'] ?? '').toString(),
+        description: (row['description'] ?? '').toString(),
+        expectedOutcome: (row['expected_outcome'] ?? '').toString(),
+        successMetric: (row['success_metric'] ?? '').toString(),
+        successOperator: (row['success_operator'] ?? 'lt').toString(),
+        successTarget: _asDouble(row['success_target']) ?? 0,
+        startedOn: _asDay(row['started_on']) ?? _dateOnly(DateTime.now()),
+        baselineSurveyTitle: (row['baseline_survey_title'] ?? '').toString(),
+        baselineValue: _asDouble(row['baseline_value']),
+        baselineN: _asInt(row['baseline_n']),
+        followupSurveyId: _asText(row['followup_survey_id']),
+        followupSurveyTitle: _asText(row['followup_survey_title']),
+        followupValue: _asDouble(row['followup_value']),
+        followupN: _asInt(row['followup_n']),
+        outcomeStatus: DssOutcomeStatusX.fromDb(
+          row['outcome_status']?.toString(),
+        ),
+        evaluationNote: _asText(row['evaluation_note']),
+        evaluatedAt: _asDate(row['evaluated_at']),
+        decision: DssOutcomeDecisionX.fromDb(row['decision']?.toString()),
+        decisionNote: _asText(row['decision_note']),
+        escalatedTo: _asText(row['escalated_to']),
+        decidedByName: _asText(row['decided_by_name']),
+        decidedAt: _asDate(row['decided_at']),
+        createdByName: (row['created_by_name'] ?? '').toString(),
+        createdAt: _asDate(row['created_at']) ?? DateTime.now(),
+      );
+}
+
+/// Result of `dss_evaluate_intervention`. While the follow-up wave still
+/// accepts responses, [provisional] is true and [previewStatus] is what the
+/// outcome would be today; nothing final is stored.
+class DssOutcomeCheck {
+  const DssOutcomeCheck({
+    required this.outcomeStatus,
+    this.previewStatus,
+    this.provisional = false,
+    this.followupSurveyTitle,
+    this.followupValue,
+    this.followupN,
+    this.note,
+  });
+
+  final DssOutcomeStatus outcomeStatus;
+  final DssOutcomeStatus? previewStatus;
+  final bool provisional;
+  final String? followupSurveyTitle;
+  final double? followupValue;
+  final int? followupN;
+  final String? note;
+
+  factory DssOutcomeCheck.fromJson(Map<String, dynamic> json) =>
+      DssOutcomeCheck(
+        outcomeStatus: DssOutcomeStatusX.fromDb(
+          json['outcome_status']?.toString(),
+        ),
+        previewStatus: DssOutcomeStatusX.tryFromDb(
+          json['preview_status']?.toString(),
+        ),
+        provisional: json['provisional'] == true,
+        followupSurveyTitle: _asText(json['followup_survey_title']),
+        followupValue: _asDouble(json['followup_value']),
+        followupN: _asInt(json['followup_n']),
+        note: _asText(json['note']),
+      );
+}
+
+/// `YYYY-MM-DD` for a date column.
+String dssDateValue(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-'
+    '${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';
 
 class DssActionResult {
   const DssActionResult({
@@ -572,13 +1078,18 @@ class DssHistoryStats {
     required this.impactStillFlagged,
     required this.improvedPct,
     required this.impactByRule,
+    this.superseded = 0,
   });
 
+  /// Flags raised as findings (Watch items are not counted).
   final int raised;
   final int resolved;
   final int dismissed;
   final int open;
   final int inProgress;
+
+  /// Replaced by a newer wave of the same finding.
+  final int superseded;
   final double? avgResolutionDays;
   final Map<String, int> byMonth;
   final Map<String, int> byRule;
@@ -618,4 +1129,17 @@ DateTime? _asDate(dynamic v) {
   if (v == null) return null;
   if (v is DateTime) return v;
   return DateTime.tryParse(v.toString());
+}
+
+/// A date column as local midnight.
+DateTime? _asDay(dynamic v) {
+  final d = _asDate(v);
+  return d == null ? null : _dateOnly(d);
+}
+
+DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+String? _asText(dynamic v) {
+  final s = v?.toString().trim();
+  return s == null || s.isEmpty ? null : s;
 }

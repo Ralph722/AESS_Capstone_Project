@@ -1,12 +1,8 @@
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 
-/// Closed-loop impact verdict after resolve / recheck.
-enum DssImpactVerdict {
-  improved,
-  unchanged,
-  stillFlagged,
-  insufficientData,
-}
+/// Same-wave coverage re-check verdict after resolve / recheck. The
+/// next-wave intervention outcome is `DssOutcomeStatus`.
+enum DssImpactVerdict { improved, unchanged, stillFlagged, insufficientData }
 
 extension DssImpactVerdictX on DssImpactVerdict {
   String get dbValue => switch (this) {
@@ -31,7 +27,7 @@ extension DssImpactVerdictX on DssImpactVerdict {
     DssImpactVerdict.stillFlagged =>
       'Cohort still meets the rule threshold (or sample is still too small).',
     DssImpactVerdict.insufficientData =>
-      'Not enough responses yet to judge impact — collect more, then recheck.',
+      'Not enough responses yet to re-check — collect more, then re-check.',
   };
 
   static DssImpactVerdict? fromDb(String? raw) {

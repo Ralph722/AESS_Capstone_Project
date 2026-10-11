@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_instant_content.dart';
-import 'package:alumni_system/features/admin/dss/application/dss_ai_service.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_evaluation_service.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_export_service.dart';
+import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_report_card.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_report_card_service.dart';
 import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
@@ -20,9 +20,22 @@ import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 
 enum _DssPanel { list, detail, history, settings }
 
-enum _DssStatusFilter { all, open, inProgress, resolved, dismissed }
+enum _DssStatusFilter {
+  all,
+  open,
+  inProgress,
+  watch,
+  resolved,
+  dismissed,
+  superseded,
+}
 
-enum _DssSort { newest, oldest, severity, sampleDesc }
+enum _DssEvidenceFilter { all, findings, watch }
+
+enum _DssSort { priority, newest, oldest, severity, sampleDesc }
+
+/// Open and in-progress flags by due date.
+enum _DssDueFilter { all, overdue, dueSoon }
 
 /// Admin DSS Recommendations — matches Surveys/Directory chrome.
 class AdminDssScreen extends StatefulWidget {
@@ -41,7 +54,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
   final _repo = DssRepository();
   final _eval = DssEvaluationService();
-  final _ai = DssAiService();
   final _export = DssExportService();
   final _reportCards = DssReportCardService();
   bool _buildingReport = false;
@@ -53,15 +65,17 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   bool _evaluating = false;
   String? _error;
   String? _evalMessage;
-  String? _priorityHint;
-  bool _prioritizing = false;
 
   _DssPanel _panel = _DssPanel.list;
   String? _activeFlagId;
 
   _DssStatusFilter _statusFilter = _DssStatusFilter.all;
+  _DssEvidenceFilter _evidenceFilter = _DssEvidenceFilter.all;
   String _ruleFilter = '';
-  _DssSort _sort = _DssSort.newest;
+  DssPriority? _priorityFilter;
+  String _officeFilter = '';
+  _DssDueFilter _dueFilter = _DssDueFilter.all;
+  _DssSort _sort = _DssSort.priority;
   String _query = '';
   bool _mineOnly = false;
 
@@ -139,41 +153,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     }
   }
 
-  Future<void> _prioritizeWithAi() async {
-    final open = _flags
-        .where(
-          (f) =>
-              f.status == DssFlagStatus.open ||
-              f.status == DssFlagStatus.inProgress,
-        )
-        .toList();
-    if (open.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No open flags to prioritize.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    setState(() => _prioritizing = true);
-    try {
-      final hint = await _ai.prioritizeFlags(open);
-      if (!mounted) return;
-      setState(() => _priorityHint = hint);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('AI prioritization unavailable: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _prioritizing = false);
-    }
-  }
-
   Future<void> _exportReportCard() async {
     if (!requireWebExport(context)) return;
     final course = await showDialog<String>(
@@ -191,7 +170,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       tryDownloadBytesOnWeb(
         context,
         bytes: bytes,
-        fileName: 'program_report_card_${safe}_$date.pdf',
+        fileName: data.institution
+            ? 'institution_report_card_$date.pdf'
+            : 'program_report_card_${safe}_$date.pdf',
         mimeType: 'application/pdf',
       );
     } catch (e) {
@@ -247,47 +228,85 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
   bool get _hasActiveFilters =>
       _statusFilter != _DssStatusFilter.all ||
+      _evidenceFilter != _DssEvidenceFilter.all ||
       _ruleFilter.isNotEmpty ||
+      _priorityFilter != null ||
+      _officeFilter.isNotEmpty ||
+      _dueFilter != _DssDueFilter.all ||
       _query.isNotEmpty ||
-      _sort != _DssSort.newest ||
+      _sort != _DssSort.priority ||
       _mineOnly;
 
   void _resetFilters() {
     _searchController.clear();
     setState(() {
       _statusFilter = _DssStatusFilter.all;
+      _evidenceFilter = _DssEvidenceFilter.all;
       _ruleFilter = '';
-      _sort = _DssSort.newest;
+      _priorityFilter = null;
+      _officeFilter = '';
+      _dueFilter = _DssDueFilter.all;
+      _sort = _DssSort.priority;
       _query = '';
       _mineOnly = false;
     });
   }
 
   int get _openCount =>
-      _flags.where((f) => f.status == DssFlagStatus.open).length;
-  int get _inProgressCount =>
-      _flags.where((f) => f.status == DssFlagStatus.inProgress).length;
+      _flags.where((f) => f.status == DssFlagStatus.open && f.isFinding).length;
+  int get _inProgressCount => _flags
+      .where((f) => f.status == DssFlagStatus.inProgress && f.isFinding)
+      .length;
   int get _resolvedCount =>
       _flags.where((f) => f.status == DssFlagStatus.resolved).length;
-  int get _lowConfidenceCount =>
-      _flags.where((f) => f.confidence == DssConfidence.low).length;
+  int get _watchCount => _flags.where((f) => f.isActive && !f.isFinding).length;
 
   List<DssFlag> get _filtered {
+    final now = DateTime.now();
     var list = _flags.where((f) {
-      switch (_statusFilter) {
-        case _DssStatusFilter.all:
+      switch (_evidenceFilter) {
+        case _DssEvidenceFilter.all:
           break;
-        case _DssStatusFilter.open:
-          if (f.status != DssFlagStatus.open) return false;
-        case _DssStatusFilter.inProgress:
-          if (f.status != DssFlagStatus.inProgress) return false;
-        case _DssStatusFilter.resolved:
-          if (f.status != DssFlagStatus.resolved) return false;
-        case _DssStatusFilter.dismissed:
-          if (f.status != DssFlagStatus.dismissed) return false;
+        case _DssEvidenceFilter.findings:
+          if (!f.isFinding) return false;
+        case _DssEvidenceFilter.watch:
+          if (f.isFinding) return false;
+      }
+      final wanted = switch (_statusFilter) {
+        _DssStatusFilter.all => null,
+        _DssStatusFilter.open => DssFlagStatus.open,
+        _DssStatusFilter.inProgress => DssFlagStatus.inProgress,
+        _DssStatusFilter.watch => DssFlagStatus.watch,
+        _DssStatusFilter.resolved => DssFlagStatus.resolved,
+        _DssStatusFilter.dismissed => DssFlagStatus.dismissed,
+        _DssStatusFilter.superseded => DssFlagStatus.superseded,
+      };
+      // Superseded flags are history; they show only under their filter.
+      if (wanted == null
+          ? f.status == DssFlagStatus.superseded
+          : f.status != wanted) {
+        return false;
       }
       if (_ruleFilter.isNotEmpty && f.ruleId != _ruleFilter) {
         return false;
+      }
+      final wantedPriority = _priorityFilter;
+      if (wantedPriority != null &&
+          (!f.isActive ||
+              DssPriorityCalc.of(f, now: now).level != wantedPriority)) {
+        return false;
+      }
+      if (_officeFilter.isNotEmpty && f.ownerOffice != _officeFilter) {
+        return false;
+      }
+      if (_dueFilter != _DssDueFilter.all) {
+        final days = f.daysUntilDue(now);
+        final keep = switch (_dueFilter) {
+          _DssDueFilter.overdue => days != null && days < 0,
+          _DssDueFilter.dueSoon => days != null && days >= 0 && days <= 7,
+          _DssDueFilter.all => true,
+        };
+        if (!keep) return false;
       }
       if (_mineOnly) {
         final uid = AppSession.currentUser?.id;
@@ -297,7 +316,8 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         final q = _query.toLowerCase();
         final hay =
             '${f.title} ${f.body} ${f.ruleId} ${f.ruleName ?? ''} '
-            '${f.cohortLabel} ${f.surveyTitle}'
+                    '${f.cohortLabel} ${f.surveyTitle} '
+                    '${f.ownerOffice ?? ''} ${f.responsibleName ?? ''}'
                 .toLowerCase();
         if (!hay.contains(q)) return false;
       }
@@ -312,6 +332,14 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     };
 
     switch (_sort) {
+      case _DssSort.priority:
+        list.sort((a, b) {
+          // Active work first; closed and superseded flags keep newest-first.
+          final active = (b.isActive ? 1 : 0).compareTo(a.isActive ? 1 : 0);
+          if (active != 0) return active;
+          if (!a.isActive) return b.createdAt.compareTo(a.createdAt);
+          return DssPriorityCalc.compare(a, b, now: now);
+        });
       case _DssSort.newest:
         list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       case _DssSort.oldest:
@@ -338,8 +366,16 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       chips.add(
         DirectoryActiveFilterChip(
           label: 'Status: ${_statusFilterLabel(_statusFilter)}',
+          onRemoved: () => setState(() => _statusFilter = _DssStatusFilter.all),
+        ),
+      );
+    }
+    if (_evidenceFilter != _DssEvidenceFilter.all) {
+      chips.add(
+        DirectoryActiveFilterChip(
+          label: 'Evidence: ${_evidenceFilterLabel(_evidenceFilter)}',
           onRemoved: () =>
-              setState(() => _statusFilter = _DssStatusFilter.all),
+              setState(() => _evidenceFilter = _DssEvidenceFilter.all),
         ),
       );
     }
@@ -352,6 +388,30 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         DirectoryActiveFilterChip(
           label: 'Rule: ${rule?.name ?? _ruleFilter}',
           onRemoved: () => setState(() => _ruleFilter = ''),
+        ),
+      );
+    }
+    if (_priorityFilter != null) {
+      chips.add(
+        DirectoryActiveFilterChip(
+          label: 'Priority: ${_priorityFilter!.label}',
+          onRemoved: () => setState(() => _priorityFilter = null),
+        ),
+      );
+    }
+    if (_officeFilter.isNotEmpty) {
+      chips.add(
+        DirectoryActiveFilterChip(
+          label: 'Office: $_officeFilter',
+          onRemoved: () => setState(() => _officeFilter = ''),
+        ),
+      );
+    }
+    if (_dueFilter != _DssDueFilter.all) {
+      chips.add(
+        DirectoryActiveFilterChip(
+          label: _dueFilterLabel(_dueFilter),
+          onRemoved: () => setState(() => _dueFilter = _DssDueFilter.all),
         ),
       );
     }
@@ -381,8 +441,32 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     _DssStatusFilter.all => 'All',
     _DssStatusFilter.open => 'Open',
     _DssStatusFilter.inProgress => 'In Progress',
+    _DssStatusFilter.watch => 'Watch',
     _DssStatusFilter.resolved => 'Resolved',
     _DssStatusFilter.dismissed => 'Dismissed',
+    _DssStatusFilter.superseded => 'Superseded',
+  };
+
+  String _dueFilterLabel(_DssDueFilter f) => switch (f) {
+    _DssDueFilter.all => 'All due dates',
+    _DssDueFilter.overdue => 'Overdue',
+    _DssDueFilter.dueSoon => 'Due within 7 days',
+  };
+
+  /// Offices recorded on any flag, alphabetical.
+  List<String> get _offices {
+    final set = <String>{
+      for (final f in _flags)
+        if (f.ownerOffice != null) f.ownerOffice!,
+    };
+    return set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }
+
+  String _evidenceFilterLabel(_DssEvidenceFilter f) => switch (f) {
+    _DssEvidenceFilter.all => 'All evidence',
+    _DssEvidenceFilter.findings => 'Findings',
+    _DssEvidenceFilter.watch => 'Watch & small samples',
   };
 
   @override
@@ -486,13 +570,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             onDismiss: () => setState(() => _evalMessage = null),
           ),
         ],
-        if (_priorityHint != null) ...[
-          const SizedBox(height: AdminDssTheme.space1),
-          DssInsightBanner(
-            text: _priorityHint!,
-            onDismiss: () => setState(() => _priorityHint = null),
-          ),
-        ],
         const SizedBox(height: AdminDssTheme.space1),
         if (_error != null)
           Expanded(
@@ -518,9 +595,12 @@ class _AdminDssScreenState extends State<AdminDssScreen>
                     ? 'Run Refresh insights to evaluate CHED tracer responses against your insight thresholds.'
                     : 'Try a different search or clear filters.',
                 icon: Icons.lightbulb_outline,
-                primaryAction: _flags.isEmpty ? _refreshInsights : _resetFilters,
-                primaryLabel:
-                    _flags.isEmpty ? 'Refresh insights' : 'Reset filters',
+                primaryAction: _flags.isEmpty
+                    ? _refreshInsights
+                    : _resetFilters,
+                primaryLabel: _flags.isEmpty
+                    ? 'Refresh insights'
+                    : 'Reset filters',
               ),
               child: ListView.builder(
                 padding: const EdgeInsets.only(bottom: AdminDensity.space3),
@@ -546,20 +626,24 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         DirectoryStatCard(
           label: 'Open',
           value: '$_openCount',
-          description: 'Needs attention',
+          description: 'Findings that need attention',
           icon: Icons.flag_outlined,
           accent: AdminDssTheme.danger,
-          onTap: () =>
-              setState(() => _statusFilter = _DssStatusFilter.open),
+          onTap: () => setState(() {
+            _statusFilter = _DssStatusFilter.open;
+            _evidenceFilter = _DssEvidenceFilter.findings;
+          }),
         ),
         DirectoryStatCard(
           label: 'In progress',
           value: '$_inProgressCount',
-          description: 'Being handled',
+          description: 'Findings being handled',
           icon: Icons.pending_actions_outlined,
           accent: AdminDssTheme.warning,
-          onTap: () =>
-              setState(() => _statusFilter = _DssStatusFilter.inProgress),
+          onTap: () => setState(() {
+            _statusFilter = _DssStatusFilter.inProgress;
+            _evidenceFilter = _DssEvidenceFilter.findings;
+          }),
         ),
         DirectoryStatCard(
           label: 'Resolved',
@@ -571,11 +655,15 @@ class _AdminDssScreenState extends State<AdminDssScreen>
               setState(() => _statusFilter = _DssStatusFilter.resolved),
         ),
         DirectoryStatCard(
-          label: 'Low confidence',
-          value: '$_lowConfidenceCount',
-          description: 'Small sample / low response',
-          icon: Icons.warning_amber_outlined,
-          accent: AdminDssTheme.textSecondary,
+          label: 'Watch',
+          value: '$_watchCount',
+          description: 'Too few answers for a finding',
+          icon: Icons.visibility_outlined,
+          accent: AdminDssTheme.info,
+          onTap: () => setState(() {
+            _statusFilter = _DssStatusFilter.all;
+            _evidenceFilter = _DssEvidenceFilter.watch;
+          }),
         ),
       ],
     );
@@ -612,17 +700,83 @@ class _AdminDssScreenState extends State<AdminDssScreen>
               ..._rules.map(
                 (r) => DropdownMenuItem<String>(
                   value: r.ruleId,
-                  child: Text(r.name, overflow: TextOverflow.ellipsis),
+                  child: Text(r.displayName, overflow: TextOverflow.ellipsis),
                 ),
               ),
             ],
             onChanged: (v) => setState(() => _ruleFilter = v ?? ''),
+          ),
+          DirectoryFilterField<_DssEvidenceFilter>(
+            label: 'Evidence',
+            value: _evidenceFilter,
+            width: 160,
+            items: [
+              for (final f in _DssEvidenceFilter.values)
+                DropdownMenuItem(
+                  value: f,
+                  child: Text(_evidenceFilterLabel(f)),
+                ),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => _evidenceFilter = v);
+            },
+          ),
+          DirectoryFilterField<DssPriority?>(
+            label: 'Priority',
+            value: _priorityFilter,
+            width: 140,
+            items: [
+              const DropdownMenuItem<DssPriority?>(
+                value: null,
+                child: Text('All priorities'),
+              ),
+              for (final p in DssPriority.values)
+                DropdownMenuItem<DssPriority?>(value: p, child: Text(p.label)),
+            ],
+            onChanged: (v) => setState(() => _priorityFilter = v),
+          ),
+          if (_offices.isNotEmpty || _officeFilter.isNotEmpty)
+            DirectoryFilterField<String>(
+              label: 'Office',
+              value: _officeFilter,
+              width: 200,
+              items: [
+                const DropdownMenuItem<String>(
+                  value: '',
+                  child: Text('All offices'),
+                ),
+                for (final o in {
+                  ..._offices,
+                  if (_officeFilter.isNotEmpty) _officeFilter,
+                })
+                  DropdownMenuItem<String>(
+                    value: o,
+                    child: Text(o, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (v) => setState(() => _officeFilter = v ?? ''),
+            ),
+          DirectoryFilterField<_DssDueFilter>(
+            label: 'Due',
+            value: _dueFilter,
+            width: 160,
+            items: [
+              for (final f in _DssDueFilter.values)
+                DropdownMenuItem(value: f, child: Text(_dueFilterLabel(f))),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => _dueFilter = v);
+            },
           ),
           DirectoryFilterField<_DssSort>(
             label: 'Sort',
             value: _sort,
             width: 148,
             items: const [
+              DropdownMenuItem(
+                value: _DssSort.priority,
+                child: Text('Priority'),
+              ),
               DropdownMenuItem(
                 value: _DssSort.newest,
                 child: Text('Newest first'),
@@ -655,19 +809,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             selected: _mineOnly,
             onSelected: (v) => setState(() => _mineOnly = v),
           ),
-          const SizedBox(width: 4),
-          OutlinedButton.icon(
-            onPressed: _prioritizing ? null : _prioritizeWithAi,
-            icon: _prioritizing
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.auto_awesome, size: 16),
-            label: const Text('AI prioritize'),
-            style: dssOutlinedButtonStyle(),
-          ),
         ],
       ),
     );
@@ -695,7 +836,7 @@ class _ReportCardPickerState extends State<_ReportCardPicker> {
         borderRadius: BorderRadius.circular(AdminDssTheme.radiusMd),
       ),
       title: const Text(
-        'Program report card',
+        'Report card',
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
       content: SizedBox(
@@ -720,11 +861,16 @@ class _ReportCardPickerState extends State<_ReportCardPicker> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'One-page PDF with this program\'s tracer results against the '
-                  'institution, results across waves, findings, actions taken '
-                  'and impact checks.',
-                  style: TextStyle(
+                Text(
+                  _selected == DssReportCardService.wholeInstitution
+                      ? 'PDF with tracer results for all programs, results '
+                            'across waves, the most urgent findings across '
+                            'programs, intervention outcomes and actions taken.'
+                      : 'PDF with this program\'s tracer results against the '
+                            'institution, results across waves, findings, '
+                            'intervention outcomes, actions taken and coverage '
+                            're-checks.',
+                  style: const TextStyle(
                     fontSize: 12.5,
                     height: 1.4,
                     color: AdminDssTheme.textSecondary,
@@ -732,10 +878,14 @@ class _ReportCardPickerState extends State<_ReportCardPicker> {
                 ),
                 const SizedBox(height: 12),
                 DirectoryFilterField<String?>(
-                  label: 'Program',
+                  label: 'Report for',
                   value: _selected,
                   width: 400,
                   items: [
+                    const DropdownMenuItem<String?>(
+                      value: DssReportCardService.wholeInstitution,
+                      child: Text('Whole institution (all programs)'),
+                    ),
                     for (final c in courses)
                       DropdownMenuItem<String?>(
                         value: c,

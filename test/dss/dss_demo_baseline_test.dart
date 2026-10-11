@@ -87,11 +87,12 @@ void main() {
       expect(share(DssMetrics.clerical(answers)), (hits: 6, total: 10));
     });
 
-    test('Q29 "Others" is still in the denominator today', () {
+    test('Q29 "Others" is left out of the denominator', () {
       expect(share(DssMetrics.longTimeToFirstJob(answers)), (
         hits: 4,
-        total: 10,
+        total: 9,
       ));
+      expect(DssMetrics.timeToJobOthers(answers), 1);
     });
 
     test('low starting pay', () {

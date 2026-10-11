@@ -4,112 +4,212 @@ import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/ai/data/ai_assistant_service.dart';
 import 'package:alumni_system/features/ai/models/ai_chat_message.dart';
 
-/// Narrow AI helpers: phrase flags and prioritize open items. Never invents rules.
+/// An explanation of one flag. [byAi] is false when the rule-based text is
+/// shown instead (AI not configured, unavailable, or its reply rejected).
+class DssAiExplanation {
+  const DssAiExplanation({
+    required this.text,
+    required this.byAi,
+    this.rejectedReason,
+    this.unavailable = false,
+  });
+
+  final String text;
+  final bool byAi;
+
+  /// Why the AI reply was not used, when it failed the checks.
+  final String? rejectedReason;
+
+  /// The AI call failed (network, quota, empty reply).
+  final bool unavailable;
+}
+
+/// AI explanation of a finding the rules already produced. AI only explains:
+/// it never creates, detects, closes, resolves, ranks or prioritizes
+/// findings, sets severity, or judges whether an intervention succeeded.
+/// It receives computed facts only, and a reply that does not restate the
+/// value and the number of answers, or that goes beyond explaining, is
+/// discarded.
 class DssAiService {
-  DssAiService({AiAssistantService? ai}) : _ai = ai ?? AiAssistantService();
+  DssAiService({AiAssistantService? ai, bool? available})
+    : _ai = ai ?? AiAssistantService(),
+      _available = available;
 
   final AiAssistantService _ai;
+  final bool? _available;
 
-  Future<String> phraseFlag(DssFlag flag) async {
-    final fallback =
-        '${DssCopy.whyFlagged(flag)} ${DssCopy.displayRecommendedAction(flag)}';
-    if (!AiConfig.isConfigured) return fallback;
+  static bool get isAvailable => AiConfig.isConfigured;
+
+  /// The rule-based explanation shown when AI is not used.
+  static String fallbackText(DssFlag flag) =>
+      '${DssCopy.whyFlagged(flag)} ${DssCopy.displayRecommendedAction(flag)}';
+
+  Future<DssAiExplanation> explainFlag(DssFlag flag) async {
+    final fallback = fallbackText(flag);
+    if (!(_available ?? isAvailable)) {
+      return DssAiExplanation(text: fallback, byAi: false);
+    }
+    String raw;
     try {
-      final text = await _ai.sendMessage(
+      raw = await _ai.sendMessage(
         isAdmin: true,
         history: const <AiChatMessage>[],
-        userMessage:
-            'Write a complete admin briefing in 2-4 short sentences. '
-            'Finish every sentence. Be plain and clear for non-technical admins. '
-            'Do not invent recommendations.\n'
-            'Display title: ${DssCopy.displayTitle(flag)}\n'
-            'Why flagged: ${DssCopy.whyFlagged(flag)}\n'
-            'Finding: ${DssCopy.displayHeadline(flag)}\n'
-            '${DssCopy.metricLabel(flag)}: ${DssCopy.metricValueLabel(flag)}\n'
-            'Rule threshold wording: ${DssCopy.thresholdLabel(flag)}\n'
-            'Responses: ${flag.sampleN}; roster in group: ${flag.eligibleN ?? 'n/a'}\n'
-            'Fixed recommended action: ${DssCopy.displayRecommendedAction(flag)}',
-        systemInstructionOverride:
-            'You help university alumni-office admins understand DSS alerts. '
-            'Explain clearly why the flag exists. If response rate is high but '
-            'the flag is about too few responses, say that explicitly. '
-            'Restate only supplied facts and the fixed recommended action. '
-            'Never leave a sentence unfinished. '
-            'Use plain text only — no markdown, asterisks, hashtags, or bullet symbols.',
+        userMessage: factsPrompt(flag),
+        systemInstructionOverride: systemInstruction,
         temperature: 0.2,
         maxOutputTokens: 2048,
         disableThinking: true,
       );
-      return _completeOrFallback(text, fallback);
     } catch (_) {
-      return fallback;
+      return DssAiExplanation(text: fallback, byAi: false, unavailable: true);
     }
-  }
-
-  Future<String> prioritizeFlags(List<DssFlag> openFlags) async {
-    if (openFlags.isEmpty) return 'No open flags.';
-    final sorted = [...openFlags]..sort((a, b) {
-      final sev = _sevRank(b.severity).compareTo(_sevRank(a.severity));
-      if (sev != 0) return sev;
-      final n = b.sampleN.compareTo(a.sampleN);
-      if (n != 0) return n;
-      return a.createdAt.compareTo(b.createdAt);
-    });
-    final heuristic = StringBuffer('Suggested priority:\n');
-    for (var i = 0; i < sorted.length && i < 8; i++) {
-      final f = sorted[i];
-      heuristic.writeln(
-        '${i + 1}. ${DssCopy.displayTitle(f)} (${f.cohortLabel}) — '
-        '${DssCopy.responsesLabel(f)}, ${f.status.label}',
+    final text = stripMarkdown(raw);
+    if (!_looksComplete(text)) {
+      return DssAiExplanation(text: fallback, byAi: false, unavailable: true);
+    }
+    final problem = checkReply(text, flag);
+    if (problem != null) {
+      return DssAiExplanation(
+        text: fallback,
+        byAi: false,
+        rejectedReason: problem,
       );
     }
-    if (!AiConfig.isConfigured) return heuristic.toString();
-    try {
-      final facts = sorted
-          .take(12)
-          .map(
-            (f) =>
-                '- ${DssCopy.displayTitle(f)} | ${f.cohortLabel} | '
-                '${DssCopy.metricLabel(f)}=${DssCopy.metricValueLabel(f)} | '
-                '${DssCopy.responsesLabel(f)} | '
-                'why=${DssCopy.whyFlagged(f)} | status=${f.status.label}',
-          )
-          .join('\n');
-      final ai = await _ai.sendMessage(
-        isAdmin: true,
-        history: const <AiChatMessage>[],
-        userMessage:
-            'Suggest a short priority order for these open DSS flags and why. '
-            'Prefer higher severity, larger affected groups, and older items. '
-            'Write complete plain sentences.\n$facts',
-        systemInstructionOverride:
-            'You prioritize existing DSS flags for alumni admins. '
-            'Use only the supplied facts. Keep under 180 words. '
-            'Never leave a sentence unfinished. '
-            'Use plain text only — no markdown, asterisks, hashtags, or bullet symbols.',
-        temperature: 0.2,
-        maxOutputTokens: 2048,
-        disableThinking: true,
-      );
-      return _completeOrFallback(ai, heuristic.toString());
-    } catch (_) {
-      return heuristic.toString();
-    }
+    return DssAiExplanation(text: text, byAi: true);
   }
 
-  String _completeOrFallback(String raw, String fallback) {
-    final text = _stripMarkdown(raw);
-    if (text.isEmpty) return fallback;
-    final truncatedTail = RegExp(r'''[\s"'‘’“”({\[]$''');
-    if (truncatedTail.hasMatch(text)) return fallback;
+  static const systemInstruction =
+      'You explain decision-support findings to university alumni-office '
+      'admins. The findings were produced by fixed rules; you only explain '
+      'them in plain words. Use only the facts supplied. Restate the '
+      'measured value and the number of answers exactly as given. If the '
+      'item is a Watch item or the evidence is limited, say so. Do not '
+      'prioritize, rank or compare it with other findings, do not judge how '
+      'severe or urgent it is, do not say it should be resolved, closed, '
+      'dismissed or ignored, do not say whether any intervention worked, and '
+      'do not suggest causes or actions beyond the fixed recommended action. '
+      'Write 2-4 short, complete sentences in plain text, with no markdown, '
+      'asterisks, hashtags or bullet symbols.';
+
+  /// The facts sent to the AI: computed values only, no names or answers.
+  static String factsPrompt(DssFlag flag) {
+    final evidence = DssCopy.evidenceLabel(flag);
+    return [
+      'Explain this finding for a non-technical admin.',
+      'Finding: ${DssCopy.displayTitle(flag)}',
+      'Group: ${flag.cohortLabel}',
+      'Status: ${flag.status.label}'
+          '${flag.isFinding ? '' : ' (not a finding yet: too few answers)'}',
+      'Why it was raised: ${DssCopy.whyFlagged(flag)}',
+      '${DssCopy.metricLabel(flag)}: ${DssCopy.metricValueLabel(flag)}',
+      'Rule: ${DssCopy.thresholdLabel(flag)}',
+      'Answers: ${answersCount(flag)} (${DssCopy.responsesLabel(flag)})',
+      if (evidence != null) 'Evidence: $evidence',
+      if (flag.certainty != null && flag.isFinding)
+        'Certainty: ${flag.certainty!.label}',
+      'Roster in group: ${flag.eligibleN ?? 'not available'}',
+      'Fixed recommended action: ${DssCopy.displayRecommendedAction(flag)}',
+      'Your reply must include the value '
+          '"${requiredValueText(flag) ?? 'not shown'}" and the number of '
+          'answers (${answersCount(flag)}).',
+    ].join('\n');
+  }
+
+  /// Answers behind the value: respondents for data quality, otherwise
+  /// valid answers to the measured question.
+  static int answersCount(DssFlag flag) =>
+      flag.isDataQuality ? flag.sampleN : flag.validAnswers;
+
+  /// The value the reply must restate, as shown on the page; null when no
+  /// rate is shown (fewer than 5 answers).
+  static String? requiredValueText(DssFlag flag) {
+    if (flag.evidenceStrength == DssEvidenceStrength.insufficient) return null;
+    final v = flag.metricValue;
+    if (flag.ruleId == 'SALARY_STAGNATION') {
+      return v <= 0 ? null : '${v.toStringAsFixed(1)} bracket(s)';
+    }
+    if (flag.isTrend) return formatPoints(v);
+    return '${(v * 100).toStringAsFixed(0)}%';
+  }
+
+  static final _decisionLanguage = <RegExp>[
+    RegExp(r'\bprioriti[sz]'),
+    RegExp(r'\b(high|higher|highest|top|low|lower|medium) priority\b'),
+    RegExp(r'\bmost (urgent|important|pressing)\b'),
+    RegExp(r'\brank(ed|ing|s)?\b'),
+    RegExp(r'\bseverity\b'),
+    RegExp(r'\b(is|as|be) (critical|severe|not serious|minor)\b'),
+    RegExp(
+      r'\b(resolve|close|dismiss|ignore|reopen|supersede)\s+(this|the)\s+'
+      r'(flag|finding|alert|item|issue)\b',
+    ),
+    RegExp(r'\b(resolve|dismiss|ignore)\s+it\b'),
+    RegExp(
+      r'\b(should|must|can|could|may) be (resolved|closed|dismissed|ignored)\b',
+    ),
+    RegExp(r'\bmark(ed)? (it|this|the \w+) as\b'),
+    RegExp(r'\b(false alarm|not a real (issue|problem|finding))\b'),
+    RegExp(r'\b(succeeded|was successful|were successful|was unsuccessful)\b'),
+    RegExp(r'\b(intervention|it|this) (worked|did not work|failed)\b'),
+  ];
+
+  /// Why [text] cannot be shown as an explanation of [flag], or null.
+  static String? checkReply(String text, DssFlag flag) {
+    final lower = text
+        .toLowerCase()
+        .replaceAll(RegExp(r'rank\s*(/|or|and)\s*clerical'), 'clerical');
+    for (final re in _decisionLanguage) {
+      if (re.hasMatch(lower)) {
+        return 'it went beyond explaining (decision or priority wording)';
+      }
+    }
+    if (!_mentionsValue(lower, flag)) {
+      return 'it did not restate the measured value';
+    }
+    final n = answersCount(flag);
+    if (!RegExp('(?<![\\d.])$n(?![\\d.]*\\d)').hasMatch(lower)) {
+      return 'it did not restate the number of answers';
+    }
+    return null;
+  }
+
+  static bool _mentionsValue(String lower, DssFlag flag) {
+    if (requiredValueText(flag) == null) return true;
+    final v = flag.metricValue;
+    if (flag.ruleId == 'SALARY_STAGNATION') {
+      final one = v.toStringAsFixed(1).replaceAll('.', r'\.');
+      final whole = v.toStringAsFixed(0);
+      return RegExp('\\b($one|$whole)\\s*(bracket|salary bracket)')
+          .hasMatch(lower);
+    }
+    final pts = (v * 100).abs();
+    if (flag.isTrend) {
+      final options = {pts.round().toString(), pts.toStringAsFixed(1)};
+      return options.any(
+        (o) => RegExp(
+          '(?<![\\d.])${o.replaceAll('.', r'\.')}\\s*(pts|points|percentage points)',
+        ).hasMatch(lower),
+      );
+    }
+    final options = {pts.toStringAsFixed(0), pts.toStringAsFixed(1)};
+    return options.any(
+      (o) => RegExp(
+        '(?<![\\d.])${o.replaceAll('.', r'\.')}\\s*(%|percent)',
+      ).hasMatch(lower),
+    );
+  }
+
+  static bool _looksComplete(String text) {
+    if (text.isEmpty) return false;
+    if (RegExp(r'''[\s"'‘’“”({\[]$''').hasMatch(text)) return false;
     if (text.length < 40 && !text.endsWith('.') && !text.endsWith('!')) {
-      return fallback;
+      return false;
     }
-    return text;
+    return true;
   }
 
   /// Removes common markdown so admins never see raw **, #, or similar markup.
-  String _stripMarkdown(String raw) {
+  static String stripMarkdown(String raw) {
     var text = raw.trim();
     if (text.isEmpty) return text;
 
@@ -151,11 +251,4 @@ class DssAiService {
     text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
     return text.trim();
   }
-
-  int _sevRank(DssSeverity? s) => switch (s) {
-    DssSeverity.critical => 3,
-    DssSeverity.warning => 2,
-    DssSeverity.info => 1,
-    null => 2,
-  };
 }

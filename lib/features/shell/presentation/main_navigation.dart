@@ -15,6 +15,7 @@ import 'package:alumni_system/features/events/data/reminder_service.dart';
 import 'package:alumni_system/features/notifications/application/notification_router.dart';
 import 'package:alumni_system/features/notifications/push/push_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
+import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Primary tab indices for the alumni portal shell.
@@ -56,8 +57,10 @@ class MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = (widget.initialIndex ?? PortalTabs.home)
-        .clamp(0, PortalTabs.count - 1);
+    _currentIndex = (widget.initialIndex ?? PortalTabs.home).clamp(
+      0,
+      PortalTabs.count - 1,
+    );
     _visitedTabs.add(_currentIndex);
     _recordAlumniActivity();
     active = this;
@@ -110,10 +113,7 @@ class MainNavigationState extends State<MainNavigation> {
   }
 
   /// Home deep-link: Events tab, then open the tapped event.
-  Future<void> openEvent(
-    String eventId, {
-    bool openComments = false,
-  }) async {
+  Future<void> openEvent(String eventId, {bool openComments = false}) async {
     final id = eventId.trim();
     if (id.isEmpty) return;
     await _ensureTabReady(PortalTabs.events);
@@ -148,9 +148,9 @@ class MainNavigationState extends State<MainNavigation> {
     if (id.isEmpty) return;
     await _ensureTabReady(PortalTabs.community);
     if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ForumTopicScreen(topicId: id)),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => ForumTopicScreen(topicId: id)));
   }
 
   Future<void> _recordAlumniActivity() async {
@@ -293,7 +293,22 @@ class MainNavigationState extends State<MainNavigation> {
     return Scaffold(
       backgroundColor: PortalTheme.pageBg,
       extendBody: true,
-      body: _buildBodyStack(),
+      body: Stack(
+        children: [
+          Positioned.fill(child: _buildBodyStack()),
+          // extendBody puts the nav bar height in the body's bottom padding.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Builder(
+              builder: (context) => PortalNavFade(
+                navHeight: MediaQuery.paddingOf(context).bottom,
+              ),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: _buildMinimalNavBar(),
     );
   }
@@ -301,25 +316,8 @@ class MainNavigationState extends State<MainNavigation> {
   Widget _buildMinimalNavBar() {
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Container(
+      child: PortalFrostedPill(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: PortalTheme.border.withValues(alpha: 0.7)),
-          boxShadow: [
-            BoxShadow(
-              color: PortalTheme.navy.withValues(alpha: 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: _navItems.map(_buildMinimalNavItem).toList(),
@@ -359,9 +357,7 @@ class MainNavigationState extends State<MainNavigation> {
                 child: Icon(
                   isSelected ? navItem.activeIcon : navItem.icon,
                   size: 20,
-                  color: isSelected
-                      ? Colors.white
-                      : PortalTheme.textSecondary,
+                  color: isSelected ? Colors.white : PortalTheme.textSecondary,
                 ),
               ),
               const SizedBox(height: 2),
@@ -370,8 +366,9 @@ class MainNavigationState extends State<MainNavigation> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color:
-                      isSelected ? PortalTheme.navy : PortalTheme.textSecondary,
+                  color: isSelected
+                      ? PortalTheme.navy
+                      : PortalTheme.textSecondary,
                   height: 1.1,
                 ),
                 maxLines: 1,

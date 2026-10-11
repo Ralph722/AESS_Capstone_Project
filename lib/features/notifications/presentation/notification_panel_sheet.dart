@@ -194,7 +194,7 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
                     TextButton(
                       onPressed: _markAllRead,
                       style: TextButton.styleFrom(
-                        foregroundColor: PortalTheme.sky,
+                        foregroundColor: PortalTheme.navy,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -202,7 +202,7 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
                       child: Text(
                         'Mark all read',
                         style: PortalTheme.meta.copyWith(
-                          color: PortalTheme.sky,
+                          color: PortalTheme.navy,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

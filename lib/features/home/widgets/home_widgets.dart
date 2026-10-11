@@ -9,6 +9,7 @@ import 'package:alumni_system/features/announcements/models/announcement_model.d
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/models/event_display_status.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
+import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/features/home/models/home_calendar_item.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/widgets/job_ui.dart';
@@ -28,6 +29,33 @@ const double _hPad = 16;
 
 /// Consistent vertical gap above each home section card.
 const double _sectionTop = 10;
+
+/// Side padding for home section cards. The two-column desktop layout sets
+/// it to 0 so its own gutters decide the spacing between columns.
+class HomeSectionInset extends InheritedWidget {
+  const HomeSectionInset({
+    super.key,
+    required this.horizontal,
+    required super.child,
+  });
+
+  final double horizontal;
+
+  static double of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<HomeSectionInset>()
+          ?.horizontal ??
+      _hPad;
+
+  @override
+  bool updateShouldNotify(HomeSectionInset oldWidget) =>
+      oldWidget.horizontal != horizontal;
+}
+
+EdgeInsets _sectionPadding(BuildContext context) {
+  final h = HomeSectionInset.of(context);
+  return EdgeInsets.fromLTRB(h, _sectionTop, h, 0);
+}
 
 Widget _portalCard({
   required Widget child,
@@ -95,7 +123,7 @@ class HomeAlumniIdentityHero extends StatelessWidget {
     final heroRadius = BorderRadius.circular(PortalTheme.radius2xl);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: Material(
         color: Colors.transparent,
         elevation: 3,
@@ -263,11 +291,20 @@ class _IdentityAvatar extends StatelessWidget {
 // NEEDS ATTENTION — single yellow card, new pill/meta look
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Tracer line on the Home attention card, worded like the Tracer tab.
+String homeTracerSubtitle({required bool started, String? dueLabel}) {
+  if (dueLabel != null && dueLabel.trim().isNotEmpty) {
+    return '$dueLabel · ${started ? 'In progress' : 'Not started'}';
+  }
+  return started
+      ? 'In progress · pick up where you left off'
+      : 'Not started · about 10–15 min';
+}
+
 class HomeNeedsAttentionPanel extends StatelessWidget {
   const HomeNeedsAttentionPanel({
     super.key,
     required this.tracerComplete,
-    required this.tracerPercent,
     required this.pendingSurveys,
     required this.onOpenTracer,
     required this.onOpenSurveys,
@@ -278,7 +315,6 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
   });
 
   final bool tracerComplete;
-  final double tracerPercent;
   final int pendingSurveys;
   final VoidCallback onOpenTracer;
   final VoidCallback onOpenSurveys;
@@ -314,7 +350,7 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
 
     final needRadius = BorderRadius.circular(PortalTheme.radius2xl);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: Material(
         color: Colors.transparent,
         elevation: 2,
@@ -441,7 +477,7 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
                         title: 'Graduate Tracer Survey',
                         subtitle: tracerSubtitle?.trim().isNotEmpty == true
                             ? tracerSubtitle!
-                            : '${tracerPercent.toStringAsFixed(0)}% complete — finish your CHED Tracer',
+                            : homeTracerSubtitle(started: false),
                         onTap: onOpenTracer,
                       ),
                     if (_hasTracer && _hasSurveys) const SizedBox(height: 8),
@@ -657,6 +693,9 @@ class HomeStatCardsRow extends StatelessWidget {
     this.loading = false,
   });
 
+  /// Space between the stat cards.
+  static const double gap = 10;
+
   final int announcementsCount;
   final int communityTodayCount;
   final int eventsCount;
@@ -675,7 +714,7 @@ class HomeStatCardsRow extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: Row(
         children: [
           Expanded(
@@ -688,7 +727,7 @@ class HomeStatCardsRow extends StatelessWidget {
               onTap: onAnnouncements,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: gap),
           Expanded(
             child: HomeStatCard(
               icon: Icons.forum_outlined,
@@ -699,7 +738,7 @@ class HomeStatCardsRow extends StatelessWidget {
               onTap: onCommunity,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: gap),
           Expanded(
             child: HomeStatCard(
               icon: Icons.event_outlined,
@@ -859,7 +898,7 @@ class HomeUpcomingEventsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: _portalCard(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         radius: PortalTheme.radius2xl,
@@ -1259,7 +1298,7 @@ class HomeCommunityCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: _portalCard(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         radius: PortalTheme.radius2xl,
@@ -1346,6 +1385,21 @@ class HomeCommunityCard extends StatelessWidget {
   final ForumTopic topic;
   final VoidCallback onTap;
 
+  /// The one status or tag worth showing, matching the Forum list chips.
+  Widget? _pill() {
+    if (topic.isPinned) return ForumStatusChip.pinned();
+    if (topic.isSolved) return ForumStatusChip.solved();
+    if (topic.needsResponse) return ForumStatusChip.needsResponse();
+    final tag = topic.tags.isEmpty ? '' : topic.tags.first.label.trim();
+    if (tag.isEmpty) return null;
+    return ForumStatusChip(
+      label: tag,
+      foreground: PortalTheme.navyMid,
+      background: PortalTheme.sky.withValues(alpha: 0.15),
+      icon: Icons.sell_outlined,
+    );
+  }
+
   String _relativeTime(DateTime value) {
     final diff = DateTime.now().difference(value);
     if (diff.inMinutes < 1) return 'Just now';
@@ -1365,6 +1419,7 @@ class HomeCommunityCard extends StatelessWidget {
         '$authorName · ${replies == 1 ? '1 reply' : '$replies replies'} · ${_relativeTime(topic.createdAt)}';
     final url = topic.authorAvatarUrl;
     final provider = url == null || url.isEmpty ? null : AppImage.provider(url);
+    final pill = _pill();
 
     return Material(
       color: Colors.transparent,
@@ -1409,25 +1464,7 @@ class HomeCommunityCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: PortalTheme.sky.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'Discussion',
-                        style: PortalTheme.caption.copyWith(
-                          color: PortalTheme.navyMid,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
+                    if (pill != null) ...[pill, const SizedBox(height: 4)],
                     Text(
                       topic.title,
                       style: PortalTheme.cardTitle.copyWith(fontSize: 13),
@@ -1465,7 +1502,7 @@ class HomeCommunityEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: _portalCard(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         radius: PortalTheme.radiusXl,
@@ -1562,7 +1599,7 @@ class _HomeImportantDatesCalendarState
         : _itemsForDay(selected);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: _portalCard(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
         radius: PortalTheme.radius2xl,
@@ -1875,7 +1912,7 @@ class HomeEventsEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, _sectionTop, _hPad, 0),
+      padding: _sectionPadding(context),
       child: _portalCard(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         radius: PortalTheme.radiusXl,

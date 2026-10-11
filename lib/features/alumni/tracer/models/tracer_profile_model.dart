@@ -1,4 +1,5 @@
 import 'package:alumni_system/core/constants/gts_constants.dart';
+import 'package:alumni_system/core/utils/calendar_date.dart';
 
 /// Live alumni profile stored on `public.users` — GTS Section A, B item 12, employment status.
 class TracerProfile {
@@ -109,6 +110,18 @@ class TracerProfile {
       _readString(data, 'employmentStatus').trim().isNotEmpty,
     ];
     return checks.where((v) => v).length;
+  }
+
+  /// Keys from [requiredFieldKeys] that are still empty in [data].
+  static List<String> missingRequiredKeys(Map<String, dynamic> data) {
+    final checks = [
+      ..._profileCompletionChecks(data),
+      _readString(data, 'employmentStatus').trim().isNotEmpty,
+    ];
+    return [
+      for (var i = 0; i < requiredFieldKeys.length; i++)
+        if (!checks[i]) requiredFieldKeys[i],
+    ];
   }
 
   static int get profileFieldCount => profileRequiredFieldKeys.length;
@@ -239,7 +252,7 @@ class TracerProfile {
       'address': address.trim(),
       'gender': gender.trim(),
       'civil_status': civilStatus.trim(),
-      'birth_date': birthDate?.toUtc().toIso8601String().split('T').first,
+      'birth_date': CalendarDate.toDb(birthDate),
       'region_of_origin': regionOfOrigin.trim(),
       'province': province.trim(),
       'location_of_residence': locationOfResidence.trim(),

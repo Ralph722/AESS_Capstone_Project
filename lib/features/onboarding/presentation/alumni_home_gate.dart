@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/features/onboarding/presentation/alumni_onboarding_page.dart';
 import 'package:alumni_system/features/shell/presentation/main_navigation.dart';
 import 'package:alumni_system/features/onboarding/data/onboarding_service.dart';
-import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Routes alumni to onboarding or the main app based on profile onboarding state.
 class AlumniHomeGate extends StatefulWidget {
@@ -34,10 +34,8 @@ class _AlumniHomeGateState extends State<AlumniHomeGate> {
     // Wait until onboarding status is known — never flash the home dashboard.
     if (_needsOnboarding == null) {
       return const Scaffold(
-        backgroundColor: OnboardingTheme.surface,
-        body: Center(
-          child: CircularProgressIndicator(color: OnboardingTheme.navy),
-        ),
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator(color: PortalTheme.navy)),
       );
     }
 

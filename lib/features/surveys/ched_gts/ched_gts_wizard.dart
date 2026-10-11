@@ -32,9 +32,13 @@ class ChedGtsWizard extends StatefulWidget {
     required this.onClose,
     this.saving = false,
     this.helpSurveyId,
+    this.prefilledAnswers = const {},
   });
 
   final Map<String, dynamic> answers;
+
+  /// See [ChedGtsForm.prefilledAnswers].
+  final Map<String, dynamic> prefilledAnswers;
   final ChedGtsAnswersChanged onChanged;
   final Future<void> Function() onSubmit;
 
@@ -318,6 +322,7 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
                   onlyItemIds: _focusIds,
                   highlightMissing: _highlight,
                   helpSurveyId: widget.helpSurveyId,
+                  prefilledAnswers: widget.prefilledAnswers,
                 ),
               const SizedBox(height: 12),
               _WizardActions(
@@ -388,7 +393,7 @@ class _SectionTitleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.all(PortalTheme.space4),
       decoration: BoxDecoration(
         color: PortalTheme.card,
         borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
@@ -396,36 +401,20 @@ class _SectionTitleCard extends StatelessWidget {
         boxShadow: PortalTheme.softShadow,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(height: 5, color: PortalTheme.navy),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              PortalTheme.space4,
-              PortalTheme.space3,
-              PortalTheme.space4,
-              PortalTheme.space4,
+          Text(
+            eyebrow.toUpperCase(),
+            style: PortalTheme.meta.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: PortalTheme.textMuted,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  eyebrow.toUpperCase(),
-                  style: PortalTheme.meta.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: PortalTheme.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: PortalTheme.sectionTitle.copyWith(
-                    color: PortalTheme.navy,
-                  ),
-                ),
-              ],
-            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: PortalTheme.sectionTitle.copyWith(color: PortalTheme.navy),
           ),
         ],
       ),

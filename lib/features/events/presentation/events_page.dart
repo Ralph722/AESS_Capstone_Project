@@ -12,6 +12,8 @@ import 'package:alumni_system/features/events/widgets/event_rsvp_bar.dart';
 import 'package:alumni_system/features/events/widgets/event_status_badge.dart';
 import 'package:alumni_system/features/events/widgets/events_month_calendar.dart';
 import 'package:alumni_system/shared/widgets/safe_link_text.dart';
+import 'package:alumni_system/shared/widgets/user/portal_filters.dart';
+import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
@@ -351,12 +353,8 @@ class EventsScreenState extends State<EventsScreen>
       body: PortalContentFrame(
         child: CustomScrollView(
           slivers: [
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _EventsFilterHeaderDelegate(
-                child: _buildStickyFilterBar(filteredEvents.length),
-                height: _filterBarHeight(context),
-              ),
+            PortalFloatingFilterHeader(
+              child: _buildFilterCardContent(filteredEvents.length),
             ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -404,35 +402,44 @@ class EventsScreenState extends State<EventsScreen>
                     );
                   }
 
-                  // Match tile height to card content so rows stay tight.
-                  const hPad = 16.0;
+                  // Rows size to their tallest card, so the gap between
+                  // rows is always exactly [gap].
                   const gap = 12.0;
-                  const bodyEstimate = 228.0;
-                  final tileWidth =
-                      (width - (hPad * 2) - gap * (cols - 1)) / cols;
-                  final imageHeight = tileWidth / EventCover.feedTeaserRatio;
-                  final mainAxisExtent = imageHeight + bodyEstimate;
-
+                  final rows = (filteredEvents.length / cols).ceil();
                   return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
-                    sliver: SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: cols,
-                        mainAxisSpacing: gap,
-                        crossAxisSpacing: gap,
-                        mainAxisExtent: mainAxisExtent,
-                      ),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, index) =>
-                            _buildEventCard(filteredEvents[index]),
-                        childCount: filteredEvents.length,
+                        (context, row) => Padding(
+                          padding: EdgeInsets.only(
+                            bottom: row == rows - 1 ? 0 : gap,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (var c = 0; c < cols; c++) ...[
+                                if (c > 0) const SizedBox(width: gap),
+                                Expanded(
+                                  child: row * cols + c < filteredEvents.length
+                                      ? _buildEventCard(
+                                          filteredEvents[row * cols + c],
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        childCount: rows,
                       ),
                     ),
                   );
                 },
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 88)),
+            SliverToBoxAdapter(
+              child: SizedBox(height: PortalFloating.bottomClearance(context)),
+            ),
           ],
         ),
       ),
@@ -535,121 +542,36 @@ class EventsScreenState extends State<EventsScreen>
     );
   }
 
-  /// Exact height of [_buildStickyFilterBar]: margins 18 + card padding 26 +
-  /// border 2 + search 44 + gap 12 + chips 36 + gap 10, plus the count line.
-  double _filterBarHeight(BuildContext context) {
-    final countLine =
-        MediaQuery.textScalerOf(context).scale(PortalTheme.meta.fontSize!) *
-        PortalTheme.meta.height!;
-    return (148 + countLine).ceilToDouble() + 1;
-  }
-
-  Widget _buildStickyFilterBar(int count) {
-    return ColoredBox(
-      color: PortalTheme.pageBg,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-            border: Border.all(
-              color: PortalTheme.border.withValues(alpha: 0.75),
-            ),
-            boxShadow: PortalTheme.softShadow,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 44,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  style: PortalTheme.body,
-                  decoration: InputDecoration(
-                    hintText: 'Search by title, venue, or category',
-                    hintStyle: PortalTheme.bodySecondary,
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      size: 20,
-                      color: PortalTheme.textSecondary,
-                    ),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              _onSearchChanged('');
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: PortalTheme.surfaceMuted,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 0,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-                      borderSide: const BorderSide(color: _navy, width: 1.2),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _ScrollableChipRow(
-                height: 36,
-                itemCount: _filters.length,
-                itemBuilder: (context, index) {
-                  final selected = _selectedFilter == index;
-                  return FilterChip(
-                    selected: selected,
-                    showCheckmark: false,
-                    label: Text(_filters[index]),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    onSelected: (v) {
-                      if (v) _filterEvents(index);
-                    },
-                    selectedColor: PortalTheme.navy,
-                    backgroundColor: PortalTheme.surfaceMuted,
-                    labelStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: selected
-                          ? Colors.white
-                          : PortalTheme.textSecondary,
-                    ),
-                    side: BorderSide(
-                      color: selected ? PortalTheme.navy : PortalTheme.border,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '$count ${count == 1 ? 'event' : 'events'}',
-                style: PortalTheme.meta,
-              ),
-            ],
-          ),
+  Widget _buildFilterCardContent(int count) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PortalSearchField(
+          controller: _searchController,
+          onChanged: _onSearchChanged,
+          hintText: 'Search by title, venue, or category',
         ),
-      ),
+        const SizedBox(height: 12),
+        _ScrollableChipRow(
+          height: PortalFilterChip.height,
+          itemCount: _filters.length,
+          itemBuilder: (context, index) {
+            final selected = _selectedFilter == index;
+            return PortalFilterChip(
+              label: _filters[index],
+              selected: selected,
+              onTap: () {
+                if (!selected) _filterEvents(index);
+              },
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '$count ${count == 1 ? 'event' : 'events'}',
+          style: PortalTheme.meta,
+        ),
+      ],
     );
   }
 
@@ -1325,32 +1247,5 @@ class _OpenMapPill extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _EventsFilterHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _EventsFilterHeaderDelegate({required this.child, required this.height});
-
-  final Widget child;
-  final double height;
-
-  @override
-  double get minExtent => height;
-
-  @override
-  double get maxExtent => height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _EventsFilterHeaderDelegate oldDelegate) {
-    return child != oldDelegate.child || height != oldDelegate.height;
   }
 }

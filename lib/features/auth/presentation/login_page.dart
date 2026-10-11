@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/auth/presentation/auth_shell.dart';
+import 'package:alumni_system/features/auth/presentation/forgot_password_page.dart';
 import 'package:alumni_system/features/auth/presentation/register_page.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
@@ -56,7 +57,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthShell(
-      eyebrow: 'Sign in',
       title: 'Welcome back',
       subtitle: 'Sign in to continue to your alumni portal.',
       form: AutofillGroup(
@@ -156,12 +156,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () {
-                      showAuthFeedback(
-                        context,
-                        'Forgot password feature coming soon',
-                      );
-                    },
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ForgotPasswordScreen(
+                                  initialEmail: _emailController.text,
+                                ),
+                              ),
+                            );
+                          },
                     style: PortalTheme.ghostButton(dense: true).copyWith(
                       foregroundColor: const WidgetStatePropertyAll(
                         PortalTheme.navy,

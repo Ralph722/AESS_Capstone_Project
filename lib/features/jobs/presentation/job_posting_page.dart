@@ -15,11 +15,12 @@ import 'package:alumni_system/features/jobs/models/job_category_constants.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/widgets/job_cover_photo.dart';
 import 'package:alumni_system/features/jobs/widgets/job_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_filters.dart';
+import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
-import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 class JobPostingScreen extends StatefulWidget {
@@ -403,7 +404,7 @@ class JobPostingScreenState extends State<JobPostingScreen> {
           onRefresh: _load,
           child: CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(child: _filterBar()),
+              PortalFloatingFilterHeader(child: _filterCardContent()),
               if (_showSavedOnly && _savedClosedIds.isNotEmpty)
                 SliverToBoxAdapter(child: _closedSavedNote()),
               if (!_loading &&
@@ -504,6 +505,11 @@ class JobPostingScreenState extends State<JobPostingScreen> {
                     ),
                   ),
               ],
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: PortalFloating.bottomClearance(context),
+                ),
+              ),
             ],
           ),
         ),
@@ -552,139 +558,89 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     );
   }
 
-  Widget _filterBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(JobUiTheme.radius2xl),
-          border: Border.all(color: JobUiTheme.border.withValues(alpha: 0.75)),
-          boxShadow: JobUiTheme.cardShadow,
+  Widget _filterCardContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PortalSearchField(
+          controller: _search,
+          onChanged: (_) => setState(() => _page = 0),
+          hintText: 'Search title, company, or location…',
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _search,
-              onChanged: (_) => setState(() => _page = 0),
-              style: PortalTheme.body,
-              decoration: InputDecoration(
-                hintText: 'Search title, company, or location…',
-                hintStyle: PortalTheme.bodySecondary,
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  size: 20,
-                  color: JobUiTheme.textSecondary,
+        const SizedBox(height: 12),
+        SizedBox(
+          height: PortalFilterChip.height,
+          width: double.infinity,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.hardEdge,
+            child: Row(
+              children: [
+                PortalFilterChip(
+                  label: 'Recommended',
+                  icon: Icons.auto_awesome_rounded,
+                  selected: _showRecommendedOnly,
+                  onTap: () => setState(() {
+                    _showRecommendedOnly = !_showRecommendedOnly;
+                    _showSavedOnly = false;
+                    _page = 0;
+                  }),
                 ),
-                suffixIcon: _search.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: () {
-                          _search.clear();
-                          setState(() => _page = 0);
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: JobUiTheme.surfaceMuted,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(JobUiTheme.radiusMd),
-                  borderSide: const BorderSide(
-                    color: JobUiTheme.navy,
-                    width: 1.2,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 40,
-              width: double.infinity,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.hardEdge,
-                child: Row(
-                  children: [
-                    _JobFilterChip(
-                      label: 'Recommended',
-                      icon: Icons.auto_awesome_rounded,
-                      selected: _showRecommendedOnly,
-                      onTap: () => setState(() {
-                        _showRecommendedOnly = !_showRecommendedOnly;
-                        _showSavedOnly = false;
-                        _page = 0;
-                      }),
-                    ),
-                    const SizedBox(width: 8),
-                    _dropdownChip(
-                      value: _category,
-                      items: [
-                        ('all', 'Category'),
-                        ...JobCategoryConstants.all.map((c) => (c, c)),
-                      ],
-                      onChanged: (v) => setState(() {
-                        _category = v;
-                        _page = 0;
-                      }),
-                    ),
-                    const SizedBox(width: 8),
-                    _dropdownChip(
-                      value: _type,
-                      items: [
-                        ('all', 'Type'),
-                        ...JobCategoryConstants.jobTypes.map((c) => (c, c)),
-                      ],
-                      onChanged: (v) => setState(() {
-                        _type = v;
-                        _page = 0;
-                      }),
-                    ),
-                    const SizedBox(width: 8),
-                    _JobFilterChip(
-                      label: 'Remote',
-                      icon: Icons.home_work_outlined,
-                      selected: _remoteOnly == true,
-                      onTap: () => setState(() {
-                        _remoteOnly = _remoteOnly == true ? null : true;
-                        _page = 0;
-                      }),
-                    ),
-                    const SizedBox(width: 8),
-                    _dropdownChip(
-                      value: _sort,
-                      items: const [
-                        ('newest', 'Newest'),
-                        ('oldest', 'Oldest'),
-                        ('deadline', 'Deadline'),
-                        ('salary_high', 'Salary ↓'),
-                        ('salary_low', 'Salary ↑'),
-                      ],
-                      onChanged: (v) => setState(() {
-                        _sort = v;
-                        _page = 0;
-                      }),
-                    ),
+                const SizedBox(width: 8),
+                _dropdownChip(
+                  value: _category,
+                  items: [
+                    ('all', 'Category'),
+                    ...JobCategoryConstants.all.map((c) => (c, c)),
                   ],
+                  onChanged: (v) => setState(() {
+                    _category = v;
+                    _page = 0;
+                  }),
                 ),
-              ),
+                const SizedBox(width: 8),
+                _dropdownChip(
+                  value: _type,
+                  items: [
+                    ('all', 'Type'),
+                    ...JobCategoryConstants.jobTypes.map((c) => (c, c)),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _type = v;
+                    _page = 0;
+                  }),
+                ),
+                const SizedBox(width: 8),
+                PortalFilterChip(
+                  label: 'Remote',
+                  icon: Icons.home_work_outlined,
+                  selected: _remoteOnly == true,
+                  onTap: () => setState(() {
+                    _remoteOnly = _remoteOnly == true ? null : true;
+                    _page = 0;
+                  }),
+                ),
+                const SizedBox(width: 8),
+                _dropdownChip(
+                  value: _sort,
+                  icon: Icons.swap_vert_rounded,
+                  items: const [
+                    ('newest', 'Newest'),
+                    ('oldest', 'Oldest'),
+                    ('deadline', 'Deadline'),
+                    ('salary_high', 'Salary ↓'),
+                    ('salary_low', 'Salary ↑'),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _sort = v;
+                    _page = 0;
+                  }),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -692,27 +648,14 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     required String value,
     required List<(String, String)> items,
     required ValueChanged<String> onChanged,
+    IconData? icon,
   }) {
-    final label = items.firstWhere((e) => e.$1 == value).$2;
-    final isActive = value != 'all' && value != 'newest';
-    return PopupMenuButton<String>(
-      onSelected: onChanged,
-      itemBuilder: (ctx) => items
-          .map(
-            (e) => portalMenuItem(
-              value: e.$1,
-              label: e.$2,
-              selected: e.$1 == value,
-            ),
-          )
-          .toList(),
-      child: UnconstrainedBox(
-        child: _JobFilterChip(
-          label: label,
-          icon: Icons.expand_more_rounded,
-          selected: isActive,
-        ),
-      ),
+    return PortalDropdownChip<String>(
+      value: value,
+      items: items,
+      onChanged: onChanged,
+      icon: icon,
+      selected: value != 'all' && value != 'newest',
     );
   }
 
@@ -930,70 +873,6 @@ class JobPostingScreenState extends State<JobPostingScreen> {
   }
 }
 
-class _JobFilterChip extends StatelessWidget {
-  const _JobFilterChip({
-    required this.label,
-    this.icon,
-    this.selected = false,
-    this.onTap,
-  });
-
-  final String label;
-  final IconData? icon;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final child = AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: selected ? JobUiTheme.navy : JobUiTheme.surfaceMuted,
-        borderRadius: BorderRadius.circular(JobUiTheme.radiusLg),
-        border: Border.all(
-          color: selected
-              ? JobUiTheme.navy
-              : JobUiTheme.border.withValues(alpha: 0.9),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(
-              icon,
-              size: 14,
-              color: selected ? Colors.white : JobUiTheme.textSecondary,
-            ),
-            const SizedBox(width: 5),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : JobUiTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-    if (onTap == null) return child;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(JobUiTheme.radiusLg),
-        child: child,
-      ),
-    );
-  }
-}
-
 class _RecommendedMiniCard extends StatelessWidget {
   const _RecommendedMiniCard({required this.job, required this.onTap});
 
@@ -1065,7 +944,7 @@ class _AlumniJobCard extends StatelessWidget {
   final DateTime? savedAt;
 
   static const Color _salaryGreen = PortalTheme.success;
-  static const Color _levelOrange = PortalTheme.warning;
+  static const Color _levelOrange = PortalTheme.ember;
 
   @override
   Widget build(BuildContext context) {
@@ -1135,7 +1014,7 @@ class _AlumniJobCard extends StatelessWidget {
                   isFavorite
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_border_rounded,
-                  color: isFavorite ? JobUiTheme.gold : JobUiTheme.textMuted,
+                  color: isFavorite ? JobUiTheme.navy : JobUiTheme.textMuted,
                   size: 24,
                 ),
               ),
@@ -1308,9 +1187,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                   ),
                 Container(
                   width: double.infinity,
-                  decoration: const BoxDecoration(
-                    gradient: PortalTheme.heroGradient,
-                  ),
+                  color: PortalTheme.surfaceMuted,
                   child: Column(
                     children: [
                       if (!job.hasCoverImage) ...[
@@ -1319,7 +1196,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.35),
+                            color: PortalTheme.borderStrong,
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
@@ -1336,6 +1213,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                 borderRadius: BorderRadius.circular(
                                   JobUiTheme.radiusLg,
                                 ),
+                                border: Border.all(color: PortalTheme.border),
                               ),
                               child: JobCompanyLogo(
                                 job: job,
@@ -1353,7 +1231,7 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                         ? 'Open role'
                                         : job.jobTitle,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: PortalTheme.navy,
                                       fontSize: 21,
                                       fontWeight: FontWeight.w800,
                                       height: 1.2,
@@ -1362,10 +1240,8 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                   const SizedBox(height: 6),
                                   Text(
                                     job.companyName,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.85,
-                                      ),
+                                    style: const TextStyle(
+                                      color: PortalTheme.textPrimary,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1374,21 +1250,17 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Icon(
+                                        const Icon(
                                           Icons.place_outlined,
                                           size: 14,
-                                          color: Colors.white.withValues(
-                                            alpha: 0.7,
-                                          ),
+                                          color: PortalTheme.textSecondary,
                                         ),
                                         const SizedBox(width: 4),
                                         Expanded(
                                           child: Text(
                                             locationLabel,
-                                            style: TextStyle(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.7,
-                                              ),
+                                            style: const TextStyle(
+                                              color: PortalTheme.textSecondary,
                                               fontSize: 12.5,
                                             ),
                                           ),
@@ -1412,10 +1284,8 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                                   const SizedBox(height: 10),
                                   Text(
                                     jobPostedAgo(job.postedDate),
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.65,
-                                      ),
+                                    style: const TextStyle(
+                                      color: PortalTheme.textSecondary,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                     ),

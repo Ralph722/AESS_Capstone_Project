@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/constants/course_constants.dart';
+import 'package:alumni_system/core/utils/calendar_date.dart';
 import 'package:alumni_system/core/utils/local_id.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
@@ -452,7 +453,7 @@ class AlumniMemberService {
       'address': address,
       'gender': gender,
       'civil_status': civilStatus,
-      'birth_date': birthDate?.toIso8601String().split('T').first,
+      'birth_date': CalendarDate.toDb(birthDate),
       'tracer_profile_complete': tracerProfileComplete,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };

@@ -328,7 +328,7 @@ class JobMetaRow extends StatelessWidget {
   }
 }
 
-/// High-contrast pill for dark navy headers.
+/// Pill for the grey job details header.
 class JobHeaderPill extends StatelessWidget {
   const JobHeaderPill({super.key, required this.label});
 
@@ -339,14 +339,14 @@ class JobHeaderPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+        border: Border.all(color: PortalTheme.border),
       ),
       child: Text(
         label,
         style: PortalTheme.caption.copyWith(
-          color: Colors.white,
+          color: PortalTheme.navy,
           fontWeight: FontWeight.w700,
           fontSize: 11,
         ),

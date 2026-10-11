@@ -6,6 +6,7 @@ import 'package:alumni_system/features/events/data/event_comment_service.dart';
 import 'package:alumni_system/features/events/models/event_comment_model.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/shared/widgets/safe_link_text.dart';
+import 'package:alumni_system/shared/widgets/user/portal_composer.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
@@ -31,8 +32,6 @@ class EventCommentsSheet extends StatefulWidget {
 class _EventCommentsSheetState extends State<EventCommentsSheet> {
   static const double _avatarSize = 36;
   static const double _bodyIndent = _avatarSize + 10;
-  static const double _composerHeight = 44;
-
   final TextEditingController _commentController = TextEditingController();
   final TextEditingController _editController = TextEditingController();
   final FocusNode _inputFocus = FocusNode();
@@ -232,7 +231,7 @@ class _EventCommentsSheetState extends State<EventCommentsSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) => Material(
-        color: PortalTheme.pageBg,
+        color: Colors.white,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(PortalTheme.radius2xl),
         ),
@@ -600,114 +599,36 @@ class _EventCommentsSheetState extends State<EventCommentsSheet> {
   }
 
   Widget _buildComposer(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Container(
-      padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + bottomInset),
-      decoration: BoxDecoration(
-        color: PortalTheme.card,
-        border: const Border(top: BorderSide(color: PortalTheme.border)),
-        boxShadow: [
-          BoxShadow(
-            color: PortalTheme.navy.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: ListenableBuilder(
-                listenable: _inputFocus,
-                builder: (context, child) => AnimatedContainer(
-                  duration: PortalTheme.fast,
-                  constraints: const BoxConstraints(minHeight: _composerHeight),
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: PortalTheme.surfaceMuted,
-                    borderRadius: BorderRadius.circular(_composerHeight / 2),
-                    border: Border.all(
-                      color: _inputFocus.hasFocus
-                          ? PortalTheme.navy.withValues(alpha: 0.35)
-                          : Colors.transparent,
-                      width: 1.2,
-                    ),
-                  ),
-                  child: child,
-                ),
-                child: TextField(
-                  controller: _commentController,
-                  focusNode: _inputFocus,
-                  minLines: 1,
-                  maxLines: 4,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: PortalTheme.body,
-                  decoration:
-                      InputDecoration.collapsed(
-                        hintText: 'Ask a question or share a thought…',
-                        hintStyle: PortalTheme.body.copyWith(
-                          color: PortalTheme.textMuted,
-                        ),
-                      ).copyWith(
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                        ),
-                      ),
-                ),
+    return PortalComposerBar(
+      avoidKeyboard: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _commentController,
+              focusNode: _inputFocus,
+              minLines: 1,
+              maxLines: 4,
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
+              style: PortalTheme.body,
+              decoration: PortalComposer.inputDecoration(
+                hintText: 'Ask a question or share a thought…',
               ),
             ),
-            const SizedBox(width: 8),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _commentController,
-              builder: (context, value, _) {
-                final canSend = value.text.trim().isNotEmpty && !_isSubmitting;
-                final active = canSend || _isSubmitting;
-                return AnimatedContainer(
-                  duration: PortalTheme.fast,
-                  width: _composerHeight,
-                  height: _composerHeight,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: active ? PortalTheme.navy : PortalTheme.border,
-                  ),
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: canSend ? _submitComment : null,
-                      child: Tooltip(
-                        message: 'Post comment',
-                        child: Center(
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.send_rounded,
-                                  size: 20,
-                                  color: active
-                                      ? Colors.white
-                                      : PortalTheme.textMuted,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
+          ),
+          const SizedBox(width: PortalComposer.gap),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _commentController,
+            builder: (context, value, _) => PortalSendButton(
+              label: 'Post comment',
+              busy: _isSubmitting,
+              onPressed:
+                  value.text.trim().isNotEmpty ? _submitComment : null,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -94,7 +94,7 @@ abstract final class ChedGtsBuiltin {
       section: ChedGtsSection.a,
       type: ChedGtsFieldType.text,
       prompt: 'Name',
-      helpText: 'Write your full name: Last name, First name, Middle name.',
+      helpText: 'Write your full name the way you normally write it.',
       required: true,
       prefillKey: 'profile.displayName',
     ),

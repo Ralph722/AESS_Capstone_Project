@@ -168,7 +168,10 @@ class _NotificationPreferencesScreenState
                 child: SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: PortalTheme.navy,
+                  ),
                 ),
               ),
             ),
@@ -183,7 +186,9 @@ class _NotificationPreferencesScreenState
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: PortalTheme.navy),
+      );
     }
     if (_error != null) {
       return PortalErrorState(error: _error, onRetry: _load);
@@ -226,6 +231,8 @@ class _NotificationPreferencesScreenState
           ),
           _card([
             SwitchListTile.adaptive(
+              activeThumbColor: Colors.white,
+              activeTrackColor: PortalTheme.navy,
               value: _prefs.quietHoursEnabled,
               onChanged: (v) => _update(_prefs.copyWith(quietHoursEnabled: v)),
               title: Text('Pause alerts', style: PortalTheme.cardTitle),
@@ -331,7 +338,10 @@ class _NotificationPreferencesScreenState
               height: 24,
               child: Padding(
                 padding: EdgeInsets.all(3),
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: PortalTheme.navy,
+                ),
               ),
             )
           : Icon(
@@ -351,11 +361,15 @@ class _NotificationPreferencesScreenState
     required bool locked,
     required ValueChanged<bool> onChanged,
   }) {
-    final accent = Color(NotificationModel.colorValueFor(type));
     return SwitchListTile.adaptive(
+      activeThumbColor: Colors.white,
+      activeTrackColor: PortalTheme.navy,
       value: value,
       onChanged: locked || _saving ? null : onChanged,
-      secondary: Icon(notificationIconFor(type), color: accent),
+      secondary: Icon(
+        notificationIconFor(type),
+        color: notificationColorFor(type),
+      ),
       title: Text(notificationTypeLabel(type), style: PortalTheme.cardTitle),
       subtitle: Text(
         locked

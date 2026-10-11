@@ -19,12 +19,16 @@ class ChedGtsTakeScreen extends StatefulWidget {
     super.key,
     required this.surveyId,
     required this.initialAnswers,
+    this.prefilledAnswers = const {},
     this.closeAt,
     this.aiHelpEnabled = true,
   });
 
   final String surveyId;
   final Map<String, dynamic> initialAnswers;
+
+  /// See [ChedGtsForm.prefilledAnswers].
+  final Map<String, dynamic> prefilledAnswers;
   final DateTime? closeAt;
 
   /// Shows "Help me answer" on Q19/Q20 (admin switch per survey).
@@ -34,6 +38,7 @@ class ChedGtsTakeScreen extends StatefulWidget {
     BuildContext context, {
     required String surveyId,
     required Map<String, dynamic> initialAnswers,
+    Map<String, dynamic> prefilledAnswers = const {},
     DateTime? closeAt,
     bool aiHelpEnabled = true,
   }) async {
@@ -43,6 +48,7 @@ class ChedGtsTakeScreen extends StatefulWidget {
             builder: (_) => ChedGtsTakeScreen(
               surveyId: surveyId,
               initialAnswers: initialAnswers,
+              prefilledAnswers: prefilledAnswers,
               closeAt: closeAt,
               aiHelpEnabled: aiHelpEnabled,
             ),
@@ -150,11 +156,10 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
             'You have unsaved answers. Save a draft so you can continue '
             'where you left off.',
         actions: [
-          FilledButton.icon(
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, _LeaveChoice.save),
             style: PortalTheme.primaryButton(),
-            icon: const Icon(Icons.save_outlined, size: 18),
-            label: const Text('Save draft'),
+            child: const Text('Save draft'),
           ),
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx, _LeaveChoice.discard),
@@ -181,6 +186,7 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
   Widget build(BuildContext context) {
     return ChedGtsWizard(
       answers: _answers,
+      prefilledAnswers: widget.prefilledAnswers,
       saving: _saving,
       helpSurveyId: widget.aiHelpEnabled ? widget.surveyId : null,
       onChanged: (a) => setState(() {

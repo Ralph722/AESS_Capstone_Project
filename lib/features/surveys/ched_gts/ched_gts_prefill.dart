@@ -7,6 +7,34 @@ import 'package:intl/intl.dart';
 
 /// Prefills built-in CHED GTS answers from live profile / employment.
 abstract final class ChedGtsPrefill {
+  /// Pre-filled profile items that often change between tracer rounds, so
+  /// alumni are prompted to re-check them: contact details, civil status,
+  /// province and type of residence, and whether they are employed. Region
+  /// of origin stays out: it is where the alumni is from.
+  static const Set<String> mayChangeIds = {
+    'ched_2',
+    'ched_3',
+    'ched_4',
+    'ched_5',
+    'ched_6',
+    'ched_10',
+    'ched_11',
+    'ched_16',
+  };
+
+  /// Whether [itemId] still shows its pre-filled profile value and is one
+  /// that may be out of date.
+  static bool showsProfileNote(
+    String itemId,
+    dynamic answer,
+    Map<String, dynamic> prefilled,
+  ) {
+    if (!mayChangeIds.contains(itemId)) return false;
+    final original = prefilled[itemId];
+    if (!_hasValue(original) || !_hasValue(answer)) return false;
+    return original.toString().trim() == answer.toString().trim();
+  }
+
   static Map<String, dynamic> fromProfile(
     TracerProfile profile, {
     EmploymentRecord? employment,
@@ -29,10 +57,7 @@ abstract final class ChedGtsPrefill {
     if (profile.birthDate != null) {
       put('ched_8', DateFormat('yyyy-MM-dd').format(profile.birthDate!));
     }
-    put(
-      'ched_9',
-      _match(profile.regionOfOrigin, GtsConstants.regionsOfOrigin),
-    );
+    put('ched_9', _match(profile.regionOfOrigin, GtsConstants.regionsOfOrigin));
     put('ched_10', profile.province);
     put(
       'ched_11',
@@ -133,8 +158,9 @@ abstract final class ChedGtsPrefill {
       if (firstFilled != null) {
         final uni = firstFilled['College or University']?.toString().trim();
         final year = firstFilled['Year Graduated']?.toString().trim();
-        final award =
-            firstFilled['Honor(s) or Award(s) Received']?.toString().trim();
+        final award = firstFilled['Honor(s) or Award(s) Received']
+            ?.toString()
+            .trim();
         if (uni != null && uni.isNotEmpty) college = uni;
         if (yearGraduated.trim().isEmpty && year != null && year.isNotEmpty) {
           yearGraduated = year;

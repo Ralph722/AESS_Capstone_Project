@@ -79,6 +79,34 @@ class GtsProfileFormState {
     employmentStatus = profile.employmentStatus;
     studentId = profile.studentId;
     yearLocked = profile.yearGraduated.trim().isNotEmpty;
+
+    _loaded = _snapshot();
+    // The college field falls back to a default, which is not "on record".
+    if (profile.collegeUniversity.isEmpty) _loaded.remove('collegeUniversity');
+  }
+
+  /// Required-field values as loaded from the saved record.
+  Map<String, String> _loaded = const {};
+
+  Map<String, String> _snapshot() => {
+    for (final e in completionPayload().entries)
+      e.key: e.value?.toString().trim() ?? '',
+  };
+
+  /// Whether [key] still holds the non-empty value loaded from the record.
+  bool isFromRecord(String key) {
+    final loaded = _loaded[key];
+    if (loaded == null || loaded.isEmpty) return false;
+    return _snapshot()[key] == loaded;
+  }
+
+  List<String> missingRequiredKeys() =>
+      TracerProfile.missingRequiredKeys(completionPayload());
+
+  /// Filled required fields in [section] (for "3 of 4" counters).
+  int filledInSection(GtsFormSection section) {
+    final missing = missingRequiredKeys().toSet();
+    return section.requiredKeys.where((k) => !missing.contains(k)).length;
   }
 
   TracerProfile toTracerProfile({required String uid, required String email}) {
@@ -132,6 +160,36 @@ class GtsProfileFormState {
   }
 }
 
+/// Field groups for rendering the GTS form one step at a time.
+enum GtsFormSection {
+  /// Name, sex, civil status, birthday.
+  personal(['displayName', 'gender', 'civilStatus', 'birthDate']),
+
+  /// Address, email, phone numbers, region, province, residence.
+  contact([
+    'address',
+    'email',
+    'telephoneNumber',
+    'mobileNumber',
+    'regionOfOrigin',
+    'province',
+    'locationOfResidence',
+  ]),
+
+  /// Degree, college, year graduated, honors (+ employment status).
+  education([
+    'program',
+    'collegeUniversity',
+    'yearGraduated',
+    'employmentStatus',
+  ]);
+
+  const GtsFormSection(this.requiredKeys);
+
+  /// Keys from [TracerProfile.requiredFieldKeys] collected in this section.
+  final List<String> requiredKeys;
+}
+
 /// GTS Section A + B item 12 form fields with exact CHED labels.
 class GtsProfileFormFields extends StatelessWidget {
   const GtsProfileFormFields({
@@ -140,17 +198,20 @@ class GtsProfileFormFields extends StatelessWidget {
     required this.onChanged,
     this.emailReadOnly = false,
     this.showEmploymentStatus = false,
-    this.showProgress = false,
     this.enabled = true,
     this.chedStyleLabels = true,
+    this.section,
   });
 
   final GtsProfileFormState state;
   final VoidCallback onChanged;
   final bool emailReadOnly;
   final bool showEmploymentStatus;
-  final bool showProgress;
   final bool enabled;
+
+  /// When set, renders only that group's fields as a flat column (no section
+  /// cards) so the caller can supply its own chrome.
+  final GtsFormSection? section;
 
   /// CHED paper-form headings ("A. General Information", "Item 12") and `*`
   /// on required labels. Off for the Profile screen's plainer look; required
@@ -167,127 +228,88 @@ class GtsProfileFormFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final payload = state.completionPayload(
-      includeEmployment: showEmploymentStatus,
-    );
-    final filled = showEmploymentStatus
-        ? TracerProfile.countFilledRequiredFields(payload)
-        : TracerProfile.countFilledProfileFields(payload);
-    final total = showEmploymentStatus
-        ? TracerProfile.fullProfileFieldCount
-        : TracerProfile.profileFieldCount;
+    final only = section;
+    if (only != null) {
+      // Single-section (step) mode: office-managed values are locked rows and
+      // every required field — including birthday and employment — validates
+      // inline so the step can block until it is complete.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: switch (only) {
+          GtsFormSection.personal => [
+            _nameField(),
+            _sexField(),
+            _civilStatusField(),
+            _requiredBirthdayField(context),
+          ],
+          GtsFormSection.contact => [
+            _addressField(),
+            if (emailReadOnly)
+              _lockedRow(
+                icon: Icons.email_outlined,
+                label: GtsConstants.labelEmail,
+                value: state.emailController.text.trim(),
+                caption: 'From your account',
+              )
+            else
+              _emailField(),
+            _telephoneField(),
+            _mobileField(),
+            _regionField(),
+            _provinceField(context),
+            _residenceField(),
+          ],
+          GtsFormSection.education => [
+            _lockedProgramRow(),
+            _collegeField(),
+            if (state.yearLocked)
+              _lockedRow(
+                icon: Icons.calendar_today_outlined,
+                label: GtsConstants.labelYearGraduated,
+                value: state.yearGraduatedController.text.trim(),
+                caption: 'Contact the alumni office to change this',
+              )
+            else
+              _yearGraduatedField(),
+            _honorsField(),
+            if (showEmploymentStatus) ...[
+              Padding(
+                padding: const EdgeInsets.only(
+                  top: OnboardingSpacing.xs,
+                  bottom: OnboardingSpacing.sm,
+                ),
+                child: Text(
+                  _req(GtsConstants.labelEmploymentStatus),
+                  style: PortalTheme.cardTitle,
+                ),
+              ),
+              _requiredEmploymentField(),
+            ],
+          ],
+        },
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showProgress)
-          OnboardingProfileProgress(filled: filled, total: total),
         OnboardingSectionGroup(
           title: chedStyleLabels
               ? 'A. General Information'
               : 'General information',
           icon: Icons.person_outline,
           children: [
-            _text(
-              controller: state.displayNameController,
-              label: _req(GtsConstants.labelName),
-              icon: Icons.person_outline,
-            ),
-            _text(
-              controller: state.addressController,
-              label: _req(GtsConstants.labelPermanentAddress),
-              icon: Icons.home_outlined,
-              maxLines: 2,
-            ),
-            _text(
-              controller: state.emailController,
-              label: _req(GtsConstants.labelEmail),
-              icon: Icons.email_outlined,
-              readOnly: emailReadOnly,
-              helperText: emailReadOnly ? 'From your account' : null,
-              keyboard: TextInputType.emailAddress,
-            ),
-            _text(
-              controller: state.telephoneController,
-              label: _req(GtsConstants.labelTelephone),
-              icon: Icons.phone_outlined,
-              keyboard: TextInputType.phone,
-            ),
-            _text(
-              controller: state.mobileController,
-              label: _req(GtsConstants.labelMobile),
-              icon: Icons.smartphone_outlined,
-              keyboard: TextInputType.phone,
-            ),
-            _dropdown(
-              label: _req(GtsConstants.labelCivilStatus),
-              value: state.civilStatus,
-              items: GtsConstants.civilStatuses,
-              icon: Icons.favorite_outline,
-              onChanged: (v) {
-                state.civilStatus = v ?? '';
-                onChanged();
-              },
-            ),
-            _dropdown(
-              label: _req(GtsConstants.labelSex),
-              value: state.gender,
-              items: GtsConstants.sexOptions,
-              icon: Icons.wc_outlined,
-              onChanged: (v) {
-                state.gender = v ?? '';
-                onChanged();
-              },
-            ),
-            OnboardingDateTile(
-              label: _req(GtsConstants.labelBirthday),
-              valueText: state.birthDate != null
-                  ? DateFormat.yMMMd().format(state.birthDate!)
-                  : 'Tap to choose date',
-              hasValue: state.birthDate != null,
-              enabled: enabled,
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: state.birthDate ?? DateTime(2000),
-                  firstDate: DateTime(1950),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null) {
-                  state.birthDate = picked;
-                  onChanged();
-                }
-              },
-            ),
-            _dropdown(
-              label: _req(GtsConstants.labelRegionOfOrigin),
-              value: state.regionOfOrigin,
-              items: PhilippineLocationConstants.regions,
-              icon: Icons.map_outlined,
-              onChanged: (v) {
-                final region = v ?? '';
-                state.regionOfOrigin = region;
-                final allowed = PhilippineLocationConstants.provincesForRegion(
-                  region,
-                );
-                if (state.provinceController.text.isNotEmpty &&
-                    !allowed.contains(state.provinceController.text)) {
-                  state.provinceController.clear();
-                }
-                onChanged();
-              },
-            ),
+            _nameField(),
+            _addressField(),
+            _emailField(),
+            _telephoneField(),
+            _mobileField(),
+            _civilStatusField(),
+            _sexField(),
+            _birthdayField(context),
+            _regionField(),
             _provinceField(context),
-            _dropdown(
-              label: _req(GtsConstants.labelLocationOfResidence),
-              value: state.locationOfResidence,
-              items: GtsConstants.locationOfResidenceOptions,
-              icon: Icons.location_city_outlined,
-              onChanged: (v) {
-                state.locationOfResidence = v ?? '';
-                onChanged();
-              },
-            ),
+            _residenceField(),
           ],
         ),
         OnboardingSectionGroup(
@@ -296,67 +318,347 @@ class GtsProfileFormFields extends StatelessWidget {
               : 'Educational background',
           icon: Icons.school_outlined,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                bottom: OnboardingSpacing.fieldGap,
-              ),
-              child: TextFormField(
-                key: ValueKey<String>('program|${state.program}'),
-                initialValue: state.program,
-                readOnly: true,
-                enabled: enabled,
-                style: _fieldStyle,
-                decoration: onboardingFieldDecoration(
-                  label: GtsConstants.labelDegreeSpecialization,
-                  hint: 'Not set yet',
-                  icon: Icons.menu_book_outlined,
-                  readOnly: true,
-                  helperText: 'Set by the alumni office',
-                ),
-              ),
-            ),
-            _text(
-              controller: state.collegeController,
-              label: _req(GtsConstants.labelCollegeUniversity),
-              icon: Icons.school_outlined,
-              minLines: 1,
-              maxLines: 4,
-            ),
-            _text(
-              controller: state.yearGraduatedController,
-              label: _req(GtsConstants.labelYearGraduated),
-              icon: Icons.calendar_today_outlined,
-              hint: 'e.g. 2024',
-              keyboard: TextInputType.number,
-              readOnly: state.yearLocked,
-              helperText: state.yearLocked
-                  ? 'Contact the alumni office to change this'
-                  : null,
-            ),
-            _text(
-              controller: state.honorsController,
-              label: GtsConstants.labelHonorsAwards,
-              icon: Icons.emoji_events_outlined,
-              required: false,
-            ),
+            _programField(),
+            _collegeField(),
+            _yearGraduatedField(),
+            _honorsField(),
           ],
         ),
         if (showEmploymentStatus)
           OnboardingSectionGroup(
             title: _req(GtsConstants.labelEmploymentStatus),
             icon: Icons.work_outline,
-            children: [
-              OnboardingGtsEmploymentStatus(
-                value: state.employmentStatus,
-                enabled: enabled,
-                onChanged: (v) {
-                  state.employmentStatus = v;
-                  onChanged();
-                },
-              ),
-            ],
+            children: [_employmentField()],
           ),
       ],
+    );
+  }
+
+  /// Step mode only: reassures that an untouched value came from the record.
+  String? _recordHint(String key) => section != null && state.isFromRecord(key)
+      ? 'From your alumni record'
+      : null;
+
+  Widget _nameField() => _text(
+    controller: state.displayNameController,
+    label: _req(GtsConstants.labelName),
+    icon: Icons.person_outline,
+    helperText: _recordHint('displayName'),
+  );
+
+  Widget _addressField() => _text(
+    controller: state.addressController,
+    label: _req(GtsConstants.labelPermanentAddress),
+    icon: Icons.home_outlined,
+    maxLines: 2,
+    helperText: _recordHint('address'),
+  );
+
+  Widget _emailField() => _text(
+    controller: state.emailController,
+    label: _req(GtsConstants.labelEmail),
+    icon: Icons.email_outlined,
+    readOnly: emailReadOnly,
+    helperText: emailReadOnly ? 'From your account' : null,
+    keyboard: TextInputType.emailAddress,
+  );
+
+  Widget _telephoneField() => _text(
+    controller: state.telephoneController,
+    label: _req(GtsConstants.labelTelephone),
+    icon: Icons.phone_outlined,
+    keyboard: TextInputType.phone,
+    helperText: _recordHint('telephoneNumber'),
+  );
+
+  Widget _mobileField() => _text(
+    controller: state.mobileController,
+    label: _req(GtsConstants.labelMobile),
+    icon: Icons.smartphone_outlined,
+    keyboard: TextInputType.phone,
+    helperText: _recordHint('mobileNumber'),
+  );
+
+  Widget _civilStatusField() => _dropdown(
+    label: _req(GtsConstants.labelCivilStatus),
+    value: state.civilStatus,
+    items: GtsConstants.civilStatuses,
+    icon: Icons.favorite_outline,
+    helperText: _recordHint('civilStatus'),
+    onChanged: (v) {
+      state.civilStatus = v ?? '';
+      onChanged();
+    },
+  );
+
+  Widget _sexField() => _dropdown(
+    label: _req(GtsConstants.labelSex),
+    value: state.gender,
+    items: GtsConstants.sexOptions,
+    icon: Icons.wc_outlined,
+    helperText: _recordHint('gender'),
+    onChanged: (v) {
+      state.gender = v ?? '';
+      onChanged();
+    },
+  );
+
+  Widget _birthdayField(BuildContext context) => OnboardingDateTile(
+    label: _req(GtsConstants.labelBirthday),
+    valueText: state.birthDate != null
+        ? DateFormat.yMMMd().format(state.birthDate!)
+        : 'Tap to choose date',
+    hasValue: state.birthDate != null,
+    enabled: enabled,
+    onTap: () async {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: state.birthDate ?? DateTime(2000),
+        firstDate: DateTime(1950),
+        lastDate: DateTime.now(),
+      );
+      if (picked != null) {
+        state.birthDate = picked;
+        onChanged();
+      }
+    },
+  );
+
+  Widget _regionField() => _dropdown(
+    label: _req(GtsConstants.labelRegionOfOrigin),
+    value: state.regionOfOrigin,
+    items: PhilippineLocationConstants.regions,
+    icon: Icons.map_outlined,
+    helperText: _recordHint('regionOfOrigin'),
+    onChanged: (v) {
+      final region = v ?? '';
+      state.regionOfOrigin = region;
+      final allowed = PhilippineLocationConstants.provincesForRegion(region);
+      if (state.provinceController.text.isNotEmpty &&
+          !allowed.contains(state.provinceController.text)) {
+        state.provinceController.clear();
+      }
+      onChanged();
+    },
+  );
+
+  Widget _residenceField() => _dropdown(
+    label: _req(GtsConstants.labelLocationOfResidence),
+    value: state.locationOfResidence,
+    items: GtsConstants.locationOfResidenceOptions,
+    icon: Icons.location_city_outlined,
+    helperText: _recordHint('locationOfResidence'),
+    onChanged: (v) {
+      state.locationOfResidence = v ?? '';
+      onChanged();
+    },
+  );
+
+  Widget _programField() => Padding(
+    padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
+    child: TextFormField(
+      key: ValueKey<String>('program|${state.program}'),
+      initialValue: state.program,
+      readOnly: true,
+      enabled: enabled,
+      style: _fieldStyle,
+      decoration: onboardingFieldDecoration(
+        label: GtsConstants.labelDegreeSpecialization,
+        hint: 'Not set yet',
+        icon: Icons.menu_book_outlined,
+        readOnly: true,
+        helperText: 'Set by the alumni office',
+      ),
+    ),
+  );
+
+  Widget _collegeField() => _text(
+    controller: state.collegeController,
+    label: _req(GtsConstants.labelCollegeUniversity),
+    icon: Icons.school_outlined,
+    minLines: 1,
+    maxLines: 4,
+    helperText: _recordHint('collegeUniversity'),
+  );
+
+  Widget _yearGraduatedField() => _text(
+    controller: state.yearGraduatedController,
+    label: _req(GtsConstants.labelYearGraduated),
+    icon: Icons.calendar_today_outlined,
+    hint: 'e.g. 2024',
+    keyboard: TextInputType.number,
+    readOnly: state.yearLocked,
+    helperText: state.yearLocked
+        ? 'Contact the alumni office to change this'
+        : null,
+  );
+
+  Widget _honorsField() => _text(
+    controller: state.honorsController,
+    label: GtsConstants.labelHonorsAwards,
+    icon: Icons.emoji_events_outlined,
+    required: false,
+  );
+
+  Widget _employmentField() => OnboardingGtsEmploymentStatus(
+    value: state.employmentStatus,
+    enabled: enabled,
+    onChanged: (v) {
+      state.employmentStatus = v;
+      onChanged();
+    },
+  );
+
+  Widget _requiredBirthdayField(BuildContext context) {
+    return FormField<DateTime>(
+      initialValue: state.birthDate,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      validator: (_) => state.birthDate == null ? 'Required' : null,
+      builder: (field) => OnboardingDateTile(
+        label: _req(GtsConstants.labelBirthday),
+        valueText: state.birthDate != null
+            ? DateFormat.yMMMd().format(state.birthDate!)
+            : 'Tap to choose date',
+        hasValue: state.birthDate != null,
+        enabled: enabled,
+        errorText: field.errorText,
+        onTap: () async {
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: state.birthDate ?? DateTime(2000),
+            firstDate: DateTime(1950),
+            lastDate: DateTime.now(),
+          );
+          if (picked != null) {
+            state.birthDate = picked;
+            field.didChange(picked);
+            onChanged();
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _requiredEmploymentField() {
+    return FormField<String>(
+      initialValue: state.employmentStatus,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      validator: (_) =>
+          state.employmentStatus.trim().isEmpty ? 'Choose one' : null,
+      builder: (field) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OnboardingGtsEmploymentStatus(
+            value: state.employmentStatus,
+            enabled: enabled,
+            onChanged: (v) {
+              state.employmentStatus = v;
+              field.didChange(v);
+              onChanged();
+            },
+          ),
+          if (field.hasError) _fieldError(field.errorText!),
+        ],
+      ),
+    );
+  }
+
+  /// Degree is set by the alumni office; an empty one blocks the step with
+  /// an explanation instead of an unfixable "Required".
+  Widget _lockedProgramRow() {
+    final program = state.program.trim();
+    return FormField<String>(
+      initialValue: program,
+      validator: (_) => state.program.trim().isEmpty
+          ? 'Your degree hasn’t been added yet. Contact the alumni office '
+                'to continue.'
+          : null,
+      builder: (field) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _lockedRow(
+            icon: Icons.menu_book_outlined,
+            label: GtsConstants.labelDegreeSpecialization,
+            value: program.isEmpty ? 'Not set yet' : program,
+            caption: 'Set by the alumni office',
+            padBottom: !field.hasError,
+          ),
+          if (field.hasError) _fieldError(field.errorText!),
+        ],
+      ),
+    );
+  }
+
+  Widget _fieldError(String message) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        14,
+        OnboardingSpacing.xs,
+        14,
+        OnboardingSpacing.fieldGap,
+      ),
+      child: Text(
+        message,
+        style: PortalTheme.meta.copyWith(color: PortalTheme.danger),
+      ),
+    );
+  }
+
+  /// Read-only value shown as a summary row rather than a disabled input.
+  Widget _lockedRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required String caption,
+    bool padBottom = true,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: padBottom ? OnboardingSpacing.fieldGap : 0,
+      ),
+      child: Semantics(
+        label: '$label: $value. $caption',
+        child: ExcludeSemantics(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: PortalTheme.surfaceMuted,
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+              border: Border.all(color: PortalTheme.border),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: PortalTheme.navy),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: PortalTheme.meta),
+                      const SizedBox(height: 2),
+                      Text(
+                        value,
+                        style: PortalTheme.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: PortalTheme.navy,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(caption, style: PortalTheme.caption),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 18,
+                  color: PortalTheme.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -470,6 +772,7 @@ class GtsProfileFormFields extends StatelessWidget {
     required ValueChanged<String?> onChanged,
     IconData icon = Icons.list_alt_outlined,
     bool required = true,
+    String? helperText,
   }) {
     final selected = value != null && value.isNotEmpty && items.contains(value)
         ? value
@@ -483,7 +786,11 @@ class GtsProfileFormFields extends StatelessWidget {
         isExpanded: true,
         borderRadius: PortalMenu.dropdownRadius,
         dropdownColor: PortalTheme.card,
-        decoration: onboardingFieldDecoration(label: label, icon: icon),
+        decoration: onboardingFieldDecoration(
+          label: label,
+          icon: icon,
+          helperText: helperText,
+        ),
         hint: const Text(
           'Select',
           style: TextStyle(
@@ -536,55 +843,59 @@ class OnboardingGtsEmploymentStatus extends StatelessWidget {
           final narrow = constraints.maxWidth < 420;
           final children = GtsConstants.employmentStatuses.map((status) {
             final selected = value == status;
-            final card = Material(
-              color: selected
-                  ? OnboardingTheme.navy.withValues(alpha: 0.08)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
-                onTap: enabled ? () => onChanged(status) : null,
-                borderRadius: BorderRadius.circular(14),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: narrow ? double.infinity : null,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 14,
-                    horizontal: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: selected
-                          ? OnboardingTheme.navy
-                          : OnboardingTheme.border,
-                      width: selected ? 2 : 1,
+            final radius = BorderRadius.circular(PortalTheme.radiusMd);
+            final card = Semantics(
+              button: true,
+              selected: selected,
+              child: Material(
+                color: selected
+                    ? PortalTheme.navy.withValues(alpha: 0.06)
+                    : PortalTheme.card,
+                borderRadius: radius,
+                child: InkWell(
+                  onTap: enabled ? () => onChanged(status) : null,
+                  borderRadius: radius,
+                  child: AnimatedContainer(
+                    duration: PortalTheme.fast,
+                    width: narrow ? double.infinity : null,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                      horizontal: 10,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        selected ? Icons.check_circle : _iconFor(status),
-                        size: 18,
-                        color: selected
-                            ? OnboardingTheme.navy
-                            : OnboardingTheme.muted,
+                    decoration: BoxDecoration(
+                      borderRadius: radius,
+                      border: Border.all(
+                        color: selected ? PortalTheme.navy : PortalTheme.border,
+                        width: selected ? 2 : 1,
                       ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          status,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: selected
-                                ? OnboardingTheme.navy
-                                : OnboardingTheme.muted,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.check_circle_rounded
+                              : _iconFor(status),
+                          size: 18,
+                          color: selected
+                              ? PortalTheme.navy
+                              : PortalTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            status,
+                            textAlign: TextAlign.center,
+                            style: PortalTheme.button.copyWith(
+                              fontSize: 13,
+                              color: selected
+                                  ? PortalTheme.navy
+                                  : PortalTheme.textSecondary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -8,6 +8,8 @@ import 'package:alumni_system/features/onboarding/presentation/alumni_home_gate.
 import 'package:alumni_system/features/auth/data/alumni_eligibility_service.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
+import 'package:alumni_system/features/auth/data/email_code_policy.dart';
+import 'package:alumni_system/features/auth/data/password_policy.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -34,6 +36,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _otpSent = false;
   bool _eligibilityVerified = false;
   String? _eligibilityErrorMessage;
+  String? _eligibilityErrorCode;
   String? _rosterMemberId;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -45,7 +48,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       AlumniEligibilityService();
   final AuditService _auditService = AuditService();
 
-  bool get _identityLocked => _eligibilityVerified || _otpSent;
+  /// 0 = verify alumni record, 1 = account details, 2 = email code.
+  int get _step => _otpSent
+      ? 2
+      : _eligibilityVerified
+      ? 1
+      : 0;
 
   void _clearEligibilityError() {
     if (_eligibilityErrorMessage != null) {
@@ -68,8 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthShell(
-      eyebrow: 'Register',
-      backLabel: 'Back to login',
+      showBackButton: false,
       title: 'Create your account',
       subtitle: 'Registration is verified against the official alumni roster.',
       form: AutofillGroup(
@@ -78,213 +85,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_eligibilityErrorMessage != null && !_eligibilityVerified)
-                _StatusBanner(
-                  tone: _StatusTone.error,
-                  title: 'Cannot register',
-                  message: _eligibilityErrorMessage!,
+              _RegisterStepper(current: _step),
+              const SizedBox(height: PortalTheme.space4),
+              // Only the current step's fields are built, so validation
+              // never trips over a field the graduate cannot see yet.
+              AnimatedSwitcher(
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : PortalTheme.normal,
+                switchInCurve: PortalTheme.ease,
+                switchOutCurve: PortalTheme.ease,
+                layoutBuilder: (current, previous) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: [...previous, if (current != null) current],
                 ),
-              if (_eligibilityVerified)
-                const _StatusBanner(
-                  tone: _StatusTone.success,
-                  title: null,
-                  message: 'Verified on official alumni roster',
-                ),
-              Text(
-                'Alumni record',
-                style: PortalTheme.caption.copyWith(
-                  color: PortalTheme.navy,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: PortalTheme.space2),
-              TextFormField(
-                controller: _fullNameController,
-                enabled: !_identityLocked,
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => _clearEligibilityError(),
-                decoration: authFieldDecoration(
-                  label: 'Full name',
-                  icon: Icons.person_outline,
-                  enabled: !_identityLocked,
-                ),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Enter your full name'
-                    : null,
-              ),
-              const SizedBox(height: PortalTheme.space3),
-              _buildCourseDropdown(),
-              const SizedBox(height: PortalTheme.space3),
-              TextFormField(
-                controller: _studentIdController,
-                enabled: !_identityLocked,
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => _clearEligibilityError(),
-                decoration: authFieldDecoration(
-                  label: 'ID number',
-                  icon: Icons.badge_outlined,
-                  enabled: !_identityLocked,
-                ),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Enter your school ID number'
-                    : null,
-              ),
-              const SizedBox(height: PortalTheme.space5),
-              Text(
-                'Account details',
-                style: PortalTheme.caption.copyWith(
-                  color: PortalTheme.navy,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: PortalTheme.space2),
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.email],
-                enabled: !_otpSent,
-                decoration: authFieldDecoration(
-                  label: 'Gmail address',
-                  icon: Icons.email_outlined,
-                  enabled: !_otpSent,
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Enter your Gmail address';
-                  }
-                  if (!v.contains('@')) {
-                    return 'Enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: PortalTheme.space3),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.newPassword],
-                enabled: _eligibilityVerified && !_otpSent,
-                decoration: authFieldDecoration(
-                  label: 'Password',
-                  icon: Icons.lock_outline,
-                  enabled: _eligibilityVerified && !_otpSent,
-                  helperText: 'At least 8 characters, with letters and numbers',
-                  suffixIcon: _visibilityToggle(
-                    obscured: _obscurePassword,
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                ),
-                validator: (v) {
-                  if (!_eligibilityVerified) return null;
-                  if (v == null || v.length < 8) {
-                    return 'At least 8 characters';
-                  }
-                  if (!RegExp(r'[A-Za-z]').hasMatch(v) ||
-                      !RegExp(r'[0-9]').hasMatch(v)) {
-                    return 'Use both letters and numbers';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: PortalTheme.space3),
-              TextFormField(
-                controller: _confirmPasswordController,
-                obscureText: _obscureConfirmPassword,
-                textInputAction: TextInputAction.done,
-                autofillHints: const [AutofillHints.newPassword],
-                enabled: _eligibilityVerified && !_otpSent,
-                onFieldSubmitted: (_) {
-                  if (!_isLoading) _handlePrimaryAction();
-                },
-                decoration: authFieldDecoration(
-                  label: 'Confirm password',
-                  icon: Icons.lock_outline,
-                  enabled: _eligibilityVerified && !_otpSent,
-                  suffixIcon: _visibilityToggle(
-                    obscured: _obscureConfirmPassword,
-                    onPressed: () => setState(
-                      () => _obscureConfirmPassword = !_obscureConfirmPassword,
-                    ),
-                  ),
-                ),
-                validator: (v) {
-                  if (!_eligibilityVerified) return null;
-                  if (v == null || v.isEmpty) {
-                    return 'Confirm your password';
-                  }
-                  if (v != _passwordController.text) {
-                    return 'Passwords do not match';
-                  }
-                  return null;
-                },
-              ),
-              if (_otpSent) ...[
-                const SizedBox(height: PortalTheme.space5),
-                Text(
-                  'Email verification',
-                  style: PortalTheme.caption.copyWith(
-                    color: PortalTheme.navy,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: PortalTheme.space2),
-                TextFormField(
-                  controller: _otpController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  textAlign: TextAlign.center,
-                  autofocus: true,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    letterSpacing: 6,
-                    color: PortalTheme.textPrimary,
-                  ),
-                  decoration: authFieldDecoration(
-                    label: '6-digit code sent to your Gmail',
-                    icon: Icons.verified_user_outlined,
-                  ),
-                  validator: (v) {
-                    if (v == null || !RegExp(r'^\d{6}$').hasMatch(v.trim())) {
-                      return 'Enter the 6-digit code';
-                    }
-                    return null;
+                child: KeyedSubtree(
+                  key: ValueKey(_step),
+                  child: switch (_step) {
+                    0 => _buildRecordStep(),
+                    1 => _buildAccountStep(),
+                    _ => _buildCodeStep(),
                   },
                 ),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: _isLoading || _resendSeconds > 0
-                          ? null
-                          : _resendCode,
-                      style: PortalTheme.ghostButton(dense: true),
-                      child: Text(
-                        _resendSeconds > 0
-                            ? 'Resend code in ${_resendSeconds}s'
-                            : 'Resend code',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _isLoading ? null : _useDifferentEmail,
-                      style: PortalTheme.ghostButton(dense: true),
-                      child: const Text('Use a different email'),
-                    ),
-                  ],
-                ),
-              ],
+              ),
               const SizedBox(height: PortalTheme.space4),
-              Text(_stepCaption, style: PortalTheme.meta),
-              const SizedBox(height: PortalTheme.space1),
               AuthSubmitButton(
                 label: _submitLabel,
                 loading: _isLoading,
@@ -340,13 +164,221 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  String get _stepCaption {
-    if (_otpSent) {
-      return 'Step 3 of 3 · Email verification';
-    } else if (_eligibilityVerified) {
-      return 'Step 2 of 3 · Account details';
-    }
-    return 'Step 1 of 3 · Verify alumni status';
+  /// Step 1: only what the roster check uses.
+  Widget _buildRecordStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_eligibilityErrorMessage != null)
+          _ErrorBanner(
+            title: _eligibilityErrorStyle.$1,
+            message: _eligibilityErrorMessage!,
+          ),
+        const _SectionLabel('Alumni record'),
+        Text(
+          'Enter your details exactly as they appear in your school records.',
+          style: PortalTheme.meta,
+        ),
+        const SizedBox(height: PortalTheme.space3),
+        TextFormField(
+          controller: _fullNameController,
+          textInputAction: TextInputAction.next,
+          textCapitalization: TextCapitalization.words,
+          autofillHints: const [AutofillHints.name],
+          onChanged: (_) => _clearEligibilityError(),
+          decoration: authFieldDecoration(
+            label: 'Full name',
+            icon: Icons.person_outline,
+          ),
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'Enter your full name' : null,
+        ),
+        const SizedBox(height: PortalTheme.space3),
+        _buildCourseDropdown(),
+        const SizedBox(height: PortalTheme.space3),
+        TextFormField(
+          controller: _studentIdController,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) => _clearEligibilityError(),
+          onFieldSubmitted: (_) {
+            if (!_isLoading) _handlePrimaryAction();
+          },
+          decoration: authFieldDecoration(
+            label: 'ID number',
+            icon: Icons.badge_outlined,
+          ),
+          validator: (v) => v == null || v.trim().isEmpty
+              ? 'Enter your school ID number'
+              : null,
+        ),
+      ],
+    );
+  }
+
+  /// Step 2: sign-in details for the verified graduate.
+  Widget _buildAccountStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _VerifiedRecordCard(
+          name: _fullNameController.text.trim(),
+          course: _selectedCourse,
+          studentId: _studentIdController.text.trim(),
+          onChange: _isLoading ? null : _changeRecord,
+        ),
+        const SizedBox(height: PortalTheme.space4),
+        const _SectionLabel('Account details'),
+        Text(
+          'You’ll use these to sign in. We’ll email a code to confirm your '
+          'Gmail.',
+          style: PortalTheme.meta,
+        ),
+        const SizedBox(height: PortalTheme.space3),
+        TextFormField(
+          controller: _emailController,
+          autofocus: _emailController.text.isEmpty,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
+          decoration: authFieldDecoration(
+            label: 'Gmail address',
+            icon: Icons.email_outlined,
+          ),
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) {
+              return 'Enter your Gmail address';
+            }
+            if (!v.contains('@')) {
+              return 'Enter a valid email';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: PortalTheme.space3),
+        TextFormField(
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.newPassword],
+          decoration: authFieldDecoration(
+            label: 'Password',
+            icon: Icons.lock_outline,
+            helperText: PasswordPolicy.requirementText,
+            suffixIcon: _visibilityToggle(
+              obscured: _obscurePassword,
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+            ),
+          ),
+          validator: PasswordPolicy.validate,
+        ),
+        const SizedBox(height: PortalTheme.space3),
+        TextFormField(
+          controller: _confirmPasswordController,
+          obscureText: _obscureConfirmPassword,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.newPassword],
+          onFieldSubmitted: (_) {
+            if (!_isLoading) _handlePrimaryAction();
+          },
+          decoration: authFieldDecoration(
+            label: 'Confirm password',
+            icon: Icons.lock_outline,
+            suffixIcon: _visibilityToggle(
+              obscured: _obscureConfirmPassword,
+              onPressed: () => setState(
+                () => _obscureConfirmPassword = !_obscureConfirmPassword,
+              ),
+            ),
+          ),
+          validator: (v) {
+            if (v == null || v.isEmpty) {
+              return 'Confirm your password';
+            }
+            if (v != _passwordController.text) {
+              return 'Passwords do not match';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Step 3: confirm the Gmail with the emailed code.
+  Widget _buildCodeStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _VerifiedRecordCard(
+          name: _fullNameController.text.trim(),
+          course: _selectedCourse,
+          studentId: _studentIdController.text.trim(),
+          onChange: null,
+        ),
+        const SizedBox(height: PortalTheme.space4),
+        const _SectionLabel('Email verification'),
+        Text.rich(
+          TextSpan(
+            text: 'We sent a verification code to ',
+            children: [
+              TextSpan(
+                text: _emailController.text.trim(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: PortalTheme.textPrimary,
+                ),
+              ),
+              const TextSpan(text: '. It can take a minute to arrive.'),
+            ],
+          ),
+          style: PortalTheme.meta,
+        ),
+        const SizedBox(height: PortalTheme.space3),
+        TextFormField(
+          controller: _otpController,
+          keyboardType: TextInputType.number,
+          inputFormatters: EmailCodePolicy.inputFormatters,
+          textAlign: TextAlign.center,
+          autofocus: true,
+          autofillHints: const [AutofillHints.oneTimeCode],
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) {
+            if (!_isLoading) _handlePrimaryAction();
+          },
+          style: const TextStyle(
+            fontSize: 20,
+            letterSpacing: 6,
+            color: PortalTheme.textPrimary,
+          ),
+          decoration: authFieldDecoration(
+            label: 'Verification code',
+            icon: Icons.verified_user_outlined,
+          ),
+          validator: EmailCodePolicy.validate,
+        ),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            TextButton(
+              onPressed: _isLoading || _resendSeconds > 0 ? null : _resendCode,
+              style: PortalTheme.ghostButton(dense: true),
+              child: Text(
+                _resendSeconds > 0
+                    ? 'Resend code in ${_resendSeconds}s'
+                    : 'Resend code',
+              ),
+            ),
+            TextButton(
+              onPressed: _isLoading ? null : _useDifferentEmail,
+              style: PortalTheme.ghostButton(dense: true),
+              child: const Text('Use a different email'),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   Widget _buildCourseDropdown() {
@@ -355,28 +387,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
       borderRadius: PortalMenu.dropdownRadius,
       dropdownColor: PortalTheme.card,
       style: const TextStyle(fontSize: 14, color: PortalTheme.textPrimary),
-      icon: Icon(
+      icon: const Icon(
         Icons.keyboard_arrow_down_rounded,
-        color: _identityLocked ? PortalTheme.textMuted : PortalTheme.navy,
+        color: PortalTheme.navy,
       ),
       decoration: authFieldDecoration(
         label: 'Course',
         icon: Icons.school_outlined,
-        enabled: !_identityLocked,
       ),
       items: CourseConstants.courses
           .map((c) => DropdownMenuItem(value: c, child: Text(c)))
           .toList(),
-      onChanged: _identityLocked
-          ? null
-          : (v) {
-              if (v != null) {
-                setState(() => _selectedCourse = v);
-                _clearEligibilityError();
-              }
-            },
+      onChanged: (v) {
+        if (v != null) {
+          setState(() => _selectedCourse = v);
+          _clearEligibilityError();
+        }
+      },
       validator: (v) => v == null ? 'Select your course' : null,
     );
+  }
+
+  /// Returns to step 1 so a wrong course or ID can be corrected.
+  void _changeRecord() {
+    setState(() {
+      _eligibilityVerified = false;
+      _rosterMemberId = null;
+      _eligibilityErrorMessage = null;
+    });
   }
 
   Future<void> _handlePrimaryAction() async {
@@ -416,13 +454,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!result.eligible || result.memberId == null) {
         final message =
             result.message ??
-            'You are not listed as an official alumni member. '
-                'Please contact the alumni office.';
+            'We couldn’t find a matching alumni record. Please contact the '
+                'alumni office.';
         if (!mounted) return;
         setState(() {
           _eligibilityVerified = false;
           _rosterMemberId = null;
           _eligibilityErrorMessage = message;
+          _eligibilityErrorCode = result.code;
           _isLoading = false;
         });
         _showEligibilityError(message);
@@ -443,7 +482,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       showAuthFeedback(
         context,
-        'Alumni status verified. Set your password and continue.',
+        'Alumni status verified. Now set up your account.',
         error: false,
       );
     } catch (e) {
@@ -452,34 +491,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _eligibilityVerified = false;
         _eligibilityErrorMessage = message;
+        _eligibilityErrorCode = 'unavailable';
         _isLoading = false;
       });
       _showEligibilityError(message);
     }
   }
 
+  /// Title and icon for a failed roster check, from the server's code.
+  (String, IconData) get _eligibilityErrorStyle =>
+      switch (_eligibilityErrorCode) {
+        'already_exists' => (
+          'Account already exists',
+          Icons.manage_accounts_outlined,
+        ),
+        'failed_precondition' => (
+          'Alumni record deactivated',
+          Icons.person_off_outlined,
+        ),
+        'not_found' => ('No matching alumni record', Icons.search_off_rounded),
+        'unavailable' => (
+          'Couldn’t check the roster',
+          Icons.cloud_off_outlined,
+        ),
+        _ => ('Check your details', Icons.error_outline),
+      };
+
   void _showEligibilityError(String message) {
     if (!mounted) return;
+    final (title, icon) = _eligibilityErrorStyle;
+    final alreadyRegistered = _eligibilityErrorCode == 'already_exists';
 
     showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.person_off_outlined,
-          color: PortalTheme.danger,
-          size: 36,
-        ),
-        title: const Text('Not an official alumni member'),
+        icon: Icon(icon, color: PortalTheme.danger, size: 36),
+        title: Text(title),
         content: SingleChildScrollView(
           child: Text(message, style: const TextStyle(height: 1.4)),
         ),
         actions: [
-          FilledButton(
-            style: PortalTheme.primaryButton(dense: true),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
+          if (alreadyRegistered) ...[
+            TextButton(
+              style: PortalTheme.ghostButton(dense: true),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+            FilledButton(
+              style: PortalTheme.primaryButton(dense: true),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.maybePop(context);
+              },
+              child: const Text('Go to login'),
+            ),
+          ] else
+            FilledButton(
+              style: PortalTheme.primaryButton(dense: true),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
         ],
       ),
     );
@@ -502,7 +574,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _startResendCooldown();
       showAuthFeedback(
         context,
-        'We emailed a 6-digit code to your Gmail.',
+        'We emailed a verification code to your Gmail.',
         error: false,
       );
     } catch (e) {
@@ -517,7 +589,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await _authService.verifyRegistrationCode(
         email: _emailController.text,
-        code: _otpController.text,
+        code: EmailCodePolicy.normalize(_otpController.text),
         password: _passwordController.text,
       );
     } catch (e) {
@@ -637,40 +709,185 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-enum _StatusTone { error, success }
+/// Three-segment progress for Verify → Account → Email code.
+class _RegisterStepper extends StatelessWidget {
+  const _RegisterStepper({required this.current});
 
-/// Inline roster-status feedback shown at the top of the form.
-class _StatusBanner extends StatelessWidget {
-  const _StatusBanner({
-    required this.tone,
-    required this.message,
-    required this.title,
+  final int current;
+
+  static const _labels = ['Verify', 'Account', 'Email code'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Step ${current + 1} of ${_labels.length}: ${_labels[current]}',
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          for (var i = 0; i < _labels.length; i++) ...[
+            if (i > 0) const SizedBox(width: PortalTheme.space1),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AnimatedContainer(
+                    duration: PortalTheme.normal,
+                    curve: PortalTheme.ease,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: i < current
+                          ? PortalTheme.success
+                          : i == current
+                          ? PortalTheme.navy
+                          : PortalTheme.border,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    i < current ? '✓ ${_labels[i]}' : _labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: PortalTheme.caption.copyWith(
+                      fontWeight: i == current
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: i == current
+                          ? PortalTheme.navy
+                          : i < current
+                          ? PortalTheme.success
+                          : PortalTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PortalTheme.space1),
+      child: Text(
+        text,
+        style: PortalTheme.caption.copyWith(
+          color: PortalTheme.navy,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+/// Collapsed alumni record shown once the roster check passes.
+class _VerifiedRecordCard extends StatelessWidget {
+  const _VerifiedRecordCard({
+    required this.name,
+    required this.course,
+    required this.studentId,
+    required this.onChange,
   });
 
-  final _StatusTone tone;
+  final String name;
+  final String course;
+  final String studentId;
+
+  /// Null hides the Change link (after the code has been sent).
+  final VoidCallback? onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+      decoration: BoxDecoration(
+        color: PortalTheme.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        border: Border.all(color: PortalTheme.success.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.verified_outlined,
+            color: PortalTheme.success,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Verified on official alumni roster',
+                  style: PortalTheme.caption.copyWith(
+                    color: PortalTheme.success,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PortalTheme.body.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  '$course · ID $studentId',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PortalTheme.meta,
+                ),
+              ],
+            ),
+          ),
+          if (onChange != null)
+            TextButton(
+              onPressed: onChange,
+              style: PortalTheme.ghostButton(dense: true),
+              child: const Text(
+                'Change',
+                semanticsLabel: 'Change alumni record',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Inline roster-check failure shown above the record fields.
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message, required this.title});
+
   final String? title;
   final String message;
 
   @override
   Widget build(BuildContext context) {
-    final isError = tone == _StatusTone.error;
-    final color = isError ? PortalTheme.danger : PortalTheme.success;
+    const color = PortalTheme.danger;
     return Container(
       margin: const EdgeInsets.only(bottom: PortalTheme.space3),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isError ? 0.08 : 0.1),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isError ? Icons.error_outline : Icons.verified_outlined,
-            color: color,
-            size: 20,
-          ),
+          const Icon(Icons.error_outline, color: color, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

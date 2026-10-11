@@ -1,3 +1,5 @@
+import 'package:alumni_system/core/utils/calendar_date.dart';
+
 /// Official alumni roster entry (`alumni_members/{id}`).
 class AlumniMember {
   final String id;
@@ -129,7 +131,7 @@ class AlumniMember {
       'address': address,
       'gender': gender,
       'civil_status': civilStatus,
-      'birth_date': birthDate?.toUtc().toIso8601String().split('T').first,
+      'birth_date': CalendarDate.toDb(birthDate),
       'year_graduated': yearGraduated,
       'tracer_profile_complete': tracerProfileComplete,
       'created_at': createdAt.toUtc().toIso8601String(),

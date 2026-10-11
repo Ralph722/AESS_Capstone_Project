@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 
 /// Shared alumni / user-portal visual tokens (USTP brand).
 ///
 /// Prefer these over hard-coded colors in feature UI.
 /// Feature themes (Forum, Jobs, Messages) should alias these values.
 abstract final class PortalTheme {
-  // —— Brand ——
+  // —— Brand (official values live in [UstpColors]) ——
   /// USTP Blue (primary)
-  static const Color navy = Color(0xFF1A1851);
+  static const Color navy = UstpColors.blue;
   /// Deep secondary for gradients / dark accents
-  static const Color navyDeep = Color(0xFF031C2E);
+  static const Color navyDeep = UstpColors.darkNavy;
   /// Mid secondary blue
-  static const Color navyMid = Color(0xFF0D4A77);
+  static const Color navyMid = UstpColors.midBlue;
   /// Soft brand blue (chips, links)
-  static const Color sky = Color(0xFF329DEA);
+  static const Color sky = UstpColors.skyBlue;
   /// USTP Gold (accent — use sparingly)
-  static const Color gold = Color(0xFFFCB315);
+  static const Color gold = UstpColors.gold;
   /// Warm secondary accents
-  static const Color ember = Color(0xFFFF6418);
-  static const Color amber = Color(0xFFFF9718);
+  static const Color ember = UstpColors.orange;
+  static const Color amber = UstpColors.lightOrange;
 
   // —— Surfaces ——
   /// Soft cool page wash (navy-tinted, not flat gray).

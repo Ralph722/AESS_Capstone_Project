@@ -54,6 +54,7 @@ class PushService {
     if (_tapsWired) return;
     _tapsWired = true;
     AuthService.beforeSignOut = unregisterForSignOut;
+    AuthService.afterOtherSessionsRevoked = revokeOtherDevices;
     if (kIsWeb) {
       final launchRoute = webPushTakeLaunchRoute();
       if (launchRoute != null) NotificationRouter.openRoute(launchRoute);
@@ -186,21 +187,42 @@ class PushService {
     _syncedForUser = null;
     if (!AppSession.isSignedIn) return;
     try {
-      String? token;
-      if (kIsWeb) {
-        if (!webPushSupported()) return;
-        token = (await webPushSubscription(
-          PushConfig.webVapidPublicKey,
-          create: false,
-        ))
-            ?.endpoint;
-      } else if (FcmPushBridge.supported) {
-        token = await FcmPushBridge.token();
-      }
+      final token = await _currentDeviceToken();
       if (token != null) await _unregister(token);
     } catch (e) {
       debugPrint('PushService.unregisterForSignOut failed: $e');
     }
+  }
+
+  /// Removes the signed-in user's other devices from alerts after their
+  /// sessions were revoked (password change or reset). This device is kept.
+  /// If reading this device's token fails, nothing is removed.
+  Future<void> revokeOtherDevices() async {
+    final userId = AppSession.userId;
+    if (userId == null) return;
+    try {
+      final current = await _currentDeviceToken();
+      var query = _supabase.from('push_tokens').delete().eq('user_id', userId);
+      if (current != null) query = query.neq('token', current);
+      await query;
+    } catch (e) {
+      debugPrint('PushService.revokeOtherDevices failed: $e');
+    }
+  }
+
+  /// This device's push token (FCM) or endpoint (Web Push), or null when
+  /// this platform has no registration to read.
+  Future<String?> _currentDeviceToken() async {
+    if (kIsWeb) {
+      if (!webPushSupported()) return null;
+      final sub = await webPushSubscription(
+        PushConfig.webVapidPublicKey,
+        create: false,
+      );
+      return sub?.endpoint;
+    }
+    if (FcmPushBridge.supported) return FcmPushBridge.token();
+    return null;
   }
 
   Future<void> _registerWeb({required bool create}) async {

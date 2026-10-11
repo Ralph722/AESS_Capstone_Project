@@ -17,6 +17,21 @@ import 'package:alumni_system/features/notifications/application/notification_ro
 import 'package:alumni_system/features/notifications/push/push_service.dart';
 import 'package:alumni_system/features/notifications/application/notification_target.dart';
 import 'package:alumni_system/features/notifications/presentation/notification_preferences_page.dart';
+import 'package:alumni_system/features/auth/data/auth_service.dart';
+import 'package:alumni_system/features/auth/presentation/auth_shell.dart';
+import 'package:alumni_system/features/auth/presentation/widgets/change_password_form.dart';
+import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
+
+/// Search / command-palette result that opens the Change password dialog.
+/// Negative so it can never collide with an [AdminNavItem.index].
+const int _kChangePasswordCommand = -1;
+
+const List<String> _kChangePasswordKeywords = [
+  'password',
+  'security',
+  'account',
+  'settings',
+];
 
 /// Grouped admin navigation (indices must match dashboard page routing).
 class AdminNavItem {
@@ -1160,6 +1175,10 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
 
     if (!mounted) return;
     setState(() => _commandPaletteOpen = false);
+    if (selected == _kChangePasswordCommand) {
+      await _showChangePasswordDialog();
+      return;
+    }
     if (selected != null) {
       _rememberRecentPage(selected);
       widget.onMenuSelected(selected);
@@ -1289,6 +1308,21 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
           );
         }
       }
+    }
+
+    if ('change password'.contains(normalized) ||
+        _kChangePasswordKeywords.any(
+          (k) => k.contains(normalized) || normalized.contains(k),
+        )) {
+      hits.add(
+        const AdminSearchHit(
+          category: AdminSearchCategory.settings,
+          title: 'Change password',
+          subtitle: 'Account · Security',
+          icon: Icons.lock_outline,
+          menuIndex: _kChangePasswordCommand,
+        ),
+      );
     }
 
     return hits;
@@ -1703,11 +1737,16 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
   }
 
   void _selectSearchResult(int menuIndex) {
-    _rememberRecentPage(menuIndex);
+    final isChangePassword = menuIndex == _kChangePasswordCommand;
+    if (!isChangePassword) _rememberRecentPage(menuIndex);
     _removeSearchOverlay();
     _searchController.clear();
     _searchFocusNode.unfocus();
     setState(() => _searchOpen = false);
+    if (isChangePassword) {
+      _showChangePasswordDialog();
+      return;
+    }
     widget.onMenuSelected(menuIndex);
   }
 
@@ -3169,6 +3208,15 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
         ),
       ),
       const PopupMenuItem<String>(
+        value: 'password',
+        child: ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.lock_outline, size: 20),
+          title: Text('Change password'),
+        ),
+      ),
+      const PopupMenuItem<String>(
         value: 'help',
         child: ListTile(
           dense: true,
@@ -3194,11 +3242,30 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     switch (value) {
       case 'profile':
         _showAccountDetails();
+      case 'password':
+        _showChangePasswordDialog();
       case 'help':
         _showHelp();
       case 'logout':
         widget.onLogout?.call();
     }
+  }
+
+  Future<void> _showChangePasswordDialog() async {
+    final othersSignedOut = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      barrierLabel: 'Change password',
+      builder: (_) => const _AdminChangePasswordDialog(),
+    );
+    if (!mounted || othersSignedOut == null) return;
+    showAuthFeedback(
+      context,
+      othersSignedOut
+          ? 'Password changed successfully. Other devices have been signed out.'
+          : 'Password changed successfully.',
+      error: false,
+    );
   }
 
   Future<void> _showAccountDetails() async {
@@ -3271,7 +3338,61 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
   }
 }
 
-enum _CommandPaletteKind { recent, actions, pages }
+/// Pops with whether other devices were signed out, or null when cancelled.
+class _AdminChangePasswordDialog extends StatelessWidget {
+  const _AdminChangePasswordDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(PortalTheme.space5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                header: true,
+                child: const Text(
+                  'Change password',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: PortalTheme.navy,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Keep your account secure by using a strong password '
+                "that you don't use elsewhere.",
+                style: PortalTheme.meta.copyWith(height: 1.4),
+              ),
+              const SizedBox(height: PortalTheme.space4),
+              ChangePasswordForm(
+                role: UserRole.admin,
+                autofocus: true,
+                onSuccess: (othersSignedOut) =>
+                    Navigator.of(context).pop(othersSignedOut),
+                onCancel: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _CommandPaletteKind { recent, actions, pages, settings }
 
 class _CommandPaletteEntry {
   const _CommandPaletteEntry({
@@ -3356,6 +3477,17 @@ class _AdminCommandPaletteState extends State<_AdminCommandPalette> {
         );
       }
     }
+
+    all.add(
+      const _CommandPaletteEntry(
+        kind: _CommandPaletteKind.settings,
+        title: 'Change password',
+        subtitle: 'Account · Security',
+        icon: Icons.lock_outline,
+        menuIndex: _kChangePasswordCommand,
+        keywords: _kChangePasswordKeywords,
+      ),
+    );
 
     final query = _controller.text.trim().toLowerCase();
     if (query.isEmpty) return all;
@@ -3548,6 +3680,7 @@ class _AdminCommandPaletteState extends State<_AdminCommandPalette> {
       _CommandPaletteKind.recent => 'RECENT',
       _CommandPaletteKind.actions => 'QUICK ACTIONS',
       _CommandPaletteKind.pages => 'PAGES',
+      _CommandPaletteKind.settings => 'SETTINGS',
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 5),

@@ -2,6 +2,8 @@
 .branches
 .temp
 .env
+.env.demo
+demo.dart_defines.json
 
 # dotenvx
 .env.keys

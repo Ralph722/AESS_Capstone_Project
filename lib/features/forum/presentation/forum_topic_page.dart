@@ -14,6 +14,7 @@ import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
 import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
+import 'package:alumni_system/shared/widgets/user/portal_composer.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
@@ -582,7 +583,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
             ],
           ),
         ),
-        if (!topic.isLocked) _buildReplyBar(topic, inset),
+        if (!topic.isLocked) _buildReplyBar(topic),
         if (topic.isLocked) _buildLockedBanner(topic, inset),
       ],
     );
@@ -1126,21 +1127,10 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     );
   }
 
-  Widget _buildReplyBar(ForumTopic topic, double inset) {
-    return Material(
-      elevation: 2,
-      shadowColor: ForumTheme.navy.withValues(alpha: 0.08),
-      color: Colors.white,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            inset,
-            PortalTheme.space2,
-            inset,
-            PortalTheme.space2,
-          ),
-          child: Column(
+  Widget _buildReplyBar(ForumTopic topic) {
+    return PortalComposerBar(
+      maxWidth: PortalBreakpoints.contentMax,
+      child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_quoting != null)
@@ -1208,81 +1198,30 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                     child: TextField(
                       controller: _replyController,
                       focusNode: _replyFocus,
-                      decoration: InputDecoration(
+                      style: PortalTheme.body,
+                      decoration: PortalComposer.inputDecoration(
                         hintText: 'Write a reply… Use @ to mention',
-                        hintStyle: PortalTheme.bodySecondary,
-                        filled: true,
-                        fillColor: ForumTheme.surfaceMuted,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            PortalTheme.radiusMd,
-                          ),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            PortalTheme.radiusMd,
-                          ),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            PortalTheme.radiusMd,
-                          ),
-                          borderSide: const BorderSide(
-                            color: ForumTheme.navy,
-                            width: 1.2,
-                          ),
-                        ),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
                       ),
                       maxLines: 4,
                       minLines: 1,
                       textInputAction: TextInputAction.newline,
                     ),
                   ),
-                  const SizedBox(width: PortalTheme.space2),
+                  const SizedBox(width: PortalComposer.gap),
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _replyController,
-                    builder: (context, value, _) {
-                      final canSend = !_sending && value.text.trim().isNotEmpty;
-                      return FilledButton(
-                        onPressed: canSend ? () => _sendReply(topic) : null,
-                        style: PortalTheme.primaryButton(dense: true).copyWith(
-                          minimumSize: const WidgetStatePropertyAll(
-                            Size(48, 48),
-                          ),
-                          shape: WidgetStatePropertyAll(
-                            RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                PortalTheme.radiusMd,
-                              ),
-                            ),
-                          ),
-                        ),
-                        child: _sending
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.send_rounded),
-                      );
-                    },
+                    builder: (context, value, _) => PortalSendButton(
+                      label: 'Send reply',
+                      busy: _sending,
+                      onPressed: value.text.trim().isNotEmpty
+                          ? () => _sendReply(topic)
+                          : null,
+                    ),
                   ),
                 ],
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 

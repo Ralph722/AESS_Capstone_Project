@@ -1,6 +1,7 @@
 # Program Insights (DSS) improvements (plan)
 
 Status: planned, not implemented. Reviewed on 2026-10-02.
+Superseded by `dss-capability-audit.md` (2026-10-08).
 
 ## Current implementation (summary)
 

@@ -51,6 +51,23 @@ These aren't stored in the repo and must be re-entered on a new project:
 - Authentication → URL Configuration (site URL and redirect URLs).
 - Authentication → Email templates.
 
+## Hosted Auth settings
+
+The app's password checks and email-code screens assume these values. Local development reads them from `supabase/config.toml`; the hosted project only has what's set in the Dashboard, so check them on every new or restored project.
+
+| Dashboard location | Setting | Required value | Why |
+|---|---|---|---|
+| Authentication → Providers → Email | Minimum password length | 8 | Matches `PasswordPolicy` and `minimum_password_length` |
+| Authentication → Providers → Email | Password requirements | Letters and digits | Matches `PasswordPolicy` and `password_requirements = "letters_digits"`. A stricter hosted rule makes Supabase reject passwords the app accepts, and users only see a generic message |
+| Authentication → Providers → Email | Confirm email | On | Registration sends an email code. When off, registration stops with "We couldn't send a verification code" instead of skipping the code. Check with `GET /auth/v1/settings`: `mailer_autoconfirm` must be `false` |
+| Authentication → Providers → Email | Email OTP Length | 6 (any of 6–10 works) | Matches `otp_length`. The code fields accept 6 to 10 digits (`EmailCodePolicy`), so a different hosted length still works |
+| Authentication → Providers → Email | Secure password change | Either | Change Password signs in again first, which counts as a recent login |
+| Authentication → Emails → Confirm signup | Body includes `{{ .Token }}` | Required | Registration asks for the code, not a link. Copy `supabase/templates/confirmation.html` |
+| Authentication → Emails → Reset password | Body includes `{{ .Token }}` | Required | Forgot Password asks for the code, not a link. Copy `supabase/templates/recovery.html` |
+| Authentication → Rate limits | Emails sent per hour | High enough for sign-ups plus resets | Each registration and each password reset sends one email |
+| Authentication → Providers → Email | Leaked password protection | Optional (paid plans) | The app shows a specific message when a password is found in a breach |
+| Authentication → Emails (security notifications, where available) | Password changed | Optional | Emails the user when their password changes; no app code needed |
+
 ## Rotating a secret
 
 1. Set the new value with `supabase secrets set` (or update the Vault secret with `vault.update_secret`).

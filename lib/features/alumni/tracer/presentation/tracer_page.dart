@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
-import 'package:alumni_system/features/alumni/tracer/data/id_tracer_service.dart';
-import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_prefill.dart';
 import 'package:alumni_system/features/alumni/tracer/data/tracer_reminder_service.dart';
 import 'package:alumni_system/features/alumni/tracer/presentation/tracer_history_screen.dart';
@@ -13,9 +11,11 @@ import 'package:alumni_system/features/alumni/tracer/presentation/tracer_reminde
 import 'package:alumni_system/features/alumni/tracer/presentation/tracer_intro_view.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_take_screen.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
+import 'package:alumni_system/features/surveys/models/current_tracer.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/presentation/user_surveys_page.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
+import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
@@ -34,8 +34,6 @@ class TracerScreen extends StatefulWidget {
 class _TracerScreenState extends State<TracerScreen> {
   final _surveyService = SurveyService();
   final _profileService = UserProfileService();
-  final _idTracerService = IdTracerService();
-
   List<SurveyAssignment> _assignments = [];
   List<SurveyResponseWithMeta> _history = [];
   final Map<String, Survey> _surveyById = {};
@@ -43,6 +41,7 @@ class _TracerScreenState extends State<TracerScreen> {
 
   String? _chedSurveyId;
   Map<String, dynamic> _chedAnswers = {};
+  Map<String, dynamic> _chedPrefilled = {};
   bool _chedHasDraft = false;
   bool _chedLoading = false;
   TracerReminder? _chedReminder;
@@ -107,21 +106,28 @@ class _TracerScreenState extends State<TracerScreen> {
   List<SurveyAssignment> get _activeAssignments =>
       _incompleteAssignments.where((a) => _surveyIsOpen(a.surveyId)).toList();
 
-  /// Incomplete CHED assignment that has not opened yet.
-  SurveyAssignment? get _scheduledChedAssignment {
-    for (final a in _incompleteAssignments) {
-      final s = _surveyById[a.surveyId];
-      if (s?.isChedGtsBuiltin == true && s?.isNotYetOpen == true) return a;
-    }
-    return null;
+  /// Newest assigned tracer; older ones left open are not asked for.
+  SurveyAssignment? get _currentChedAssignment =>
+      CurrentTracer.pick(_assignments, (id) => _surveyById[id]);
+
+  SurveyAssignment? get _incompleteCurrentChed {
+    final a = _currentChedAssignment;
+    if (a == null || a.status == SurveyAssignmentStatus.completed) return null;
+    return a;
   }
 
+  /// Current tracer when it has not opened yet.
+  SurveyAssignment? get _scheduledChedAssignment {
+    final a = _incompleteCurrentChed;
+    if (a == null) return null;
+    return _surveyById[a.surveyId]?.isNotYetOpen == true ? a : null;
+  }
+
+  /// Current tracer when it can be answered now.
   SurveyAssignment? get _primaryChedAssignment {
-    for (final a in _activeAssignments) {
-      final s = _surveyById[a.surveyId];
-      if (s?.isChedGtsBuiltin == true) return a;
-    }
-    return null;
+    final a = _incompleteCurrentChed;
+    if (a == null) return null;
+    return _surveyIsOpen(a.surveyId) ? a : null;
   }
 
   List<SurveyAssignment> get _otherActiveAssignments => _activeAssignments
@@ -137,6 +143,7 @@ class _TracerScreenState extends State<TracerScreen> {
         setState(() {
           _chedSurveyId = null;
           _chedAnswers = {};
+          _chedPrefilled = {};
           _chedHasDraft = false;
           _chedLoading = false;
           _chedReminder = null;
@@ -160,13 +167,11 @@ class _TracerScreenState extends State<TracerScreen> {
         uid,
       );
       final profile = await _profileService.getTracerProfile(uid);
-      EmploymentRecord? employment;
-      try {
-        employment = await _idTracerService.getCurrentUserRecord();
-      } catch (_) {}
 
+      // Only profile details are carried over; the job questions describe
+      // the alumni's situation now, so each tracer starts them blank.
       final prefill = profile != null
-          ? ChedGtsPrefill.fromProfile(profile, employment: employment)
+          ? ChedGtsPrefill.fromProfile(profile)
           : <String, dynamic>{};
       final merged = ChedGtsPrefill.merge(
         existing: existing?.answers ?? const {},
@@ -177,6 +182,7 @@ class _TracerScreenState extends State<TracerScreen> {
       if (!mounted) return;
       setState(() {
         _chedAnswers = merged;
+        _chedPrefilled = prefill;
         _chedReminder = reminder;
         _chedHasDraft =
             existing != null &&
@@ -196,6 +202,7 @@ class _TracerScreenState extends State<TracerScreen> {
       context,
       surveyId: surveyId,
       initialAnswers: _chedAnswers,
+      prefilledAnswers: _chedPrefilled,
       closeAt: _surveyById[surveyId]?.closeAt,
       aiHelpEnabled: _surveyById[surveyId]?.aiHelpEnabled ?? true,
     );
@@ -310,7 +317,11 @@ class _TracerScreenState extends State<TracerScreen> {
       onRefresh: _load,
       color: PortalTheme.navy,
       child: ListView(
-        padding: padding.copyWith(bottom: widget.embeddedInNav ? 108 : 40),
+        padding: padding.copyWith(
+          bottom: widget.embeddedInNav
+              ? PortalFloating.bottomClearance(context)
+              : 40,
+        ),
         children: [
           if (ched != null) ...[
             if (_chedLoading)

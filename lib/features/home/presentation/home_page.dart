@@ -26,12 +26,14 @@ import 'package:alumni_system/features/forum/models/forum_filters.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
+import 'package:alumni_system/features/surveys/models/current_tracer.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/shared/widgets/aess_logo.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
+import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/features/home/data/survey_attention_reminder.dart';
 import 'package:alumni_system/features/home/models/home_calendar_item.dart';
@@ -65,7 +67,6 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   int communityTodayCount = 0;
   int messagesCount = 0;
   int unreadNotificationsCount = 0;
-  double _tracerCompletion = 0;
   int _pendingCustomSurveys = 0;
   bool _openTracerAttention = false;
   bool _attentionDueSoon = false;
@@ -177,7 +178,6 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
               : (tracer?.yearGraduated.trim().isNotEmpty == true
                     ? tracer!.yearGraduated.trim()
                     : null);
-          _tracerCompletion = tracer?.completionPercent ?? 0;
         });
       }
     } catch (_) {}
@@ -238,6 +238,11 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       final userId = AppSession.userId;
       if (userId == null) return;
       final assignments = await _surveyService.getUserAssignments(userId);
+      final surveys = await _surveysFor(assignments);
+      final currentTracer = CurrentTracer.pick(
+        assignments,
+        (id) => surveys[id],
+      );
       var customPending = 0;
       var openTracerPending = false;
       DateTime? nearestClose;
@@ -247,9 +252,10 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
 
       for (final a in assignments) {
         if (a.status == SurveyAssignmentStatus.completed) continue;
-        final survey = await _surveyService.getSurvey(a.surveyId);
+        final survey = surveys[a.surveyId];
         // Respect schedule: only surface surveys that are currently open.
         if (survey == null || !survey.acceptsResponses) continue;
+        if (CurrentTracer.isStale(a, survey, currentTracer)) continue;
 
         final closeAt = survey.closeAt;
         if (closeAt != null) {
@@ -263,18 +269,17 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
               (daysLeft <= 3 || hoursLeft <= 72);
           if (isDueSoon) dueSoon = true;
 
-          final dueText = _formatDueLabel(closeAt);
-          if (survey.isChedGtsBuiltin) {
-            tracerSubtitle = dueText;
-          } else {
-            surveySubtitle = dueText;
+          if (!survey.isChedGtsBuiltin) {
+            surveySubtitle = _formatDueLabel(closeAt);
           }
         }
 
         if (survey.isChedGtsBuiltin) {
           openTracerPending = true;
-          tracerSubtitle ??=
-              '${_tracerCompletion.toStringAsFixed(0)}% complete — finish your CHED Tracer';
+          tracerSubtitle = homeTracerSubtitle(
+            started: a.status == SurveyAssignmentStatus.inProgress,
+            dueLabel: closeAt == null ? null : _formatDueLabel(closeAt),
+          );
         } else {
           customPending++;
           surveySubtitle ??= 'Respond when you can — separate from Tracer';
@@ -299,6 +304,17 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       // Outside setState so the dialog has a settled tree / navigator.
       if (mounted) unawaited(_maybeShowAttentionReminder());
     } catch (_) {}
+  }
+
+  Future<Map<String, Survey>> _surveysFor(
+    List<SurveyAssignment> assignments,
+  ) async {
+    final surveys = <String, Survey>{};
+    for (final a in assignments) {
+      final s = await _surveyService.getSurvey(a.surveyId);
+      if (s != null) surveys[a.surveyId] = s;
+    }
+    return surveys;
   }
 
   String _formatDueLabel(DateTime closeAt) {
@@ -581,10 +597,16 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       final userId = AppSession.userId;
       if (userId == null) return;
       final assignments = await _surveyService.getUserAssignments(userId);
+      final surveys = await _surveysFor(assignments);
+      final currentTracer = CurrentTracer.pick(
+        assignments,
+        (id) => surveys[id],
+      );
       for (final a in assignments) {
         if (a.status == SurveyAssignmentStatus.completed) continue;
-        final survey = await _surveyService.getSurvey(a.surveyId);
+        final survey = surveys[a.surveyId];
         if (survey == null || survey.closeAt == null) continue;
+        if (CurrentTracer.isStale(a, survey, currentTracer)) continue;
         if (!survey.isOpen && survey.closeAt!.isBefore(DateTime.now())) {
           continue;
         }
@@ -776,7 +798,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
         ..._eventsBlock(),
         ..._communityBlock(),
         ..._calendarBlock(),
-        const SizedBox(height: 108),
+        SizedBox(height: PortalFloating.bottomClearance(context)),
       ],
     );
   }
@@ -789,25 +811,38 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
         children: [
           ..._identityAndAttention(firstName),
           ..._statsBlock(),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [..._eventsBlock(), ..._communityBlock()],
-                ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: HomeSectionInset(
+              horizontal: 0,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Columns line up with the stat cards above: events under
+                  // the first two cards, the calendar under the third.
+                  final statWidth =
+                      (constraints.maxWidth - HomeStatCardsRow.gap * 2) / 3;
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: statWidth * 2 + HomeStatCardsRow.gap,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [..._eventsBlock(), ..._communityBlock()],
+                        ),
+                      ),
+                      const SizedBox(width: HomeStatCardsRow.gap),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [..._calendarBlock()],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [..._calendarBlock()],
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -826,7 +861,6 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       ),
       HomeNeedsAttentionPanel(
         tracerComplete: !_openTracerAttention,
-        tracerPercent: _tracerCompletion,
         pendingSurveys: _pendingCustomSurveys,
         dueSoon: _attentionDueSoon,
         dueSoonLabel: _attentionDueSoonLabel,
@@ -855,10 +889,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   List<Widget> _eventsBlock() {
     return [
       if (isLoadingEvents)
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: HomeEventCarouselSkeleton(),
-        )
+        const _SectionPad(child: HomeEventCarouselSkeleton())
       else if (_eventsError != null)
         _SectionRetry(message: _eventsError!, onRetry: _loadUpcomingEvents)
       else if (upcomingEvents.isEmpty)
@@ -875,10 +906,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   List<Widget> _communityBlock() {
     return [
       if (isLoadingCommunity)
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: HomeEventCardsSkeleton(count: 2),
-        )
+        const _SectionPad(child: HomeEventCardsSkeleton(count: 2))
       else if (_communityError != null)
         _SectionRetry(message: _communityError!, onRetry: _loadCommunitySection)
       else if (_communityTopics.isEmpty)
@@ -900,8 +928,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   List<Widget> _calendarBlock() {
     return [
       if (isLoadingCalendar && _calendarItems.isEmpty)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        _SectionPad(
           child: Container(
             height: 320,
             decoration: BoxDecoration(
@@ -1011,6 +1038,18 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 }
 
+class _SectionPad extends StatelessWidget {
+  const _SectionPad({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final h = HomeSectionInset.of(context);
+    return Padding(padding: EdgeInsets.fromLTRB(h, 10, h, 0), child: child);
+  }
+}
+
 class _SectionRetry extends StatelessWidget {
   const _SectionRetry({required this.message, required this.onRetry});
 
@@ -1020,7 +1059,10 @@ class _SectionRetry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: HomeSectionInset.of(context),
+        vertical: 4,
+      ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(

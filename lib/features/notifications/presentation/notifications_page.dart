@@ -326,6 +326,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     final groups = groupNotifications(_items);
     return RefreshIndicator(
+      color: PortalTheme.navy,
       onRefresh: () => _reload(),
       child: NotificationListener<ScrollNotification>(
         onNotification: (s) {
@@ -370,7 +371,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   child: SizedBox(
                     width: 22,
                     height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: PortalTheme.navy,
+                    ),
                   ),
                 ),
               )
@@ -378,6 +382,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               Center(
                 child: TextButton(
                   onPressed: _loadMore,
+                  style: PortalTheme.ghostButton(),
                   child: const Text('Load more'),
                 ),
               ),

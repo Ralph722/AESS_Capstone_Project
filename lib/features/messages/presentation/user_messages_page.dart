@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:alumni_system/core/utils/local_id.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/messages/application/message_actions.dart';
@@ -61,6 +61,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   final Map<String, Uint8List> _decodedImagesCache = {};
   static const int _maxDecodedImages = 24;
   final Map<String, Map<String, dynamic>> _failedMessageDrafts = {};
+
   /// History beyond the live newest window (Part 8 pagination).
   final Map<String, Map<String, dynamic>> _olderById = {};
   bool _hasMoreHistory = true;
@@ -284,14 +285,16 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
             .toList();
         final merged = _mergeServerMessages(filteredMessages);
         final fingerprint = MessageRealtime.legacyListFingerprint(merged);
-        final previousFingerprint =
-            MessageRealtime.legacyListFingerprint(_messages);
+        final previousFingerprint = MessageRealtime.legacyListFingerprint(
+          _messages,
+        );
         if (fingerprint == previousFingerprint && !_isLoading) {
           return;
         }
 
         final grew = merged.length > previousCount;
-        final incomingWhileReading = grew && !wasNearLatest && previousCount > 0;
+        final incomingWhileReading =
+            grew && !wasNearLatest && previousCount > 0;
 
         setState(() {
           _messages = merged;
@@ -477,12 +480,13 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         final failedId = messageId;
         if (failedId != null) {
           final existing = _messages.cast<Map<String, dynamic>?>().firstWhere(
-                (m) => (m?['docId'] ?? m?['id']) == failedId,
-                orElse: () => null,
-              );
+            (m) => (m?['docId'] ?? m?['id']) == failedId,
+            orElse: () => null,
+          );
           if (existing != null) {
-            _failedMessageDrafts[failedId] =
-                Map<String, dynamic>.from(existing);
+            _failedMessageDrafts[failedId] = Map<String, dynamic>.from(
+              existing,
+            );
           }
           _upsertLocalMessage({
             'docId': failedId,
@@ -518,9 +522,9 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         messageId: docId,
         senderId: _currentUserId!,
         senderDocId: draft['senderDocId'] as String?,
-        senderName: draft['senderName'] as String? ?? _currentUserName ?? 'User',
-        senderEmail:
-            draft['senderEmail'] as String? ?? _currentUserEmail ?? '',
+        senderName:
+            draft['senderName'] as String? ?? _currentUserName ?? 'User',
+        senderEmail: draft['senderEmail'] as String? ?? _currentUserEmail ?? '',
         senderRole: 'user',
         recipientId: admin.authUid,
         recipientDocId: admin.docId,
@@ -646,7 +650,8 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
     showMessageImageViewer(
       context: context,
       imageUrl: imageUrl,
-      decodedBytes: imageUrl.startsWith('data:') &&
+      decodedBytes:
+          imageUrl.startsWith('data:') &&
               messageDocId != null &&
               messageDocId.isNotEmpty
           ? _getCachedImageBytes(messageDocId, imageUrl)
@@ -683,24 +688,28 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         title: MessageTheme.officeDisplayName,
         automaticallyImplyLeading: Navigator.canPop(context),
       ),
-      body: PortalContentFrame(
-        maxWidth: PortalBreakpoints.chatMax,
-        child: Column(
+      body: Column(
         children: [
           Expanded(
-            child: Stack(
-              children: [
-                ColoredBox(
-                  color: MessageTheme.pageBg,
-                  child: _isLoading
-                      ? const MessageThreadSkeleton()
-                      : _messages.isEmpty
+            child: PortalContentFrame(
+              maxWidth: PortalBreakpoints.chatMax,
+              child: SizedBox.expand(
+                child: Stack(
+                  children: [
+                    ColoredBox(
+                      color: MessageTheme.pageBg,
+                      child: _isLoading
+                          ? const MessageThreadSkeleton()
+                          : _messages.isEmpty
                           ? const MessageEmptyState()
                           : ListView.builder(
                               controller: _scrollController,
                               reverse: true,
-                              padding: const EdgeInsets.all(MessageTheme.threadPadding),
-                              itemCount: _messages.length +
+                              padding: const EdgeInsets.all(
+                                MessageTheme.threadPadding,
+                              ),
+                              itemCount:
+                                  _messages.length +
                                   (_hasMoreHistory || _loadingOlder ? 1 : 0),
                               addAutomaticKeepAlives: false,
                               itemBuilder: (context, index) {
@@ -728,20 +737,18 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                   );
                                 }
                                 final msg = _messages[index];
-                                final isCurrentUser =
-                                    _messageService.isUserSender(
-                                  msg,
-                                  _userIdentityIds,
-                                );
+                                final isCurrentUser = _messageService
+                                    .isUserSender(msg, _userIdentityIds);
                                 final timestamp =
                                     (msg['timestamp'] as DateTime?) ??
-                                        DateTime.now();
+                                    DateTime.now();
                                 final older = index + 1 < _messages.length
                                     ? _messages[index + 1]
                                     : null;
                                 final olderTs =
                                     older?['timestamp'] as DateTime?;
-                                final showDateSep = olderTs == null ||
+                                final showDateSep =
+                                    olderTs == null ||
                                     !isSameMessageCalendarDay(
                                       timestamp,
                                       olderTs,
@@ -760,15 +767,17 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                   children: [
                                     if (showDateSep)
                                       MessageDateSeparator(
-                                        label:
-                                            formatMessageDateLabel(timestamp),
+                                        label: formatMessageDateLabel(
+                                          timestamp,
+                                        ),
                                       ),
                                     MessageBubble(
                                       isMine: isCurrentUser,
                                       body: messageText,
                                       timestamp: timestamp,
                                       imageUrl: imageUrl,
-                                      imageBytes: imageUrl != null &&
+                                      imageBytes:
+                                          imageUrl != null &&
                                               imageUrl.startsWith('data:') &&
                                               messageDocId.isNotEmpty
                                           ? _getCachedImageBytes(
@@ -799,18 +808,17 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                       onOpenImage: imageUrl == null
                                           ? null
                                           : () => _showImageFullScreen(
-                                                context,
-                                                imageUrl,
-                                                messageDocId,
-                                              ),
-                                      onRetry: () =>
-                                          _retryFailedMessage(msg),
+                                              context,
+                                              imageUrl,
+                                              messageDocId,
+                                            ),
+                                      onRetry: () => _retryFailedMessage(msg),
                                       onCopy: messageText.trim().isEmpty
                                           ? null
                                           : () => copyMessageText(
-                                                context,
-                                                messageText,
-                                              ),
+                                              context,
+                                              messageText,
+                                            ),
                                       onEdit: isCurrentUser
                                           ? () => _editMessage(msg)
                                           : null,
@@ -822,25 +830,28 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
                                 );
                               },
                             ),
-                ),
-                if (_showNewMessagesButton)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 12,
-                    child: Center(
-                      child: MessageNewMessagesButton(
-                        count: _pendingNewMessageCount > 1
-                            ? _pendingNewMessageCount
-                            : null,
-                        onPressed: _jumpToNewMessages,
-                      ),
                     ),
-                  ),
-              ],
+                    if (_showNewMessagesButton)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 12,
+                        child: Center(
+                          child: MessageNewMessagesButton(
+                            count: _pendingNewMessageCount > 1
+                                ? _pendingNewMessageCount
+                                : null,
+                            onPressed: _jumpToNewMessages,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
           MessageComposer(
+            maxContentWidth: PortalBreakpoints.chatMax,
             controller: _messageController,
             isUploading: _isUploadingImage,
             uploadProgress: _uploadProgress,
@@ -860,7 +871,6 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
             onSend: _sendMessage,
           ),
         ],
-        ),
       ),
     );
   }

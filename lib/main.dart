@@ -5,17 +5,15 @@ import 'package:alumni_system/core/config/supabase_config.dart';
 import 'package:alumni_system/core/navigation/app_navigator.dart';
 import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
 import 'package:alumni_system/features/notifications/push/push_service.dart';
+import 'package:alumni_system/shared/widgets/environment_banner.dart';
 import 'package:alumni_system/shared/widgets/user/portal_overlay_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _installWebDebugErrorGuards();
 
-  if (!SupabaseConfig.isConfigured) {
-    throw StateError(
-      'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.',
-    );
-  }
+  final configError = SupabaseConfig.configurationError;
+  if (configError != null) throw StateError(configError);
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.anonKey,
@@ -75,7 +73,10 @@ class MyApp extends StatelessWidget {
           data: suspended
               ? Theme.of(context)
               : PortalOverlayTheme.apply(Theme.of(context)),
-          child: child!,
+          child: EnvironmentBanner(
+            label: SupabaseConfig.environmentLabel,
+            child: child!,
+          ),
         ),
       ),
       // AuthGate restores an existing Supabase session (if any) before Login.

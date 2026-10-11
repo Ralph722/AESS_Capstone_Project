@@ -11,6 +11,7 @@ import 'package:alumni_system/core/utils/avatar_image_prepare.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
+import 'package:alumni_system/features/alumni/profile/presentation/change_password_page.dart';
 import 'package:alumni_system/features/alumni/profile/presentation/profile_information_page.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
@@ -20,6 +21,7 @@ import 'package:alumni_system/features/messages/presentation/user_messages_page.
 import 'package:alumni_system/features/notifications/presentation/notifications_page.dart';
 import 'package:alumni_system/features/surveys/presentation/user_surveys_page.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
+import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
@@ -204,7 +206,12 @@ class ProfileScreenState extends State<ProfileScreen>
         child: _isLoading
             ? const ProfileSkeleton()
             : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(hPad, 0, hPad, 100),
+                padding: EdgeInsets.fromLTRB(
+                  hPad,
+                  0,
+                  hPad,
+                  PortalFloating.bottomClearance(context),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -272,7 +279,12 @@ class ProfileScreenState extends State<ProfileScreen>
             ),
             clipBehavior: Clip.antiAlias,
             child: _isUploadingImage
-                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: PortalTheme.navy,
+                    ),
+                  )
                 : provider == null
                 ? Icon(
                     Icons.person_rounded,
@@ -334,7 +346,7 @@ class ProfileScreenState extends State<ProfileScreen>
               const _PortalAccountDivider(),
               _PortalAccountRow(
                 icon: Icons.poll_outlined,
-                iconColor: PortalTheme.sky,
+                iconColor: PortalTheme.navy,
                 title: 'My Surveys',
                 subtitle: 'Complete tracer and alumni surveys',
                 onTap: () {
@@ -349,7 +361,7 @@ class ProfileScreenState extends State<ProfileScreen>
               const _PortalAccountDivider(),
               _PortalAccountRow(
                 icon: Icons.support_agent_outlined,
-                iconColor: PortalTheme.navyMid,
+                iconColor: PortalTheme.navy,
                 title: 'Support messages',
                 subtitle: 'Chat with the alumni office',
                 onTap: () {
@@ -380,7 +392,7 @@ class ProfileScreenState extends State<ProfileScreen>
               const _PortalAccountDivider(),
               _PortalAccountRow(
                 icon: Icons.feedback_outlined,
-                iconColor: PortalTheme.amber,
+                iconColor: PortalTheme.navy,
                 title: 'Feedback',
                 subtitle: 'Share bugs, ideas, or issues',
                 onTap: () {
@@ -388,6 +400,21 @@ class ProfileScreenState extends State<ProfileScreen>
                     context,
                     MaterialPageRoute(
                       builder: (_) => const UserFeedbackListScreen(),
+                    ),
+                  );
+                },
+              ),
+              const _PortalAccountDivider(),
+              _PortalAccountRow(
+                icon: Icons.lock_outline_rounded,
+                iconColor: PortalTheme.navy,
+                title: 'Change password',
+                subtitle: 'Update your sign-in password',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChangePasswordScreen(),
                     ),
                   );
                 },
@@ -475,7 +502,7 @@ class _PortalAccountRow extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
+                  color: iconColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
                 ),
                 child: Icon(icon, color: iconColor, size: 22),

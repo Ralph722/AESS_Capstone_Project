@@ -1,0 +1,5 @@
+{
+  "AESS_ENV": "demo",
+  "SUPABASE_URL": "https://your-demo-project-ref.supabase.co",
+  "SUPABASE_ANON_KEY": "your-demo-anon-key"
+}

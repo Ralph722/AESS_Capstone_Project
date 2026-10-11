@@ -180,7 +180,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                               const SizedBox(height: PortalTheme.space2),
                               const PortalChip(
                                 label: 'Unsaved changes',
-                                tone: PortalChipTone.warning,
+                                tone: PortalChipTone.gold,
                                 icon: Icons.edit_note,
                               ),
                             ],

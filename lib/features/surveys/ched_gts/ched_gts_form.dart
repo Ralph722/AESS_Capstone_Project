@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_help_service.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_help_sheet.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_prefill.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -53,9 +54,14 @@ class ChedGtsForm extends StatefulWidget {
     this.onlyItemIds,
     this.highlightMissing = false,
     this.helpSurveyId,
+    this.prefilledAnswers = const {},
   });
 
   final Map<String, dynamic> answers;
+
+  /// Answers pre-filled from the profile. Details that may be out of date
+  /// get a re-check note until edited.
+  final Map<String, dynamic> prefilledAnswers;
   final ChedGtsAnswersChanged onChanged;
   final bool readOnly;
   final bool showIntro;
@@ -211,6 +217,13 @@ class _ChedGtsFormState extends State<ChedGtsForm> {
           textController: _textControllers[item.id],
           readOnly: widget.readOnly,
           missing: missing.contains(item.id),
+          fromProfile:
+              !widget.readOnly &&
+              ChedGtsPrefill.showsProfileNote(
+                item.id,
+                _answers[item.id],
+                widget.prefilledAnswers,
+              ),
           onChanged: (v) => _set(item.id, v),
           onHelp: _helpFor(item),
           helpUsed: _applied.isNotEmpty,
@@ -305,6 +318,46 @@ class _SectionHeader extends StatelessWidget {
 }
 
 /// Guidance note under the question; long notes collapse to two lines.
+class _ProfileValueNote extends StatelessWidget {
+  const _ProfileValueNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: PortalTheme.sky.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        border: Border.all(color: PortalTheme.sky.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.edit_note_rounded,
+              size: 16,
+              color: PortalTheme.navyMid,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Filled in from your profile. If this has changed, update it '
+              'to your current details.',
+              style: PortalTheme.meta.copyWith(
+                height: 1.4,
+                color: PortalTheme.navyMid,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HelpNote extends StatefulWidget {
   const _HelpNote({required this.text});
 
@@ -546,6 +599,7 @@ class _ItemCard extends StatelessWidget {
     required this.readOnly,
     this.textController,
     this.missing = false,
+    this.fromProfile = false,
     this.onHelp,
     this.helpUsed = false,
     this.recommendation,
@@ -558,6 +612,9 @@ class _ItemCard extends StatelessWidget {
   final bool readOnly;
   final TextEditingController? textController;
   final bool missing;
+
+  /// Still shows a pre-filled profile value that may be out of date.
+  final bool fromProfile;
   final VoidCallback? onHelp;
   final bool helpUsed;
 
@@ -629,6 +686,10 @@ class _ItemCard extends StatelessWidget {
           ] else if (item.helpText != null) ...[
             const SizedBox(height: 8),
             _HelpNote(text: item.helpText!),
+          ],
+          if (fromProfile) ...[
+            const SizedBox(height: 8),
+            const _ProfileValueNote(),
           ],
           if (helpPointer) ...[
             const SizedBox(height: 6),

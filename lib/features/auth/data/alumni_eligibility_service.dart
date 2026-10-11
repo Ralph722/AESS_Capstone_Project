@@ -11,6 +11,7 @@ class AlumniEligibilityResult {
     this.course,
     this.studentId,
     this.message,
+    this.code,
   });
 
   final bool eligible;
@@ -19,6 +20,11 @@ class AlumniEligibilityResult {
   final String? course;
   final String? studentId;
   final String? message;
+
+  /// Why the check failed: `not_found`, `already_exists`,
+  /// `failed_precondition` (deactivated), `invalid_argument`, or
+  /// `unavailable` when the roster could not be reached.
+  final String? code;
 }
 
 /// Validates roster eligibility and links accounts after registration.
@@ -42,6 +48,7 @@ class AlumniEligibilityService {
     if (fullName.trim().isEmpty || sid.isEmpty || prog == null) {
       return const AlumniEligibilityResult(
         eligible: false,
+        code: 'invalid_argument',
         message: 'Please complete all fields.',
       );
     }
@@ -65,10 +72,12 @@ class AlumniEligibilityService {
         course: data['course']?.toString(),
         studentId: data['studentId']?.toString(),
         message: eligible ? null : data['message']?.toString(),
+        code: eligible ? null : data['code']?.toString(),
       );
     } catch (_) {
       return const AlumniEligibilityResult(
         eligible: false,
+        code: 'unavailable',
         message:
             'Could not check the alumni roster right now. '
             'Check your connection and try again.',

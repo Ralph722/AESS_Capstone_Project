@@ -264,11 +264,10 @@ class _ForumComposerPageState extends State<ForumComposerPage>
             'Your title and message will be kept on this device so you '
             'can finish this post later.',
         actions: [
-          FilledButton.icon(
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, _LeaveChoice.save),
             style: PortalTheme.primaryButton(),
-            icon: const Icon(Icons.save_outlined, size: 18),
-            label: const Text('Save draft'),
+            child: const Text('Save draft'),
           ),
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx, _LeaveChoice.discard),
@@ -412,7 +411,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         await _close();
       },
       child: Scaffold(
-        backgroundColor: PortalTheme.pageBg,
+        backgroundColor: Colors.white,
         appBar: PortalAppBar(
           title: _headerTitle,
           bottom: TabBar(
@@ -549,9 +548,6 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   }
 
   Widget _writeTab() {
-    final titleLen = _titleController.text.characters.length;
-    final bodyLen = _bodyController.text.characters.length;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       children: [
@@ -622,10 +618,6 @@ class _ForumComposerPageState extends State<ForumComposerPage>
             return null;
           },
         ),
-        Text(
-          '$titleLen / ${ForumService.titleMaxLength}',
-          style: const TextStyle(fontSize: 12, color: ForumTheme.textMuted),
-        ),
         const SizedBox(height: 12),
         ForumFormatToolbar(
           controller: _bodyController,
@@ -651,10 +643,6 @@ class _ForumComposerPageState extends State<ForumComposerPage>
             },
           },
           child: _bodyField(),
-        ),
-        Text(
-          '$bodyLen / ${ForumService.bodyMaxLength}',
-          style: const TextStyle(fontSize: 12, color: ForumTheme.textMuted),
         ),
         const SizedBox(height: 16),
         const Text(

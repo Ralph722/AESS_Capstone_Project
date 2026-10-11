@@ -24,6 +24,27 @@ IconData notificationIconFor(NotificationType type) {
   }
 }
 
+/// Theme colour for each notification type's icon.
+Color notificationColorFor(NotificationType type) {
+  switch (type) {
+    case NotificationType.event:
+      return PortalTheme.success;
+    case NotificationType.job:
+      return PortalTheme.navyMid;
+    case NotificationType.message:
+      return PortalTheme.sky;
+    case NotificationType.announcement:
+      // Plain gold is too faint for an icon on white.
+      return const Color(0xFFD99A00);
+    case NotificationType.survey:
+    case NotificationType.feedback:
+    case NotificationType.forum:
+      return PortalTheme.navy;
+    case NotificationType.system:
+      return PortalTheme.textSecondary;
+  }
+}
+
 String notificationTypeLabel(NotificationType type) {
   switch (type) {
     case NotificationType.event:
@@ -125,7 +146,7 @@ class NotificationTile extends StatelessWidget {
     final timeText = isToday
         ? intl.DateFormat('hh:mm a').format(created)
         : intl.DateFormat('MMM d • hh:mm a').format(created);
-    final accent = Color(notification.colorValue);
+    final accent = notificationColorFor(notification.type);
     final unread = !notification.isRead;
 
     return Padding(
@@ -189,7 +210,7 @@ class NotificationTile extends StatelessWidget {
                             height: 8,
                             margin: const EdgeInsets.only(top: 5),
                             decoration: const BoxDecoration(
-                              color: PortalTheme.sky,
+                              color: PortalTheme.gold,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -242,17 +263,18 @@ class _PriorityChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = urgent ? PortalTheme.danger : PortalTheme.amber;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: urgent
+            ? PortalTheme.danger.withValues(alpha: 0.12)
+            : PortalTheme.gold.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         urgent ? 'Urgent' : 'Important',
         style: PortalTheme.caption.copyWith(
-          color: color,
+          color: urgent ? PortalTheme.danger : PortalTheme.navy,
           fontWeight: FontWeight.w800,
           fontSize: 10.5,
         ),

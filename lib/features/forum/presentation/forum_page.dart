@@ -7,9 +7,10 @@ import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
 import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
+import 'package:alumni_system/shared/widgets/user/portal_filters.dart';
+import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
-import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 
@@ -156,27 +157,41 @@ class _ForumScreenState extends State<ForumScreen> {
     if (mounted) await _load(reset: true, silent: true);
   }
 
+  Widget _buildSortChip() {
+    return PortalDropdownChip<ForumSort>(
+      value: _sort,
+      items: [for (final s in ForumSort.values) (s, s.label)],
+      icon: Icons.swap_vert_rounded,
+      selected: _sort != ForumSort.latestActivity,
+      onChanged: (v) {
+        setState(() => _sort = v);
+        _load(reset: true);
+      },
+    );
+  }
+
   Widget _buildFilterChips() {
     return SizedBox(
-      height: 36,
+      height: PortalFilterChip.height,
       width: double.infinity,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: ForumListFilter.values.map((f) {
-            final selected = _filters.contains(f) ||
-                (f == ForumListFilter.all &&
-                    _filters.length == 1 &&
-                    _filters.contains(ForumListFilter.all));
-            return Padding(
+          children: [
+            Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: PortalChip(
-                label: f.label,
-                selected: selected,
-                onTap: () => _toggleFilter(f),
+              child: _buildSortChip(),
+            ),
+            for (final f in ForumListFilter.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: PortalFilterChip(
+                  label: f.label,
+                  selected: _filters.contains(f),
+                  onTap: () => _toggleFilter(f),
+                ),
               ),
-            );
-          }).toList(),
+          ],
         ),
       ),
     );
@@ -196,14 +211,20 @@ class _ForumScreenState extends State<ForumScreen> {
         child: ListView(
           padding: const EdgeInsets.all(PortalTheme.space3),
           children: [
-            Text('Filters', style: PortalTheme.sectionTitle.copyWith(fontSize: 16)),
+            Text(
+              'Filters',
+              style: PortalTheme.sectionTitle.copyWith(fontSize: 16),
+            ),
             const SizedBox(height: PortalTheme.space2),
             ...ForumListFilter.values.map((f) {
               final selected = _filters.contains(f);
               return CheckboxListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: Text(f.label, style: PortalTheme.body.copyWith(fontSize: 13)),
+                title: Text(
+                  f.label,
+                  style: PortalTheme.body.copyWith(fontSize: 13),
+                ),
                 value: selected,
                 activeColor: ForumTheme.navy,
                 onChanged: (_) => _toggleFilter(f),
@@ -241,11 +262,12 @@ class _ForumScreenState extends State<ForumScreen> {
         // Clear the floating pill bottom nav when embedded in Community hub.
         // Tablet / web use a side rail instead, so no offset there.
         padding: EdgeInsets.only(
-          bottom: widget.embeddedInHub &&
+          bottom:
+              widget.embeddedInHub &&
                   !PortalBreakpoints.useNavigationRail(
                     PortalBreakpoints.widthOf(context),
                   )
-              ? 88
+              ? PortalFloating.bottomClearance(context) - 16
               : 0,
         ),
         child: FloatingActionButton.extended(
@@ -262,150 +284,41 @@ class _ForumScreenState extends State<ForumScreen> {
         onRefresh: () => _load(reset: true),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            return Column(
+            return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                          BorderRadius.circular(ForumTheme.radius2xl),
-                      border: Border.all(
-                        color: ForumTheme.border.withValues(alpha: 0.75),
-                      ),
-                      boxShadow: ForumTheme.softShadow,
+                if (wide) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: PortalTheme.space3,
+                      top: PortalTheme.space3,
+                      bottom: PortalTheme.space3,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          height: 44,
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: _onSearchChanged,
-                            textInputAction: TextInputAction.search,
-                            style: PortalTheme.body,
-                            decoration: InputDecoration(
-                              hintText:
-                                  'Search title, content, author, program, tags…',
-                              hintStyle: PortalTheme.bodySecondary,
-                              prefixIcon: const Icon(
-                                Icons.search_rounded,
-                                size: 20,
-                                color: PortalTheme.textSecondary,
-                              ),
-                              suffixIcon: _searchController.text.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      tooltip: 'Clear',
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        _onSearchChanged('');
-                                      },
-                                      icon: const Icon(Icons.clear, size: 18),
-                                    ),
-                              filled: true,
-                              fillColor: PortalTheme.surfaceMuted,
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(
-                                  PortalTheme.radiusMd,
-                                ),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(
-                                  PortalTheme.radiusMd,
-                                ),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(
-                                  PortalTheme.radiusMd,
-                                ),
-                                borderSide: const BorderSide(
-                                  color: PortalTheme.navy,
-                                  width: 1.2,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: PortalTheme.space2),
-                        if (!wide) _buildFilterChips(),
-                        if (!wide) const SizedBox(height: PortalTheme.space2),
-                        Row(
-                          children: [
-                            Text(
-                              _totalCount == 1
-                                  ? '1 discussion'
-                                  : '$_totalCount discussions',
-                              style: PortalTheme.meta,
-                            ),
-                            const Spacer(),
-                            DropdownButtonHideUnderline(
-                              child: DropdownButton<ForumSort>(
-                                value: _sort,
-                                borderRadius: PortalMenu.dropdownRadius,
-                                dropdownColor: PortalTheme.card,
-                                style: PortalTheme.meta.copyWith(
-                                  color: PortalTheme.navy,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                items: ForumSort.values
-                                    .map(
-                                      (s) => DropdownMenuItem(
-                                        value: s,
-                                        child: Text(s.label),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (v) {
-                                  if (v == null) return;
-                                  setState(() => _sort = v);
-                                  _load(reset: true);
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    child: _buildSidebar(true),
                   ),
-                ),
+                  const SizedBox(width: PortalTheme.space3),
+                ],
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (wide) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            left: PortalTheme.space3,
-                            top: PortalTheme.space3,
-                            bottom: PortalTheme.space3,
-                          ),
-                          child: _buildSidebar(true),
+                  child: PortalContentFrame(
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        PortalFloatingFilterHeader(
+                          child: _buildFilterCardContent(wide),
                         ),
-                        const SizedBox(width: PortalTheme.space3),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                          sliver: SliverToBoxAdapter(child: _buildListBody()),
+                        ),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: wide
+                                ? PortalTheme.space5
+                                : PortalFloating.bottomClearance(context),
+                          ),
+                        ),
                       ],
-                      Expanded(
-                        child: PortalContentFrame(
-                          child: ListView(
-                            padding: EdgeInsets.fromLTRB(
-                              16,
-                              14,
-                              16,
-                              wide ? PortalTheme.space5 : 100,
-                            ),
-                            children: [_buildListBody()],
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -413,6 +326,32 @@ class _ForumScreenState extends State<ForumScreen> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildFilterCardContent(bool wide) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PortalSearchField(
+          controller: _searchController,
+          onChanged: _onSearchChanged,
+          textInputAction: TextInputAction.search,
+          hintText: 'Search title, content, author, program, tags…',
+        ),
+        const SizedBox(height: PortalTheme.space2),
+        if (!wide) _buildFilterChips(),
+        if (!wide) const SizedBox(height: PortalTheme.space2),
+        Row(
+          children: [
+            Text(
+              _totalCount == 1 ? '1 discussion' : '$_totalCount discussions',
+              style: PortalTheme.meta,
+            ),
+            if (wide) ...[const Spacer(), _buildSortChip()],
+          ],
+        ),
+      ],
     );
   }
 
@@ -436,33 +375,37 @@ class _ForumScreenState extends State<ForumScreen> {
       final searching = _search.isNotEmpty;
       final bookmarkedOnly =
           _filters.contains(ForumListFilter.bookmarked) &&
-              !_filters.contains(ForumListFilter.all);
+          !_filters.contains(ForumListFilter.all);
       return SizedBox(
         height: 320,
         child: ForumEmptyState(
           icon: searching
               ? Icons.search_off
               : bookmarkedOnly
-                  ? Icons.bookmark_border
-                  : Icons.forum_outlined,
+              ? Icons.bookmark_border
+              : Icons.forum_outlined,
           title: searching
               ? 'No search results'
               : bookmarkedOnly
-                  ? 'No bookmarked topics'
-                  : 'No discussions yet',
+              ? 'No bookmarked topics'
+              : 'No discussions yet',
           subtitle: searching
               ? 'Try a different keyword or clear filters.'
               : bookmarkedOnly
-                  ? 'Save discussions you want to revisit later.'
-                  : 'Start the first topic and invite alumni to reply.',
+              ? 'Save discussions you want to revisit later.'
+              : 'Start the first topic and invite alumni to reply.',
           actionLabel: searching || bookmarkedOnly ? null : 'Start discussion',
           onAction: searching || bookmarkedOnly ? null : _openComposer,
         ),
       );
     }
 
-    final pinned = _topics.where((t) => t.isPinned && !t.isAnnouncement).toList();
-    final regular = _topics.where((t) => !t.isPinned || t.isAnnouncement).toList();
+    final pinned = _topics
+        .where((t) => t.isPinned && !t.isAnnouncement)
+        .toList();
+    final regular = _topics
+        .where((t) => !t.isPinned || t.isAnnouncement)
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

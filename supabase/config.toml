@@ -228,7 +228,8 @@ enable_confirmations = true
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
-# Number of characters used in the email OTP.
+# Number of characters used in the email OTP. The app accepts 6 to 10 digits
+# (EmailCodePolicy), so the hosted "Email OTP Length" may differ.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
@@ -247,6 +248,18 @@ otp_expiry = 3600
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+# Registration enters this email code in the app, so the template must
+# include the .Token variable. Mirror it in the hosted Confirm signup template.
+[auth.email.template.confirmation]
+subject = "Your AESS account confirmation code"
+content_path = "./supabase/templates/confirmation.html"
+
+# Forgot Password enters this email code in the app, so the template must
+# include the .Token variable. Mirror it in the hosted Reset password template.
+[auth.email.template.recovery]
+subject = "Your AESS password reset code"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

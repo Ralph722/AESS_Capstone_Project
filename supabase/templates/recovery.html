@@ -1,0 +1,17 @@
+<!-- Password reset email. Keep {{ .Token }}: the app asks for this code
+     (verifyOTP type "recovery") and does not handle reset links. -->
+<div style="font-family: Arial, Helvetica, sans-serif; color: #151515; max-width: 480px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1A1851; margin: 0 0 16px;">Reset your AESS password</h2>
+  <p style="margin: 0 0 16px; line-height: 1.5;">
+    We received a request to reset the password for your AESS Alumni Portal account.
+    Enter this code in the app to choose a new password:
+  </p>
+  <p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1A1851; margin: 0 0 16px;">
+    {{ .Token }}
+  </p>
+  <p style="margin: 0 0 16px; line-height: 1.5;">
+    The code expires in 1 hour. If you didn't ask to reset your password, you can ignore this
+    email; your password stays the same.
+  </p>
+  <p style="margin: 0; color: #6B7280; font-size: 12px;">USTP Alumni Engagement and Support System</p>
+</div>

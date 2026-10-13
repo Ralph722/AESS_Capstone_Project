@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
@@ -198,7 +199,7 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
       'Title,Author,Program,Batch,Replies,Pinned,Locked,Solved,Announcement,Tags,Created',
     );
     for (final t in _topics) {
-      String esc(String v) => '"${v.replaceAll('"', '""')}"';
+      const esc = CsvSafe.cell;
       buf.writeln([
         esc(t.title),
         esc(t.authorName),

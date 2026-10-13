@@ -5,10 +5,13 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/utils/csv_safe.dart';
+import 'package:alumni_system/core/utils/personal_data_notice.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
+import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
@@ -54,11 +57,24 @@ class CustomReportDocument {
 
   int get totalRows =>
       sections.fold<int>(0, (sum, s) => sum + s.rowCount);
+
+  /// Lists at least one graduate by name or contact details.
+  bool get containsPersonalData => sections.any(
+    (s) =>
+        CustomReportExportService.personalSections.contains(s.id) &&
+        s.rows.isNotEmpty,
+  );
 }
 
 /// Builds and exports multi-section custom reports.
 class CustomReportExportService {
   CustomReportExportService._();
+
+  /// Sections that list graduates by name, ID or email.
+  static const personalSections = {
+    CustomReportSectionId.alumniRoster,
+    CustomReportSectionId.employmentRecords,
+  };
 
   static CustomReportDocument buildDocument({
     required CustomReportTemplate template,
@@ -90,7 +106,15 @@ class CustomReportExportService {
           );
         case CustomReportSectionId.employmentRecords:
           sections.add(
-            _employmentRecords(analytics.reportEmploymentRecords, filters),
+            _employmentRecords(
+              analytics.reportEmploymentRecords,
+              filters,
+              cohort: _cohortKeys(
+                analytics.activeRoster,
+                filters,
+                profilesByAuthUid,
+              ),
+            ),
           );
         case CustomReportSectionId.surveySummary:
           sections.add(_surveySummary(analytics, analytics.surveys));
@@ -334,13 +358,8 @@ class CustomReportExportService {
             pw.SizedBox(height: 8),
           ],
         ),
-        footer: (ctx) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-          ),
-        ),
+        footer: (ctx) =>
+            pdfPageFooter(ctx, personal: doc.containsPersonalData),
         build: (ctx) {
           final widgets = <pw.Widget>[];
           for (var i = 0; i < doc.sections.length; i++) {
@@ -492,11 +511,12 @@ class CustomReportExportService {
           'Registered without complete tracer',
           '${a.registeredWithoutTracerComplete}',
         ],
-        ['Employment submissions', '${a.reportEmploymentCount}'],
-        ['Employed', '${a.employedCount}'],
-        ['Unemployed', '${a.unemployedCount}'],
+        ['Alumni with tracer employment answers', '${a.reportEmploymentCount}'],
+        ['Employed (item 16: Yes)', '${a.employedCount}'],
+        ['Not employed (item 16: No)', '${a.notEmployedCount}'],
+        ['Never employed (item 16: Never Employed)', '${a.neverEmployedCount}'],
         [
-          'Employed % of submissions',
+          'Employed % of alumni with answers',
           '${(a.employmentRateAmongSubmissions * 100).toStringAsFixed(1)}%',
         ],
         ['Survey assignments', '${a.totalSurveyAssignments}'],
@@ -585,21 +605,53 @@ class CustomReportExportService {
     );
   }
 
+  /// Auth uids and student IDs of roster members inside the batch / course
+  /// filters; `null` when neither filter is set.
+  static ({Set<String> uids, Set<String> studentIds})? _cohortKeys(
+    List<AlumniMember> members,
+    CustomReportFilters filters,
+    Map<String, TracerProfile> profilesByAuthUid,
+  ) {
+    if (filters.batchYears.isEmpty && filters.courses.isEmpty) return null;
+    final uids = <String>{};
+    final studentIds = <String>{};
+    for (final m in members) {
+      final profile = profileFor(m, profilesByAuthUid);
+      if (!_matchesBatch(memberBatch(m, profile), filters)) continue;
+      if (!_matchesCourse(m.course, filters)) continue;
+      final uid = (m.authUid ?? '').trim();
+      if (uid.isNotEmpty) uids.add(uid);
+      final sid = AlumniMemberService.normalizeStudentId(m.studentId);
+      if (sid.isNotEmpty) studentIds.add(sid);
+    }
+    return (uids: uids, studentIds: studentIds);
+  }
+
   static CustomReportSectionData _employmentRecords(
     List<EmploymentRecord> records,
-    CustomReportFilters filters,
-  ) {
+    CustomReportFilters filters, {
+    ({Set<String> uids, Set<String> studentIds})? cohort,
+  }) {
     final rows = <List<String>>[];
     for (final r in records) {
+      if (cohort != null) {
+        final uid = r.userId.trim();
+        final sid = AlumniMemberService.normalizeStudentId(r.schoolId);
+        final inCohort =
+            (uid.isNotEmpty && cohort.uids.contains(uid)) ||
+            (sid.isNotEmpty && cohort.studentIds.contains(sid));
+        if (!inCohort) continue;
+      }
       if (!_matchesEmploymentStatus(r.employmentStatus, filters)) continue;
       if (!_matchesDate(r.lastUpdated, filters)) continue;
       rows.add([
         r.userName,
         r.userEmail,
         r.employmentStatus,
-        r.companyName ?? '',
+        r.employmentType ?? '',
         r.position ?? '',
         r.industry ?? '',
+        _placeOfWork(r.country),
         DateFormat('yyyy-MM-dd').format(r.lastUpdated),
       ]);
     }
@@ -610,14 +662,22 @@ class CustomReportExportService {
         'Name',
         'Email',
         'Status',
-        'Company',
-        'Position',
+        'Employment type',
+        'Occupation',
         'Industry',
-        'Updated',
+        'Place of work',
+        'Submitted',
       ],
       rows: rows,
     );
   }
+
+  /// `gts_employment_records` stores CHED item 21 as a country label.
+  static String _placeOfWork(String? country) => switch (country) {
+    'Philippines' => 'Local',
+    'Abroad' => 'Abroad',
+    _ => '',
+  };
 
   static CustomReportSectionData _surveySummary(
     AdminReportsAnalytics a,
@@ -690,7 +750,7 @@ class CustomReportExportService {
         'Type',
         'Answered',
         'Total',
-        'Skipped',
+        'Not answered',
         'Detail',
       ],
       rows: [
@@ -953,8 +1013,13 @@ class CustomReportExportService {
     if (filters.tracer != CustomReportTracerFilter.all) {
       parts.add('Tracer: ${filters.tracer.name}');
     }
-    if (filters.employment != CustomReportEmploymentFilter.all) {
-      parts.add('Employment: ${filters.employment.name}');
+    switch (filters.employment) {
+      case CustomReportEmploymentFilter.all:
+        break;
+      case CustomReportEmploymentFilter.employedOnly:
+        parts.add('Employment: Employed');
+      case CustomReportEmploymentFilter.unemployedOnly:
+        parts.add('Employment: Not employed or never employed');
     }
     if (filters.hasDateRange) {
       final fmt = DateFormat('yyyy-MM-dd');
@@ -992,13 +1057,5 @@ class CustomReportExportService {
   }
 
   static String _csvRow(List<String> cells) =>
-      cells.map(_escCsv).join(',');
-
-  static String _escCsv(String v) {
-    final s = v.replaceAll('"', '""');
-    if (s.contains(',') || s.contains('"') || s.contains('\n')) {
-      return '"$s"';
-    }
-    return s;
-  }
+      cells.map(CsvSafe.cell).join(',');
 }

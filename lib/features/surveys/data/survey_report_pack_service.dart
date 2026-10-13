@@ -5,6 +5,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
@@ -68,7 +69,9 @@ class SurveyReportPackService {
     }
     if (rollups.isNotEmpty) {
       final skipped = <SurveyQuestionAggregate>[];
-      for (final r in rollups) {
+      // Official CHED items are shown only when an earlier answer applies,
+      // so their unanswered counts are mostly by design, not skips.
+      for (final r in rollups.where((r) => !r.survey.isChedGtsBuiltin)) {
         skipped.addAll(SurveyReportAnalytics.mostSkipped(r.aggregates, limit: 2));
       }
       skipped.sort((a, b) {
@@ -116,7 +119,7 @@ class SurveyReportPackService {
 
     final questionRows = <SurveyPackQuestionRow>[];
     for (final rollup in rollups) {
-      for (final a in rollup.aggregates.take(12)) {
+      for (final a in rollup.aggregates) {
         questionRows.add(
           SurveyPackQuestionRow(
             surveyTitle: rollup.survey.title,
@@ -187,7 +190,9 @@ class SurveyReportPackService {
             questions: questions,
             responses: submitted,
           );
-    final skipped = SurveyReportAnalytics.mostSkipped(aggregates, limit: 5);
+    final skipped = survey.isChedGtsBuiltin
+        ? const <SurveyQuestionAggregate>[]
+        : SurveyReportAnalytics.mostSkipped(aggregates, limit: 5);
 
     final insights = <String>[
       'Completion rate ${participation.completionRate.toStringAsFixed(0)}% '
@@ -309,14 +314,30 @@ class SurveyReportPackService {
     );
   }
 
+  /// Every chosen option as "label: count (share of answered)".
   static String _questionDetail(SurveyQuestionAggregate a) {
     if (a.choicePercentages.isNotEmpty) {
-      final top = a.choicePercentages.entries.toList()
-        ..sort((x, y) => y.value.compareTo(x.value));
-      return top
-          .take(3)
-          .map((e) => '${e.key} ${e.value.toStringAsFixed(0)}%')
+      final entries = a.choicePercentages.entries.toList();
+      final picked = [
+        for (var i = 0; i < entries.length; i++)
+          (
+            order: i,
+            label: entries[i].key,
+            count: (entries[i].value / 100 * a.answeredCount).round(),
+            pct: entries[i].value,
+          ),
+      ].where((e) => e.count > 0).toList()
+        ..sort((x, y) {
+          final byCount = y.count.compareTo(x.count);
+          return byCount != 0 ? byCount : x.order.compareTo(y.order);
+        });
+      if (picked.isEmpty) return '';
+      final detail = picked
+          .map((e) => '${e.label}: ${e.count} (${e.pct.toStringAsFixed(0)}%)')
           .join('; ');
+      return a.type == SurveyQuestionType.multipleChoice
+          ? '$detail. Multi-select, so shares can total over 100%.'
+          : detail;
     }
     if (a.scaleAverage != null) {
       return 'avg ${a.scaleAverage!.toStringAsFixed(1)} '
@@ -401,13 +422,7 @@ class SurveyReportPackService {
   static String _csv(String section, String field, String value) =>
       '${_esc(section)},${_esc(field)},${_esc(value)}';
 
-  static String _esc(String v) {
-    final s = v.replaceAll('"', '""');
-    if (s.contains(',') || s.contains('"') || s.contains('\n')) {
-      return '"$s"';
-    }
-    return s;
-  }
+  static String _esc(String v) => CsvSafe.cell(v);
 
   static Future<Uint8List> toPdf(SurveyReportPack pack) async {
     final doc = pw.Document();

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
@@ -386,13 +387,7 @@ abstract final class SurveyChedOutcomesSummaryService {
 
   static String toCsv(ChedOutcomesSummary summary) {
     final buf = StringBuffer();
-    String esc(String v) {
-      final s = v.replaceAll('"', '""');
-      if (s.contains(',') || s.contains('"') || s.contains('\n')) {
-        return '"$s"';
-      }
-      return s;
-    }
+    const esc = CsvSafe.cell;
 
     buf.writeln('Survey,${esc(summary.survey.title)}');
     buf.writeln(

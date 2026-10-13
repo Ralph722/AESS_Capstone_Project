@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
+import 'package:alumni_system/core/utils/personal_data_notice.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/features/surveys/data/classic_survey_visibility.dart';
@@ -144,13 +145,7 @@ class SurveySingleResponseExportService {
             pw.SizedBox(height: 8),
           ],
         ),
-        footer: (ctx) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-          ),
-        ),
+        footer: pdfPageFooter,
         build: (ctx) => [
           pw.Text(
             'Alumni information',

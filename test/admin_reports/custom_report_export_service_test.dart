@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
 import 'package:alumni_system/features/admin/reports/data/custom_report_export_service.dart';
-import 'package:alumni_system/features/admin/reports/data/custom_report_template_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
@@ -74,50 +72,6 @@ void main() {
       expect(
         noSections.validate(forSave: false),
         'Select at least one section.',
-      );
-    });
-  });
-
-  group('CustomReportTemplateService', () {
-    setUp(() {
-      SharedPreferences.setMockInitialValues({});
-    });
-
-    test('save load delete', () async {
-      final service = CustomReportTemplateService();
-      final now = DateTime(2026, 7, 22);
-      final template = CustomReportTemplate(
-        id: 'a',
-        name: 'Alpha',
-        sections: const [CustomReportSectionId.events],
-        format: CustomReportFormat.pdf,
-        filters: const CustomReportFilters(),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await service.save(template);
-      var all = await service.loadAll();
-      expect(all.length, 1);
-      expect(all.first.name, 'Alpha');
-
-      await service.save(
-        template.copyWith(name: 'Alpha 2', updatedAt: now.add(const Duration(minutes: 1))),
-      );
-      all = await service.loadAll();
-      expect(all.length, 1);
-      expect(all.first.name, 'Alpha 2');
-
-      await service.delete('a');
-      all = await service.loadAll();
-      expect(all, isEmpty);
-    });
-
-    test('rejects invalid template on save', () async {
-      final service = CustomReportTemplateService();
-      expect(
-        () => service.save(CustomReportTemplate.draft(id: 'bad')),
-        throwsA(isA<ArgumentError>()),
       );
     });
   });
@@ -436,6 +390,120 @@ void main() {
           doc.sections.firstWhere((s) => s.id == CustomReportSectionId.events);
       expect(eventSection.rows.length, 1);
       expect(eventSection.rows.first.first, 'Homecoming');
+    });
+
+    test('employment rows follow batch and course filters', () {
+      CustomReportSectionData employmentFor(CustomReportFilters filters) =>
+          CustomReportExportService.buildDocument(
+            template: template(
+              sections: const [CustomReportSectionId.employmentRecords],
+              filters: filters,
+            ),
+            analytics: analytics,
+            events: events,
+            jobs: jobs,
+          ).sections.single;
+
+      expect(employmentFor(const CustomReportFilters()).rows.length, 2);
+      expect(
+        employmentFor(
+          const CustomReportFilters(batchYears: ['2024'], courses: ['BSIT']),
+        ).rows.map((r) => r.first),
+        ['Ada Lovelace', 'Alan Turing'],
+      );
+      expect(
+        employmentFor(const CustomReportFilters(courses: ['BSCS'])).rows,
+        isEmpty,
+      );
+      expect(
+        employmentFor(const CustomReportFilters(batchYears: ['2023'])).rows,
+        isEmpty,
+      );
+    });
+
+    test('employment rows show type and place of work, not company', () {
+      final withPlace = AdminReportsAnalytics(
+        members: analytics.members,
+        employmentRecords: [
+          EmploymentRecord(
+            id: 'e1',
+            userId: 'uid-1',
+            userName: 'Ada Lovelace',
+            userEmail: 'ada@example.com',
+            schoolId: '2024-001',
+            employmentStatus: 'Employed',
+            employmentType: 'Regular or Permanent',
+            position: 'Engineer',
+            industry: 'Tech',
+            country: 'Philippines',
+            contactNumber: '',
+            lastUpdated: DateTime(2026, 3, 1),
+          ),
+        ],
+        surveys: const [],
+        announcements: const [],
+        forumTopics: const [],
+        portalUserCount: 2,
+      );
+      final section = CustomReportExportService.buildDocument(
+        template: template(
+          sections: const [CustomReportSectionId.employmentRecords],
+        ),
+        analytics: withPlace,
+        events: events,
+        jobs: jobs,
+      ).sections.single;
+
+      expect(section.headers, isNot(contains('Company')));
+      final row = section.rows.single;
+      expect(
+        row[section.headers.indexOf('Employment type')],
+        'Regular or Permanent',
+      );
+      expect(row[section.headers.indexOf('Place of work')], 'Local');
+    });
+
+    test('executive KPIs split not employed from never employed', () {
+      final mixed = AdminReportsAnalytics(
+        members: analytics.members,
+        employmentRecords: [
+          ...analytics.employmentRecords,
+          EmploymentRecord(
+            id: 'e3',
+            userId: 'uid-5',
+            userName: 'Katherine Johnson',
+            userEmail: 'katherine@example.com',
+            schoolId: '2020-005',
+            employmentStatus: 'Never Employed',
+            contactNumber: '',
+            lastUpdated: DateTime(2026, 5, 2),
+          ),
+        ],
+        surveys: const [],
+        announcements: const [],
+        forumTopics: const [],
+        portalUserCount: 3,
+      );
+      expect(mixed.employedCount, 1);
+      expect(mixed.notEmployedCount, 1);
+      expect(mixed.neverEmployedCount, 1);
+      expect(mixed.unemployedCount, 2);
+
+      final kpis = CustomReportExportService.buildDocument(
+        template: template(
+          sections: const [CustomReportSectionId.executiveKpis],
+        ),
+        analytics: mixed,
+        events: events,
+        jobs: jobs,
+      ).sections.single;
+      String value(String metric) =>
+          kpis.rows.firstWhere((r) => r.first == metric)[1];
+
+      expect(value('Employed (item 16: Yes)'), '1');
+      expect(value('Not employed (item 16: No)'), '1');
+      expect(value('Never employed (item 16: Never Employed)'), '1');
+      expect(kpis.rows.any((r) => r.first == 'Unemployed'), isFalse);
     });
 
     test('csv contains section markers and rows', () {

@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/core/utils/supabase_paging.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 
 /// Employment rows derived from each alumnus' latest submitted CHED GTS
@@ -51,17 +52,18 @@ class IdTracerService {
     return getEmploymentRecordByUserId(userId);
   }
 
-  /// Get all employment records (for admin)
-  Future<List<EmploymentRecord>> getAllEmploymentRecords({
-    int limit = 100,
-  }) async {
+  /// Every employment row (one per alumnus, latest submission), for admin.
+  Future<List<EmploymentRecord>> getAllEmploymentRecords() async {
     await _assertAdminCaller();
     try {
-      final rows = await _supabase
-          .from(_view)
-          .select()
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final rows = await fetchAllPages(
+        (from, to) => _supabase
+            .from(_view)
+            .select()
+            .order('created_at', ascending: false)
+            .order('user_id')
+            .range(from, to),
+      );
 
       return rows.map(EmploymentRecord.fromSupabaseRow).toList();
     } catch (e) {

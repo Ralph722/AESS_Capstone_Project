@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/web_file_download.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
@@ -49,7 +50,7 @@ class DssExportService {
         'start_date',
         'due_date',
         'review_date',
-      ].map(_csv).join(','),
+      ].map(CsvSafe.cell).join(','),
     );
     final now = DateTime.now();
     for (final f in flags) {
@@ -92,7 +93,7 @@ class DssExportService {
           f.startDate == null ? '' : dssDateValue(f.startDate!),
           f.dueDate == null ? '' : dssDateValue(f.dueDate!),
           f.reviewDate == null ? '' : dssDateValue(f.reviewDate!),
-        ].map(_csv).join(','),
+        ].map(CsvSafe.cell).join(','),
       );
     }
     final bytes = Uint8List.fromList(utf8.encode(buf.toString()));
@@ -102,13 +103,5 @@ class DssExportService {
           'dss_flags_${DateTime.now().toIso8601String().split('T').first}.csv',
       mimeType: 'text/csv',
     );
-  }
-
-  String _csv(String value) {
-    final v = value.replaceAll('"', '""');
-    if (v.contains(',') || v.contains('"') || v.contains('\n')) {
-      return '"$v"';
-    }
-    return v;
   }
 }

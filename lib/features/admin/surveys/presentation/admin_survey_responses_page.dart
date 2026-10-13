@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:alumni_system/core/utils/csv_safe.dart';
+import 'package:alumni_system/core/utils/personal_data_notice.dart';
+import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/config/email_delivery_config.dart';
@@ -238,7 +241,9 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       .where((b) => b.trim().isNotEmpty)
       .toSet();
 
-  void _exportPendingSelectedCsv(List<SurveyParticipant> visible) {
+  Future<void> _exportPendingSelectedCsv(
+    List<SurveyParticipant> visible,
+  ) async {
     if (!requireWebExport(context)) return;
     final selected = visible
         .where((p) => _selectedUserIds.contains(p.assignment.userId))
@@ -249,11 +254,18 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       );
       return;
     }
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The pending list',
+        ) ||
+        !mounted) {
+      return;
+    }
     final buf = StringBuffer();
     buf.writeln(
       'name,email,program,batch,status,assigned_at,last_reminder_at,reminder_count',
     );
-    String esc(String v) => '"${v.replaceAll('"', '""')}"';
+    const esc = CsvSafe.cell;
     for (final p in selected) {
       final a = p.assignment;
       buf.writeln(
@@ -396,15 +408,22 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     }
   }
 
-  void _exportCsv({
+  Future<void> _exportCsv({
     List<SurveyParticipant>? participants,
     int? submittedCount,
-  }) {
+  }) async {
     if (!requireWebExport(context)) return;
     if (_survey == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Survey not loaded yet')));
+      return;
+    }
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The responses file',
+        ) ||
+        !mounted) {
       return;
     }
     final people = participants ?? _participants;
@@ -459,6 +478,13 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Survey not loaded yet')),
       );
+      return;
+    }
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The responses workbook',
+        ) ||
+        !mounted) {
       return;
     }
     final people = participants ?? _participants;
@@ -626,6 +652,13 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No submitted responses to export')),
       );
+      return;
+    }
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The CHED GTS filing workbook',
+        ) ||
+        !mounted) {
       return;
     }
 
@@ -1555,6 +1588,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       );
       return;
     }
+    if (!await confirmPersonalDataExport(context, what: 'The pending list') ||
+        !mounted) {
+      return;
+    }
 
     setState(() => _isExportingChed = true);
     try {
@@ -1623,7 +1660,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         buf.writeln(
           'name,email,program,batch,status,assigned_at,last_reminder_at,reminder_count',
         );
-        String esc(String v) => '"${v.replaceAll('"', '""')}"';
+        const esc = CsvSafe.cell;
         for (final p in list) {
           final a = p.assignment;
           buf.writeln(
@@ -1700,13 +1737,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
             pw.SizedBox(height: 6),
           ],
         ),
-        footer: (ctx) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-          ),
-        ),
+        footer: pdfPageFooter,
         build: (ctx) => [
           pw.TableHelper.fromTextArray(
             headers: const [
@@ -1758,6 +1789,13 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No submitted responses to fill')),
       );
+      return;
+    }
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The filled CHED forms',
+        ) ||
+        !mounted) {
       return;
     }
 
@@ -2630,6 +2668,13 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     final survey = _survey;
     final response = participant.response;
     if (survey == null || response == null) return;
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'This response file',
+        ) ||
+        !mounted) {
+      return;
+    }
 
     try {
       if (action == 'pdf') {

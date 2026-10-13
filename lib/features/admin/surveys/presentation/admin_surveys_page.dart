@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/admin/surveys/presentation/admin_survey_editor_page.dart';
 import 'package:alumni_system/features/admin/surveys/presentation/admin_survey_responses_page.dart';
@@ -263,6 +264,13 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
 
   Future<void> _exportSurvey(Survey survey) async {
     if (!requireWebExport(context)) return;
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The detailed survey export',
+        ) ||
+        !mounted) {
+      return;
+    }
     try {
       final questions = await _surveyService.getQuestions(survey.id);
       final participants = await _surveyService.getSurveyParticipants(survey.id);

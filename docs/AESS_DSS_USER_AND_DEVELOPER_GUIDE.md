@@ -113,8 +113,8 @@ The AESS Decision Support System is a deterministic, rule-based module that eval
 
 | Environment | Phase 1–8 migrations | Nightly evaluation job `aess-dss-evaluate` |
 |---|---|---|
-| Demo project | Applied 2026-10-11 (recorded) | Switched **on**; first scheduled run **not yet observed** when last checked |
-| Live project | Applied 2026-10-12 (recorded) | Exists, switched **off** |
+| Demo project | Applied 2026-10-11 (recorded) | Switched **on**; first scheduled run 2026-10-12 03:25 Manila succeeded with the same results as the last manual Refresh |
+| Live project | Applied 2026-10-12 (recorded) | Switched **on** 2026-10-12 after a dry run matched the last manual Refresh (nothing raised or closed) |
 
 Phases 5, 9 and 10 changed app code only.
 
@@ -584,7 +584,7 @@ List page with stat cards; filters open; a flag detail page (Open); a Watch item
 | Operation | Automatic or manual | Trigger | Frequency | Result | Evidence it happened |
 |---|---|---|---|---|---|
 | Evaluation (Refresh insights) | Manual | Admin clicks **Refresh insights** | On demand | Flags raised, updated, superseded or skipped | Banner/snackbar; History "Evaluation runs"; `dss_evaluation_events` (trigger `manual`) |
-| Nightly evaluation `aess-dss-evaluate` | Automatic **if switched on** | pg_cron `25 19 * * *` UTC (03:25 Manila) | Daily | Same as Refresh | `dss_evaluation_events` (trigger `scheduled`), notes signed "DSS evaluation". **Demo: on, first run not yet observed. Live: off.** |
+| Nightly evaluation `aess-dss-evaluate` | Automatic **if switched on** | pg_cron `25 19 * * *` UTC (03:25 Manila) | Daily | Same as Refresh | `dss_evaluation_events` (trigger `scheduled`), notes signed "DSS evaluation". **On in demo and live (since 2026-10-12).** |
 | Nightly re-check `aess-dss-recheck` | Automatic | pg_cron `15 19 * * *` UTC (03:15 Manila) | Daily | `still_triggered` / `recovered` / `no_data` per active flag; never closes or raises flags | `dss_flag_checks`; note on the flag page. Whether the job is active on each project: **Not verified** for this guide |
 | Grouping, roll-up, sample-size labels, certainty | Automatic | During evaluation | Each evaluation | Stored on the flag | Flag chips and evidence |
 | Superseding older waves; Watch ↔ Open | Automatic | During evaluation | Each evaluation | Status change | `dss_evaluation_events` |

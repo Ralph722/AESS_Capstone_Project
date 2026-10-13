@@ -757,8 +757,9 @@ Progress:
     data quality stays at 2. `SEEKING_WORK_HIGH` added switched off. All
     eight DSS tables have RLS; `dss_evaluate_all` is executable by signed-in
     users (admin checked inside) and not by anonymous users.
-  - The nightly `aess-dss-evaluate` job exists on live but is switched off
-    until a manual Refresh on live has been reviewed.
+  - The nightly `aess-dss-evaluate` job was switched on in live on
+    2026-10-12, after the demo's first nightly run matched its last manual
+    Refresh and a live dry run raised and closed nothing.
 
 The plan rests on three findings:
 

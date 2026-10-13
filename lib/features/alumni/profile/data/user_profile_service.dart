@@ -209,11 +209,21 @@ class UserProfileService {
         await AlumniMemberService().getActiveRegisteredAuthUids();
     if (activeRegisteredIds.isEmpty) return {};
 
-    final rows = await _supabase
-        .from('users')
-        .select()
-        .eq('role', 'user')
-        .inFilter('id', activeRegisteredIds.toList());
+    // Chunked so the id list stays within URL limits and each request
+    // stays under PostgREST's row cap.
+    const chunkSize = 200;
+    final ids = activeRegisteredIds.toList();
+    final rows = <Map<String, dynamic>>[];
+    for (var i = 0; i < ids.length; i += chunkSize) {
+      final end = i + chunkSize > ids.length ? ids.length : i + chunkSize;
+      rows.addAll(
+        await _supabase
+            .from('users')
+            .select()
+            .eq('role', 'user')
+            .inFilter('id', ids.sublist(i, end)),
+      );
+    }
 
     return {
       for (final row in rows)

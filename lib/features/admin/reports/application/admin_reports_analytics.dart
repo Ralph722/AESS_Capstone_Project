@@ -117,7 +117,18 @@ class AdminReportsAnalytics {
       .where((r) => r.employmentStatus.toLowerCase() == 'employed')
       .length;
 
+  /// Everyone not employed: CHED item 16 "No" plus "Never Employed".
   int get unemployedCount => reportEmploymentCount - employedCount;
+
+  /// CHED item 16 "No" only.
+  int get notEmployedCount => reportEmploymentRecords
+      .where((r) => r.employmentStatus.toLowerCase() == 'unemployed')
+      .length;
+
+  /// CHED item 16 "Never Employed" only.
+  int get neverEmployedCount => reportEmploymentRecords
+      .where((r) => r.employmentStatus.toLowerCase() == 'never employed')
+      .length;
 
   static String _employmentPersonKey(EmploymentRecord r) {
     final uid = r.userId.trim();

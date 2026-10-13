@@ -4,8 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'dart:typed_data';
+import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/local_id.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
+import 'package:alumni_system/core/utils/supabase_paging.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/core/constants/audience_targeting.dart';
@@ -826,11 +828,15 @@ class SurveyService {
 
   Future<List<SurveyResponse>> getSurveyResponses(String surveyId) async {
     try {
-      final rows = await _supabase
-          .from('survey_responses')
-          .select()
-          .eq('survey_id', surveyId)
-          .eq('status', SurveyResponseStatus.submitted.name);
+      final rows = await fetchAllPages(
+        (from, to) => _supabase
+            .from('survey_responses')
+            .select()
+            .eq('survey_id', surveyId)
+            .eq('status', SurveyResponseStatus.submitted.name)
+            .order('id')
+            .range(from, to),
+      );
       final merged = <String, SurveyResponse>{};
       for (final row in rows) {
         final response = SurveyResponse.fromSupabaseRow(
@@ -1766,11 +1772,5 @@ class SurveyService {
     }
   }
 
-  static String _csvEscape(String value) {
-    final v = value.replaceAll('"', '""');
-    if (v.contains(',') || v.contains('"') || v.contains('\n')) {
-      return '"$v"';
-    }
-    return v;
-  }
+  static String _csvEscape(String value) => CsvSafe.cell(value);
 }

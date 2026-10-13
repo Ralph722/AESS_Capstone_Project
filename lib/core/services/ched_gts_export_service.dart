@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:alumni_system/core/utils/supabase_paging.dart';
 import 'package:alumni_system/features/surveys/data/ched_survey_template_seed.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
@@ -31,14 +32,23 @@ class ChedGtsExportService {
 
     final userIds = submitted.map((p) => p.assignment.userId).toList();
     final profiles = await _loadProfiles(userIds);
-    final employmentByUser = await _loadEmploymentByUserId();
+    // Built-in waves carry their own section D answers; other surveys fall
+    // back to each alumnus' latest tracer answers.
+    final employmentByUser = survey.isChedGtsBuiltin
+        ? const <String, EmploymentRecord>{}
+        : await _loadEmploymentByUserId();
 
     final excel = Excel.createExcel();
     // Use the template's Sheet1 for README (rename/delete mutates unmodifiable XML).
     _buildReadmeSheet(excel, survey, submitted.length, participants.length);
     _buildSectionASheet(excel, submitted, profiles);
     _buildSectionBSheet(excel, submitted, profiles);
-    _buildEmploymentTracerSheet(excel, submitted, employmentByUser);
+    _buildEmploymentTracerSheet(
+      excel,
+      submitted,
+      employmentByUser,
+      fromWaveAnswers: survey.isChedGtsBuiltin,
+    );
     if (survey.isChedGtsBuiltin) {
       _buildBuiltinLongSheet(excel, survey, submitted);
       _buildBuiltinWideSheet(excel, submitted);
@@ -66,7 +76,13 @@ class ChedGtsExportService {
   }
 
   Future<Map<String, EmploymentRecord>> _loadEmploymentByUserId() async {
-    final rows = await _supabase.from('gts_employment_records').select();
+    final rows = await fetchAllPages(
+      (from, to) => _supabase
+          .from('gts_employment_records')
+          .select()
+          .order('user_id')
+          .range(from, to),
+    );
     final map = <String, EmploymentRecord>{};
     for (final row in rows) {
       final record = EmploymentRecord.fromSupabaseRow(row);
@@ -101,7 +117,8 @@ class ChedGtsExportService {
       ['B_Education', 'Tracer education fields (CHED section B)'],
       [
         'Employment_Tracer',
-        'Alumni Tracer employment record (supports section D)',
+        'Section D employment answers: from this wave for Official CHED '
+            'waves, otherwise from each alumnus\' latest tracer',
       ],
       ['Survey_C_D', 'Long format: one row per CHED survey answer'],
       ['Survey_Wide', 'One row per alumni; columns per survey question'],
@@ -135,14 +152,14 @@ class ChedGtsExportService {
           ('1', 'Name', (p) => p.displayName),
           ('2', 'Permanent Address', (p) => p.address),
           ('3', 'E-mail Address', (p) => p.email),
-          ('4', 'Telephone / Contact', (p) => p.contactNumber),
-          ('5', 'Mobile Number', (p) => p.contactNumber),
+          ('4', 'Telephone / Contact', (p) => p.telephoneNumber),
+          ('5', 'Mobile Number', (p) => p.mobileNumber),
           ('6', 'Civil Status', (p) => p.civilStatus),
           ('7', 'Sex', (p) => p.gender),
           ('8', 'Birthday', (p) => _formatDate(p.birthDate)),
-          ('9', 'Region of Origin', (_) => ''),
-          ('10', 'Province', (_) => ''),
-          ('11', 'Location of Residence', (_) => ''),
+          ('9', 'Region of Origin', (p) => p.regionOfOrigin),
+          ('10', 'Province', (p) => p.province),
+          ('11', 'Location of Residence', (p) => p.locationOfResidence),
         ];
 
     for (final p in submitted) {
@@ -211,7 +228,9 @@ class ChedGtsExportService {
         (
           '12',
           'College or University',
-          'See institution code on official form',
+          profile.collegeUniversity.trim().isNotEmpty
+              ? profile.collegeUniversity
+              : 'See institution code on official form',
         ),
         ('13', 'Professional Examination(s)', '(not in tracer — add manually)'),
         ('14', 'Reason(s) for taking course', '(not in tracer — add manually)'),
@@ -236,8 +255,9 @@ class ChedGtsExportService {
   void _buildEmploymentTracerSheet(
     Excel excel,
     List<SurveyParticipant> submitted,
-    Map<String, EmploymentRecord> employmentByUser,
-  ) {
+    Map<String, EmploymentRecord> employmentByUser, {
+    required bool fromWaveAnswers,
+  }) {
     final sheet = excel['Employment_Tracer'];
     sheet.appendRow([
       'User ID',
@@ -245,42 +265,71 @@ class ChedGtsExportService {
       'Email',
       'Program',
       'Batch',
-      'Employment Status',
-      'Company',
-      'Position',
-      'Industry',
-      'Employment Type',
-      'Salary Range (tracer)',
-      'City',
-      'Province',
-      'Country',
+      'Employment Status (16)',
+      'Employment Type (18)',
+      'Occupation (19)',
+      'Industry (20)',
+      'Place of Work (21)',
+      'Initial Monthly Earning (31)',
       'Submitted At',
-      'Verification',
+      'Source',
     ]);
 
     for (final p in submitted) {
       final uid = p.assignment.userId;
-      final emp = employmentByUser[uid];
+      final List<String> values;
+      if (fromWaveAnswers) {
+        final a = p.response!.answers;
+        String text(String id) => (a[id] ?? '').toString().trim();
+        final industry = text('ched_20');
+        final industryOther = text('ched_20_other');
+        values = [
+          _employmentStatusLabel(text('ched_16')),
+          text('ched_18'),
+          text('ched_19'),
+          industry.startsWith('Others') && industryOther.isNotEmpty
+              ? industryOther
+              : industry,
+          text('ched_21'),
+          text('ched_31'),
+          _formatDateTime(p.response!.submittedAt ?? p.response!.updatedAt),
+          'This wave',
+        ];
+      } else {
+        final emp = employmentByUser[uid];
+        values = [
+          emp?.employmentStatus ?? '',
+          emp?.employmentType ?? '',
+          emp?.position ?? '',
+          emp?.industry ?? '',
+          switch (emp?.country) {
+            'Philippines' => 'Local',
+            'Abroad' => 'Abroad',
+            _ => '',
+          },
+          emp?.salaryRange ?? '',
+          emp != null ? _formatDateTime(emp.submittedAt) : '',
+          emp != null ? 'Latest tracer' : '',
+        ];
+      }
       sheet.appendRow([
         uid,
         p.displayName,
         p.email,
         p.program,
         p.batchYear,
-        emp?.employmentStatus ?? '',
-        emp?.companyName ?? '',
-        emp?.position ?? '',
-        emp?.industry ?? '',
-        emp?.employmentType ?? '',
-        emp?.salaryRange ?? '',
-        emp?.city ?? '',
-        emp?.province ?? '',
-        emp?.country ?? '',
-        emp != null ? _formatDateTime(emp.submittedAt) : '',
-        emp?.verificationStatus ?? '',
+        ...values,
       ]);
     }
   }
+
+  /// Same labels as the `gts_employment_records` view.
+  static String _employmentStatusLabel(String item16) => switch (item16) {
+    '' => '',
+    ChedGtsBuiltin.yes => 'Employed',
+    ChedGtsBuiltin.neverEmployed => 'Never Employed',
+    _ => 'Unemployed',
+  };
 
   void _buildSurveyLongSheet(
     Excel excel,

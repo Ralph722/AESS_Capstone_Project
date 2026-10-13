@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/constants/course_constants.dart';
 import 'package:alumni_system/core/utils/calendar_date.dart';
 import 'package:alumni_system/core/utils/local_id.dart';
+import 'package:alumni_system/core/utils/supabase_paging.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/services/supabase_user_bridge.dart';
@@ -570,11 +571,15 @@ class AlumniMemberService {
 
   Future<Set<String>> getActiveRegisteredAuthUids() async {
     try {
-      final rows = await _supabase
-          .from('alumni_members')
-          .select('auth_uid')
-          .eq('is_registered_user', true)
-          .eq('is_deactivated', false);
+      final rows = await fetchAllPages(
+        (from, to) => _supabase
+            .from('alumni_members')
+            .select('auth_uid')
+            .eq('is_registered_user', true)
+            .eq('is_deactivated', false)
+            .order('id')
+            .range(from, to),
+      );
       return rows
           .map((row) => row['auth_uid']?.toString() ?? '')
           .where((id) => id.isNotEmpty)
@@ -777,16 +782,20 @@ class AlumniMemberService {
   }
 
   Future<List<AlumniMember>> _fetchMembersFromSupabase() async {
-    final rows = await _supabase
-        .from('alumni_members')
-        .select(
-          'id, full_name, course, student_id, auth_uid, registered_email, '
-          'is_registered_user, is_deactivated, profile_image_url, last_active_at, '
-          'has_profile_updates, admin_viewed_at, created_at, updated_at, '
-          'contact_number, email_address, address, gender, civil_status, birth_date, '
-          'year_graduated, tracer_profile_complete',
-        )
-        .order('created_at', ascending: false);
+    final rows = await fetchAllPages(
+      (from, to) => _supabase
+          .from('alumni_members')
+          .select(
+            'id, full_name, course, student_id, auth_uid, registered_email, '
+            'is_registered_user, is_deactivated, profile_image_url, last_active_at, '
+            'has_profile_updates, admin_viewed_at, created_at, updated_at, '
+            'contact_number, email_address, address, gender, civil_status, birth_date, '
+            'year_graduated, tracer_profile_complete',
+          )
+          .order('created_at', ascending: false)
+          .order('id')
+          .range(from, to),
+    );
     return rows.map(AlumniMember.fromSupabaseRow).toList();
   }
 

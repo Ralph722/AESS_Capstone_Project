@@ -37,7 +37,7 @@ AESS (Alumni Engagement System) is a web-first Flutter application that provides
 - **Announcements**: Priority-based announcements with audience targeting and email delivery
 - **Feedback**: Alumni feedback submissions with admin response workflow
 - **AI Assistant**: Gemini-powered chatbot for portal guidance
-- **Reports & Analytics**: Custom report builder with PDF/Excel/CSV export, KPIs, CHED wave comparison
+- **Reports & Analytics**: KPIs, tracer charts, preset PDF/Excel/CSV downloads, CHED wave comparison
 - **Audit Trail**: Full action logging for accountability
 
 ### Two User Roles
@@ -95,7 +95,7 @@ lib/
 │       ├── jobs/                      # Job management + insights + interested alumni
 │       ├── announcements/             # Announcement CRUD + audience targeting
 │       ├── surveys/                   # Survey editor + responses + analytics + export
-│       ├── reports/                   # Custom report builder + KPIs + CHED comparison
+│       ├── reports/                   # KPIs + preset downloads + CHED comparison
 │       ├── activity/                  # Audit log viewer
 │       ├── forum/                     # Forum moderation
 │       ├── feedback/                  # Feedback management
@@ -258,14 +258,17 @@ The admin portal (`AdminDashboardWeb`) uses a collapsible navy sidebar with sect
 - **Overview**: KPI cards with growth %, sparklines, status badges
 - **Tracer**: Cohort filters, employment charts, CHED wave comparison (2-8 waves)
 - **Survey**: Response rates, question-level rollups
-- **Export**: Custom report builder with 11 section types, PDF/Excel/CSV/print
+- **Builder**: two modes. "Alumni list" (who answered and what they said: one row per alumnus on the active roster, any columns, tally at the bottom) and "Summary & charts" (how many and what share, no names). See "Report builder" under the database views below.
+
+**Tracer tab numbers**: every answer-based card (employment rate, degree aligned, curriculum relevant, status, rate by wave, by batch, by course, course comparison employment rate, industry, employment type, initial monthly earning, graduate location and the Career path cards) comes from `TracerTabStats`, which runs the report engine (`GtsReportEngine`) over the tracer answers already loaded on the page. It counts graduates linked to an active roster record with a course (the Program Insights population), applies the wave, course and batch filters, and with every wave in scope counts each graduate once, from their latest wave. "Employed only" cards keep graduates who answered item 16 "Yes". Groups and totals with fewer than 5 answers show "Not enough data" and cannot be opened to list names. The coverage funnel and "Tracer responses" still count every submitter, and the "Export view" download still uses the preset export. `supabase/regression/dss_cohort_parity.ps1` (demo only) also checks that the engine's item-16 counts equal `dss_cohort_metrics` for the institution, every course and every course × batch.
+- **Downloads**: 6 preset report packs, PDF/Excel/CSV/print
 - **AI Insights**: Executive summary, key findings, recommendations
 
-**Custom Report Builder**:
-- 11 section types: executiveKpis, alumniRoster, employmentRecords, surveySummary, surveyParticipation, surveyQuestions, chedWaveComparison, events, jobPostings, announcements, forumTopics
-- Filter by: batch years, courses, registration status, tracer completion, employment status, date range
-- Save/load templates locally
-- 6 preset download packs (executive brief, tracer pack, CHED GTS pack, wave comparison, survey participation, roster extract)
+**Downloads (preset reports)**:
+- 6 presets: Executive snapshot, Tracer outcomes, CHED GTS pack, CHED wave comparison, Survey participation, Roster extract
+- Built from 11 section types: executiveKpis, alumniRoster, employmentRecords, surveySummary, surveyParticipation, surveyQuestions, chedWaveComparison, events, jobPostings, announcements, forumTopics
+- Roster and employment rows follow the Tracer tab's batch and course filters; other sections cover the whole system
+- The Tracer tab's "Export view" exports the current wave, batch and course filters
 
 ### 4.8 Forum Moderation
 **File**: `lib/features/admin/forum/`
@@ -605,6 +608,26 @@ Latest submitted CHED GTS response per alumnus.
 
 `gts_respondent_facts` (one typed row per submitted CHED response) and `gts_metric(...)` back the DSS metrics.
 
+`gts_report_facts` backs the report builder: one row per submitted CHED response with the roster cohort (`on_active_roster`, `course`, `year_graduated`, same join as `gts_respondent_facts`) and the answers with personal items (1-5, 8) removed. It uses the caller's RLS (`security_invoker`), so admins see all responses and alumni only their own.
+
+**Report builder.** The admin Reports page's **Builder** tab opens on a mode switch: "Alumni list" (default) or "Summary & charts".
+
+*Alumni list* (`GtsAlumniListPanel`, `GtsAlumniList`) lists every alumnus on the active roster, one row each, with their answer from one CHED wave (newest by default) or their latest answer from any wave (a "Wave answered" column is then always shown). Responses are read from `survey_responses` (submitted only) under the existing admin RLS; the roster is the one the page already loaded. Each row gets a tracer status from item 16, read as the DSS does: Employed, Not employed, Never employed, "Answered, status not given" (item 16 blank), "Untracked – registered, not yet answered" or "Untracked – not registered". People who answered without an active roster record are listed last as "Answered – not on active roster" and are not counted in the total. Columns (`GtsListColumns`) are 10 roster columns (batch, name, student ID, course, registration, email, contact number, tracer status, wave answered, date answered) plus every CHED item 1–34, picked by section with search and reordered by dragging. Answers are written out in full: multi-select joined with "; ", grids as "row (columns)", tables as "a | b | c" rows, "Others: text" for the specify boxes, "Not asked" when the form skipped the item and blank for untracked alumni. Filters: tracer status, course, batch and CHED answers; any column can be the sort order. The tally at the bottom (`GtsListTally`) counts every status with its share, the response rate (answered ÷ total) and the employment rate (employed ÷ answered item 16), overall or with subtotals by batch or course, plus an optional status chart. It equals the Tracer tab coverage funnel and employment card and the DSS employment rate. Excel, CSV and PDF downloads (`GtsListExportService`) print the same layout as the screen (about lines, the list, then the tally); they ask for the personal-data confirmation first and the PDF carries the RA 10173 footer. The PDF stops at 1,000 rows with a note and uses small print past 10 columns; Excel has a second "Columns" sheet with each column's full question. Four ready-made lists (`GtsListTemplates`): employment status of all alumni, untracked alumni for follow-up (with contact details), employed alumni job details (items 18–21) and not employed with reasons (item 17).
+
+*Summary & charts* (`GtsReportBuilderPanel`) reads `gts_report_facts`. The settings are: ready-made report cards; tracer wave (one dropdown, plus a "Compare waves" switch that shows waves side by side, grouped by wave); 1. What do you want to know? (a CHED question picked by section with search); 2. Compare by (None, Course, Batch or another question); 3. Only include (conditions shown as sentences, e.g. "Only graduates whose Course is BSIT."); 4. Show as (chart buttons, greyed out with the reason when they do not fit, and Numbers: Percent of those who answered, or Number of graduates). "More options" holds the item-30 job column, answer order, top-N, the middle bracket (median) for bracket questions and a second split. The preview starts with one sentence describing the report. One calculated result (`GtsReportEngine`) feeds the preview and the PDF, Excel and CSV downloads. New reports count graduates linked to an active roster record with a course (the DSS population). Older saved reports that count every response, or use "share of graduates who were asked", "share of all graduates" or "number of answers", keep those settings so their numbers do not change; the screen says so and offers a one-click switch.
+
+The six ready-made Summary reports (`GtsReportTemplates`) are employment summary, employment status by graduation year, employment status by course, first job related to course, employment type, and industry. Templates are ordinary report settings, so they can be changed after they are applied. All six count roster-linked graduates; the item-16 ones' "No" plus "Never Employed" shares equal the DSS not-employed rate.
+
+A PDF prints at most 1,000 group lines plus the All graduates totals and says so when it stops early; Excel and CSV always contain every line. The on-screen table shows 200 group lines at a time (plus the totals) with a "Show more" button. Charts on screen and in the PDF draw at most 40 bars, slices or points, in table order, with a note; the table still lists every line.
+
+Performance: responses are read from `gts_report_facts` in pages of 1,000 for the selected waves only, and kept per wave while the admin stays on the Reports page (switching tabs does not download them again; "Reload responses" does). Calculation runs in the browser; with 50,000 synthetic responses one report takes under 0.1 s in tests, so no server-side aggregation is used. Changing only the report name does not recalculate.
+
+Groups with fewer than 5 answers show "Not enough data" and their counts, base and percentages are left blank in the preview and every download (the All graduates totals stay visible). `supabase/regression/gts_report_facts_rls.sql` checks the view's access rules; it runs against the demo project with `supabase db query --db-url`.
+
+**Saved reports.** Builder settings from either mode can be saved under a name in `public.report_definitions` (`GtsSavedReportService`): `name` (unique, ignoring case and surrounding spaces), `config` (the `GtsReportConfig` or `GtsListConfig` JSON, which stores settings only and never any names or answers; alumni lists carry `"mode": "list"`), `created_by`/`created_at` and `updated_by`/`updated_at`. The who-and-when columns are set by a trigger from the signed-in session and cannot be supplied by the app. Saved reports are shared: every active admin can open, change and delete any of them; alumni and other accounts have no access. Each mode's "Saved reports" list shows both kinds; opening the other kind switches mode. Opening a saved report recalculates it from current responses; waves that are no longer published or closed are dropped with a message (an alumni list uses the newest wave instead), columns that no longer exist are reported, and settings saved by a newer app version are refused. Delete asks for confirmation. `supabase/regression/report_definitions_rls.sql` checks these rules on the demo project.
+
+**Export safety.** Every CSV writer uses `CsvSafe.cell`, which quotes values and puts an apostrophe before text starting with `=`, `+`, `-`, `@`, tab or carriage return so spreadsheet apps do not run it as a formula (numbers such as `-0.05` are left alone). Excel downloads write text cells, never formulas. Downloads that list graduates by name or contact details (Reports presets with the roster or employment records, the Tracer filtered view, CHED filing workbook, filled CHED forms, survey response and pending lists, detailed survey export) ask the admin to confirm first, and their PDFs carry a "Contains personal data … RA 10173" footer.
+
 #### `public.forum_topics`
 | Column | Type |
 |--------|------|
@@ -814,12 +837,14 @@ MessagesPage
 ### Admin Report Export Flow
 ```
 ReportsPage
-  → Select tab (Overview/Tracer/Survey/Export/AI)
-  → Custom Report Builder
-  → Pick sections (11 types)
-  → Apply filters (batch, course, date)
-  → Export to PDF / Excel / CSV / Print
-  → Or use preset download packs
+  → Select tab (Overview/Tracer/Survey/Downloads/Builder)
+  → Builder → Alumni list: wave, columns, filters, order, subtotals
+      → confirm personal data → PDF / Excel / CSV (list + tally)
+  → Builder → Summary & charts: wave(s), question, compare by, conditions, chart
+      → PDF / Excel / CSV (no names)
+  → Either mode: save / open shared saved reports (report_definitions)
+  → Downloads: preset packs (11 section types; batch, course, date filters)
+      → PDF / Excel / CSV / Print
 ```
 
 ### CHED GTS PDF Export Flow

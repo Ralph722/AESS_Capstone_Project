@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
@@ -1655,7 +1656,7 @@ Future<void> exportInterestedAlumniCsv({
   final buf = StringBuffer();
   buf.writeln('Name,Email,Course,Batch,Employment,Interested At');
   for (final a in alumni) {
-    String esc(String s) => '"${s.replaceAll('"', '""')}"';
+    const esc = CsvSafe.cell;
     buf.writeln(
       [
         esc(a.name),

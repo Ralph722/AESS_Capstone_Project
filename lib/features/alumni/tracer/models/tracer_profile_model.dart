@@ -26,6 +26,18 @@ class TracerProfile {
   final bool isComplete;
   final DateTime? completedAt;
 
+  /// Verified contact email (`users.contact_email`), separate from the login
+  /// [email]. Read-only here: saved by contact-verify `apply_email`.
+  /// Empty on profiles built from form fields.
+  final String contactEmail;
+  final DateTime? contactEmailVerifiedAt;
+
+  /// Set only after a real SMS check.
+  final DateTime? mobileVerifiedAt;
+
+  /// `sms`, `mock` (demo code while SMS is not integrated) or empty.
+  final String mobileVerificationMethod;
+
   const TracerProfile({
     required this.uid,
     required this.email,
@@ -49,10 +61,29 @@ class TracerProfile {
     this.completionPercent = 0,
     this.isComplete = false,
     this.completedAt,
+    this.contactEmail = '',
+    this.contactEmailVerifiedAt,
+    this.mobileVerifiedAt,
+    this.mobileVerificationMethod = '',
   });
 
   /// Legacy alias — mobile number is the primary contact field.
   String get contactNumber => mobileNumber;
+
+  /// The email to contact the alumnus at: [contactEmail], else the login.
+  String get preferredEmail =>
+      contactEmail.trim().isNotEmpty ? contactEmail.trim() : email.trim();
+
+  /// The login email was confirmed at registration, so it counts as verified.
+  bool get contactEmailVerified =>
+      contactEmailVerifiedAt != null ||
+      preferredEmail.toLowerCase() == email.trim().toLowerCase();
+
+  bool get mobileVerified => mobileVerifiedAt != null;
+
+  /// Confirmed with a demo code; still needs an SMS check once available.
+  bool get mobileDemoConfirmed =>
+      !mobileVerified && mobileVerificationMethod == 'mock';
 
   /// GTS Section A + B item 12 (employment collected separately in onboarding).
   static const profileRequiredFieldKeys = [
@@ -213,6 +244,15 @@ class TracerProfile {
       completionPercent: resolvedCompletion,
       isComplete: isComplete,
       completedAt: null,
+      contactEmail: (row['contact_email'] as String? ?? '').trim(),
+      contactEmailVerifiedAt: DateTime.tryParse(
+        row['contact_email_verified_at']?.toString() ?? '',
+      ),
+      mobileVerifiedAt: DateTime.tryParse(
+        row['mobile_verified_at']?.toString() ?? '',
+      ),
+      mobileVerificationMethod:
+          (row['mobile_verification_method'] as String? ?? '').trim(),
     );
   }
 
@@ -307,6 +347,10 @@ class TracerProfile {
       collegeUniversity: collegeUniversity ?? this.collegeUniversity,
       honorsAwards: honorsAwards ?? this.honorsAwards,
       employmentStatus: employmentStatus ?? this.employmentStatus,
+      contactEmail: contactEmail,
+      contactEmailVerifiedAt: contactEmailVerifiedAt,
+      mobileVerifiedAt: mobileVerifiedAt,
+      mobileVerificationMethod: mobileVerificationMethod,
     );
   }
 }

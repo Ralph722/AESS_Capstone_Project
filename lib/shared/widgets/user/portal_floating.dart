@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -200,7 +198,7 @@ class PortalNavFade extends StatelessWidget {
   }
 }
 
-/// See-through nav pill that blurs whatever scrolls behind it.
+/// Opaque floating nav pill (solid card surface, not frosted glass).
 class PortalFrostedPill extends StatelessWidget {
   const PortalFrostedPill({
     super.key,
@@ -221,29 +219,22 @@ class PortalFrostedPill extends StatelessWidget {
         radius: radius,
         shadows: PortalFloating.shadow(),
       ),
-      child: ClipRRect(
-        borderRadius: shape,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.78),
-              borderRadius: shape,
-              border: Border.all(
-                color: PortalTheme.border.withValues(alpha: 0.6),
-              ),
-            ),
-            child: child,
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: PortalTheme.card,
+          borderRadius: shape,
+          border: Border.all(
+            color: PortalTheme.border.withValues(alpha: 0.75),
           ),
         ),
+        child: child,
       ),
     );
   }
 }
 
-/// Soft drop shadow painted only around a rounded rect, never inside it, so
-/// it can't show through a translucent surface.
+/// Soft drop shadow painted only around a rounded rect, never inside it.
 class _OutsideShadowPainter extends CustomPainter {
   const _OutsideShadowPainter({required this.radius, required this.shadows});
 

@@ -8,6 +8,7 @@ import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/config/email_delivery_config.dart';
+import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/core/services/ched_gts_export_service.dart';
@@ -17,16 +18,19 @@ import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_analyt
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_formal_report_dialog.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_export_dialog.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
+import 'package:alumni_system/features/admin/surveys/widgets/survey_question_editor.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_pack_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_ched_outcomes_summary_service.dart';
 import 'package:alumni_system/features/admin/ched_gts_pdf_export/ched_gts_pdf_export.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_search_field.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
@@ -35,6 +39,84 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+
+/// Reminder confirmation text; [emailDropped] = email was requested but
+/// isn't configured, so only in-app goes out.
+@visibleForTesting
+String surveyReminderConfirmMessage({
+  required String surveyTitle,
+  required int recipients,
+  required bool inApp,
+  required bool email,
+  required bool emailDropped,
+}) {
+  final channels = <String>[
+    if (inApp) 'in-app',
+    if (email) 'email',
+  ].join(' + ');
+  final title = surveyTitle.trim().isEmpty
+      ? 'this survey'
+      : '“${surveyTitle.trim()}”';
+  final who = recipients == 1 ? 'alumnus' : 'alumni';
+  final note = emailDropped
+      ? ' Email isn’t set up, so these will be sent in-app only.'
+      : '';
+  return 'Send $channels reminders for $title to $recipients pending $who?'
+      '$note';
+}
+
+/// Result line after `sendReminders`, including skipped emails.
+@visibleForTesting
+String surveyReminderSummary(
+  SurveyReminderResult result, {
+  required bool inApp,
+  required bool email,
+  required bool emailDropped,
+}) {
+  final parts = <String>[
+    if (inApp) '${result.inAppSent} in-app',
+    if (email) '${result.emailSent} email',
+    if (result.emailSkippedNoAddress > 0)
+      '${result.emailSkippedNoAddress} skipped (no email)',
+    if (result.emailSkippedOptedOut > 0)
+      '${result.emailSkippedOptedOut} skipped (opted out of email)',
+    if (result.emailSkippedNotConfigured > 0)
+      '${result.emailSkippedNotConfigured} email skipped (not set up)',
+  ];
+  final summary = parts.isEmpty
+      ? 'No reminders sent'
+      : 'Sent: ${parts.join(', ')}';
+  return emailDropped ? '$summary · email isn’t set up' : summary;
+}
+
+/// Export failure text: what failed, plus the reason when it reads cleanly.
+@visibleForTesting
+String surveyExportErrorMessage(String what, Object error) {
+  final reason = error is Error ? '' : surveyFriendlyError(error, '');
+  final base = 'Couldn’t create $what.';
+  return reason.isEmpty ? '$base Try again.' : '$base $reason';
+}
+
+/// Detail panel meta line: course · batch · submitted date · device.
+@visibleForTesting
+String surveyResponseMetaLine(
+  SurveyParticipant participant,
+  SurveyResponse response,
+) {
+  final program = participant.program.trim();
+  final batch = participant.batchYear.trim();
+  final submittedAt = response.submittedAt;
+  final device = response.deviceSummary;
+  return <String>[
+    if (program.isNotEmpty) program,
+    if (batch.isNotEmpty) 'Batch $batch',
+    if (submittedAt != null)
+      'Submitted ${DateFormat.yMMMd().format(submittedAt)}'
+    else
+      'Last saved ${DateFormat.yMMMd().format(response.updatedAt)}',
+    if (device != 'Device not recorded') device,
+  ].join(' · ');
+}
 
 class AdminSurveyResponsesScreen extends StatefulWidget {
   const AdminSurveyResponsesScreen({
@@ -71,6 +153,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   bool _isLoading = false;
   bool _isSendingReminders = false;
   bool _isExportingChed = false;
+
+  /// Label of the running Overview publish / re-publish / close step.
+  String? _stateActionBusy;
+  bool _duplicating = false;
   String? _loadError;
   bool _loadErrorLooksOffline = false;
   late TabController _tabController;
@@ -81,6 +167,8 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   String? _pendingBatchFilter;
   _PendingSort _pendingSort = _PendingSort.assignedNewest;
   _SubmittedSort _submittedSort = _SubmittedSort.newest;
+  String? _submittedProgramFilter;
+  String? _submittedBatchFilter;
   final _submittedSearchController = TextEditingController();
   int _pendingPage = 0;
   int _pendingPageSize = 25;
@@ -291,11 +379,9 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       fileName: '${title}_pending_selected.csv',
       mimeType: 'text/csv',
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Exported ${selected.length} pending alumni'),
-        backgroundColor: Colors.green,
-      ),
+    _showSnack(
+      'Exported ${selected.length} pending alumni',
+      color: AdminColors.success,
     );
   }
 
@@ -313,46 +399,31 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       return;
     }
 
-    final channels = <String>[
-      if (inApp) 'in-app',
-      if (email) 'email',
-    ].join(' + ');
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Send reminders?'),
-        content: Text(
-          'Send $channels reminders to ${targets.length} pending alumni?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    if (!mounted) return;
-
-    if (email && !EmailDeliveryConfig.isConfigured) {
-      if (!inApp) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Email reminders are not configured. Check Gmail SMTP / '
-              'Supabase secrets or use In-app.',
-            ),
-          ),
-        );
-        return;
-      }
-      email = false;
+    final emailDropped = email && !EmailDeliveryConfig.isConfigured;
+    if (emailDropped && !inApp) {
+      _showSnack(
+        'Email reminders are not configured. Check Gmail SMTP / '
+        'Supabase secrets or use In-app.',
+        color: AdminColors.warning,
+      );
+      return;
     }
+    if (emailDropped) email = false;
+
+    final confirmed = await showAdminConfirmDialog(
+      context,
+      title: 'Send reminders?',
+      message: surveyReminderConfirmMessage(
+        surveyTitle: _survey?.title ?? '',
+        recipients: targets.length,
+        inApp: inApp,
+        email: email,
+        emailDropped: emailDropped,
+      ),
+      confirmLabel: 'Send',
+      icon: Icons.send_outlined,
+    );
+    if (!confirmed || !mounted) return;
 
     setState(() => _isSendingReminders = true);
     try {
@@ -363,44 +434,30 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         email: email,
       );
       if (!mounted) return;
-      final parts = <String>[];
-      if (inApp) parts.add('${result.inAppSent} in-app');
-      if (email) parts.add('${result.emailSent} email');
-      if (result.emailSkippedNoAddress > 0) {
-        parts.add('${result.emailSkippedNoAddress} skipped (no email)');
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            parts.isEmpty ? 'No reminders sent' : 'Sent: ${parts.join(', ')}',
-          ),
-          backgroundColor: result.failures.isEmpty
-              ? Colors.green
-              : Colors.orange,
+      _showSnack(
+        surveyReminderSummary(
+          result,
+          inApp: inApp,
+          email: email,
+          emailDropped: emailDropped,
         ),
+        color: result.failures.isEmpty && !emailDropped
+            ? AdminColors.success
+            : AdminColors.warning,
       );
       if (result.failures.isNotEmpty) {
-        showDialog(
+        showAdminDialogSurface<void>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Some reminders failed'),
-            content: SingleChildScrollView(
-              child: Text(result.failures.join('\n')),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+          maxWidth: 480,
+          child: _ReminderFailuresDialog(failures: result.failures),
         );
       }
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+        _showSnack(
+          surveyFriendlyError(e, 'Couldn’t send reminders. Try again.'),
+          color: AdminColors.danger,
         );
       }
     } finally {
@@ -450,20 +507,13 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         mimeType: 'text/csv;charset=utf-8',
       );
       if (ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Responses CSV downloaded'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showSnack('Responses CSV downloaded', color: AdminColors.success);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+        _showSnack(
+          surveyExportErrorMessage('the responses CSV', e),
+          color: AdminColors.danger,
         );
       }
     }
@@ -541,19 +591,12 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Responses Excel downloaded'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _showSnack('Responses Excel downloaded', color: AdminColors.success);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+        _showSnack(
+          surveyExportErrorMessage('the responses Excel file', e),
+          color: AdminColors.danger,
         );
       }
     } finally {
@@ -620,19 +663,12 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Management report downloaded'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _showSnack('Management report downloaded', color: AdminColors.success);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+        _showSnack(
+          surveyExportErrorMessage('the management report', e),
+          color: AdminColors.danger,
         );
       }
     } finally {
@@ -686,20 +722,16 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('CHED GTS Excel export downloaded'),
-            backgroundColor: Colors.green,
-          ),
+        _showSnack(
+          'CHED GTS Excel export downloaded',
+          color: AdminColors.success,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+        _showSnack(
+          surveyExportErrorMessage('the CHED GTS Excel pack', e),
+          color: AdminColors.danger,
         );
       }
     } finally {
@@ -820,14 +852,44 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (embedded)
-          SurveyResponsesWorkspaceHeader(
-            survey: _survey,
-            onBack: widget.onClose!,
-            overflowBusy: _isExportingChed,
-            overflowItems: _overflowMenuItems(),
-            onOverflowSelected: _onOverflowSelected,
-          ),
-        segmentNav,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AdminColors.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AdminColors.border),
+                boxShadow: AdminSurfaces.cardShadow,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SurveyResponsesWorkspaceHeader(
+                    survey: _survey,
+                    onBack: widget.onClose!,
+                    overflowBusy: _isExportingChed,
+                    overflowItems: _overflowMenuItems(),
+                    onOverflowSelected: _onOverflowSelected,
+                    showBottomBorder: false,
+                  ),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: AdminColors.border,
+                  ),
+                  SurveyWorkspaceSegmentedNav(
+                    tabs: workspaceTabs,
+                    controller: _tabController,
+                    showBottomBorder: false,
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          segmentNav,
         if (_isLoading && _survey != null)
           const LinearProgressIndicator(
             minHeight: 2,
@@ -880,21 +942,11 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   }
 
   Widget _withWorkspaceShortcuts(Widget child) {
-    return CallbackShortcuts(
-      bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.digit1): () =>
-            _goToWorkspaceTab(0),
-        const SingleActivator(LogicalKeyboardKey.digit2): () =>
-            _goToWorkspaceTab(1),
-        const SingleActivator(LogicalKeyboardKey.digit3): () =>
-            _goToWorkspaceTab(2),
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-            _goToWorkspaceTab(_tabController.index - 1),
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-            _goToWorkspaceTab(_tabController.index + 1),
-        const SingleActivator(LogicalKeyboardKey.escape): _clearWorkspaceSearch,
-      },
-      child: Focus(autofocus: true, child: child),
+    return SurveyWorkspaceShortcuts(
+      currentTab: () => _tabController.index,
+      onSelectTab: _goToWorkspaceTab,
+      onEscape: _clearWorkspaceSearch,
+      child: child,
     );
   }
 
@@ -908,7 +960,9 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     _searchController.clear();
     _submittedSearchController.clear();
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() {});
+    setState(() {
+      if (hadPending) _selectedUserIds.clear();
+    });
   }
 
   void _goToWorkspaceTab(int index) {
@@ -927,24 +981,24 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     if (_isLoading && _survey == null) {
       final tab = _tabController.index;
       if (tab == 1 || tab == 2) {
-        return const SurveyResponsesWorkspaceSkeleton.list();
+        return const SurveyResponsesSkeleton.table();
       }
-      return const SurveyResponsesWorkspaceSkeleton.overview();
+      return const SurveyResponsesSkeleton.overview();
     }
 
     if (_loadError != null && _survey == null) {
-      return SurveyEmptyState(
+      return AdminStateView.error(
         title: _loadErrorLooksOffline
             ? 'You appear to be offline'
             : 'Couldn’t load responses',
-        subtitle: _loadErrorLooksOffline
+        message: _loadErrorLooksOffline
             ? 'Check your internet connection, then try again.'
-            : _loadError!,
-        icon: _loadErrorLooksOffline
-            ? Icons.wifi_off_outlined
-            : Icons.error_outline,
-        actionLabel: 'Retry',
-        onAction: _load,
+            : surveyFriendlyError(
+                _loadError!,
+                'Something went wrong while loading this survey. Try again.',
+              ),
+        details: _loadErrorLooksOffline ? null : _loadError,
+        onRetry: _load,
       );
     }
 
@@ -1002,7 +1056,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     final dateFmt = DateFormat.yMMMd().add_jm();
 
     return LayoutBuilder(
-              builder: (context, constraints) {
+      builder: (context, constraints) {
         final wide = constraints.maxWidth >= 900;
         final left = _overviewLeftColumn(
           survey: survey,
@@ -1026,25 +1080,28 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
 
         if (!wide) {
           return ListView(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                    children: [
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            children: [
               left,
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               SizedBox(
                 height: math.max(420, constraints.maxHeight * 0.7),
                 child: right,
               ),
-                    ],
-                  );
-                }
+            ],
+          );
+        }
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-              Expanded(flex: 4, child: left),
-              const SizedBox(width: 14),
+            children: [
+              Expanded(
+                flex: 4,
+                child: SingleChildScrollView(child: left),
+              ),
+              const SizedBox(width: 16),
               Expanded(flex: 6, child: right),
             ],
           ),
@@ -1059,78 +1116,55 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     required int completed,
     required DateFormat dateFmt,
   }) {
-    return SingleChildScrollView(
-              child: Column(
+    return Container(
+      decoration: AdminSurfaces.card(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-          SurveySectionCard(
-            title: 'Quick actions',
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
+        children: [
+          if (survey != null)
+            SurveyEditorSection(
+              title: 'Survey',
+              first: true,
+              child: _overviewSurveyActions(survey),
+            ),
+          SurveyEditorSection(
+            title: 'Outputs',
+            first: survey == null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (survey != null) ...[
-                  _quickActionChip(
-                    icon: survey.status == SurveyStatus.published
-                        ? Icons.lock_outline
-                        : Icons.publish_outlined,
-                    label: survey.status == SurveyStatus.draft
-                        ? 'Publish'
-                        : survey.status == SurveyStatus.published
-                        ? 'Close survey'
-                        : 'Re-publish',
-                    primary: true,
-                    onPressed: _isBusyQuickAction
-                        ? null
-                        : () => _overviewPublishToggle(survey),
-                  ),
-                  _quickActionChip(
-                    icon: Icons.edit_outlined,
-                    label: 'View survey',
-                    onPressed: () {
-                      final open = widget.onOpenEditor;
-                      if (open != null) {
-                        open(survey.id);
-                      }
-                    },
-                  ),
-                  _quickActionChip(
-                    icon: Icons.copy_outlined,
-                    label: 'Duplicate survey',
-                    onPressed: _isBusyQuickAction ? null : _overviewDuplicate,
-                  ),
-                ],
-                _quickActionChip(
+                _OverviewLinkRow(
                   icon: Icons.download_outlined,
                   label: 'Download / export',
-                  onPressed: !canExportFiles || _survey == null
+                  onTap: !canExportFiles || _survey == null
                       ? null
                       : _showExportPicker,
                 ),
                 if (survey != null)
-                  _quickActionChip(
-                    icon: Icons.auto_awesome,
+                  _OverviewLinkRow(
+                    icon: Icons.auto_awesome_outlined,
                     label: 'Generate formal report',
-                    onPressed: _openFormalReport,
-                ),
-                _quickActionChip(
+                    onTap: _openFormalReport,
+                  ),
+                _OverviewLinkRow(
                   icon: Icons.history_outlined,
                   label: 'Reminder history',
-                  onPressed: _showReminderHistorySheet,
+                  onTap: _showReminderHistorySheet,
                 ),
               ],
             ),
           ),
           if (survey != null) ...[
-            const SizedBox(height: 10),
-            SurveySectionCard(
-              title: 'Survey information',
+            SurveyEditorSection(
+              title: 'Details',
               child: Column(
                 children: [
                   _infoRow('Survey type', _surveyTypeLabel(survey)),
+                  _infoRow('Status', surveyStatusText(survey)),
                   _infoRow(
-                    'Status',
-                    survey.archived ? 'Archived' : survey.status.name,
+                    'Window',
+                    surveyWindowText(survey) ?? 'No window set',
                   ),
                   _infoRow(
                     'Created by',
@@ -1190,7 +1224,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       parts.add(programs.join(', '));
     }
     if (batches.isNotEmpty) {
-      parts.add('Batches ${batches.join(', ')}');
+      final years = AudienceTargeting.formatBatchYearsForDisplay(
+        AudienceTargeting.expandBatchYearTargets(batches),
+      );
+      parts.add('Batches ${years.isEmpty ? batches.join(', ') : years}');
     }
     return parts.join(' · ');
   }
@@ -1202,23 +1239,20 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 128,
+            width: 112,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 12,
+              style: AdminText.caption.copyWith(
                 fontWeight: FontWeight.w600,
-                color: AdminSurveyTheme.textMuted,
+                color: AdminColors.textMuted,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 13,
+              style: AdminText.body.copyWith(
                 fontWeight: FontWeight.w600,
-                color: AdminSurveyTheme.textPrimary,
                 height: 1.35,
               ),
             ),
@@ -1229,99 +1263,231 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     );
   }
 
-  Widget _quickActionChip({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-    bool primary = false,
-  }) {
-    if (primary) {
-      return FilledButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 16),
-        label: Text(label),
-        style: surveyFilledButtonStyle(),
-      );
-    }
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      label: Text(label),
-      style: surveyOutlinedButtonStyle(),
+  bool get _overviewActionBusy =>
+      _stateActionBusy != null || _duplicating || _isBusyQuickAction;
+
+  Widget _overviewSurveyActions(Survey survey) {
+    final busy = _overviewActionBusy;
+    final published = survey.status == SurveyStatus.published;
+    final stateLabel = _stateActionBusy ??
+        switch (survey.status) {
+          SurveyStatus.draft => 'Publish',
+          SurveyStatus.published => 'Close survey',
+          SurveyStatus.closed => 'Re-publish',
+        };
+    final stateIcon = _stateActionBusy != null
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : Icon(
+            published ? Icons.lock_outline : Icons.publish_outlined,
+            size: 18,
+          );
+    final stateOnPressed = busy ? null : () => _overviewPublishToggle(survey);
+    final openEditor = widget.onOpenEditor;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (published)
+          OutlinedButton.icon(
+            onPressed: stateOnPressed,
+            icon: stateIcon,
+            label: Text(stateLabel),
+            style: AdminButtonStyles.outlined(),
+          )
+        else
+          FilledButton.icon(
+            onPressed: stateOnPressed,
+            icon: stateIcon,
+            label: Text(stateLabel),
+            style: AdminButtonStyles.filled(),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: busy || openEditor == null
+                    ? null
+                    : () => openEditor(survey.id),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Edit survey', overflow: TextOverflow.ellipsis),
+                style: AdminButtonStyles.outlined(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: busy ? null : _overviewDuplicate,
+                icon: _duplicating
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.copy_outlined, size: 16),
+                label: Text(
+                  _duplicating ? 'Duplicating…' : 'Duplicate',
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: AdminButtonStyles.outlined(),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showSnack(String message, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
     );
   }
 
   Future<void> _overviewPublishToggle(Survey survey) async {
-    try {
-      if (survey.status == SurveyStatus.draft ||
-          survey.status == SurveyStatus.closed) {
-        final count = await _surveyService.publishSurvey(survey.id);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              survey.status == SurveyStatus.draft
-                  ? 'Published · $count alumni assigned'
-                  : 'Re-published · $count alumni assigned',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else if (survey.status == SurveyStatus.published) {
-        final ok = await showDialog<bool>(
+    if (_overviewActionBusy) return;
+    if (survey.status == SurveyStatus.published) {
+      await _overviewClose(survey);
+    } else {
+      await _overviewPublish(survey);
+    }
+  }
+
+  /// Publish (draft) or re-publish (closed) with the Editor's pre-publish
+  /// checks: question problems, zero audience, then a confirmation.
+  Future<void> _overviewPublish(Survey survey) async {
+    final reopen = survey.status == SurveyStatus.closed;
+    if (!survey.isChedGtsBuiltin) {
+      final problems = surveyPublishProblems(_questions);
+      if (problems.isNotEmpty) {
+        final openEditor = await showAdminDialogSurface<bool>(
           context: context,
-          builder: (c) => AlertDialog(
-            title: const Text('Close survey?'),
-            content: const Text(
-              'Alumni will no longer be able to submit new responses.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(c, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(c, true),
-                child: const Text('Close survey'),
-              ),
-            ],
+          maxWidth: 480,
+          child: _OverviewPublishProblemsDialog(
+            problems: problems,
+            canOpenEditor: widget.onOpenEditor != null,
           ),
         );
-        if (ok != true || !mounted) return;
-        await _surveyService.closeSurvey(survey.id);
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Survey closed')));
+        if (openEditor == true && mounted) {
+          widget.onOpenEditor?.call(survey.id);
+        }
+        return;
       }
+    }
+
+    setState(() => _stateActionBusy = 'Checking audience…');
+    try {
+      final audienceCount = await _surveyService.countAudience(
+        targetPrograms: survey.targetPrograms,
+        targetBatchYears: AudienceTargeting.expandBatchYearTargets(
+          survey.targetBatchYears,
+        ),
+      );
+      if (!mounted) return;
+      final hasFilters = survey.targetPrograms.isNotEmpty ||
+          survey.targetBatchYears.isNotEmpty;
+      if (hasFilters && audienceCount == 0) {
+        _showSnack(
+          'No alumni match this survey’s courses and batch years. '
+          'Open the editor to adjust the audience.',
+          color: AdminColors.danger,
+        );
+        return;
+      }
+
+      setState(() => _stateActionBusy = null);
+      final audience =
+          'About $audienceCount alumni match the current audience'
+          '${hasFilters ? '' : ' (all alumni)'}.';
+      final confirmed = await showAdminConfirmDialog(
+        context,
+        title: reopen ? 'Re-publish survey?' : 'Publish survey?',
+        message: reopen
+            ? '$audience The survey reopens for them. '
+                  'Existing submissions are kept.'
+            : '$audience They will be assigned and notified.',
+        confirmLabel: reopen ? 'Re-publish' : 'Publish',
+        icon: Icons.publish_outlined,
+      );
+      if (!confirmed || !mounted) return;
+
+      setState(
+        () => _stateActionBusy = reopen ? 'Re-publishing…' : 'Publishing…',
+      );
+      final count = await _surveyService.publishSurvey(survey.id);
+      if (!mounted) return;
+      _showSnack(
+        reopen
+            ? 'Re-published · $count alumni assigned'
+            : 'Published · $count alumni assigned',
+        color: AdminColors.success,
+      );
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+      _showSnack(
+        surveyFriendlyError(
+          e,
+          reopen
+              ? 'Couldn’t re-publish this survey. Try again.'
+              : 'Couldn’t publish this survey. Try again.',
+        ),
+        color: AdminColors.danger,
       );
+    } finally {
+      if (mounted) setState(() => _stateActionBusy = null);
+    }
+  }
+
+  Future<void> _overviewClose(Survey survey) async {
+    final confirmed = await showAdminConfirmDialog(
+      context,
+      title: 'Close survey?',
+      message: 'Alumni will no longer be able to submit new responses.',
+      confirmLabel: 'Close survey',
+      icon: Icons.lock_outline,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _stateActionBusy = 'Closing…');
+    try {
+      await _surveyService.closeSurvey(survey.id);
+      if (!mounted) return;
+      _showSnack('Survey closed', color: AdminColors.success);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(
+        surveyFriendlyError(e, 'Couldn’t close this survey. Try again.'),
+        color: AdminColors.danger,
+      );
+    } finally {
+      if (mounted) setState(() => _stateActionBusy = null);
     }
   }
 
   Future<void> _overviewDuplicate() async {
+    if (_overviewActionBusy) return;
+    setState(() => _duplicating = true);
     try {
       final id = await _surveyService.duplicateSurvey(widget.surveyId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Survey duplicated as draft'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _showSnack('Survey duplicated as draft', color: AdminColors.success);
       final open = widget.onOpenEditor;
       if (open != null) {
         open(id);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+      _showSnack(
+        surveyFriendlyError(e, 'Couldn’t duplicate this survey. Try again.'),
+        color: AdminColors.danger,
       );
+    } finally {
+      if (mounted) setState(() => _duplicating = false);
     }
   }
 
@@ -1551,19 +1717,12 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('CHED outcomes summary ready'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _showSnack('CHED outcomes summary ready', color: AdminColors.success);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+        _showSnack(
+          surveyExportErrorMessage('the CHED outcomes summary', e),
+          color: AdminColors.danger,
         );
       }
     } finally {
@@ -1686,19 +1845,15 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Pending list exported (${list.length})'),
-          backgroundColor: Colors.green,
-        ),
+      _showSnack(
+        'Pending list exported (${list.length})',
+        color: AdminColors.success,
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+        _showSnack(
+          surveyExportErrorMessage('the pending list', e),
+          color: AdminColors.danger,
         );
       }
     } finally {
@@ -1800,40 +1955,30 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     }
 
     if (targets.length > ChedGtsPdfExportLimits.maxBatchSize) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Batch limit'),
-          content: Text(
+      final proceed = await showAdminConfirmDialog(
+        context,
+        title: 'Batch limit',
+        message:
             '${ChedGtsPdfExportLimits.batchCapMessage(targets.length)}\n\n'
-                'Export the first ${ChedGtsPdfExportLimits.maxBatchSize} now?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
+            'Export the first ${ChedGtsPdfExportLimits.maxBatchSize} now?',
+        confirmLabel: 'Continue',
+        icon: Icons.folder_zip_outlined,
       );
-      if (proceed != true || !mounted) return;
+      if (!proceed || !mounted) return;
       targets = targets.take(ChedGtsPdfExportLimits.maxBatchSize).toList();
     }
 
     setState(() => _isExportingChed = true);
     final progress = ValueNotifier<(int, int, String?)>((0, targets.length, null));
-    showDialog<void>(
+    showAdminDialogSurface<void>(
       context: context,
+      maxWidth: 420,
       barrierDismissible: false,
-      builder: (ctx) => PopScope(
+      child: PopScope(
         canPop: false,
-        child: AlertDialog(
-          title: const Text('Building official CHED PDFs'),
-          content: ValueListenableBuilder<(int, int, String?)>(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          child: ValueListenableBuilder<(int, int, String?)>(
             valueListenable: progress,
             builder: (_, value, __) {
               final (done, total, name) = value;
@@ -1841,18 +1986,30 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Text(
+                    'Building official CHED PDFs',
+                    style: AdminText.sectionTitle,
+                  ),
+                  const SizedBox(height: 14),
                   LinearProgressIndicator(
                     value: total == 0 ? null : done / total,
+                    color: AdminColors.primary,
+                    backgroundColor: AdminColors.border,
                   ),
-                  const SizedBox(height: 12),
-                  Text('$done / $total'),
+                  const SizedBox(height: 10),
+                  Text(
+                    '$done / $total',
+                    style: AdminText.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   if (name != null && name.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12),
+                      style: AdminText.caption,
                     ),
                   ],
                 ],
@@ -1910,26 +2067,20 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
 
       if (!mounted) return;
       final skipped = result.failures.length;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            skipped == 0
-                ? 'Downloaded ZIP with ${result.successCount} fillable PDF(s)'
-                : 'Downloaded ZIP with ${result.successCount} PDF(s); '
-                    '$skipped skipped/failed',
-          ),
-          backgroundColor: Colors.green,
-        ),
+      _showSnack(
+        skipped == 0
+            ? 'Downloaded ZIP with ${result.successCount} fillable PDF(s)'
+            : 'Downloaded ZIP with ${result.successCount} PDF(s); '
+                '$skipped skipped/failed',
+        color: skipped == 0 ? AdminColors.success : AdminColors.warning,
       );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       await batch.logBatchFailure(error: e, selectedCount: targets.length);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fillable PDF export failed: $e'),
-          backgroundColor: Colors.red,
-        ),
+      _showSnack(
+        surveyExportErrorMessage('the fillable CHED PDFs', e),
+        color: AdminColors.danger,
       );
     } finally {
       progress.dispose();
@@ -2086,127 +2237,224 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AdminSearchField(
-                controller: _searchController,
-                onDebouncedChanged: (_) => setState(() => _pendingPage = 0),
-                hintText: 'Name, email, course, or batch…',
-                decoration: AdminSurveyTheme.toolbarFieldDecoration(
-                  hint: 'Name, email, course, or batch…',
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    size: 18,
-                    color: AdminSurveyTheme.textMuted,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _pendingFilterChip(
-                    label: _pendingStatusFilter == null
-                        ? 'Status'
-                        : _statusLabel(_pendingStatusFilter!),
-                    selected: _pendingStatusFilter != null,
-                    onTap: _pickPendingStatusFilter,
-                  ),
-                  _pendingFilterChip(
-                    label: _pendingProgramFilter ?? 'Course',
-                    selected: _pendingProgramFilter != null,
-                    onTap: _pickPendingProgramFilter,
-                  ),
-                  _pendingFilterChip(
-                    label: _pendingBatchFilter == null
-                        ? 'Batch'
-                        : 'Batch $_pendingBatchFilter',
-                    selected: _pendingBatchFilter != null,
-                    onTap: _pickPendingBatchFilter,
-                  ),
-                  PopupMenuButton<_PendingSort>(
-                    tooltip: 'Sort',
-                    initialValue: _pendingSort,
-                    onSelected: (v) => setState(() {
-                      _pendingSort = v;
-                      _pendingPage = 0;
-                    }),
-                    itemBuilder: (context) => [
-                      for (final s in _PendingSort.values)
-                        PopupMenuItem(value: s, child: Text(s.label)),
-                    ],
-                    child: Chip(
-                      avatar: const Icon(Icons.sort, size: 16),
-                      label: Text(_pendingSort.label),
-                      backgroundColor: AdminSurveyTheme.surface,
-                      side: const BorderSide(color: AdminSurveyTheme.border),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AdminColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AdminColors.border),
+              boxShadow: AdminSurfaces.cardShadow,
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (_) => setState(() {
+                            _pendingPage = 0;
+                            _selectedUserIds.clear();
+                          }),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AdminColors.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Search pending by name, email, course, or batch…',
+                            hintStyle: const TextStyle(
+                              fontSize: 13,
+                              color: AdminColors.textMuted,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              size: 18,
+                              color: AdminColors.textMuted,
+                            ),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 16),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _pendingPage = 0;
+                                        _selectedUserIds.clear();
+                                      });
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: AdminColors.surface,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AdminColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AdminColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: AdminColors.primary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  if (hasFilters)
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _pendingStatusFilter = null;
-                          _pendingProgramFilter = null;
-                          _pendingBatchFilter = null;
-                          _pendingPage = 0;
-                        });
-                      },
-                      child: const Text('Clear filters'),
-                    ),
-                  TextButton.icon(
-                    onPressed: pageList.isEmpty
-                        ? null
-                        : () {
-                            setState(() {
-                              if (allVisibleSelected) {
-                                for (final p in pageList) {
-                                  _selectedUserIds.remove(p.assignment.userId);
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: pageList.isEmpty
+                          ? null
+                          : () {
+                              setState(() {
+                                if (allVisibleSelected) {
+                                  for (final p in pageList) {
+                                    _selectedUserIds.remove(p.assignment.userId);
+                                  }
+                                } else {
+                                  _selectedUserIds.addAll(
+                                    pageList.map((p) => p.assignment.userId),
+                                  );
                                 }
-                              } else {
-                                _selectedUserIds.addAll(
-                                  pageList.map((p) => p.assignment.userId),
-                                );
-                              }
-                            });
-                          },
-                    icon: Icon(
-                      allVisibleSelected
-                          ? Icons.check_box_outlined
-                          : Icons.check_box_outline_blank,
-                      size: 18,
+                              });
+                            },
+                      icon: Icon(
+                        allVisibleSelected
+                            ? Icons.check_box_outlined
+                            : Icons.check_box_outline_blank,
+                        size: 16,
+                      ),
+                      label: Text(
+                        allVisibleSelected ? 'Deselect page' : 'Select page',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: AdminButtonStyles.outlined(),
                     ),
-                    label: Text(
-                      allVisibleSelected
-                          ? 'Clear page selection'
-                          : 'Select page',
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _pendingFilterChip(
+                      label: _pendingStatusFilter == null
+                          ? 'Status: All'
+                          : 'Status: ${_statusLabel(_pendingStatusFilter!)}',
+                      selected: _pendingStatusFilter != null,
+                      onTap: _pickPendingStatusFilter,
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    _pendingFilterChip(
+                      label: _pendingProgramFilter == null
+                          ? 'Course: All'
+                          : 'Course: $_pendingProgramFilter',
+                      selected: _pendingProgramFilter != null,
+                      onTap: _pickPendingProgramFilter,
+                    ),
+                    _pendingFilterChip(
+                      label: _pendingBatchFilter == null
+                          ? 'Batch: All'
+                          : 'Batch: $_pendingBatchFilter',
+                      selected: _pendingBatchFilter != null,
+                      onTap: _pickPendingBatchFilter,
+                    ),
+                    _pendingFilterChip(
+                      label: 'Sort: ${_pendingSort.label}',
+                      selected: false,
+                      onTap: _pickPendingSort,
+                    ),
+                    if (hasFilters || hasQuery)
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _pendingStatusFilter = null;
+                            _pendingProgramFilter = null;
+                            _pendingBatchFilter = null;
+                            _pendingPage = 0;
+                            _selectedUserIds.clear();
+                          });
+                        },
+                        icon: const Icon(Icons.refresh_rounded, size: 14),
+                        label: const Text(
+                          'Reset',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AdminColors.textSecondary,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         if (_selectedUserIds.isNotEmpty)
-          Material(
-            color: AdminSurveyTheme.infoBg,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: AdminColors.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AdminColors.primary.withValues(alpha: 0.2),
+                ),
+              ),
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text(
-                    '${_selectedUserIds.length} selected',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AdminSurveyTheme.primary,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AdminColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_selectedUserIds.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'selected',
+                        style: AdminText.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AdminColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: () => setState(_selectedUserIds.clear),
+                    child: const Text('Clear selection'),
                   ),
                   FilledButton.icon(
                     onPressed: _isSendingReminders
@@ -2243,15 +2491,14 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
             ),
           ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
           child: Text(
             allPending.isEmpty
                 ? 'No pending assignments'
                 : 'Showing ${list.length} of ${allPending.length} pending',
-            style: const TextStyle(
-              fontSize: 12,
+            style: AdminText.caption.copyWith(
               fontWeight: FontWeight.w600,
-              color: AdminSurveyTheme.textMuted,
+              color: AdminColors.textMuted,
             ),
           ),
         ),
@@ -2282,6 +2529,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                             _pendingProgramFilter = null;
                             _pendingBatchFilter = null;
                             _pendingPage = 0;
+                            _selectedUserIds.clear();
                           });
                         }
                       : null,
@@ -2290,55 +2538,59 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      child: AdminDataTable(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                        columns: _pendingTableColumns,
-                        leadingHeader: Checkbox(
-                          value: allVisibleSelected
-                              ? true
-                              : (selectedOnPage > 0 ? null : false),
-                          tristate: true,
-                          onChanged: pageList.isEmpty
-                              ? null
-                              : (v) {
-                                  setState(() {
-                                    if (v == true) {
-                                      _selectedUserIds.addAll(
-                                        pageList.map(
-                                          (p) => p.assignment.userId,
-                                        ),
-                                      );
-                                    } else {
-                                      for (final p in pageList) {
-                                        _selectedUserIds.remove(
-                                          p.assignment.userId,
+                      child: SurveyResponsesTableFrame(
+                        child: AdminDataTable(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                          columns: _pendingTableColumns,
+                          leadingHeader: Checkbox(
+                            value: allVisibleSelected
+                                ? true
+                                : (selectedOnPage > 0 ? null : false),
+                            tristate: true,
+                            onChanged: pageList.isEmpty
+                                ? null
+                                : (v) {
+                                    setState(() {
+                                      if (v == true) {
+                                        _selectedUserIds.addAll(
+                                          pageList.map(
+                                            (p) => p.assignment.userId,
+                                          ),
                                         );
+                                      } else {
+                                        for (final p in pageList) {
+                                          _selectedUserIds.remove(
+                                            p.assignment.userId,
+                                          );
+                                        }
                                       }
-                                    }
-                                  });
-                                },
+                                    });
+                                  },
+                          ),
+                          leadingWidth: 48,
+                          rowCount: pageList.length,
+                          rowBuilder: (context, index) {
+                            final p = pageList[index];
+                            return _PendingAlumniCard(
+                              participant: p,
+                              selected: _selectedUserIds.contains(
+                                p.assignment.userId,
+                              ),
+                              onSelected: (v) {
+                                setState(() {
+                                  if (v) {
+                                    _selectedUserIds.add(p.assignment.userId);
+                                  } else {
+                                    _selectedUserIds.remove(
+                                      p.assignment.userId,
+                                    );
+                                  }
+                                });
+                              },
+                              statusLabel: _statusLabel(p.assignment.status),
+                            );
+                          },
                         ),
-                        leadingWidth: 48,
-                        rowCount: pageList.length,
-                        rowBuilder: (context, index) {
-                          final p = pageList[index];
-                          return _PendingAlumniCard(
-                            participant: p,
-                            selected: _selectedUserIds.contains(
-                              p.assignment.userId,
-                            ),
-                            onSelected: (v) {
-                              setState(() {
-                                if (v) {
-                                  _selectedUserIds.add(p.assignment.userId);
-                                } else {
-                                  _selectedUserIds.remove(p.assignment.userId);
-                                }
-                              });
-                            },
-                            statusLabel: _statusLabel(p.assignment.status),
-                          );
-                        },
                       ),
                     ),
                     AdminPaginationBar(
@@ -2393,13 +2645,52 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       ],
     );
     if (!mounted || value == null) return;
+    final next = value is SurveyAssignmentStatus ? value : null;
+    if (value != '__clear__' && next == null) return;
     setState(() {
       _pendingPage = 0;
-      if (value == '__clear__') {
-        _pendingStatusFilter = null;
-      } else if (value is SurveyAssignmentStatus) {
-        _pendingStatusFilter = value;
-      }
+      if (next != _pendingStatusFilter) _selectedUserIds.clear();
+      _pendingStatusFilter = next;
+    });
+  }
+
+  Future<void> _pickPendingSort() async {
+    final value = await showAdminOptionPicker<_PendingSort>(
+      context: context,
+      title: 'Sort pending alumni',
+      options: [
+        for (final s in _PendingSort.values)
+          AdminPickerOption(
+            value: s,
+            label: s.label,
+            selected: s == _pendingSort,
+          ),
+      ],
+    );
+    if (!mounted || value == null) return;
+    setState(() {
+      _pendingSort = value;
+      _pendingPage = 0;
+    });
+  }
+
+  Future<void> _pickSubmittedSort() async {
+    final value = await showAdminOptionPicker<_SubmittedSort>(
+      context: context,
+      title: 'Sort submitted responses',
+      options: [
+        for (final s in _SubmittedSort.values)
+          AdminPickerOption(
+            value: s,
+            label: s.label,
+            selected: s == _submittedSort,
+          ),
+      ],
+    );
+    if (!mounted || value == null) return;
+    setState(() {
+      _submittedSort = value;
+      _submittedPage = 0;
     });
   }
 
@@ -2423,9 +2714,11 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       ],
     );
     if (!mounted || value == null) return;
+    final next = value.isEmpty ? null : value;
     setState(() {
       _pendingPage = 0;
-      _pendingProgramFilter = value.isEmpty ? null : value;
+      if (next != _pendingProgramFilter) _selectedUserIds.clear();
+      _pendingProgramFilter = next;
     });
   }
 
@@ -2449,9 +2742,75 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       ],
     );
     if (!mounted || value == null) return;
+    final next = value.isEmpty ? null : value;
     setState(() {
       _pendingPage = 0;
-      _pendingBatchFilter = value.isEmpty ? null : value;
+      if (next != _pendingBatchFilter) _selectedUserIds.clear();
+      _pendingBatchFilter = next;
+    });
+  }
+
+  Set<String> get _submittedProgramOptions => _submitted
+      .map((p) => p.program)
+      .where((p) => p.trim().isNotEmpty)
+      .toSet();
+
+  Set<String> get _submittedBatchOptions => _submitted
+      .map((p) => p.batchYear)
+      .where((b) => b.trim().isNotEmpty)
+      .toSet();
+
+  Future<void> _pickSubmittedProgramFilter() async {
+    final options = _submittedProgramOptions.toList()..sort();
+    final value = await showAdminOptionPicker<String>(
+      context: context,
+      title: 'Filter by course',
+      options: [
+        AdminPickerOption(
+          value: '',
+          label: 'All courses',
+          selected: _submittedProgramFilter == null,
+        ),
+        for (final p in options)
+          AdminPickerOption(
+            value: p,
+            label: p,
+            selected: _submittedProgramFilter == p,
+          ),
+      ],
+    );
+    if (!mounted || value == null) return;
+    final next = value.isEmpty ? null : value;
+    setState(() {
+      _submittedPage = 0;
+      _submittedProgramFilter = next;
+    });
+  }
+
+  Future<void> _pickSubmittedBatchFilter() async {
+    final options = _submittedBatchOptions.toList()..sort();
+    final value = await showAdminOptionPicker<String>(
+      context: context,
+      title: 'Filter by batch',
+      options: [
+        AdminPickerOption(
+          value: '',
+          label: 'All batches',
+          selected: _submittedBatchFilter == null,
+        ),
+        for (final b in options)
+          AdminPickerOption(
+            value: b,
+            label: b,
+            selected: _submittedBatchFilter == b,
+          ),
+      ],
+    );
+    if (!mounted || value == null) return;
+    final next = value.isEmpty ? null : value;
+    setState(() {
+      _submittedPage = 0;
+      _submittedBatchFilter = next;
     });
   }
 
@@ -2459,6 +2818,8 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     final allSubmitted = _submitted;
     final list = _submittedWorkspaceList();
     final hasQuery = _submittedSearchController.text.trim().isNotEmpty;
+    final hasFilters =
+        _submittedProgramFilter != null || _submittedBatchFilter != null;
     final safePage = adminClampPage(
       _submittedPage,
       list.length,
@@ -2480,60 +2841,136 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AdminSearchField(
-                controller: _submittedSearchController,
-                onDebouncedChanged: (_) => setState(() => _submittedPage = 0),
-                hintText: 'Name, email, course, or batch…',
-                decoration: AdminSurveyTheme.toolbarFieldDecoration(
-                  hint: 'Name, email, course, or batch…',
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    size: 18,
-                    color: AdminSurveyTheme.textMuted,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AdminColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AdminColors.border),
+              boxShadow: AdminSurfaces.cardShadow,
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 38,
+                  child: TextField(
+                    controller: _submittedSearchController,
+                    onChanged: (_) => setState(() => _submittedPage = 0),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AdminColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText:
+                          'Search submitted responses by name, email, course, or batch…',
+                      hintStyle: const TextStyle(
+                        fontSize: 13,
+                        color: AdminColors.textMuted,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        size: 18,
+                        color: AdminColors.textMuted,
+                      ),
+                      suffixIcon: _submittedSearchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              onPressed: () {
+                                _submittedSearchController.clear();
+                                setState(() => _submittedPage = 0);
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: AdminColors.surface,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: AdminColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: AdminColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: AdminColors.primary,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  PopupMenuButton<_SubmittedSort>(
-                    tooltip: 'Sort',
-                    initialValue: _submittedSort,
-                    onSelected: (v) => setState(() {
-                      _submittedSort = v;
-                      _submittedPage = 0;
-                    }),
-                    itemBuilder: (context) => [
-                      for (final s in _SubmittedSort.values)
-                        PopupMenuItem(value: s, child: Text(s.label)),
-                    ],
-                    child: Chip(
-                      avatar: const Icon(Icons.sort, size: 16),
-                      label: Text(_submittedSort.label),
-                      backgroundColor: AdminSurveyTheme.surface,
-                      side: const BorderSide(color: AdminSurveyTheme.border),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _pendingFilterChip(
+                      label: _submittedProgramFilter == null
+                          ? 'Course: All'
+                          : 'Course: $_submittedProgramFilter',
+                      selected: _submittedProgramFilter != null,
+                      onTap: _pickSubmittedProgramFilter,
                     ),
-                  ),
-                  Text(
-                    allSubmitted.isEmpty
-                        ? 'No submissions'
-                        : 'Showing ${list.length} of ${allSubmitted.length}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AdminSurveyTheme.textMuted,
+                    _pendingFilterChip(
+                      label: _submittedBatchFilter == null
+                          ? 'Batch: All'
+                          : 'Batch: $_submittedBatchFilter',
+                      selected: _submittedBatchFilter != null,
+                      onTap: _pickSubmittedBatchFilter,
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    _pendingFilterChip(
+                      label: 'Sort: ${_submittedSort.label}',
+                      selected: false,
+                      onTap: _pickSubmittedSort,
+                    ),
+                    if (hasFilters || hasQuery)
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _submittedSearchController.clear();
+                            _submittedProgramFilter = null;
+                            _submittedBatchFilter = null;
+                            _submittedPage = 0;
+                          });
+                        },
+                        icon: const Icon(Icons.refresh_rounded, size: 14),
+                        label: const Text(
+                          'Reset',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AdminColors.textSecondary,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Text(
+            allSubmitted.isEmpty
+                ? 'No submissions'
+                : 'Showing ${list.length} of ${allSubmitted.length} submitted responses',
+            style: AdminText.caption.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AdminColors.textMuted,
+            ),
           ),
         ),
         Expanded(
@@ -2544,17 +2981,21 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                       : 'No matching submissions',
                   subtitle: allSubmitted.isEmpty
                       ? 'Submitted responses will appear here as alumni complete the survey.'
-                      : 'Try a different search to find a submitted response.',
+                      : 'Try clearing search or filters to find responses.',
                   icon: allSubmitted.isEmpty
                       ? Icons.inbox_outlined
                       : Icons.search_off_outlined,
-                  actionLabel: hasQuery && allSubmitted.isNotEmpty
-                      ? 'Clear search'
+                  actionLabel: (hasQuery || hasFilters) && allSubmitted.isNotEmpty
+                      ? 'Clear search & filters'
                       : null,
-                  onAction: hasQuery && allSubmitted.isNotEmpty
+                  onAction: (hasQuery || hasFilters) && allSubmitted.isNotEmpty
                       ? () {
                           _submittedSearchController.clear();
-                          setState(() => _submittedPage = 0);
+                          setState(() {
+                            _submittedProgramFilter = null;
+                            _submittedBatchFilter = null;
+                            _submittedPage = 0;
+                          });
                         }
                       : null,
                 )
@@ -2562,30 +3003,33 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      child: AdminDataTable(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                        columns: _submittedTableColumns,
-                        trailingHeader: const SizedBox.shrink(),
-                        trailingWidth: 44,
-                        rowCount: pageList.length,
-                        rowBuilder: (context, index) {
-                          final p = pageList[index];
-                          final r = p.response!;
-                          return _SubmittedResponseCard(
-                            participant: p,
-                            response: r,
-                            surveyVersionLabel: versionLabel,
-                            onViewResponse: () => _openSubmittedResponseDetail(
+                      child: SurveyResponsesTableFrame(
+                        child: AdminDataTable(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                          columns: _submittedTableColumns,
+                          trailingHeader: const SizedBox.shrink(),
+                          trailingWidth: 44,
+                          rowCount: pageList.length,
+                          rowBuilder: (context, index) {
+                            final p = pageList[index];
+                            final r = p.response!;
+                            return _SubmittedResponseCard(
                               participant: p,
-                              isChedBuiltin: isChedBuiltin,
-                            ),
-                            onAction: (action) => _onSubmittedCardAction(
-                              action: action,
-                              participant: p,
-                              isChedBuiltin: isChedBuiltin,
-                            ),
-                          );
-                        },
+                              response: r,
+                              surveyVersionLabel: versionLabel,
+                              onViewResponse: () =>
+                                  _openSubmittedResponseDetail(
+                                    participant: p,
+                                    isChedBuiltin: isChedBuiltin,
+                                  ),
+                              onAction: (action) => _onSubmittedCardAction(
+                                action: action,
+                                participant: p,
+                                isChedBuiltin: isChedBuiltin,
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                     AdminPaginationBar(
@@ -2615,6 +3059,12 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
             p.program.toLowerCase().contains(q) ||
             p.batchYear.toLowerCase().contains(q);
       }).toList();
+    }
+    if (_submittedProgramFilter != null) {
+      list = list.where((p) => p.program == _submittedProgramFilter).toList();
+    }
+    if (_submittedBatchFilter != null) {
+      list = list.where((p) => p.batchYear == _submittedBatchFilter).toList();
     }
     list = List<SurveyParticipant>.from(list);
     switch (_submittedSort) {
@@ -2731,9 +3181,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      _showSnack(
+        surveyExportErrorMessage('this response file', e),
+        color: AdminColors.danger,
+      );
     }
   }
 
@@ -2769,9 +3220,11 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     showAdminSurveyResponseDetailSheet(
       context: context,
       alumniName: participant.displayName,
+      subtitle: surveyResponseMetaLine(participant, r),
       response: r,
       isChedBuiltin: isChedBuiltin,
       questions: _questions,
+      visibilityRules: _survey?.visibilityRules ?? const {},
       onViewTimeline: () {
         showAdminSurveyResponseTimelineSheet(
           context: context,
@@ -2835,7 +3288,7 @@ const _submittedTableColumns = <AdminDataColumn>[
   AdminDataColumn(label: 'COURSE', flex: 2),
   AdminDataColumn(label: 'BATCH', width: 90),
   AdminDataColumn(label: 'SUBMITTED', width: 150),
-  AdminDataColumn(label: 'DURATION', width: 90),
+  AdminDataColumn(label: 'TIME TO SUBMIT', width: 116),
   AdminDataColumn(label: 'DEVICE', flex: 2),
   AdminDataColumn(label: 'STATUS', width: 100),
 ];
@@ -2956,7 +3409,10 @@ class _SubmittedResponseCard extends StatelessWidget {
             muted: p.batchYear.isEmpty,
           ),
           AdminTableTextCell(submittedLabel),
-          AdminTableTextCell(_durationLabel(p, r), muted: true),
+          Tooltip(
+            message: 'Time from assignment to submission',
+            child: AdminTableTextCell(_durationLabel(p, r), muted: true),
+          ),
           AdminTableTextCell(
             r.deviceSummary,
             muted: r.deviceSummary == 'Device not recorded',
@@ -3105,6 +3561,295 @@ class _ParticipantAvatar extends StatelessWidget {
               ),
             )
           : null,
+    );
+  }
+}
+
+/// Overview "Outputs" entry: icon · label · chevron; disabled when [onTap] is null.
+class _OverviewLinkRow extends StatelessWidget {
+  const _OverviewLinkRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final color = enabled ? AdminColors.textPrimary : AdminColors.textMuted;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: enabled
+                        ? AdminColors.primary.withValues(alpha: 0.08)
+                        : AdminColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: enabled
+                          ? AdminColors.primary.withValues(alpha: 0.15)
+                          : AdminColors.border,
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 16,
+                    color: enabled
+                        ? AdminColors.primary
+                        : AdminColors.textMuted,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: AdminText.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: AdminColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Fix before publishing" for the Overview; pops `true` to open the editor.
+class _OverviewPublishProblemsDialog extends StatelessWidget {
+  const _OverviewPublishProblemsDialog({
+    required this.problems,
+    required this.canOpenEditor,
+  });
+
+  final List<SurveyPublishProblem> problems;
+  final bool canOpenEditor;
+
+  static const _maxListed = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final listed = problems.take(_maxListed).toList();
+    final more = problems.length - listed.length;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AdminColors.warningBg,
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                child: const Icon(
+                  Icons.rule_outlined,
+                  size: 20,
+                  color: AdminColors.warning,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 7),
+                  child: Semantics(
+                    header: true,
+                    child: const Text(
+                      'Fix before publishing',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AdminColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Alumni can\'t answer this survey yet:',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: AdminColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final p in listed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 3),
+                    child: Icon(
+                      Icons.error_outline,
+                      size: 16,
+                      color: AdminColors.warning,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(p.message, style: AdminText.body)),
+                ],
+              ),
+            ),
+          if (more > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: Text('+ $more more', style: AdminText.caption),
+            ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  autofocus: !canOpenEditor,
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: AdminButtonStyles.outlined(),
+                  child: const Text('Close'),
+                ),
+                if (canOpenEditor)
+                  FilledButton(
+                    autofocus: true,
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: AdminButtonStyles.filled(),
+                    child: const Text('Open in editor'),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lists per-recipient reminder failures returned by `sendReminders`.
+class _ReminderFailuresDialog extends StatelessWidget {
+  const _ReminderFailuresDialog({required this.failures});
+
+  final List<String> failures;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = failures.length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AdminColors.warningBg,
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 20,
+                  color: AdminColors.warning,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    count == 1
+                        ? '1 reminder failed'
+                        : '$count reminders failed',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AdminColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'The others were sent. These could not be delivered:',
+            style: AdminText.body.copyWith(color: AdminColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Flexible(
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 260),
+              decoration: BoxDecoration(
+                color: AdminColors.surface,
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                border: Border.all(color: AdminColors.border),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: count,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: AdminColors.border),
+                itemBuilder: (context, i) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Text(failures[i], style: AdminText.body),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              autofocus: true,
+              onPressed: () => Navigator.of(context).pop(),
+              style: AdminButtonStyles.filled(),
+              child: const Text('OK'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

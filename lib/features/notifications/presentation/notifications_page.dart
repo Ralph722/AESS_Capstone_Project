@@ -203,7 +203,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PortalTheme.pageBg,
+      backgroundColor: Colors.white,
       appBar: PortalAppBar(
         title: 'Notifications',
         actions: [

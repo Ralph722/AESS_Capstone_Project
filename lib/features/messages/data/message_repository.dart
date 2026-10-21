@@ -48,9 +48,10 @@ class MessageRepository {
   Future<Set<String>> resolveAdminIdentityIds() async {
     try {
       final ids = <String>{};
-      final admins =
-          await _supabase.from('users').select('id').eq('role', 'admin');
-      for (final row in admins) {
+      final rows = await _supabase.rpc('list_support_admins');
+      if (rows is! List) return ids;
+      for (final row in rows) {
+        if (row is! Map) continue;
         final id = row['id']?.toString();
         if (id != null && id.isNotEmpty) ids.add(id);
       }
@@ -62,14 +63,12 @@ class MessageRepository {
 
   Future<PrimaryAdminContact?> resolvePrimaryAdminContact() async {
     try {
-      final row = await _supabase
-          .from('users')
-          .select()
-          .eq('role', 'admin')
-          .limit(1)
-          .maybeSingle();
-      if (row == null) return null;
+      final rows = await _supabase.rpc('list_support_admins');
+      if (rows is! List || rows.isEmpty) return null;
+      final row = rows.first;
+      if (row is! Map) return null;
       final id = row['id']?.toString() ?? '';
+      if (id.isEmpty) return null;
       return PrimaryAdminContact(
         authUid: id,
         docId: id,
@@ -202,30 +201,31 @@ class MessageRepository {
     if (ids.isEmpty) return {};
     final result = <String, UserProfileLite>{};
     try {
-      final userRows =
-          await _supabase.from('users').select().inFilter('id', ids);
+      // Public profile RPC (no admin email leakage). Direct users SELECT of
+      // admin rows is blocked after users_select RLS tighten.
+      final userRows = await _supabase.rpc(
+        'get_public_profiles',
+        params: {'p_ids': ids},
+      );
+      if (userRows is! List) return result;
       for (final row in userRows) {
+        if (row is! Map) continue;
         final id = row['id']?.toString();
         if (id == null) continue;
         final program = (row['program'] as String? ?? '').trim();
         final year = (row['year_graduated'] as String? ?? '').trim();
+        final emailRaw = (row['email'] as String?)?.trim();
         result[id] = UserProfileLite(
           displayName: row['display_name'] as String?,
-          email: row['email'] as String?,
+          email: (emailRaw == null || emailRaw.isEmpty) ? null : emailRaw,
           program: program,
           batch: year,
-          tracerComplete: row['tracer_profile_complete'] == true,
-          lastActive: row['updated_at'] != null
-              ? parseMessageDateTime(row['updated_at'])
-              : null,
-          // Users table stores avatars in profile_image_base64 (URL or data URL).
+          tracerComplete: false,
+          lastActive: null,
           avatarUrl: () {
             final primary =
                 (row['profile_image_base64'] as String?)?.trim();
             if (primary != null && primary.isNotEmpty) return primary;
-            final legacy =
-                (row['profile_image_url'] as String?)?.trim();
-            if (legacy != null && legacy.isNotEmpty) return legacy;
             return null;
           }(),
         );

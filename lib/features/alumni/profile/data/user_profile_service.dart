@@ -2,6 +2,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
+import 'package:alumni_system/features/alumni/profile/data/profile_change_diff.dart';
 
 class UserProfileService {
   UserProfileService({SupabaseClient? supabase})
@@ -67,16 +69,33 @@ class UserProfileService {
     }
   }
 
+  /// Saves the live profile. When fields actually changed, a `PROFILE_UPDATE`
+  /// audit row with the field-level diff is written so admins can see what
+  /// changed in the member timeline. [source] is `profile`, `tracer`,
+  /// `survey`, or `onboarding`.
   Future<void> saveTracerProfile(
     TracerProfile profile, {
     bool syncRoster = true,
+    String source = 'profile',
   }) async {
+    TracerProfile? before;
+    try {
+      before = await getTracerProfile(profile.uid);
+    } catch (_) {
+      // Diff capture is best-effort; the save itself must still happen.
+    }
+
     final data = profile.toSupabaseRow();
 
     // Keep role for RLS check on update writes.
     data['role'] = 'user';
 
     await _supabase.from('users').upsert(data, onConflict: 'id');
+    final hasChanges = await _logProfileChanges(
+      before: before,
+      after: profile,
+      source: source,
+    );
     if (!syncRoster) return;
 
     try {
@@ -87,7 +106,11 @@ class UserProfileService {
         'id': profile.uid,
       });
       await _syncAlumniDirectory(synced);
-      await AlumniMemberService().flagProfileUpdatedForAuthUid(profile.uid);
+      // Only flag the Updates tab when fields actually changed (an unknown
+      // diff — previous profile unreadable — still flags, to be safe).
+      if (hasChanges) {
+        await AlumniMemberService().flagProfileUpdatedForAuthUid(profile.uid);
+      }
     } catch (_) {
       // User profile is saved; roster mirror is best-effort (no list/query).
     }
@@ -102,15 +125,49 @@ class UserProfileService {
     } catch (_) {}
   }
 
+  /// Writes the diff audit row. Returns whether the member should be flagged
+  /// for admin review: true when fields changed, or when the previous
+  /// profile could not be read (diff unknown).
+  Future<bool> _logProfileChanges({
+    required TracerProfile? before,
+    required TracerProfile after,
+    required String source,
+  }) async {
+    if (before == null) return true;
+    final fields = tracerProfileFieldDiff(before, after);
+    if (fields.isEmpty) return false;
+    await AuditService().logAction(
+      action: 'PROFILE_UPDATE',
+      resource: 'Profile',
+      resourceId: after.uid,
+      description:
+          'Updated ${fields.length} profile field${fields.length == 1 ? '' : 's'} '
+          'via ${profileChangeSourceLabel(source).toLowerCase()}',
+      changes: {'source': source, 'fields': fields},
+    );
+    return true;
+  }
+
   Future<void> saveProfileImageUrl({
     required String uid,
     required String imageUrl,
+    String source = 'profile',
   }) async {
+    final previous = await getProfileImageUrl(uid);
     await _supabase.from('users').update({
       'profile_image_base64': imageUrl,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', uid);
     await AlumniMemberService().mirrorProfileImageForAuthUid(uid, imageUrl);
+    if (previous != imageUrl) {
+      await AuditService().logAction(
+        action: 'PROFILE_UPDATE',
+        resource: 'Profile',
+        resourceId: uid,
+        description: 'Updated profile photo',
+        changes: profilePhotoChange(source),
+      );
+    }
   }
 
   Future<void> _syncAlumniDirectory(TracerProfile profile) async {
@@ -129,7 +186,6 @@ class UserProfileService {
     await AlumniMemberService().syncRosterFromTracerProfile(
       authUid: profile.uid,
       contactNumber: profile.mobileNumber,
-      email: profile.email,
       address: profile.address,
       gender: profile.gender,
       civilStatus: profile.civilStatus,

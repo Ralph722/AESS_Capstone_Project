@@ -7,11 +7,20 @@ import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class AdminDssHistoryPanel extends StatefulWidget {
-  const AdminDssHistoryPanel({super.key, required this.onClose});
+  const AdminDssHistoryPanel({
+    super.key,
+    required this.onClose,
+    this.selectedSubnav = 1,
+    this.onSubnavSelected,
+  });
 
   final Future<void> Function() onClose;
+  final int selectedSubnav;
+  final ValueChanged<int>? onSubnavSelected;
 
   @override
   State<AdminDssHistoryPanel> createState() => _AdminDssHistoryPanelState();
@@ -78,11 +87,16 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DssPageHeader(
-          title: 'Insights history & trends',
-          subtitle:
-              'Flags raised and closed over time — useful continuous-improvement evidence.',
-          onBack: () => widget.onClose(),
-          backTooltip: 'Back to recommendations',
+          title: 'History',
+          subtitle: 'Findings raised, closed, and re-checked over time.',
+          onBack: widget.onSubnavSelected == null
+              ? () => widget.onClose()
+              : null,
+          backTooltip: 'Back to findings',
+          selectedSubnav: widget.onSubnavSelected != null
+              ? widget.selectedSubnav
+              : null,
+          onSubnavSelected: widget.onSubnavSelected,
           actions: [
             DirectoryFilterField<int?>(
               label: 'Period',
@@ -105,7 +119,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
             OutlinedButton.icon(
               onPressed: _loading ? null : _load,
               icon: const Icon(Icons.refresh, size: 17),
-              label: const Text('Refresh'),
+              label: const Text('Reload'),
               style: dssOutlinedButtonStyle(),
             ),
           ],
@@ -129,80 +143,88 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
           Expanded(
             child: ListView(
               children: [
-                DirectoryStatsGrid(
+                DirectoryKpiRow(
                   children: [
-                    DirectoryStatCard(
+                    AdminKpiCard(
+                      dense: true,
                       label: 'Raised',
                       value: '${s.raised}',
-                      description: s.superseded == 0
+                      caption: s.superseded == 0
                           ? _periodLabel
-                          : '$_periodLabel · ${s.superseded} superseded by a '
-                                'newer wave',
+                          : '$_periodLabel · ${s.superseded} superseded',
                       icon: Icons.flag_outlined,
-                      accent: AdminDssTheme.primary,
+                      accent: AdminColors.primary,
                     ),
-                    DirectoryStatCard(
-                      label: 'Open',
+                    AdminKpiCard(
+                      dense: true,
+                      label: 'Still open',
                       value: '${s.open}',
-                      description: 'Still active',
+                      caption: 'Not started',
                       icon: Icons.pending_outlined,
-                      accent: AdminDssTheme.danger,
+                      accent: AdminColors.danger,
                     ),
-                    DirectoryStatCard(
+                    AdminKpiCard(
+                      dense: true,
                       label: 'Resolved',
                       value: '${s.resolved}',
-                      description: 'Closed with action',
+                      caption: 'With action',
                       icon: Icons.check_circle_outline,
-                      accent: AdminDssTheme.success,
+                      accent: AdminColors.success,
                     ),
-                    DirectoryStatCard(
+                    AdminKpiCard(
+                      dense: true,
                       label: 'Avg days',
                       value: s.avgResolutionDays == null
                           ? '—'
                           : s.avgResolutionDays!.toStringAsFixed(1),
-                      description: 'Time to close',
+                      caption: 'To close',
                       icon: Icons.timelapse_outlined,
-                      accent: AdminDssTheme.warning,
+                      accent: AdminColors.warning,
                     ),
                   ],
                 ),
                 const SizedBox(height: AdminDssTheme.space2),
-                DirectoryStatsGrid(
+                DirectoryKpiRow(
                   children: [
-                    DirectoryStatCard(
-                      label: 'Coverage re-checked',
+                    AdminKpiCard(
+                      dense: true,
+                      label: 'Re-checked',
                       value: '${s.impactChecked}',
-                      description: 'Resolved, same-wave re-check',
+                      caption: 'Same-wave coverage',
                       icon: Icons.verified_outlined,
-                      accent: AdminDssTheme.info,
+                      accent: AdminColors.info,
                     ),
-                    DirectoryStatCard(
+                    AdminKpiCard(
+                      dense: true,
                       label: 'Improved',
                       value: s.improvedPct == null
                           ? '—'
                           : '${(s.improvedPct! * 100).toStringAsFixed(0)}%',
-                      description:
-                          '${s.impactImproved} of ${s.impactChecked} improved',
+                      caption: s.impactChecked == 0
+                          ? 'No re-checks'
+                          : '${s.impactImproved}/${s.impactChecked}',
                       icon: Icons.trending_up,
-                      accent: AdminDssTheme.success,
+                      accent: AdminColors.success,
                     ),
-                    DirectoryStatCard(
+                    AdminKpiCard(
+                      dense: true,
                       label: 'Still flagged',
                       value: '${s.impactStillFlagged}',
-                      description: 'Need more follow-up',
+                      caption: 'Needs follow-up',
                       icon: Icons.warning_amber_outlined,
-                      accent: AdminDssTheme.danger,
+                      accent: AdminColors.danger,
                     ),
-                    DirectoryStatCard(
+                    AdminKpiCard(
+                      dense: true,
                       label: 'Dismissed',
                       value: '${s.dismissed}',
-                      description: 'Closed without action',
+                      caption: 'No action',
                       icon: Icons.remove_circle_outline,
-                      accent: AdminDssTheme.textSecondary,
+                      accent: AdminColors.textSecondary,
                     ),
                   ],
                 ),
-                const SizedBox(height: AdminDssTheme.space3),
+                const SizedBox(height: AdminDssTheme.space2),
                 DssSurfaceCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,7 +240,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                       const SizedBox(height: 8),
                       if (s.impactByRule.isEmpty)
                         const Text(
-                          'Resolve flags and re-check coverage to see rates here.',
+                          'Re-check coverage on resolved findings to populate this.',
                           style: TextStyle(
                             color: AdminDssTheme.textMuted,
                             fontSize: 12.5,
@@ -286,7 +308,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                       const SizedBox(height: 8),
                       if (s.byRule.isEmpty)
                         const Text(
-                          'No flags in this period.',
+                          'No findings in this period.',
                           style: TextStyle(
                             color: AdminDssTheme.textMuted,
                             fontSize: 12.5,
@@ -457,9 +479,7 @@ class _OutcomesCard extends StatelessWidget {
           const Text('Intervention outcomes', style: _cardTitle),
           const SizedBox(height: 4),
           const Text(
-            'Each outcome compares the next CHED tracer wave with the '
-            'baseline. It shows what changed after the intervention, not '
-            'what caused the change.',
+            'Next tracer wave vs baseline — association, not causation.',
             style: TextStyle(
               fontSize: 12,
               height: 1.35,
@@ -469,20 +489,18 @@ class _OutcomesCard extends StatelessWidget {
           const SizedBox(height: 10),
           if (summary.isEmpty)
             Text(
-              'No interventions recorded ($periodLabel). Record one on a '
-              'flag to see its outcome here after the next wave.',
+              'No interventions recorded ($periodLabel).',
               style: _muted,
             )
           else ...[
             Text(
-              '${o.total} intervention(s) recorded ($periodLabel): '
-              '${o.count(DssOutcomeStatus.successful)} successful, '
-              '${o.count(DssOutcomeStatus.partiallySuccessful)} partially '
-              'successful, ${o.count(DssOutcomeStatus.unsuccessful)} '
-              'unsuccessful, ${o.count(DssOutcomeStatus.inconclusive)} '
-              'inconclusive, ${o.count(DssOutcomeStatus.noComparableData)} '
-              'with no comparable data, ${o.waiting} waiting for the next '
-              'wave.',
+              '${o.total} recorded ($periodLabel): '
+              '${o.count(DssOutcomeStatus.successful)} successful · '
+              '${o.count(DssOutcomeStatus.partiallySuccessful)} partial · '
+              '${o.count(DssOutcomeStatus.unsuccessful)} unsuccessful · '
+              '${o.count(DssOutcomeStatus.inconclusive)} inconclusive · '
+              '${o.count(DssOutcomeStatus.noComparableData)} no data · '
+              '${o.waiting} waiting',
               style: _cell,
             ),
             const SizedBox(height: 12),
@@ -580,15 +598,13 @@ class _RunsCard extends StatelessWidget {
           const Text('Evaluation runs', style: _cardTitle),
           const SizedBox(height: 4),
           const Text(
-            'The latest 20 runs of the rules: Refresh insights clicks and the '
-            'nightly server run.',
+            'Latest Refresh insights and nightly runs (up to 20).',
             style: TextStyle(fontSize: 12, color: AdminDssTheme.textSecondary),
           ),
           const SizedBox(height: 10),
           if (runs.isEmpty)
             const Text(
-              'No runs logged yet. Runs appear here after Refresh insights '
-              'or the nightly evaluation.',
+              'No runs logged yet.',
               style: _muted,
             )
           else

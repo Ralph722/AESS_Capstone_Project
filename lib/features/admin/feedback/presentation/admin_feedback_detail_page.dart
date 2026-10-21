@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/features/feedback/models/feedback_model.dart';
 import 'package:alumni_system/features/feedback/data/feedback_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class AdminFeedbackDetailScreen extends StatefulWidget {
   const AdminFeedbackDetailScreen({super.key, required this.feedbackId});
@@ -16,7 +17,7 @@ class AdminFeedbackDetailScreen extends StatefulWidget {
 }
 
 class _AdminFeedbackDetailScreenState extends State<AdminFeedbackDetailScreen> {
-  static const Color _navy = Color(0xFF090A4F);
+  static const Color _navy = AdminColors.primary;
 
   final _service = FeedbackService();
   final _responseController = TextEditingController();

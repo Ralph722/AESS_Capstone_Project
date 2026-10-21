@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
+import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 import 'package:alumni_system/shared/widgets/aess_logo.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/auth/presentation/login_page.dart';
 import 'package:alumni_system/features/admin/dashboard/presentation/admin_dashboard_page.dart';
 import 'package:alumni_system/features/onboarding/presentation/alumni_onboarding_page.dart';
+import 'package:alumni_system/features/alumni/card/data/alumni_card_token_service.dart';
 import 'package:alumni_system/features/shell/presentation/main_navigation.dart';
 
 /// Resolves cold-start / restored Supabase sessions into the correct root screen.
@@ -46,10 +48,16 @@ class _AuthGateState extends State<AuthGate> {
       final event = state.event;
       if (event == AuthChangeEvent.signedOut) {
         AppImage.clearDecodedCache();
-        if (!mounted) return;
-        setState(() {
-          _destination = _AuthDestination.login;
-          _statusMessage = null;
+        ImageStorageService.clearSignedUrlCache();
+        AlumniCardTokenService.clearSharedCache();
+        // Defer so concurrent Navigator replacements (e.g. Profile logout
+        // after a notification cold-start) can dispose this gate first.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _destination = _AuthDestination.login;
+            _statusMessage = null;
+          });
         });
         return;
       }
@@ -135,7 +143,18 @@ class _AuthGateState extends State<AuthGate> {
         _statusMessage =
             'Taking longer than usual. Check your connection and try again.';
       });
-    } catch (_) {
+    } catch (e) {
+      if (!mounted || _resolveToken != token) return;
+      // Network / transient errors: keep session and offer retry.
+      // Authorization / account failures: sign out and return to login.
+      if (_looksLikeNetworkError(e)) {
+        setState(() {
+          _destination = _AuthDestination.failed;
+          _statusMessage =
+              'Connection problem. Check your internet and try again.';
+        });
+        return;
+      }
       try {
         await _authService.logout();
       } catch (_) {}
@@ -145,6 +164,17 @@ class _AuthGateState extends State<AuthGate> {
         _statusMessage = null;
       });
     }
+  }
+
+  bool _looksLikeNetworkError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('socket') ||
+        msg.contains('failed to fetch') ||
+        msg.contains('clientexception') ||
+        msg.contains('network') ||
+        msg.contains('connection') ||
+        msg.contains('timed out') ||
+        msg.contains('timeout');
   }
 
   @override

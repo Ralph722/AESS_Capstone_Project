@@ -8,6 +8,7 @@ import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/email_service.dart';
+import 'package:alumni_system/features/share/share_link_config.dart';
 /// Announcements data access — Supabase only.
 class AnnouncementService {
   AnnouncementService({SupabaseClient? supabase})
@@ -15,11 +16,16 @@ class AnnouncementService {
 
   final SupabaseClient _supabase;
 
+  /// Columns needed by [Announcement.fromSupabaseRow].
+  static const announcementSelectColumns =
+      'id, title, body, status, published_at, created_at, data';
+
   Future<List<Announcement>> getAllAnnouncements() async {
     final rows = await _supabase
         .from('announcements')
-        .select()
-        .order('created_at', ascending: false);
+        .select(announcementSelectColumns)
+        .order('created_at', ascending: false)
+        .limit(300);
     return rows.map(Announcement.fromSupabaseRow).toList();
   }
 
@@ -40,7 +46,7 @@ class AnnouncementService {
   Future<Announcement?> getAnnouncement(String id) async {
     final row = await _supabase
         .from('announcements')
-        .select()
+        .select(announcementSelectColumns)
         .eq('id', id)
         .maybeSingle();
     if (row == null) return null;
@@ -178,6 +184,9 @@ class AnnouncementService {
             userName: name,
             surveyTitle: item.title,
             message: item.body,
+            actionUrl: ShareLinkConfig.origin,
+            actionLabel: 'Open AESS-USTP',
+            preferenceType: 'announcement',
           );
         } catch (_) {}
       }
@@ -196,7 +205,7 @@ class AnnouncementService {
   Future<List<Announcement>> getPublishedForUser(String userId) async {
     final userRow = await _supabase
         .from('users')
-        .select()
+        .select('id, program, year_graduated, display_name, email')
         .eq('id', userId)
         .maybeSingle();
     if (userRow == null) return [];
@@ -204,8 +213,10 @@ class AnnouncementService {
 
     final rows = await _supabase
         .from('announcements')
-        .select()
-        .eq('status', AnnouncementStatus.published.name);
+        .select(announcementSelectColumns)
+        .eq('status', AnnouncementStatus.published.name)
+        .order('published_at', ascending: false)
+        .limit(100);
     final published = rows.map(Announcement.fromSupabaseRow).toList();
 
     final list = published.where((a) => _matchesTarget(a, profile)).toList();

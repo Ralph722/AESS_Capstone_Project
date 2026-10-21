@@ -9,6 +9,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_search_field.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Admin activity / audit log viewer (extracted from [AdminDashboardWeb]).
 class AdminActivityLogsScreen extends StatefulWidget {
@@ -247,7 +248,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                 'Total Logs',
                 totalLogs.toString(),
                 Icons.history,
-                const Color(0xFF090A4F),
+                AdminColors.primary,
               ),
             ),
             const SizedBox(width: 16),
@@ -274,7 +275,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                 'Today',
                 todayLogs.toString(),
                 Icons.today,
-                const Color(0xFFFFD700),
+                AdminColors.accent,
               ),
             ),
           ],
@@ -302,7 +303,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                 children: [
                   const Icon(
                     Icons.filter_list,
-                    color: Color(0xFF090A4F),
+                    color: AdminColors.primary,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -311,7 +312,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF090A4F),
+                      color: AdminColors.primary,
                     ),
                   ),
                 ],
@@ -327,7 +328,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                       'Search by user, action, resource, or description...',
                   prefixIcon: const Icon(
                     Icons.search,
-                    color: Color(0xFF090A4F),
+                    color: AdminColors.primary,
                   ),
                   filled: true,
                   fillColor: const Color(0xFFF8F9FA),
@@ -474,7 +475,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
                     icon: const Icon(Icons.refresh, size: 18),
                     label: const Text('Reset Filters'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF090A4F),
+                      backgroundColor: AdminColors.primary,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 12,
@@ -521,7 +522,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFF090A4F),
+              color: AdminColors.primary,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -737,7 +738,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
             height: 28,
             decoration: BoxDecoration(
               color: log.userRole == 'admin'
-                  ? const Color(0xFFFFD700).withValues(alpha: 0.2)
+                  ? AdminColors.accent.withValues(alpha: 0.2)
                   : const Color(0xFF2196F3).withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),

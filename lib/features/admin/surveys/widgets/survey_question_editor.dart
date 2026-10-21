@@ -2,6 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
+
+/// What still blocks alumni from answering [q], or null when it is complete.
+String? surveyQuestionProblem(SurveyQuestion q) {
+  if (q.prompt.trim().isEmpty) return 'Add question text';
+  if (q.type == SurveyQuestionType.singleChoice ||
+      q.type == SurveyQuestionType.multipleChoice) {
+    final filled =
+        q.options.map((e) => e.trim()).where((e) => e.isNotEmpty).length;
+    if (filled < 2) return 'Add at least 2 options';
+  }
+  return null;
+}
+
+class SurveyPublishProblem {
+  const SurveyPublishProblem({required this.message, this.questionIndex});
+
+  final String message;
+
+  /// Zero-based index into the question list; null for survey-level problems.
+  final int? questionIndex;
+}
+
+/// Problems that block publishing a custom or preset survey.
+List<SurveyPublishProblem> surveyPublishProblems(
+  List<SurveyQuestion> questions,
+) {
+  if (questions.isEmpty) {
+    return const [SurveyPublishProblem(message: 'Add at least one question')];
+  }
+  return [
+    for (var i = 0; i < questions.length; i++)
+      if (surveyQuestionProblem(questions[i]) case final problem?)
+        SurveyPublishProblem(
+          message: 'Question ${i + 1} — $problem',
+          questionIndex: i,
+        ),
+  ];
+}
 
 String surveyQuestionTypeLabel(SurveyQuestionType t) {
   switch (t) {
@@ -242,45 +281,48 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
     super.dispose();
   }
 
-  String? get _validationHint {
-    final q = widget.question;
-    if (q.prompt.trim().isEmpty) return 'Add question text';
-    if (q.type == SurveyQuestionType.singleChoice ||
-        q.type == SurveyQuestionType.multipleChoice) {
-      final filled =
-          q.options.map((e) => e.trim()).where((e) => e.isNotEmpty).length;
-      if (filled < 2) return 'Add at least 2 options';
-    }
-    return null;
-  }
-
   void _emit(SurveyQuestion next) => widget.onChanged(next);
+
+  static const _switchTitleStyle = TextStyle(
+    fontSize: 13.5,
+    fontWeight: FontWeight.w600,
+    color: AdminColors.textPrimary,
+  );
 
   @override
   Widget build(BuildContext context) {
     final q = widget.question;
-    final hint = _validationHint;
+    final hint = surveyQuestionProblem(q);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AdminDensity.listItemGap),
       decoration: BoxDecoration(
-        color: AdminSurveyTheme.card,
-        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusMd),
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
         border: Border.all(
           color: widget.expanded
-              ? AdminSurveyTheme.primary.withValues(alpha: 0.35)
-              : AdminSurveyTheme.border,
+              ? AdminColors.primary.withValues(alpha: 0.45)
+              : AdminColors.border,
+          width: widget.expanded ? 1.5 : 1,
         ),
-        boxShadow: AdminSurveyTheme.surfaceCard().boxShadow,
+        boxShadow: widget.expanded
+            ? [
+                BoxShadow(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : AdminSurfaces.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
             onTap: widget.onToggleExpand,
-            borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusMd),
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+              padding: const EdgeInsets.fromLTRB(8, 10, 4, 10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -289,19 +331,19 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                     const SizedBox(width: 4),
                   ],
                   Container(
-                    width: 28,
-                    height: 28,
+                    width: 26,
+                    height: 26,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AdminSurveyTheme.infoBg,
-                      borderRadius: BorderRadius.circular(8),
+                      color: AdminColors.infoBg,
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '${widget.index + 1}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
-                        color: AdminSurveyTheme.primary,
+                        color: AdminColors.primary,
                       ),
                     ),
                   ),
@@ -318,10 +360,11 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                            fontSize: 13.5,
+                            height: 1.35,
                             color: q.prompt.trim().isEmpty
-                                ? AdminSurveyTheme.textMuted
-                                : AdminSurveyTheme.textPrimary,
+                                ? AdminColors.textSecondary
+                                : AdminColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -356,18 +399,21 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                       ],
                     ),
                   ),
-                  Icon(
-                    widget.expanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
-                    color: AdminSurveyTheme.textMuted,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, right: 4),
+                    child: Icon(
+                      widget.expanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: AdminColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           if (widget.expanded) ...[
-            const Divider(height: 1, color: AdminSurveyTheme.border),
+            const Divider(height: 1, color: AdminColors.border),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
               child: Column(
@@ -428,13 +474,10 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                   const SizedBox(height: 8),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Required',
-                      style: TextStyle(fontSize: 14),
-                    ),
+                    title: const Text('Required', style: _switchTitleStyle),
                     subtitle: const Text(
                       'Alumni must answer before submitting',
-                      style: TextStyle(fontSize: 12),
+                      style: AdminText.caption,
                     ),
                     value: q.required,
                     activeThumbColor: AdminSurveyTheme.primary,
@@ -537,46 +580,63 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
+                  const Divider(height: 1, color: AdminColors.border),
+                  const SizedBox(height: 6),
+                  Row(
                     children: [
-                      IconButton(
-                        tooltip: 'Move up',
-                        onPressed: widget.canMoveUp ? widget.onMoveUp : null,
-                        icon: const Icon(Icons.arrow_upward, size: 20),
-                        style: AdminDensity.iconButtonStyle(),
-                      ),
-                      IconButton(
-                        tooltip: 'Move down',
-                        onPressed:
-                            widget.canMoveDown ? widget.onMoveDown : null,
-                        icon: const Icon(Icons.arrow_downward, size: 20),
-                        style: AdminDensity.iconButtonStyle(),
-                      ),
-                      IconButton(
-                        tooltip: 'Duplicate',
-                        onPressed: widget.onDuplicate,
-                        icon: const Icon(Icons.copy_outlined, size: 20),
-                        style: AdminDensity.iconButtonStyle(),
-                      ),
-                      if (widget.onDuplicateSection != null)
-                        IconButton(
-                          tooltip: 'Duplicate section',
-                          onPressed: widget.onDuplicateSection,
-                          icon: const Icon(Icons.library_add_outlined, size: 20),
-                          style: AdminDensity.iconButtonStyle(),
+                      Expanded(
+                        child: Wrap(
+                          spacing: 2,
+                          runSpacing: 2,
+                          children: [
+                            IconButton(
+                              tooltip: 'Move up',
+                              onPressed:
+                                  widget.canMoveUp ? widget.onMoveUp : null,
+                              icon: const Icon(Icons.arrow_upward, size: 20),
+                              style: AdminDensity.iconButtonStyle(
+                                foregroundColor: AdminColors.textSecondary,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Move down',
+                              onPressed: widget.canMoveDown
+                                  ? widget.onMoveDown
+                                  : null,
+                              icon: const Icon(Icons.arrow_downward, size: 20),
+                              style: AdminDensity.iconButtonStyle(
+                                foregroundColor: AdminColors.textSecondary,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Duplicate',
+                              onPressed: widget.onDuplicate,
+                              icon: const Icon(Icons.copy_outlined, size: 20),
+                              style: AdminDensity.iconButtonStyle(
+                                foregroundColor: AdminColors.textSecondary,
+                              ),
+                            ),
+                            if (widget.onDuplicateSection != null)
+                              IconButton(
+                                tooltip: 'Duplicate section',
+                                onPressed: widget.onDuplicateSection,
+                                icon: const Icon(
+                                  Icons.library_add_outlined,
+                                  size: 20,
+                                ),
+                                style: AdminDensity.iconButtonStyle(
+                                  foregroundColor: AdminColors.textSecondary,
+                                ),
+                              ),
+                          ],
                         ),
-                      IconButton(
-                        tooltip: 'Delete',
+                      ),
+                      TextButton.icon(
                         onPressed: widget.onDelete,
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: AdminSurveyTheme.danger,
-                          size: 20,
-                        ),
-                        style: AdminDensity.iconButtonStyle(
-                          foregroundColor: AdminSurveyTheme.danger,
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Delete'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AdminColors.danger,
                         ),
                       ),
                     ],
@@ -647,11 +707,15 @@ class _VisibilityRuleEditor extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           title: const Text(
             'Show only when…',
-            style: TextStyle(fontSize: 14),
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: AdminColors.textPrimary,
+            ),
           ),
           subtitle: const Text(
             'Hide this question unless a prior answer matches',
-            style: TextStyle(fontSize: 12),
+            style: AdminText.caption,
           ),
           value: enabled,
           activeThumbColor: AdminSurveyTheme.primary,
@@ -790,20 +854,24 @@ class _MiniChip extends StatelessWidget {
     final Color bg;
     final Color fg;
     if (warning) {
-      bg = AdminSurveyTheme.warningBg;
-      fg = AdminSurveyTheme.warning;
+      bg = AdminColors.warningBg;
+      fg = AdminColors.warning;
     } else if (emphasize) {
-      bg = AdminSurveyTheme.infoBg;
-      fg = AdminSurveyTheme.primary;
+      bg = AdminColors.infoBg;
+      fg = AdminColors.primary;
     } else {
-      bg = AdminSurveyTheme.surface;
-      fg = AdminSurveyTheme.textSecondary;
+      bg = AdminColors.surface;
+      fg = AdminColors.textSecondary;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: fg.withValues(alpha: 0.20),
+          width: 1,
+        ),
       ),
       child: Text(
         label,

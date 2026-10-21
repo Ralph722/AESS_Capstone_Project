@@ -70,6 +70,9 @@ analysis.txt
 # Editor / agent local state
 .cursor/
 
+# Firebase CLI cache
+.firebase/
+
 # Android build output
 android/build/
 android/app/build/

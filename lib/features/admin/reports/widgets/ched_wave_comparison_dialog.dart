@@ -6,6 +6,9 @@ import 'package:alumni_system/features/admin/reports/application/ched_wave_compa
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Result of the CHED wave comparison picker.
 class ChedWaveComparisonSelection {
@@ -103,23 +106,29 @@ class _ChedWaveComparisonDialogState extends State<_ChedWaveComparisonDialog> {
       });
 
     return AlertDialog(
-      title: const Text('CHED wave comparison'),
+      shape: AdminDialogStandards.shape,
+      backgroundColor: AdminDialogStandards.backgroundColor,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: AdminDialogStandards.defaultInsetPadding,
+      contentPadding: AdminDialogStandards.defaultContentPadding,
+      titlePadding: EdgeInsets.zero,
+      actionsPadding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
+      title: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+        child: AdminModalHeader(
+          title: 'CHED Wave Comparison',
+          subtitle: 'Select 2–8 published waves to compare outcomes.',
+          icon: Icons.compare_arrows_rounded,
+          onClose: () => Navigator.pop(context),
+        ),
+      ),
       content: SizedBox(
         width: 480,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Select 2–8 published Official CHED GTS waves that already have '
-              'submitted responses. The report compares employment, degree '
-              'alignment, and other crucial fields across those waves.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: AdminReportsTheme.textSecondary,
-              ),
-            ),
+            const Divider(height: 1, color: AdminColors.border),
             const SizedBox(height: 14),
             Row(
               children: [
@@ -176,52 +185,65 @@ class _ChedWaveComparisonDialogState extends State<_ChedWaveComparisonDialog> {
                 ),
               )
             else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: sorted.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final s = sorted[index];
-                    final when = s.publishedAt ?? s.openAt ?? s.createdAt;
-                    final selected = _selectedIds.contains(s.id);
-                    final atCap =
-                        !selected &&
-                        _selectedIds.length >=
-                            ChedWaveComparisonReport.maxWaves;
-                    return CheckboxListTile(
-                      dense: true,
-                      value: selected,
-                      onChanged: atCap ? null : (_) => _toggle(s.id),
-                      title: Text(
-                        s.title.trim().isEmpty
-                            ? 'Official CHED GTS'
-                            : s.title.trim(),
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AdminColors.border),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: sorted.length,
+                    separatorBuilder: (_, _) => const Divider(
+                      height: 1,
+                      color: AdminColors.border,
+                    ),
+                    itemBuilder: (context, index) {
+                      final s = sorted[index];
+                      final when = s.publishedAt ?? s.openAt ?? s.createdAt;
+                      final selected = _selectedIds.contains(s.id);
+                      final atCap =
+                          !selected &&
+                          _selectedIds.length >=
+                              ChedWaveComparisonReport.maxWaves;
+                      return CheckboxListTile(
+                        dense: true,
+                        value: selected,
+                        activeColor: AdminColors.primary,
+                        onChanged: atCap ? null : (_) => _toggle(s.id),
+                        title: Text(
+                          s.title.trim().isEmpty
+                              ? 'Official CHED GTS'
+                              : s.title.trim(),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      subtitle: Text(
-                        '${dateFmt.format(when)} · ${s.status.name} · '
-                        '${s.responseCount} submitted',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      controlAffinity: ListTileControlAffinity.leading,
-                    );
-                  },
+                        subtitle: Text(
+                          '${dateFmt.format(when)} · ${s.status.name} · '
+                          '${s.responseCount} submitted',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    },
+                  ),
                 ),
               ),
           ],
         ),
       ),
       actions: [
-        TextButton(
+        OutlinedButton(
           onPressed: () => Navigator.pop(context),
+          style: AdminButtonStyles.outlined(),
           child: const Text('Cancel'),
         ),
         FilledButton(
+          style: AdminButtonStyles.filled(),
           onPressed: !_canConfirm
               ? null
               : () {
@@ -237,7 +259,7 @@ class _ChedWaveComparisonDialogState extends State<_ChedWaveComparisonDialog> {
                     ),
                   );
                 },
-          child: const Text('Generate'),
+          child: const Text('Generate comparison'),
         ),
       ],
     );

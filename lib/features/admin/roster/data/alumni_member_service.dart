@@ -343,7 +343,23 @@ class AlumniMemberService {
     );
   }
 
-  Future<void> markAdminViewed(String memberId) async {
+  /// Records that an admin opened this member. Viewing alone no longer
+  /// clears the profile-update flag — that is [markProfileReviewed].
+  Future<void> recordAdminViewed(String memberId) async {
+    try {
+      await _supabase
+          .from('alumni_members')
+          .update({
+            'admin_viewed_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', memberId);
+    } catch (e) {
+      throw Exception('Error recording member admin view: $e');
+    }
+  }
+
+  /// Clears the profile-update flag after an admin reviewed the changes.
+  Future<void> markProfileReviewed(String memberId) async {
     try {
       await _supabase
           .from('alumni_members')
@@ -354,7 +370,7 @@ class AlumniMemberService {
           })
           .eq('id', memberId);
     } catch (e) {
-      throw Exception('Error marking member admin viewed: $e');
+      throw Exception('Error marking member profile reviewed: $e');
     }
   }
 
@@ -388,6 +404,7 @@ class AlumniMemberService {
           .from('alumni_members')
           .update({
             'has_profile_updates': true,
+            'profile_updated_at': DateTime.now().toUtc().toIso8601String(),
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', member.id);
@@ -397,6 +414,10 @@ class AlumniMemberService {
   }
 
   /// Keeps the roster avatar in sync immediately after a user uploads one.
+  ///
+  /// Photo changes are exempt from the profile-update review flag: they are
+  /// recorded in the member timeline, but do not put the member in the
+  /// directory Updates tab.
   Future<void> mirrorProfileImageForAuthUid(
     String authUid,
     String profileImageUrl,
@@ -409,7 +430,6 @@ class AlumniMemberService {
           .from('alumni_members')
           .update({
             'profile_image_url': profileImageUrl.trim(),
-            'has_profile_updates': true,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', member.id);
@@ -438,7 +458,7 @@ class AlumniMemberService {
   Future<void> syncRosterFromTracerProfile({
     required String authUid,
     String contactNumber = '',
-    String email = '',
+    String? email,
     String address = '',
     String gender = '',
     String civilStatus = '',
@@ -450,7 +470,7 @@ class AlumniMemberService {
 
     final patch = <String, dynamic>{
       'contact_number': contactNumber,
-      'email_address': email,
+      'email_address': ?email,
       'address': address,
       'gender': gender,
       'civil_status': civilStatus,
@@ -624,11 +644,18 @@ class AlumniMemberService {
     AlumniEmploymentFilter employmentFilter = AlumniEmploymentFilter.all,
     EmploymentStatusIndex employmentIndex = const EmploymentStatusIndex(),
     AlumniDirectorySort sort = AlumniDirectorySort.nameAsc,
-    bool hideDeactivated = true,
+    AlumniDirectoryView view = AlumniDirectoryView.all,
   }) {
     final q = searchQuery.trim().toLowerCase();
     var list = members.where((m) {
-      if (hideDeactivated && m.isDeactivated) return false;
+      switch (view) {
+        case AlumniDirectoryView.all:
+          if (m.isDeactivated) return false;
+        case AlumniDirectoryView.updates:
+          if (m.isDeactivated || !m.hasProfileUpdates) return false;
+        case AlumniDirectoryView.deactivated:
+          if (!m.isDeactivated) return false;
+      }
 
       if (courseFilter != null &&
           courseFilter.isNotEmpty &&
@@ -694,6 +721,22 @@ class AlumniMemberService {
           m.effectiveBatchYear.toLowerCase().contains(q) ||
           (m.registeredEmail ?? '').toLowerCase().contains(q);
     }).toList();
+
+    if (view == AlumniDirectoryView.updates) {
+      // Newest unreviewed change first; undated flags fall back to name.
+      list.sort((a, b) {
+        final aT = a.profileUpdatedAt ?? a.updatedAt;
+        final bT = b.profileUpdatedAt ?? b.updatedAt;
+        if (aT != null && bT != null) {
+          final c = bT.compareTo(aT);
+          if (c != 0) return c;
+        } else if (aT != bT) {
+          return aT == null ? 1 : -1;
+        }
+        return a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase());
+      });
+      return list;
+    }
 
     list.sort((a, b) {
       switch (sort) {
@@ -788,7 +831,7 @@ class AlumniMemberService {
           .select(
             'id, full_name, course, student_id, auth_uid, registered_email, '
             'is_registered_user, is_deactivated, profile_image_url, last_active_at, '
-            'has_profile_updates, admin_viewed_at, created_at, updated_at, '
+            'has_profile_updates, admin_viewed_at, profile_updated_at, created_at, updated_at, '
             'contact_number, email_address, address, gender, civil_status, birth_date, '
             'year_graduated, tracer_profile_complete',
           )

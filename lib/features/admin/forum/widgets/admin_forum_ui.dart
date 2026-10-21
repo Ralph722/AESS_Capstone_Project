@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
 
@@ -34,26 +35,9 @@ abstract final class AdminForumTheme {
 }
 
 ButtonStyle forumFilledButtonStyle({Color? background}) =>
-    FilledButton.styleFrom(
-      backgroundColor: background ?? AdminForumTheme.primary,
-      foregroundColor: Colors.white,
-      minimumSize: const Size(0, AdminForumTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminForumTheme.radiusSm),
-      ),
-    );
+    AdminButtonStyles.filled(background: background);
 
-ButtonStyle forumOutlinedButtonStyle() => OutlinedButton.styleFrom(
-      foregroundColor: AdminForumTheme.textPrimary,
-      side: const BorderSide(color: AdminForumTheme.border),
-      minimumSize: const Size(0, AdminForumTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminForumTheme.radiusSm),
-      ),
-    );
+ButtonStyle forumOutlinedButtonStyle() => AdminButtonStyles.outlined();
 
 class ForumPageHeader extends StatelessWidget {
   const ForumPageHeader({

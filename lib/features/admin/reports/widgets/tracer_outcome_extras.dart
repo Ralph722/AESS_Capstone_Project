@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Compact caution when a Tracer chart has too few answers to generalize.
 class ReportsSmallNBanner extends StatelessWidget {
@@ -148,20 +151,29 @@ Future<void> showTracerRespondentsDialog({
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title),
+        shape: AdminDialogStandards.shape,
+        backgroundColor: AdminDialogStandards.backgroundColor,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: AdminDialogStandards.defaultInsetPadding,
+        contentPadding: AdminDialogStandards.defaultContentPadding,
+        titlePadding: EdgeInsets.zero,
+        actionsPadding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
+        title: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+          child: AdminModalHeader(
+            title: title,
+            subtitle: subtitle,
+            icon: Icons.trending_up_rounded,
+            onClose: () => Navigator.pop(ctx),
+          ),
+        ),
         content: SizedBox(
-          width: 460,
+          width: 480,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: AdminReportsTheme.textMuted,
-                ),
-              ),
+              const Divider(height: 1, color: AdminColors.border),
               const SizedBox(height: 12),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 420),
@@ -171,8 +183,9 @@ Future<void> showTracerRespondentsDialog({
           ),
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
+            style: AdminButtonStyles.outlined(),
             child: const Text('Close'),
           ),
         ],

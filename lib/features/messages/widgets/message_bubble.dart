@@ -668,7 +668,7 @@ class _ImageThumb extends StatelessWidget {
         imageRef: imageUrl,
         placeholder: _placeholder(),
         error: _broken(),
-        builder: (url) => Image.network(
+        builder: (url, {required errorBuilder}) => Image.network(
           url,
           fit: BoxFit.contain,
           gaplessPlayback: true,
@@ -682,7 +682,7 @@ class _ImageThumb extends StatelessWidget {
             if (progress == null) return child;
             return _placeholder();
           },
-          errorBuilder: (_, __, ___) => _broken(),
+          errorBuilder: errorBuilder,
         ),
       );
     }

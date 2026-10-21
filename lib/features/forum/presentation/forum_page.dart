@@ -306,17 +306,27 @@ class _ForumScreenState extends State<ForumScreen> {
                         PortalFloatingFilterHeader(
                           child: _buildFilterCardContent(wide),
                         ),
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                          sliver: SliverToBoxAdapter(child: _buildListBody()),
-                        ),
-                        SliverToBoxAdapter(
-                          child: SizedBox(
-                            height: wide
-                                ? PortalTheme.space5
-                                : PortalFloating.bottomClearance(context),
+                        if (_loading)
+                          const SliverFillRemaining(
+                            hasScrollBody: true,
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(16, 6, 16, 0),
+                              child: PortalCardListSkeleton(threeLine: true),
+                            ),
+                          )
+                        else ...[
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                            sliver: SliverToBoxAdapter(child: _buildListBody()),
                           ),
-                        ),
+                          SliverToBoxAdapter(
+                            child: SizedBox(
+                              height: wide
+                                  ? PortalTheme.space5
+                                  : PortalFloating.bottomClearance(context),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -356,12 +366,7 @@ class _ForumScreenState extends State<ForumScreen> {
   }
 
   Widget _buildListBody() {
-    if (_loading) {
-      return const SizedBox(
-        height: 320,
-        child: PortalCardListSkeleton(threeLine: true),
-      );
-    }
+    // Initial load uses [SliverFillRemaining] + skeleton in [build].
     if (_error != null) {
       return SizedBox(
         height: 280,

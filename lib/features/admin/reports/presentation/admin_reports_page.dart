@@ -793,7 +793,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           ),
           slivers: [
             SliverToBoxAdapter(
-              child: ReportsDashboardCanvas(child: _buildDashboardHeader()),
+              child: ReportsDashboardCanvas(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildDashboardHeader(),
+                ),
+              ),
             ),
             SliverPersistentHeader(
               pinned: true,
@@ -999,18 +1004,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     }
   }
 
-  /// Bottom half of the header card; becomes a standalone card once pinned.
+  /// Floating rounded tab card (pins cleanly when scrolled).
   Widget _buildTabBar({required bool pinned}) {
-    const radius = Radius.circular(AdminReportsTheme.radiusLg);
     final pillRadius = BorderRadius.circular(AdminReportsTheme.radiusMd);
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 3, 6, 3),
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         color: AdminReportsTheme.card,
-        borderRadius: pinned
-            ? const BorderRadius.all(radius)
-            : const BorderRadius.vertical(bottom: radius),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AdminReportsTheme.border),
         boxShadow: pinned
             ? AdminReportsTheme.cardShadow
@@ -1031,9 +1033,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         indicatorPadding: const EdgeInsets.symmetric(vertical: 2),
         indicator: BoxDecoration(
           borderRadius: pillRadius,
-          gradient: const LinearGradient(
-            colors: [AdminReportsTheme.primary, Color(0xFF2E2A7A)],
-          ),
+          color: AdminReportsTheme.primary,
           boxShadow: [
             BoxShadow(
               color: AdminReportsTheme.primary.withValues(alpha: 0.22),
@@ -3495,7 +3495,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       items.add(
         _AttentionItem(
           icon: Icons.assignment_late_outlined,
-          color: Colors.deepPurple,
+          color: _navy,
           title:
               '${a.registeredWithoutTracerComplete} need a complete tracer profile',
           subtitle:
@@ -3522,7 +3522,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       items.add(
         _AttentionItem(
           icon: Icons.work_off_outlined,
-          color: Colors.orange.shade800,
+          color: AdminReportsTheme.gold,
           title: 'No employment submissions yet',
           subtitle: 'Employment charts stay empty until alumni submit data.',
           actionLabel: 'Tracer',
@@ -3534,7 +3534,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       items.add(
         _AttentionItem(
           icon: Icons.person_off_outlined,
-          color: Colors.blueGrey,
+          color: _navy,
           title: '${a.unclaimedRoster} roster alumni not registered',
           subtitle:
               '${a.registeredOnRoster}/${a.rosterTotal} have portal accounts',

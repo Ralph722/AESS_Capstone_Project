@@ -56,6 +56,22 @@ Call 'tracer-help: input over 300 chars'       '400' 'tracer-help' $userHeaders 
 Call 'tracer-help: unknown survey id'          '403' 'tracer-help' $userHeaders (@{ surveyId = '00000000-0000-4000-8000-000000000000'; description = 'teacher' } | ConvertTo-Json)
 Call 'tracer-help: SQL-ish survey id'          '403/400' 'tracer-help' $userHeaders (@{ surveyId = "x' or 1=1 --"; description = 'teacher' } | ConvertTo-Json)
 
+$cvSend = @{ action = 'send'; channel = 'email'; target = 'nobody@example.com' } | ConvertTo-Json
+Call 'contact-verify: no Authorization'        '401' 'contact-verify' $noAuth $cvSend
+Call 'contact-verify: anon key as bearer'      '401' 'contact-verify' $anonHeaders $cvSend
+Call 'contact-verify: forged/garbage JWT'      '401' 'contact-verify' @{ apikey = $anon; Authorization = 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.bad' } $cvSend
+Call 'contact-verify: GET method'              '405' 'contact-verify' $userHeaders $null 'GET'
+Call 'contact-verify: malformed JSON'          '400' 'contact-verify' $userHeaders '{not json'
+Call 'contact-verify: unknown action'          '400' 'contact-verify' $userHeaders (@{ action = 'apply'; channel = 'email'; target = 'a@b.co' } | ConvertTo-Json)
+Call 'contact-verify: unknown channel'         '400' 'contact-verify' $userHeaders (@{ action = 'send'; channel = 'fax'; target = 'a@b.co' } | ConvertTo-Json)
+Call 'contact-verify: invalid email target'    '400' 'contact-verify' $userHeaders (@{ action = 'send'; channel = 'email'; target = 'not-an-email' } | ConvertTo-Json)
+Call 'contact-verify: code not 6 digits'       '400' 'contact-verify' $userHeaders (@{ action = 'verify'; channel = 'email'; target = 'a@b.co'; code = '12' } | ConvertTo-Json)
+Call 'contact-verify: verify with no code sent' '400' 'contact-verify' $userHeaders (@{ action = 'verify'; channel = 'email'; target = 'p19-none@example.com'; code = '123456' } | ConvertTo-Json)
+# Admin account email must already exist in auth.users for this project.
+$adminEmail = (Invoke-RestMethod -Uri "$url/rest/v1/users?id=eq.8a845be5-5870-437f-95e6-7ea3b0ad7a06&select=email" -Headers $svcHeaders)[0].email
+Call 'contact-verify: email already in use'    '409' 'contact-verify' $userHeaders (@{ action = 'send'; channel = 'email'; target = $adminEmail } | ConvertTo-Json)
+Call 'contact-verify: apply_email with no code' '400' 'contact-verify' $userHeaders (@{ action = 'apply_email'; target = 'p21-none@example.com' } | ConvertTo-Json)
+
 try { Invoke-RestMethod -Method Post -Uri "$url/auth/v1/logout?scope=local" -Headers $userHeaders | Out-Null; $out = 'signed out' } catch { $out = 'logout failed: ' + $_.Exception.Message }
 Call 'session revoked: send-email after logout' '401' 'send-email' $userHeaders $emailBody
 

@@ -85,6 +85,10 @@ class AvatarImagePrepare {
         if (jpeg.isEmpty || !ImageStorageService.isJpegBytes(jpeg)) {
           throw ArgumentError('Could not convert profile image to JPEG.');
         }
+        // Ensure under Storage upload cap (complex photos at q90 can exceed 1MB).
+        if (jpeg.length > ImageStorageService.maxUploadBytes) {
+          return ImageStorageService.ensureJpegBytes(jpeg);
+        }
         return jpeg;
       } finally {
         cropped.dispose();

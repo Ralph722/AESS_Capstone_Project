@@ -6,6 +6,7 @@ import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
 import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
 
 InputDecoration _decoration(String label, {String? helper, String? error}) {
   final radius = BorderRadius.circular(AdminDssTheme.radiusSm);
@@ -19,7 +20,7 @@ InputDecoration _decoration(String label, {String? helper, String? error}) {
       color: AdminDssTheme.textSecondary,
     ),
     filled: true,
-    fillColor: AdminDssTheme.background,
+    fillColor: Colors.white,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     border: OutlineInputBorder(
       borderRadius: radius,
@@ -272,6 +273,8 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
                 suffixIcon: PopupMenuButton<String>(
                   tooltip: 'Suggested offices',
                   icon: const Icon(Icons.arrow_drop_down),
+                  color: Colors.white,
+                  surfaceTintColor: Colors.transparent,
                   enabled: !_saving,
                   onSelected: (v) => setState(() => _officeCtrl.text = v),
                   itemBuilder: (_) => [
@@ -371,7 +374,7 @@ class DssEvidenceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text('Evidence', style: _titleStyle),
+              const Text('Proof', style: _titleStyle),
               const SizedBox(width: 8),
               DssMetaChip(label: '${entries.length}'),
               const Spacer(),
@@ -387,13 +390,13 @@ class DssEvidenceCard extends StatelessWidget {
           const SizedBox(height: 4),
           const Text(
             'Offline proof of what was done: meetings, events, memos, '
-            'reports. Any entry counts as proof for Resolve.',
+            'reports. Any entry unlocks Resolve finding.',
             style: _hintStyle,
           ),
           const SizedBox(height: 8),
           if (entries.isEmpty)
             const Text(
-              'No evidence yet.',
+              'No proof entries yet.',
               style: TextStyle(color: AdminDssTheme.textMuted, fontSize: 12.5),
             ),
           for (final e in entries)
@@ -545,6 +548,10 @@ class _AddEvidenceDialogState extends State<_AddEvidenceDialog> {
     final linkError = dssEvidenceLinkError(_linkCtrl.text);
     final canSave = _titleCtrl.text.trim().isNotEmpty && linkError == null;
     return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: AdminDialogStandards.shape,
+      elevation: AdminDialogStandards.elevation,
       title: const Text('Add evidence'),
       content: SizedBox(
         width: 440,
@@ -555,6 +562,7 @@ class _AddEvidenceDialogState extends State<_AddEvidenceDialog> {
             children: [
               DropdownButtonFormField<DssEvidenceType>(
                 initialValue: _type,
+                dropdownColor: Colors.white,
                 decoration: _decoration('Type'),
                 items: [
                   for (final t in DssEvidenceType.values)

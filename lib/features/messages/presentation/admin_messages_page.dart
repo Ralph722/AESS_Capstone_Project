@@ -76,6 +76,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   final Map<String, Map<String, dynamic>> _olderById = {};
   bool _hasMoreHistory = true;
   bool _loadingOlder = false;
+  final Set<String> _reactionBusy = {};
 
   @override
   void initState() {
@@ -645,13 +646,43 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
   Future<void> _addReaction(String messageDocId, String emoji) async {
     if (_currentAdminId == null) return;
-    await MessageActions.toggleReaction(
-      context: context,
-      service: _messageService,
-      messageId: messageDocId,
-      actorUserId: _currentAdminId!,
-      emoji: emoji,
-    );
+    final busyKey = '$messageDocId|$emoji';
+    if (_reactionBusy.contains(busyKey)) return;
+    _reactionBusy.add(busyKey);
+
+    Map<String, dynamic> current = const {};
+    for (final m in _messages) {
+      if ((m['docId'] ?? m['id']) == messageDocId) {
+        current = Map<String, dynamic>.from(m['reactions'] ?? {});
+        break;
+      }
+    }
+
+    try {
+      await MessageActions.toggleReaction(
+        context: context,
+        service: _messageService,
+        messageId: messageDocId,
+        actorUserId: _currentAdminId!,
+        emoji: emoji,
+        currentReactions: current,
+        onOptimistic: (reactions) {
+          setState(() {
+            final index = _messages.indexWhere(
+              (m) => (m['docId'] ?? m['id']) == messageDocId,
+            );
+            if (index >= 0) {
+              _messages[index] = {
+                ..._messages[index],
+                'reactions': reactions,
+              };
+            }
+          });
+        },
+      );
+    } finally {
+      _reactionBusy.remove(busyKey);
+    }
   }
 
   Future<void> _editMessage(Map<String, dynamic> message) async {

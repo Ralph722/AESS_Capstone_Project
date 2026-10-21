@@ -13,6 +13,7 @@ import 'package:alumni_system/core/config/push_config.dart';
 abstract final class FcmPushBridge {
   static bool _initialized = false;
   static bool _listening = false;
+  static final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   static bool get supported =>
       !kIsWeb &&
@@ -59,7 +60,8 @@ abstract final class FcmPushBridge {
   }
 
   /// Wires token refreshes, foreground alerts and alert taps. Safe to call
-  /// more than once.
+  /// more than once. Call [stopListening] on sign-out so handlers do not
+  /// keep running for the next account.
   static Future<void> listen({
     required void Function(String token) onToken,
     required void Function(RemoteMessage message) onForeground,
@@ -69,16 +71,28 @@ abstract final class FcmPushBridge {
     _listening = true;
 
     final messaging = FirebaseMessaging.instance;
-    messaging.onTokenRefresh.listen(onToken);
-    FirebaseMessaging.onMessage.listen(onForeground);
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      final route = routeOf(message);
-      if (route != null) onOpen(route);
-    });
+    _subscriptions.add(messaging.onTokenRefresh.listen(onToken));
+    _subscriptions.add(FirebaseMessaging.onMessage.listen(onForeground));
+    _subscriptions.add(
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        final route = routeOf(message);
+        if (route != null) onOpen(route);
+      }),
+    );
 
     final initial = await messaging.getInitialMessage();
     final route = initial == null ? null : routeOf(initial);
     if (route != null) onOpen(route);
+  }
+
+  /// Cancels FCM stream listeners. Safe to call when not listening.
+  static Future<void> stopListening() async {
+    final pending = List<StreamSubscription<dynamic>>.of(_subscriptions);
+    _subscriptions.clear();
+    _listening = false;
+    for (final sub in pending) {
+      await sub.cancel();
+    }
   }
 
   static String? routeOf(RemoteMessage message) {

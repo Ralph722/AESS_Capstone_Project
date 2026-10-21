@@ -13,6 +13,13 @@ class AppImage {
 
   static bool isDataUrl(String value) => value.startsWith('data:');
 
+  /// True for http(s) URLs only (blocks relative / script / file schemes).
+  static bool isNetworkUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null) return false;
+    return uri.scheme == 'http' || uri.scheme == 'https';
+  }
+
   static Uint8List decodeDataUrl(String value) =>
       base64Decode(value.split(',').last);
 
@@ -37,12 +44,13 @@ class AppImage {
     return (logical * dpr).round().clamp(1, 4096);
   }
 
-  /// Builds an [ImageProvider] for either format, or null when empty.
+  /// Builds an [ImageProvider] for either format, or null when empty/unsafe.
   static ImageProvider? provider(String? value) {
     if (value == null || value.trim().isEmpty) return null;
     if (isDataUrl(value)) {
       return MemoryImage(decodeDataUrlCached(value));
     }
+    if (!isNetworkUrl(value)) return null;
     return NetworkImage(value);
   }
 
@@ -97,6 +105,13 @@ class AppImage {
       cacheH = null;
     }
 
+    final fallback = errorBuilder ??
+        (context, error, stack) => SizedBox(
+              width: width,
+              height: height,
+              child: placeholder(width: width, height: height),
+            );
+
     if (isDataUrl(value)) {
       return Image.memory(
         decodeDataUrlCached(value),
@@ -111,6 +126,13 @@ class AppImage {
         semanticLabel: semanticLabel,
       );
     }
+    if (!isNetworkUrl(value)) {
+      return SizedBox(
+        width: width,
+        height: height,
+        child: placeholder(width: width, height: height),
+      );
+    }
     return Image.network(
       value,
       width: width,
@@ -120,12 +142,7 @@ class AppImage {
       cacheWidth: cacheW,
       cacheHeight: cacheH,
       filterQuality: filterQuality,
-      errorBuilder: errorBuilder ??
-          (context, error, stack) => SizedBox(
-                width: width,
-                height: height,
-                child: placeholder(width: width, height: height),
-              ),
+      errorBuilder: fallback,
       semanticLabel: semanticLabel,
     );
   }

@@ -73,7 +73,7 @@ class _UserFeedbackSubmitScreenState extends State<UserFeedbackSubmitScreen> {
         Navigator.of(context).pop();
       },
       child: Scaffold(
-        backgroundColor: PortalTheme.pageBg,
+        backgroundColor: Colors.white,
         appBar: const PortalAppBar(title: 'Send feedback'),
         body: PortalContentFrame(
           maxWidth: PortalBreakpoints.chatMax,
@@ -93,7 +93,7 @@ class _UserFeedbackSubmitScreenState extends State<UserFeedbackSubmitScreen> {
                   decoration: BoxDecoration(
                     color: PortalTheme.card,
                     borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-                    border: Border.all(color: PortalTheme.border),
+                    border: Border.all(color: PortalTheme.borderStrong),
                     boxShadow: PortalTheme.softShadow,
                   ),
                   child: Column(

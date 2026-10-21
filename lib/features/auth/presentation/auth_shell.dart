@@ -570,6 +570,7 @@ class _MobileFormSheet extends StatelessWidget {
         ),
         child: _FadeSlideIn(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _FormHeading(title: title, subtitle: subtitle, titleSize: 24),
@@ -620,6 +621,9 @@ class _MobileAuthLayoutState extends State<_MobileAuthLayout> {
   @override
   Widget build(BuildContext context) {
     final statusBar = MediaQuery.viewPaddingOf(context).top;
+    // Keep room to scroll the focused field above the keyboard. The scaffold
+    // already shrinks when inset; extra padding covers cases where it does not.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
     return ColoredBox(
       color: Colors.white,
@@ -631,6 +635,7 @@ class _MobileAuthLayoutState extends State<_MobileAuthLayout> {
               return false;
             },
             child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: keyboard),
               child: _HeroSheetLayout(
                 viewportHeight: widget.viewportHeight,
                 minHeroHeight: widget.minHeroHeight,
@@ -757,8 +762,14 @@ class _RenderHeroSheet extends RenderBox
     final hero = firstChild!;
     final sheet = lastChild!;
 
-    sheet.layout(BoxConstraints.tightFor(width: width), parentUsesSize: true);
-    final sheetHeight = sheet.size.height;
+    // Let the sheet size to its content first (no max-height cap). A tight
+    // height used to stretch short forms overflowed long ones (e.g. reset
+    // password) by a few dozen pixels on phones.
+    sheet.layout(
+      BoxConstraints(minWidth: width, maxWidth: width),
+      parentUsesSize: true,
+    );
+    var sheetHeight = sheet.size.height;
 
     final maxHero = math.max(_minHeroHeight, _maxHeroHeight);
     final heroHeight = (_viewportHeight - sheetHeight + _overlap).clamp(
@@ -768,17 +779,26 @@ class _RenderHeroSheet extends RenderBox
     hero.layout(BoxConstraints.tightFor(width: width, height: heroHeight));
 
     final sheetTop = heroHeight - _overlap;
-    // Short forms: stretch the sheet to the bottom so it never ends mid-screen.
+    // Short forms: grow the sheet to the bottom without capping taller forms.
     final fillHeight = _viewportHeight - sheetTop;
     if (sheetHeight < fillHeight) {
-      sheet.layout(BoxConstraints.tightFor(width: width, height: fillHeight));
+      sheet.layout(
+        BoxConstraints(
+          minWidth: width,
+          maxWidth: width,
+          minHeight: fillHeight,
+        ),
+        parentUsesSize: true,
+      );
+      sheetHeight = sheet.size.height;
     }
     (hero.parentData! as _HeroSheetParentData).offset = Offset.zero;
     (sheet.parentData! as _HeroSheetParentData).offset = Offset(0, sheetTop);
 
-    size = constraints.constrain(
-      Size(width, math.max(_viewportHeight, sheetTop + sheetHeight)),
-    );
+    // Prefer content height over parent max so the outer scroll view can
+    // scroll instead of clipping the form Column.
+    final contentHeight = math.max(_viewportHeight, sheetTop + sheetHeight);
+    size = Size(width, contentHeight);
   }
 
   @override

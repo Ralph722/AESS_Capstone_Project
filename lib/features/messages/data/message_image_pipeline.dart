@@ -12,9 +12,9 @@ class MessageImagePipeline {
 
   final ImageStorageService _storage;
 
-  static const int maxSourceBytes = 12 * 1024 * 1024; // 12MB raw pick limit
+  static const int maxSourceBytes = ImageStorageService.maxSourceBytes;
   static const int targetUploadBytes = 700 * 1024; // ~700KB JPEG
-  static const int absoluteMaxUploadBytes = 1024 * 1024; // hard reject above 1MB
+  static const int absoluteMaxUploadBytes = ImageStorageService.maxUploadBytes;
 
   /// Compresses [file] / [bytes] to a validated JPEG under [targetUploadBytes].
   Future<Uint8List> compress({

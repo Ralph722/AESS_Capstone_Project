@@ -1,0 +1,33 @@
+﻿n,test,expected,actual
+1,email trimmed and lower-cased,ana@gmail.com,ana@gmail.com
+2,invalid email rejected,(null),(null)
+3,PH mobile forms become 09XXXXXXXXX,09171234567|09171234567|09171234567,09171234567|09171234567|09171234567
+4,"foreign mobile kept, junk rejected",+14155550123|(null),+14155550123|(null)
+5,every active account has a contact email,0,0
+6,alumni cannot read codes,ERROR: permission denied,ERROR: permission denied for table contact_verifications
+7,alumni cannot start a code themselves,ERROR: permission denied,ERROR: permission denied for function contact_verification_start
+8,alumni cannot check a code themselves,ERROR: permission denied,ERROR: permission denied for function contact_verification_check
+9,start returns the normalised target,true|p19-new@example.com|60,true|p19-new@example.com|60
+10,second code within 60 seconds is refused,false|cooldown|true,false|cooldown|true
+11,email channel needs the email method,invalid_input,invalid_input
+12,alumni cannot apply a verified email themselves,"ERROR: To change your email, verify it first.","ERROR: To change your email, verify it first. Your sign-in email will update too."
+13,wrong code counts a try,false|wrong_code|4,false|wrong_code|4
+14,right code verifies (any letter case),true|p19-new@example.com|email,true|p19-new@example.com|email
+15,service apply of a different email fails,ERROR: This contact has not been verified.,ERROR: This contact has not been verified.
+16,verified email is saved by the service path,true,true
+17,profile and roster both hold the new email,p19-new@example.com|true|p19-new@example.com,p19-new@example.com|true|p19-new@example.com
+18,login email unchanged without apply_email,rauljuab@gmail.com,rauljuab@gmail.com
+19,a verification is used only once,ERROR: This contact has not been verified.,ERROR: This contact has not been verified.
+20,alumni cannot write the contact email directly,p19-new@example.com,p19-new@example.com
+21,mobile code starts in mock mode,true|09171234567,true|09171234567
+22,mobile code verifies,true|mock,true|mock
+23,mock-checked number saved,true,true
+24,mock number is saved but not marked verified,09171234567|mock|null|09171234567,09171234567|mock|null|09171234567
+25,direct mobile change is ignored,09171234567|mock,09171234567|mock
+26,fifth wrong try ends the code,too_many_attempts,too_many_attempts
+27,right code no longer works after five wrong tries,too_many_attempts,too_many_attempts
+28,expired code refused,expired,expired
+29,a new code ends the previous unused one,expired,expired
+30,sixth email code in an hour is refused,too_many_requests,too_many_requests
+31,contact email follows the login email while they match,p19-admin-new@example.com,p19-admin-new@example.com
+32,anonymizing clears the contact email and the codes,|0,|0

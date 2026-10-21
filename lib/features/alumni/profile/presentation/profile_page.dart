@@ -1,22 +1,18 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
-import 'package:alumni_system/core/utils/app_image.dart';
-import 'package:alumni_system/core/utils/avatar_image_prepare.dart';
-import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
+import 'package:alumni_system/features/alumni/card/data/alumni_card_service.dart';
+import 'package:alumni_system/features/alumni/card/models/alumni_card_data.dart';
+import 'package:alumni_system/features/alumni/card/presentation/alumni_digital_card.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
-import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/features/alumni/profile/presentation/change_password_page.dart';
 import 'package:alumni_system/features/alumni/profile/presentation/profile_information_page.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
+import 'package:alumni_system/features/shell/presentation/main_navigation.dart';
 import 'package:alumni_system/features/feedback/presentation/user_feedback_list_page.dart';
-import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 import 'package:alumni_system/features/messages/presentation/user_messages_page.dart';
 import 'package:alumni_system/features/notifications/presentation/notifications_page.dart';
 import 'package:alumni_system/features/surveys/presentation/user_surveys_page.dart';
@@ -24,7 +20,6 @@ import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
-import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -39,18 +34,15 @@ class ProfileScreenState extends State<ProfileScreen>
   @override
   bool get wantKeepAlive => true;
 
-  final SupabaseClient _supabase = Supabase.instance.client;
-  final ImagePicker _imagePicker = ImagePicker();
   final AuditService _auditService = AuditService();
   final AuthService _authService = AuthService();
-  final ImageStorageService _imageStorage = ImageStorageService();
-  final UserProfileService _userProfileService = UserProfileService();
+  final AlumniCardService _cardService = AlumniCardService();
 
-  bool _isLoading = false;
-  bool _isUploadingImage = false;
-  String? _profileImageUrl;
-  double _completion = 0;
+  AlumniCardLoadResult? _cardResult;
+  var _cardLoading = true;
+  var _showingCardBack = false;
   StreamSubscription<void>? _profileFieldsSub;
+  StreamSubscription<String?>? _avatarSub;
 
   /// Hub no longer hosts the editable form; discard prompts live on that screen.
   bool get hasUnsavedChanges => false;
@@ -63,6 +55,9 @@ class ProfileScreenState extends State<ProfileScreen>
     _profileFieldsSub = UserProfileEvents.onProfileFieldsChanged.listen((_) {
       if (mounted) _loadHubData();
     });
+    _avatarSub = UserProfileEvents.onAvatarChanged.listen((_) {
+      if (mounted) _loadCard();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadHubData();
     });
@@ -71,33 +66,35 @@ class ProfileScreenState extends State<ProfileScreen>
   @override
   void dispose() {
     _profileFieldsSub?.cancel();
+    _avatarSub?.cancel();
     super.dispose();
   }
 
   Future<void> _loadHubData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    await _loadCard();
+  }
+
+  Future<void> _loadCard() async {
+    if (!mounted) return;
+    setState(() => _cardLoading = true);
     try {
-      final userId = AppSession.userId;
-      if (userId == null) return;
-
-      final profile = await _userProfileService.getTracerProfile(userId);
-      final row = await _supabase
-          .from('users')
-          .select('profile_image_base64')
-          .eq('id', userId)
-          .maybeSingle();
-
-      final completion = profile?.completionPercent ?? 0.0;
-
+      final result = await _cardService.loadForCurrentUser();
       if (!mounted) return;
       setState(() {
-        _profileImageUrl = row?['profile_image_base64'] as String?;
-        _completion = completion;
+        _cardResult = result;
+        _cardLoading = false;
+        if (result.status != AlumniCardStatus.ready) {
+          _showingCardBack = false;
+        }
       });
     } catch (_) {
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() {
+        _cardResult = const AlumniCardLoadResult.unmatched();
+        _cardLoading = false;
+        _showingCardBack = false;
+      });
     }
   }
 
@@ -107,87 +104,6 @@ class ProfileScreenState extends State<ProfileScreen>
       MaterialPageRoute(builder: (_) => const ProfileInformationScreen()),
     );
     if (mounted) await _loadHubData();
-  }
-
-  Future<void> _pickImage() async {
-    if (!mounted) return;
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 95,
-        maxWidth: 2048,
-      );
-      if (image == null || !mounted) return;
-      final rawBytes = await image.readAsBytes();
-      if (!mounted) return;
-      await _uploadProfileImage(rawBytes);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
-      }
-    }
-  }
-
-  Future<void> _uploadProfileImage(Uint8List rawBytes) async {
-    if (!mounted) return;
-    setState(() => _isUploadingImage = true);
-    try {
-      final userId = AppSession.userId;
-      if (userId == null) return;
-
-      final prepared = await AvatarImagePrepare.toSquareJpeg(rawBytes);
-      final uploadedImageUrl = await _imageStorage.uploadProfileImage(
-        userId: userId,
-        bytes: prepared,
-      );
-
-      AppImage.clearDecodedCache();
-
-      await _supabase
-          .from('users')
-          .update({
-            'profile_image_base64': uploadedImageUrl,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', userId);
-      await AlumniMemberService().mirrorProfileImageForAuthUid(
-        userId,
-        uploadedImageUrl,
-      );
-
-      UserProfileEvents.notifyAvatarChanged(uploadedImageUrl);
-
-      await _auditService.logAction(
-        action: 'UPDATE',
-        resource: 'Profile',
-        resourceId: userId,
-        description: 'User updated profile photo',
-        status: 'SUCCESS',
-      );
-
-      if (mounted) {
-        setState(() => _profileImageUrl = uploadedImageUrl);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile photo updated'),
-            backgroundColor: PortalTheme.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: ${portalFriendlyError(e)}'),
-            backgroundColor: PortalTheme.danger,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isUploadingImage = false);
-    }
   }
 
   @override
@@ -203,120 +119,110 @@ class ProfileScreenState extends State<ProfileScreen>
         automaticallyImplyLeading: false,
       ),
       body: PortalContentFrame(
-        child: _isLoading
-            ? const ProfileSkeleton()
-            : SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  hPad,
-                  0,
-                  hPad,
-                  PortalFloating.bottomClearance(context),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: PortalTheme.space4),
-                    _buildPhotoCard(),
-                    const SizedBox(height: PortalTheme.space5),
-                    _buildAccountSection(),
-                  ],
-                ),
-              ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            hPad,
+            0,
+            hPad,
+            PortalFloating.bottomClearance(context),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: PortalTheme.space4),
+              _buildDigitalCardSection(),
+              const SizedBox(height: PortalTheme.space5),
+              _buildAccountSection(),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildPhotoCard() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-      decoration: BoxDecoration(
-        color: PortalTheme.card,
-        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
-        boxShadow: PortalTheme.softShadow,
-      ),
-      child: Column(
-        children: [
-          _buildAvatarRing(),
-          const SizedBox(height: PortalTheme.space3),
+  Widget _buildDigitalCardSection() {
+    // Digital ID only — no white card chrome around it.
+    return Column(
+      children: [
+        if (_cardLoading)
+          const AlumniCardSkeleton(
+            maxWidth: kAlumniCardMaxWidth,
+            aspectRatio: kAlumniCardAspectRatio,
+          )
+        else
+          _buildCardBody(),
+        const SizedBox(height: PortalTheme.space2),
+        Text(
+          _cardHint,
+          style: PortalTheme.caption.copyWith(
+            color: PortalTheme.textMuted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String get _cardHint {
+    final result = _cardResult;
+    if (_cardLoading) return 'Loading your card…';
+    if (result == null || result.status == AlumniCardStatus.unmatched) {
+      return 'Available after the Alumni Office confirms your record';
+    }
+    if (result.status == AlumniCardStatus.deactivated) {
+      return 'Contact the Alumni Office for help';
+    }
+    return 'Tap card to switch sides';
+  }
+
+  Widget _buildCardBody() {
+    final result = _cardResult;
+    if (result == null || result.status == AlumniCardStatus.unmatched) {
+      return _CardUnavailable(
+        icon: Icons.badge_outlined,
+        title: 'Card not ready yet',
+        message:
+            'Your digital alumni card will appear here once the Alumni '
+            'Office confirms your record.',
+      );
+    }
+    if (result.status == AlumniCardStatus.deactivated) {
+      return const _CardUnavailable(
+        icon: Icons.block_rounded,
+        title: 'Card unavailable',
+        message:
+            'This alumni account is deactivated. Contact the Alumni Office '
+            'if you need help.',
+      );
+    }
+
+    final data = result.data!;
+    return Column(
+      children: [
+        if (result.offline) ...[
           Text(
-            'Tap photo to update',
+            'Saved copy · QR needs internet',
             style: PortalTheme.caption.copyWith(
-              color: PortalTheme.textMuted,
-              fontWeight: FontWeight.w600,
+              color: PortalTheme.warning,
+              fontWeight: FontWeight.w700,
             ),
           ),
+          const SizedBox(height: 8),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAvatarRing() {
-    final provider = _profileImageUrl == null
-        ? null
-        : AppImage.provider(_profileImageUrl);
-
-    return GestureDetector(
-      onTap: _pickImage,
-      child: Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: PortalTheme.surfaceMuted,
-              border: Border.all(color: PortalTheme.gold, width: 3),
-              boxShadow: PortalTheme.softShadow,
-              image: _isUploadingImage || provider == null
-                  ? null
-                  : DecorationImage(
-                      image: provider,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                    ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: _isUploadingImage
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: PortalTheme.navy,
-                    ),
-                  )
-                : provider == null
-                ? Icon(
-                    Icons.person_rounded,
-                    size: 56,
-                    color: PortalTheme.navy.withValues(alpha: 0.35),
-                  )
-                : null,
-          ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: PortalTheme.navy,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: const Icon(
-              Icons.camera_alt_rounded,
-              color: Colors.white,
-              size: 18,
-            ),
-          ),
-        ],
-      ),
+        AlumniDigitalCard(
+          data: data,
+          showBack: _showingCardBack,
+          offline: result.offline,
+          // IndexedStack keeps Profile alive off-tab; don't mint codes then.
+          tokensEnabled:
+              MainNavigationState.active?.isProfileTabActive ?? true,
+          onFlip: (back) => setState(() => _showingCardBack = back),
+        ),
+      ],
     );
   }
 
   Widget _buildAccountSection() {
-    final completionLabel = _completion <= 0
-        ? 'Edit demographics, education, and employment'
-        : '${_completion.toStringAsFixed(0)}% complete — tap to edit';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -328,9 +234,7 @@ class ProfileScreenState extends State<ProfileScreen>
           decoration: BoxDecoration(
             color: PortalTheme.card,
             borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-            border: Border.all(
-              color: PortalTheme.border.withValues(alpha: 0.75),
-            ),
+            border: Border.all(color: PortalTheme.borderStrong),
             boxShadow: PortalTheme.softShadow,
           ),
           clipBehavior: Clip.antiAlias,
@@ -340,7 +244,7 @@ class ProfileScreenState extends State<ProfileScreen>
                 icon: Icons.badge_outlined,
                 iconColor: PortalTheme.navy,
                 title: 'Profile information',
-                subtitle: completionLabel,
+                subtitle: 'View and update your details',
                 onTap: _openProfileInformation,
               ),
               const _PortalAccountDivider(),
@@ -410,14 +314,7 @@ class ProfileScreenState extends State<ProfileScreen>
                 iconColor: PortalTheme.navy,
                 title: 'Change password',
                 subtitle: 'Update your sign-in password',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ChangePasswordScreen(),
-                    ),
-                  );
-                },
+                onTap: () => showChangePasswordDialog(context),
               ),
               const _PortalAccountDivider(),
               _PortalAccountRow(
@@ -439,6 +336,13 @@ class ProfileScreenState extends State<ProfileScreen>
                   }
                   await _authService.logout();
                   if (!mounted) return;
+                  // Cold-start sessions keep AuthGate as ancestor; let it
+                  // swap to LoginScreen. Avoid stacking a second AuthGate
+                  // (that race shows a red error screen after push opens).
+                  if (context.findAncestorWidgetOfExactType<AuthGate>() !=
+                      null) {
+                    return;
+                  }
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (_) => const AuthGate()),
@@ -450,6 +354,60 @@ class ProfileScreenState extends State<ProfileScreen>
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CardUnavailable extends StatelessWidget {
+  const _CardUnavailable({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: kAlumniCardMaxWidth),
+        child: AspectRatio(
+          aspectRatio: kAlumniCardAspectRatio,
+          child: Container(
+            decoration: BoxDecoration(
+              color: PortalTheme.surfaceMuted,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: PortalTheme.border),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 36,
+                  color: PortalTheme.navy.withValues(alpha: 0.55),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: PortalTheme.cardTitle.copyWith(fontSize: 15),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: PortalTheme.caption.copyWith(height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

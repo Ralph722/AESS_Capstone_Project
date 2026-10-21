@@ -38,8 +38,12 @@ abstract final class MessageAttachmentUploader {
     );
 
     try {
+      final userId = AppSession.userId;
+      if (userId == null || userId.isEmpty) {
+        throw MessageImageException('Not signed in.');
+      }
       final url = await pipeline.compressAndUpload(
-        userId: AppSession.userId ?? 'unknown',
+        userId: userId,
         messageId: messageId,
         file: file,
         bytes: bytes,

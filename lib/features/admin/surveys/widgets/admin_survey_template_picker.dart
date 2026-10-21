@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Result of the new-survey dialog.
 sealed class NewSurveyChoice {}
@@ -25,11 +26,13 @@ class _AdminSurveyTemplatePickerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AdminSurveyTheme.card,
-      elevation: 0,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 12,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusLg),
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AdminColors.border),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -49,21 +52,20 @@ class _AdminSurveyTemplatePickerDialog extends StatelessWidget {
                         const Text(
                           'Create survey',
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: AdminSurveyTheme.textPrimary,
-                            letterSpacing: -0.3,
+                            letterSpacing: -0.2,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
+                        const SizedBox(height: 4),
+                        const Text(
                           'Choose the Official CHED GTS for tracer waves, '
                           'or start blank for a custom form.',
                           style: TextStyle(
                             fontSize: 13,
                             height: 1.45,
-                            color: AdminSurveyTheme.textSecondary
-                                .withValues(alpha: 0.95),
+                            color: AdminSurveyTheme.textSecondary,
                           ),
                         ),
                       ],
@@ -156,13 +158,10 @@ class _ChoiceCardState extends State<_ChoiceCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isOfficial = widget.recommended;
-    final borderColor = isOfficial
-        ? AdminSurveyTheme.primary.withValues(alpha: _hovered ? 0.45 : 0.22)
-        : (_hovered ? AdminSurveyTheme.primary.withValues(alpha: 0.28) : AdminSurveyTheme.border);
-    final bg = isOfficial
-        ? AdminSurveyTheme.infoBg.withValues(alpha: _hovered ? 1 : 0.85)
-        : AdminSurveyTheme.surface;
+    final borderColor = _hovered
+        ? AdminSurveyTheme.primary.withValues(alpha: 0.45)
+        : AdminSurveyTheme.border;
+    final bg = _hovered ? AdminColors.rowHover : Colors.white;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -172,7 +171,7 @@ class _ChoiceCardState extends State<_ChoiceCard> {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusMd),
-          border: Border.all(color: borderColor, width: isOfficial ? 1.5 : 1),
+          border: Border.all(color: borderColor, width: 1),
           boxShadow: _hovered
               ? [
                   BoxShadow(
@@ -199,13 +198,13 @@ class _ChoiceCardState extends State<_ChoiceCard> {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: isOfficial
-                              ? AdminSurveyTheme.primary.withValues(alpha: 0.12)
-                              : AdminSurveyTheme.card,
-                          borderRadius: BorderRadius.circular(10),
-                          border: isOfficial
-                              ? null
-                              : Border.all(color: AdminSurveyTheme.border),
+                          color: widget.recommended
+                              ? AdminColors.accent.withValues(alpha: 0.16)
+                              : AdminColors.primaryTint,
+                          borderRadius: BorderRadius.circular(
+                            AdminSurveyTheme.radiusSm,
+                          ),
+                          border: Border.all(color: AdminSurveyTheme.border),
                         ),
                         child: Icon(
                           widget.icon,
@@ -293,8 +292,8 @@ class _Badge extends StatelessWidget {
     final Color fg;
     switch (tone) {
       case _BadgeTone.official:
-        bg = AdminSurveyTheme.warningBg;
-        fg = AdminSurveyTheme.warning;
+        bg = AdminSurveyTheme.infoBg;
+        fg = AdminSurveyTheme.primary;
       case _BadgeTone.custom:
         bg = AdminSurveyTheme.surface;
         fg = AdminSurveyTheme.textSecondary;

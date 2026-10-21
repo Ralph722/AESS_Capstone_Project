@@ -215,7 +215,9 @@ class DemoDataset {
   ];
 
   /// The member's live profile: what onboarding saved, then synced from the
-  /// latest tracer the way the app syncs it on submit.
+  /// latest tracer the way the app syncs it on submit. The submit sync
+  /// leaves the mobile number alone (it is saved after verification), so the
+  /// demo profile starts with the number from the answers.
   TracerProfile profileFor(DemoMember member, {String uid = ''}) {
     final latest = latestResponseOf(member);
     final answers =
@@ -230,6 +232,7 @@ class DemoDataset {
         program: member.course,
         batchYear: member.profileYear,
         yearGraduated: member.profileYear,
+        mobileNumber: (answers['ched_5'] ?? '').toString().trim(),
       ),
       answers: answers,
     );

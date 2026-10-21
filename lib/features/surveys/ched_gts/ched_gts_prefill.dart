@@ -49,7 +49,7 @@ abstract final class ChedGtsPrefill {
 
     put('ched_1', profile.displayName);
     put('ched_2', profile.address);
-    put('ched_3', profile.email);
+    put('ched_3', profile.preferredEmail);
     put('ched_4', profile.telephoneNumber);
     put('ched_5', profile.mobileNumber);
     put('ched_6', _match(profile.civilStatus, GtsConstants.civilStatuses));
@@ -121,9 +121,12 @@ abstract final class ChedGtsPrefill {
 
   /// Merge submitted CHED answers into the live profile (Section A + B.12 + item 16).
   /// Program stays as the roster has it; the year only fills a blank profile.
+  /// Q3 email and Q5 mobile are left out: a changed contact is saved only
+  /// after verification (`ContactVerificationService.saveVerified`).
   static TracerProfile mergeIntoProfile({
     required TracerProfile current,
     required Map<String, dynamic> answers,
+    bool allowNameChange = false,
   }) {
     String? text(String id) {
       final v = answers[id];
@@ -172,11 +175,13 @@ abstract final class ChedGtsPrefill {
     final employment = GtsConstants.fromChedPresentlyEmployed(text('ched_16'));
 
     return current.copyWith(
-      displayName: text('ched_1') ?? current.displayName,
+      // Name only follows ched_1 after the marriage opt-in; otherwise the
+      // verified profile name wins even if a legacy draft edited ched_1.
+      displayName: allowNameChange
+          ? (text('ched_1') ?? current.displayName)
+          : current.displayName,
       address: text('ched_2') ?? current.address,
-      email: text('ched_3') ?? current.email,
       telephoneNumber: text('ched_4') ?? current.telephoneNumber,
-      mobileNumber: text('ched_5') ?? current.mobileNumber,
       civilStatus: text('ched_6') ?? current.civilStatus,
       gender: text('ched_7') ?? current.gender,
       birthDate: birthday ?? current.birthDate,

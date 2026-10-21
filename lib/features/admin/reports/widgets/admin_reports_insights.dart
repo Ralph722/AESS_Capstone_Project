@@ -664,117 +664,102 @@ class _InsightCard extends StatelessWidget {
         border: Border.all(
           color: data.isError
               ? AdminReportsTheme.danger.withValues(alpha: 0.35)
-              : featured
-              ? _accent.withValues(alpha: 0.28)
               : AdminReportsTheme.border,
         ),
         boxShadow: AdminReportsTheme.cardShadow,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(width: featured ? 5 : 3, color: _accent),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.all(featured ? 18 : 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: featured ? 36 : 32,
-                            height: featured ? 36 : 32,
-                            decoration: BoxDecoration(
-                              color: _accent.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              data.icon,
-                              size: featured ? 18 : 16,
-                              color: _accent,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              data.title,
-                              style: TextStyle(
-                                fontSize: featured ? 15.5 : 13.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: featured ? -0.2 : 0,
-                                color: AdminReportsTheme.textPrimary,
-                              ),
-                            ),
-                          ),
-                          if (data.isPlaceholder)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AdminReportsTheme.surface,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                'Preview',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: AdminReportsTheme.textMuted,
-                                ),
-                              ),
-                            ),
-                        ],
+      child: Padding(
+        padding: EdgeInsets.all(featured ? 18 : 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: featured ? 36 : 32,
+                  height: featured ? 36 : 32,
+                  decoration: BoxDecoration(
+                    color: _accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    data.icon,
+                    size: featured ? 18 : 16,
+                    color: _accent,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    data.title,
+                    style: TextStyle(
+                      fontSize: featured ? 15.5 : 13.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: featured ? -0.2 : 0,
+                      color: AdminReportsTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                if (data.isPlaceholder)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AdminReportsTheme.surface,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      'Preview',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AdminReportsTheme.textMuted,
                       ),
-                      SizedBox(height: featured ? 14 : 10),
-                      if (showLoading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          child: LinearProgressIndicator(minHeight: 3),
-                        )
-                      else
-                        Text(
-                          data.body,
-                          style: TextStyle(
-                            fontSize: featured ? 14 : 12.5,
-                            height: featured ? 1.55 : 1.45,
-                            fontWeight: featured
-                                ? FontWeight.w500
-                                : FontWeight.w400,
-                            color: featured
-                                ? AdminReportsTheme.textPrimary
-                                : AdminReportsTheme.textSecondary,
-                          ),
-                        ),
-                      if (!showLoading &&
-                          onAction != null &&
-                          (data.actionLabel?.isNotEmpty ?? false)) ...[
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: onAction,
-                            icon: const Icon(Icons.arrow_forward, size: 14),
-                            label: Text(data.actionLabel!),
-                            style: TextButton.styleFrom(
-                              foregroundColor: _accent,
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: featured ? 14 : 10),
+            if (showLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: LinearProgressIndicator(minHeight: 3),
+              )
+            else
+              Text(
+                data.body,
+                style: TextStyle(
+                  fontSize: featured ? 14 : 12.5,
+                  height: featured ? 1.55 : 1.45,
+                  fontWeight: featured
+                      ? FontWeight.w500
+                      : FontWeight.w400,
+                  color: featured
+                      ? AdminReportsTheme.textPrimary
+                      : AdminReportsTheme.textSecondary,
+                ),
+              ),
+            if (!showLoading &&
+                onAction != null &&
+                (data.actionLabel?.isNotEmpty ?? false)) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.arrow_forward, size: 14),
+                  label: Text(data.actionLabel!),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _accent,
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );

@@ -83,23 +83,28 @@ class AdminSurveyPreviewPanel extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Preview',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: showCloseControls ? 18 : 14,
                           fontWeight: FontWeight.w700,
                           color: AdminSurveyTheme.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        survey.title.trim().isEmpty
-                            ? 'Untitled survey'
-                            : survey.title,
+                        showCloseControls
+                            ? (survey.title.trim().isEmpty
+                                  ? 'Untitled survey'
+                                  : survey.title)
+                            : (survey.isChedGtsBuiltin
+                                  ? 'Official CHED form · read-only'
+                                  : 'As alumni see it · answer to test '
+                                        'visibility rules'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
+                        style: TextStyle(
+                          fontSize: showCloseControls ? 13 : 12,
                           color: AdminSurveyTheme.textSecondary,
                         ),
                       ),
@@ -125,7 +130,7 @@ class AdminSurveyPreviewPanel extends StatelessWidget {
                         answers: const {},
                         onChanged: (_) {},
                         readOnly: true,
-                        showIntro: true,
+                        showIntro: false,
                       ),
                     ],
                   )
@@ -199,7 +204,7 @@ class _ClassicSurveyPreviewBodyState extends State<_ClassicSurveyPreviewBody> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: SurveyTakeHeaderCard(
               title: widget.survey.title,
-              description: widget.survey.description,
+              description: '',
               totalQuestions: visible.length,
               answeredCount: answered,
             ),

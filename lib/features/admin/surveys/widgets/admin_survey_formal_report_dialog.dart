@@ -7,6 +7,9 @@ import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/data/survey_formal_report_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Dialog: generate, edit, copy, and export a formal AI survey report.
 Future<void> showAdminSurveyFormalReportDialog(
@@ -28,18 +31,35 @@ Future<void> showAdminSurveyFormalReportDialog(
   );
 }
 
+/// The dialog with a stand-in draft generator (no AI service).
+@visibleForTesting
+Widget surveyFormalReportDialogForTest({
+  required Survey survey,
+  required Future<SurveyFormalReportResult> Function() generate,
+}) {
+  return _SurveyFormalReportDialog(
+    survey: survey,
+    questions: const [],
+    participants: const [],
+    responses: const [],
+    generateOverride: generate,
+  );
+}
+
 class _SurveyFormalReportDialog extends StatefulWidget {
   const _SurveyFormalReportDialog({
     required this.survey,
     required this.questions,
     required this.participants,
     required this.responses,
+    this.generateOverride,
   });
 
   final Survey survey;
   final List<SurveyQuestion> questions;
   final List<SurveyParticipant> participants;
   final List<SurveyResponse> responses;
+  final Future<SurveyFormalReportResult> Function()? generateOverride;
 
   @override
   State<_SurveyFormalReportDialog> createState() =>
@@ -47,12 +67,55 @@ class _SurveyFormalReportDialog extends StatefulWidget {
 }
 
 class _SurveyFormalReportDialogState extends State<_SurveyFormalReportDialog> {
-  final _service = SurveyFormalReportService();
+  late final _service = SurveyFormalReportService();
   final _controller = TextEditingController();
   bool _loading = true;
   bool _exporting = false;
-  String? _error;
+  Object? _error;
   SurveyFormalReportResult? _result;
+
+  /// Text as generated; anything else in the editor counts as an edit.
+  String _generatedBody = '';
+
+  bool get _hasEdits =>
+      _result != null && _controller.text.trim() != _generatedBody.trim();
+
+  Future<bool> _confirmDiscard({
+    required String message,
+    required String confirmLabel,
+  }) {
+    return showAdminConfirmDialog(
+      context,
+      title: 'Discard your edits?',
+      message: message,
+      confirmLabel: confirmLabel,
+      cancelLabel: 'Keep editing',
+      destructive: true,
+      icon: Icons.edit_off_outlined,
+    );
+  }
+
+  Future<void> _requestClose() async {
+    if (_hasEdits &&
+        !await _confirmDiscard(
+          message: 'Your changes to the report text will be lost.',
+          confirmLabel: 'Discard',
+        )) {
+      return;
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _requestRegenerate() async {
+    if (_hasEdits &&
+        !await _confirmDiscard(
+          message: 'A new draft will replace the text you edited.',
+          confirmLabel: 'Regenerate',
+        )) {
+      return;
+    }
+    if (mounted) await _generate();
+  }
 
   @override
   void initState() {
@@ -75,22 +138,26 @@ class _SurveyFormalReportDialogState extends State<_SurveyFormalReportDialog> {
       _error = null;
     });
     try {
-      final result = await _service.generate(
-        survey: widget.survey,
-        questions: widget.questions,
-        participants: widget.participants,
-        responses: widget.responses,
-      );
+      final override = widget.generateOverride;
+      final result = override != null
+          ? await override()
+          : await _service.generate(
+              survey: widget.survey,
+              questions: widget.questions,
+              participants: widget.participants,
+              responses: widget.responses,
+            );
       if (!mounted) return;
       setState(() {
         _result = result;
+        _generatedBody = result.body;
         _controller.text = result.body;
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = e;
         _loading = false;
       });
     }
@@ -102,7 +169,10 @@ class _SurveyFormalReportDialogState extends State<_SurveyFormalReportDialog> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Report copied to clipboard')),
+      const SnackBar(
+        content: Text('Report copied to clipboard'),
+        backgroundColor: AdminColors.success,
+      ),
     );
   }
 
@@ -138,13 +208,24 @@ class _SurveyFormalReportDialogState extends State<_SurveyFormalReportDialog> {
           mimeType: 'application/pdf',
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Formal report PDF downloaded')),
+          const SnackBar(
+            content: Text('Formal report PDF downloaded'),
+            backgroundColor: AdminColors.success,
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
+      final reason = e is Error ? '' : surveyFriendlyError(e, '');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('PDF export failed: $e')),
+        SnackBar(
+          content: Text(
+            reason.isEmpty
+                ? 'Couldn’t create the report PDF. Try again.'
+                : 'Couldn’t create the report PDF. $reason',
+          ),
+          backgroundColor: AdminColors.danger,
+        ),
       );
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -168,204 +249,215 @@ class _SurveyFormalReportDialogState extends State<_SurveyFormalReportDialog> {
     final wide = MediaQuery.sizeOf(context).width >= 720;
     final result = _result;
 
-    return Dialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: wide ? 48 : 16,
-        vertical: 24,
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 820,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+    return PopScope(
+      canPop: !_hasEdits,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _requestClose();
+      },
+      child: Dialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: wide ? 48 : 16,
+          vertical: 24,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AdminSurveyTheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 820,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AdminSurveyTheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: AdminSurveyTheme.primary,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      color: AdminSurveyTheme.primary,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Formal survey report',
+                            style: AdminText.sectionTitle.copyWith(
+                              fontSize: 17,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.survey.title.trim().isEmpty
+                                ? 'Untitled survey'
+                                : widget.survey.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AdminText.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: _requestClose,
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              if (!AiConfig.isEnabled)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AdminColors.warningBg,
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    border: Border.all(
+                      color: AdminColors.warning.withValues(alpha: 0.3),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Formal survey report',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
+                  child: Text(
+                    'AI is turned off in this build — a metric-based formal '
+                    'draft will still be generated for you to edit.',
+                    style: AdminText.caption.copyWith(
+                      height: 1.35,
+                      color: AdminColors.textPrimary,
+                    ),
+                  ),
+                ),
+              if (result != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: Text(
+                    result.disclaimer,
+                    style: AdminText.caption.copyWith(
+                      height: 1.35,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _loading
+                      ? const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 12),
+                              Text('Writing formal report…'),
+                            ],
+                          ),
+                        )
+                      : _error != null
+                      ? AdminStateView.error(
+                          title: 'Couldn’t write the report',
+                          message: surveyFriendlyError(
+                            _error!,
+                            'Something went wrong while writing the draft. '
+                            'Try again.',
+                          ),
+                          details: '$_error',
+                          onRetry: _generate,
+                        )
+                      : TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: AdminSurveyTheme.surface,
+                            hintText: 'Formal report text…',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: AdminSurveyTheme.border,
+                              ),
+                            ),
+                          ),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            height: 1.45,
                             color: AdminSurveyTheme.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.survey.title.trim().isEmpty
-                              ? 'Untitled survey'
-                              : widget.survey.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: AdminSurveyTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            if (!AiConfig.isEnabled)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF7ED),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFED7AA)),
-                ),
-                child: const Text(
-                  'AI is turned off in this build — a metric-based formal '
-                  'draft will still be generated for you to edit.',
-                  style: TextStyle(fontSize: 12.5, height: 1.35),
                 ),
               ),
-            if (result != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Text(
-                  result.disclaimer,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AdminSurveyTheme.textSecondary,
-                    fontStyle: FontStyle.italic,
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _loading || _exporting
+                          ? null
+                          : _requestRegenerate,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Regenerate'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _loading || _controller.text.trim().isEmpty
+                          ? null
+                          : _copy,
+                      icon: const Icon(Icons.copy_outlined, size: 18),
+                      label: const Text('Copy'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed:
+                          _loading ||
+                              _exporting ||
+                              _controller.text.trim().isEmpty
+                          ? null
+                          : () => _exportPdf(printPreview: true),
+                      icon: const Icon(Icons.print_outlined, size: 18),
+                      label: const Text('Print'),
+                    ),
+                    FilledButton.icon(
+                      onPressed:
+                          _loading ||
+                              _exporting ||
+                              _controller.text.trim().isEmpty ||
+                              !canExportFiles
+                          ? null
+                          : () => _exportPdf(printPreview: false),
+                      icon: _exporting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      label: Text(_exporting ? 'Exporting…' : 'Download PDF'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AdminSurveyTheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _loading
-                    ? const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 12),
-                            Text('Writing formal report…'),
-                          ],
-                        ),
-                      )
-                    : _error != null
-                    ? Center(
-                        child: Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      )
-                    : TextField(
-                        controller: _controller,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: AdminSurveyTheme.surface,
-                          hintText: 'Formal report text…',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AdminSurveyTheme.border,
-                            ),
-                          ),
-                        ),
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          height: 1.45,
-                          color: AdminSurveyTheme.textPrimary,
-                        ),
-                      ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _loading || _exporting ? null : _generate,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Regenerate'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _loading || _controller.text.trim().isEmpty
-                        ? null
-                        : _copy,
-                    icon: const Icon(Icons.copy_outlined, size: 18),
-                    label: const Text('Copy'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _loading ||
-                            _exporting ||
-                            _controller.text.trim().isEmpty
-                        ? null
-                        : () => _exportPdf(printPreview: true),
-                    icon: const Icon(Icons.print_outlined, size: 18),
-                    label: const Text('Print'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: _loading ||
-                            _exporting ||
-                            _controller.text.trim().isEmpty ||
-                            !canExportFiles
-                        ? null
-                        : () => _exportPdf(printPreview: false),
-                    icon: _exporting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                    label: Text(_exporting ? 'Exporting…' : 'Download PDF'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AdminSurveyTheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

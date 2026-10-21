@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/reports/data/gts_saved_report_service.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Open, save, save as new and delete for saved reports. Both builder modes
 /// use it; reports of the other mode are listed too and handed to
@@ -139,25 +143,14 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
   Future<void> _delete() async {
     final open = widget.open;
     if (open == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete saved report?'),
-        content: Text(
-          '"${open.name}" will be removed for every admin. Files already '
-          'downloaded are not affected.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final ok = await showAdminConfirmDialog(
+      context,
+      title: 'Delete saved report?',
+      message:
+          '"${open.name}" will be removed for every admin. Files already downloaded are not affected.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: Icons.delete_outline,
     );
     if (ok != true || !mounted) return;
     try {
@@ -185,17 +178,34 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
           key: ValueKey('saved-${open?.id}-${visible.length}'),
           initialValue: visible.any((r) => r.id == open?.id) ? open!.id : null,
           isExpanded: true,
+          dropdownColor: Colors.white,
           hint: Text(
             _loading
                 ? 'Loading saved reports…'
                 : visible.isEmpty
                 ? 'No saved reports yet'
                 : 'Open a saved report',
+            style: const TextStyle(fontSize: 13, color: AdminReportsTheme.textMuted),
           ),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Saved reports',
+            labelStyle: const TextStyle(fontSize: 13, color: AdminReportsTheme.textSecondary),
             isDense: true,
-            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AdminReportsTheme.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AdminReportsTheme.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AdminReportsTheme.primary, width: 1.5),
+            ),
           ),
           items: [
             for (final r in visible)
@@ -244,16 +254,17 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
             padding: EdgeInsets.only(top: 4),
             child: Text('Unsaved changes', style: muted),
           ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Wrap(
           spacing: 8,
-          runSpacing: 4,
+          runSpacing: 6,
           children: [
-            FilledButton.tonalIcon(
+            FilledButton.icon(
               onPressed: _saving || !widget.canSave
                   ? null
                   : () => unawaited(_save(asNew: false)),
-              icon: const Icon(Icons.save_outlined, size: 18),
+              style: AdminButtonStyles.filled(),
+              icon: const Icon(Icons.save_outlined, size: 16),
               label: Text(open == null ? 'Save report' : 'Save changes'),
             ),
             if (open != null) ...[
@@ -261,11 +272,13 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
                 onPressed: _saving || !widget.canSave
                     ? null
                     : () => unawaited(_save(asNew: true)),
+                style: AdminButtonStyles.outlined(),
                 child: const Text('Save as new'),
               ),
               TextButton.icon(
                 onPressed: _saving ? null : () => unawaited(_delete()),
-                icon: const Icon(Icons.delete_outline, size: 18),
+                style: AdminButtonStyles.danger(),
+                icon: const Icon(Icons.delete_outline, size: 16),
                 label: const Text('Delete'),
               ),
             ],
@@ -303,27 +316,66 @@ class _ReportNameDialogState extends State<_ReportNameDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Save report'),
+      shape: AdminDialogStandards.shape,
+      backgroundColor: AdminDialogStandards.backgroundColor,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: AdminDialogStandards.defaultInsetPadding,
+      contentPadding: AdminDialogStandards.defaultContentPadding,
+      titlePadding: EdgeInsets.zero,
+      actionsPadding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
+      title: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+        child: AdminModalHeader(
+          title: 'Save Report',
+          subtitle: 'Enter a name for this custom GTS report.',
+          icon: Icons.bookmark_add_outlined,
+          onClose: () => Navigator.of(context).pop(),
+        ),
+      ),
       content: SizedBox(
-        width: 360,
-        child: TextField(
-          controller: _name,
-          autofocus: true,
-          maxLength: 120,
-          decoration: const InputDecoration(
-            labelText: 'Report name',
-            helperText: 'Every admin can open saved reports.',
-          ),
-          onChanged: (_) => setState(() {}),
-          onSubmitted: (_) => _submit(),
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Divider(height: 1, color: AdminColors.border),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _name,
+              autofocus: true,
+              maxLength: 120,
+              decoration: InputDecoration(
+                labelText: 'Report name *',
+                helperText: 'Saved reports are available to all administrators.',
+                filled: true,
+                fillColor: AdminColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
         ),
       ),
       actions: [
-        TextButton(
+        OutlinedButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: AdminButtonStyles.outlined(),
           child: const Text('Cancel'),
         ),
         FilledButton(
+          style: AdminButtonStyles.filled(),
           onPressed: _name.text.trim().isEmpty ? null : _submit,
           child: const Text('Save'),
         ),

@@ -17,6 +17,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
+import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Opens the forum composer as a right side panel (admin announcements) or
@@ -88,6 +89,9 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   bool _draftRestored = false;
   Timer? _draftTimer;
 
+  /// Bumped on discard so in-flight [saveDraft] cannot rewrite cleared prefs.
+  int _draftEpoch = 0;
+
   bool get _isEditing => widget.editTopic != null;
   bool get _busy => _saving || _checkingContent;
 
@@ -119,15 +123,27 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   /// only when something changed (edits are not drafted).
   bool get _shouldAskOnLeave => _isEditing ? _dirty : _hasContent;
 
-  Future<void> _saveDraftNow() {
+  Future<void> _saveDraftNow() async {
     _draftTimer?.cancel();
-    if (!_hasContent) return _forumService.clearDraft();
-    return _forumService.saveDraft(
-      title: _titleController.text,
-      body: _bodyController.markdown,
-      tagIds: _selectedTagIds.toList(),
-      asAnnouncement: _asAnnouncement,
+    final epoch = _draftEpoch;
+    if (!_hasContent) {
+      await _forumService.clearDraft();
+      return;
+    }
+    final title = _titleController.text;
+    final body = _bodyController.markdown;
+    final tagIds = _selectedTagIds.toList();
+    final asAnnouncement = _asAnnouncement;
+    await _forumService.saveDraft(
+      title: title,
+      body: body,
+      tagIds: tagIds,
+      asAnnouncement: asAnnouncement,
     );
+    // Discard raced this save — wipe the rewritten draft.
+    if (epoch != _draftEpoch) {
+      await _forumService.clearDraft();
+    }
   }
 
   Future<void> _discardDraft() async {
@@ -136,12 +152,12 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     final tagIds = Set<String>.of(_selectedTagIds);
     final asAnnouncement = _asAnnouncement;
 
+    _draftEpoch++;
     _draftTimer?.cancel();
-    await _forumService.clearDraft();
-    if (!mounted) return;
     _titleController.clear();
     _bodyController.clear();
-    _draftTimer?.cancel();
+    await _forumService.clearDraft();
+    if (!mounted) return;
     setState(() {
       _selectedTagIds.clear();
       _asAnnouncement = widget.initialAsAnnouncement;
@@ -212,9 +228,29 @@ class _ForumComposerPageState extends State<ForumComposerPage>
 
   @override
   void dispose() {
-    // Keeps the last few keystrokes when the page is left without _close().
-    if (_draftTimer?.isActive ?? false) _saveDraftNow();
+    // Keep the last keystrokes when leaving without an explicit discard.
+    final shouldFlush = !_isEditing &&
+        (_draftTimer?.isActive ?? false) &&
+        _hasContent;
     _draftTimer?.cancel();
+    if (shouldFlush) {
+      final epoch = _draftEpoch;
+      final title = _titleController.text;
+      final body = _bodyController.markdown;
+      final tagIds = _selectedTagIds.toList();
+      final asAnnouncement = _asAnnouncement;
+      unawaited(() async {
+        await _forumService.saveDraft(
+          title: title,
+          body: body,
+          tagIds: tagIds,
+          asAnnouncement: asAnnouncement,
+        );
+        if (epoch != _draftEpoch) {
+          await _forumService.clearDraft();
+        }
+      }());
+    }
     _tabs.dispose();
     _titleController.dispose();
     _bodyController.dispose();
@@ -293,7 +329,10 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         ),
       );
     } else {
+      _draftEpoch++;
       _draftTimer?.cancel();
+      _titleController.clear();
+      _bodyController.clear();
       await _forumService.clearDraft();
       messenger.showSnackBar(const SnackBar(content: Text('Draft discarded')));
     }
@@ -354,9 +393,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e'), backgroundColor: Colors.red),
-      );
+      showPortalErrorSnack(context, e);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

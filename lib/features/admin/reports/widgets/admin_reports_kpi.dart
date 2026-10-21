@@ -173,7 +173,7 @@ class _ReportsKpiCardState extends State<ReportsKpiCard> {
                 borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
                 border: Border.all(
                   color: _hovered.value
-                      ? widget.color.withValues(alpha: 0.35)
+                      ? AdminReportsTheme.primary.withValues(alpha: 0.20)
                       : AdminReportsTheme.border,
                 ),
                 boxShadow: _hovered.value

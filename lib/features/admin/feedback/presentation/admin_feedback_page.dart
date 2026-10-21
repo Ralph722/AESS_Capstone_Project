@@ -6,6 +6,7 @@ import 'package:alumni_system/features/admin/feedback/presentation/admin_feedbac
 import 'package:alumni_system/features/feedback/data/feedback_service.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class AdminFeedbackScreen extends StatefulWidget {
   const AdminFeedbackScreen({super.key});
@@ -15,7 +16,7 @@ class AdminFeedbackScreen extends StatefulWidget {
 }
 
 class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
-  static const Color _navy = Color(0xFF090A4F);
+  static const Color _navy = AdminColors.primary;
 
   final _service = FeedbackService();
   FeedbackStatus? _statusFilter;

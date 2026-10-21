@@ -4,6 +4,7 @@ import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dar
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Response lifecycle timeline with real tracked events when available.
 ///
@@ -300,19 +301,14 @@ class _ResponseTimelinePanelState extends State<_ResponseTimelinePanel> {
                   children: [
                     Text(
                       'Response timeline',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AdminSurveyTheme.textPrimary,
-                      ),
+                      style: AdminText.sectionTitle.copyWith(fontSize: 16),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       name,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AdminSurveyTheme.textMuted,
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AdminText.caption,
                     ),
                   ],
                 ),
@@ -332,11 +328,7 @@ class _ResponseTimelinePanelState extends State<_ResponseTimelinePanel> {
                 ? 'Loading tracked activity…'
                 : 'Recorded steps use assignment, response, and privacy-safe '
                     'device metadata (category/platform/browser only).',
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.4,
-              color: AdminSurveyTheme.textSecondary,
-            ),
+            style: AdminText.caption.copyWith(height: 1.4),
           ),
         ),
         const Divider(height: 1, color: AdminSurveyTheme.border),

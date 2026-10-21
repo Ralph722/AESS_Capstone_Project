@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class _DetailSection {
   const _DetailSection({required this.label, required this.body});
@@ -135,47 +138,41 @@ class ReportsDetailsButton extends StatelessWidget {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
-          ),
-          titlePadding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
-          contentPadding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          title: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AdminReportsTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.info_outline,
-                  size: 18,
-                  color: AdminReportsTheme.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AdminReportsTheme.textPrimary,
-                  ),
-                ),
-              ),
-            ],
+          shape: AdminDialogStandards.shape,
+          backgroundColor: AdminDialogStandards.backgroundColor,
+          surfaceTintColor: Colors.transparent,
+          insetPadding: AdminDialogStandards.defaultInsetPadding,
+          contentPadding: AdminDialogStandards.defaultContentPadding,
+          titlePadding: EdgeInsets.zero,
+          actionsPadding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
+          title: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+            child: AdminModalHeader(
+              title: title,
+              subtitle: 'Metric definition & methodology',
+              icon: Icons.info_outline_rounded,
+              onClose: () => Navigator.pop(ctx),
+            ),
           ),
           content: SizedBox(
             width: 440,
-            child: SingleChildScrollView(child: content),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Divider(height: 1, color: AdminColors.border),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 460),
+                  child: SingleChildScrollView(child: content),
+                ),
+              ],
+            ),
           ),
           actions: [
-            TextButton(
+            OutlinedButton(
               onPressed: () => Navigator.pop(ctx),
+              style: AdminButtonStyles.outlined(),
               child: const Text('Close'),
             ),
           ],

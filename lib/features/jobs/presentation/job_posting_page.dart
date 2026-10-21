@@ -43,6 +43,8 @@ class JobPostingScreenState extends State<JobPostingScreen> {
   Set<String> _favoriteIds = {};
   Set<String> _interestedIds = {};
   Map<String, DateTime> _favoriteDates = {};
+  final Set<String> _favoriteBusy = {};
+  final Set<String> _interestBusy = {};
   bool _loading = true;
   Object? _loadError;
   String? _alumniCourse;
@@ -243,9 +245,11 @@ class JobPostingScreenState extends State<JobPostingScreen> {
   }
 
   Future<void> _toggleFavorite(String jobId) async {
+    if (_favoriteBusy.contains(jobId)) return;
     final wasFav = _favoriteIds.contains(jobId);
     // Optimistic UI so bookmark feedback is instant.
     setState(() {
+      _favoriteBusy.add(jobId);
       if (wasFav) {
         _favoriteIds = {..._favoriteIds}..remove(jobId);
         _favoriteDates = Map<String, DateTime>.from(_favoriteDates)
@@ -277,29 +281,66 @@ class JobPostingScreenState extends State<JobPostingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not update saved job')),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _favoriteBusy.remove(jobId));
+      } else {
+        _favoriteBusy.remove(jobId);
+      }
     }
   }
 
   Future<void> _toggleInterest(String jobId) async {
+    if (_interestBusy.contains(jobId)) return;
+    final wasInterested = _interestedIds.contains(jobId);
+    final nowInterested = !wasInterested;
+    setState(() {
+      _interestBusy.add(jobId);
+      if (nowInterested) {
+        _interestedIds = {..._interestedIds, jobId};
+      } else {
+        _interestedIds = {..._interestedIds}..remove(jobId);
+      }
+    });
     try {
-      final now = await _interestService.toggleInterest(jobId);
+      final confirmed = await _interestService.toggleInterest(jobId);
       if (!mounted) return;
-      setState(() {
-        if (now) {
-          _interestedIds = {..._interestedIds, jobId};
-        } else {
-          _interestedIds = {..._interestedIds}..remove(jobId);
-        }
-      });
+      // Server is source of truth if it diverges (rare race).
+      if (confirmed != nowInterested) {
+        setState(() {
+          if (confirmed) {
+            _interestedIds = {..._interestedIds, jobId};
+          } else {
+            _interestedIds = {..._interestedIds}..remove(jobId);
+          }
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(now ? 'Interest expressed' : 'Interest withdrawn'),
+          content: Text(
+            confirmed ? 'Interest expressed' : 'Interest withdrawn',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      setState(() {
+        if (wasInterested) {
+          _interestedIds = {..._interestedIds, jobId};
+        } else {
+          _interestedIds = {..._interestedIds}..remove(jobId);
+        }
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(portalFriendlyError(e))));
+    } finally {
+      if (mounted) {
+        setState(() => _interestBusy.remove(jobId));
+      } else {
+        _interestBusy.remove(jobId);
+      }
     }
   }
 
@@ -327,10 +368,16 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     }
     match ??= await _jobService.getJobPosting(id);
     if (!mounted) return;
-    if (match == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Job not found')));
+    if (match == null || !match.isActiveForAlumni) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            match != null && match.isExpiredByDeadline
+                ? 'This job posting has expired.'
+                : 'This job is no longer available.',
+          ),
+        ),
+      );
       return;
     }
 
@@ -1127,24 +1174,55 @@ class _AlumniJobDetails extends StatefulWidget {
 class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
   late bool _favorite = widget.isFavorite;
   late bool _interested = widget.isInterested;
+  bool _applyBusy = false;
 
   JobPosting get job => widget.job;
   bool get _hasApplyUrl => job.applicationUrl.trim().isNotEmpty;
 
+  @override
+  void didUpdateWidget(covariant _AlumniJobDetails oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isFavorite != widget.isFavorite) {
+      _favorite = widget.isFavorite;
+    }
+    if (oldWidget.isInterested != widget.isInterested) {
+      _interested = widget.isInterested;
+    }
+  }
+
   Future<void> _onFavorite() async {
-    widget.onToggleFavorite();
     setState(() => _favorite = !_favorite);
+    widget.onToggleFavorite();
   }
 
   Future<void> _onInterest() async {
-    widget.onToggleInterest();
     setState(() => _interested = !_interested);
+    widget.onToggleInterest();
   }
 
   Future<void> _applyNow() async {
     final url = job.applicationUrl.trim();
-    if (url.isEmpty) return;
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (url.isEmpty || _applyBusy) return;
+    setState(() => _applyBusy = true);
+    try {
+      final ok = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the application link')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the application link')),
+      );
+    } finally {
+      if (mounted) setState(() => _applyBusy = false);
+    }
   }
 
   @override
@@ -1636,15 +1714,24 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                 final apply = SizedBox(
                   height: 48,
                   child: FilledButton(
-                    onPressed: _applyNow,
+                    onPressed: _applyBusy ? null : _applyNow,
                     style: PortalTheme.primaryButton(),
-                    child: const Text(
-                      'Apply Now',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                      ),
-                    ),
+                    child: _applyBusy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Apply Now',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
                   ),
                 );
 

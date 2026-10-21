@@ -17,22 +17,81 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta content="IE=edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="AESS — Alumni Engagement and Support System">
+  <meta name="theme-color" content="#1A1851">
+  <link rel="canonical" href="https://ustp-aess.web.app/">
+
+  <!-- Social link previews (Phase E, static): crawlers do not run the
+       Flutter app, so every shared AESS link previews with this generic,
+       non-sensitive metadata. No survey-specific or personal data is ever
+       placed here. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AESS">
+  <meta property="og:title" content="Graduate Tracer Study &amp; Surveys — AESS">
+  <meta property="og:description" content="Participate in published graduate tracer studies and alumni surveys through the Alumni Engagement and Support System (AESS). Sign in with your alumni account to answer surveys assigned to you.">
+  <meta property="og:url" content="https://ustp-aess.web.app/">
+  <meta property="og:image" content="https://ustp-aess.web.app/icons/Icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="AESS logo">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Graduate Tracer Study &amp; Surveys — AESS">
+  <meta name="twitter:description" content="Participate in published graduate tracer studies and alumni surveys through the Alumni Engagement and Support System (AESS). Sign in with your alumni account to answer surveys assigned to you.">
+  <meta name="twitter:image" content="https://ustp-aess.web.app/icons/Icon-512.png">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="alumni_system">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="AESS">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>alumni_system</title>
+  <title>AESS — Alumni Engagement and Support System</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    /* White loading surface so the AESS icon is not shown on black. */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+    }
+    .aess-boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      z-index: 9999;
+      transition: opacity 180ms ease-out;
+    }
+    .aess-boot img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+    }
+    .aess-boot.aess-boot-hide {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
 </head>
 <body>
+  <div class="aess-boot" id="aess-boot" aria-label="Loading AESS">
+    <img src="icons/Icon-192.png" alt="AESS">
+  </div>
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var boot = document.getElementById('aess-boot');
+      if (!boot) return;
+      boot.classList.add('aess-boot-hide');
+      setTimeout(function () { boot.remove(); }, 220);
+    });
+  </script>
 </body>
 </html>

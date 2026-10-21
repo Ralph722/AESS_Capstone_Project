@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -29,26 +31,18 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
     final fingerprint = assignments
         .map((a) => '${a.id}:${a.surveyId}:${a.status.name}')
         .join('|');
-    final missing = assignments
-        .map((a) => a.surveyId)
-        .where((id) => !_surveyById.containsKey(id))
-        .toSet()
-        .toList();
+    final ids = assignments.map((a) => a.surveyId).toSet().toList();
+    final missing = ids.where((id) => !_surveyById.containsKey(id)).toList();
+    final listChanged = _detailsFingerprint != fingerprint;
 
-    if (missing.isEmpty) {
-      if (_detailsFingerprint != fingerprint && mounted) {
-        setState(() => _detailsFingerprint = fingerprint);
-      }
-      return;
-    }
+    // Reload all related surveys when the assignment list changes so admin
+    // title/description edits appear (not only first-time missing IDs).
+    if (!listChanged && missing.isEmpty) return;
     if (_loadingDetails) return;
     _loadingDetails = true;
 
-    final loaded = <String, Survey>{};
-    for (final id in missing) {
-      final s = await _surveyService.getSurvey(id);
-      if (s != null) loaded[id] = s;
-    }
+    final toLoad = listChanged ? ids : missing;
+    final loaded = await _surveyService.getSurveysByIds(toLoad);
     if (!mounted) return;
     setState(() {
       _surveyById.addAll(loaded);
@@ -70,7 +64,7 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
     ).copyWith(left: 16, right: 16);
 
     return Scaffold(
-      backgroundColor: PortalTheme.pageBg,
+      backgroundColor: Colors.white,
       appBar: const PortalAppBar(title: 'My Surveys'),
       body: PortalContentFrame(
         child: StreamBuilder<List<SurveyAssignment>>(
@@ -78,7 +72,7 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
           stream: _surveyService.watchUserAssignments(uid),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const PortalCardListSkeleton();
+              return const SurveyListSkeleton();
             }
             if (snapshot.hasError) {
               return PortalErrorState(
@@ -101,10 +95,9 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
                     _detailsFingerprint == fingerprint);
 
             if (!detailsReady) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) _ensureSurveyDetails(raw);
-              });
-              return const PortalCardListSkeleton();
+              // Start the batch fetch immediately (do not wait a frame).
+              unawaited(_ensureSurveyDetails(raw));
+              return const SurveyListSkeleton();
             }
 
             final assignments = raw.where((a) {
@@ -344,6 +337,9 @@ class _SurveyRowCard extends StatelessWidget {
           };
 
     final description = survey?.description.trim() ?? '';
+    final liveTitle = survey?.title.trim() ?? '';
+    final title =
+        liveTitle.isNotEmpty ? liveTitle : assignment.surveyTitle;
     final openAt = survey?.openAt;
     final closeAt = survey?.closeAt;
     final assignedAt = assignment.assignedAt;
@@ -353,7 +349,7 @@ class _SurveyRowCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: PortalTheme.card,
         borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+        border: Border.all(color: PortalTheme.borderStrong),
         boxShadow: PortalTheme.softShadow,
       ),
       child: Material(
@@ -394,7 +390,7 @@ class _SurveyRowCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: PortalTheme.space2),
-                Text(assignment.surveyTitle, style: PortalTheme.cardTitle),
+                Text(title, style: PortalTheme.cardTitle),
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(

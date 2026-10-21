@@ -16,6 +16,7 @@ import 'package:alumni_system/features/admin/surveys/widgets/admin_form_fields.d
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 Future<bool?> showAdminEventEditorDialog({
   required BuildContext context,
@@ -301,7 +302,7 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
                 ),
                 child: const Icon(
                   Icons.event_outlined,
-                  color: Color(0xFF090A4F),
+                  color: AdminColors.primary,
                   size: 20,
                 ),
               ),
@@ -697,7 +698,7 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
-                          color: Color(0xFF090A4F),
+                          color: AdminColors.primary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -743,7 +744,7 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
                   : Icon(_isEdit ? Icons.save : Icons.publish, size: 18),
               label: Text(_isEdit ? 'Save' : 'Publish'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF090A4F),
+                backgroundColor: AdminColors.primary,
                 minimumSize: const Size(0, AdminDensity.buttonHeight),
               ),
             ),

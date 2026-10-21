@@ -104,8 +104,15 @@ class AlumniDirectoryDetailService {
     );
   }
 
-  Future<AlumniMember> markAdminViewed(AlumniMember member) async {
-    await _members.markAdminViewed(member.id);
+  /// Opening the detail records the view but keeps the profile-update flag;
+  /// only [markProfileReviewed] clears it.
+  Future<AlumniMember> recordAdminViewed(AlumniMember member) async {
+    await _members.recordAdminViewed(member.id);
+    return member.copyWith(adminViewedAt: DateTime.now());
+  }
+
+  Future<AlumniMember> markProfileReviewed(AlumniMember member) async {
+    await _members.markProfileReviewed(member.id);
     return member.copyWith(
       hasProfileUpdates: false,
       adminViewedAt: DateTime.now(),

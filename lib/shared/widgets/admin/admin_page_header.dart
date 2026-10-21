@@ -2,12 +2,13 @@
 ///
 /// Provides a consistent rhythm across admin screens:
 /// title → optional short subtitle → visible action toolbar. The shell's
-/// sidebar selection and top-header title already signal location, so page
-/// headers stay breadcrumb-free.
+/// sidebar selection already signals location, so page headers stay
+/// breadcrumb-free.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Standard admin page header: title, optional subtitle, actions.
 class AdminPageHeader extends StatelessWidget {
@@ -18,8 +19,8 @@ class AdminPageHeader extends StatelessWidget {
     this.actions = const [],
     this.leading,
     this.below,
-    this.titleColor = const Color(0xFF0F172A),
-    this.subtitleColor = const Color(0xFF64748B),
+    this.titleColor = AdminColors.textPrimary,
+    this.subtitleColor = AdminColors.textSecondary,
     this.titleFontSize = AdminDensity.titleFontSize,
     this.narrowBreakpoint = 768,
   });

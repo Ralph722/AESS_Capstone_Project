@@ -18,6 +18,7 @@ import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
+import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
@@ -66,6 +67,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
   final Map<String, Map<String, dynamic>> _olderById = {};
   bool _hasMoreHistory = true;
   bool _loadingOlder = false;
+  final Set<String> _reactionBusy = {};
 
   Uint8List _getCachedImageBytes(String messageDocId, String imageUrl) {
     final existing = _decodedImagesCache.remove(messageDocId);
@@ -365,9 +367,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
       },
       onError: (msg) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
-        );
+        showPortalErrorSnack(context, msg);
       },
     );
   }
@@ -494,12 +494,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
             'sendStatus': 'failed',
           });
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending message: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showPortalErrorSnack(context, e);
         setState(() {
           _selectedImage = tempImage;
           _selectedImageBytes = tempImageBytes;
@@ -544,12 +539,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
     } catch (e) {
       _upsertLocalMessage({'docId': docId, 'sendStatus': 'failed'});
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Retry failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showPortalErrorSnack(context, e);
     }
   }
 
@@ -573,13 +563,36 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
 
   Future<void> _addReaction(String messageDocId, String emoji) async {
     if (_currentUserId == null) return;
-    await MessageActions.toggleReaction(
-      context: context,
-      service: _messageService,
-      messageId: messageDocId,
-      actorUserId: _currentUserId!,
-      emoji: emoji,
-    );
+    final busyKey = '$messageDocId|$emoji';
+    if (_reactionBusy.contains(busyKey)) return;
+    _reactionBusy.add(busyKey);
+
+    Map<String, dynamic> current = const {};
+    for (final m in _messages) {
+      if ((m['docId'] ?? m['id']) == messageDocId) {
+        current = Map<String, dynamic>.from(m['reactions'] ?? {});
+        break;
+      }
+    }
+
+    try {
+      await MessageActions.toggleReaction(
+        context: context,
+        service: _messageService,
+        messageId: messageDocId,
+        actorUserId: _currentUserId!,
+        emoji: emoji,
+        currentReactions: current,
+        onOptimistic: (reactions) {
+          _upsertLocalMessage({
+            'docId': messageDocId,
+            'reactions': reactions,
+          });
+        },
+      );
+    } finally {
+      _reactionBusy.remove(busyKey);
+    }
   }
 
   void _showMessageOptions(

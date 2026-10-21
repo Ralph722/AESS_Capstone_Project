@@ -7,6 +7,7 @@ enum NotificationDestination {
   survey,
   surveysList,
   tracer,
+  tracerSurvey,
   announcement,
   feedback,
   forumTopic,
@@ -34,15 +35,15 @@ abstract final class AdminNotificationMenu {
   static const feedback = 14;
 
   static int forType(NotificationType type) => switch (type) {
-        NotificationType.event => events,
-        NotificationType.job => jobs,
-        NotificationType.message => messages,
-        NotificationType.announcement => announcements,
-        NotificationType.survey => surveys,
-        NotificationType.feedback => feedback,
-        NotificationType.forum => forum,
-        NotificationType.system => dashboard,
-      };
+    NotificationType.event => events,
+    NotificationType.job => jobs,
+    NotificationType.message => messages,
+    NotificationType.announcement => announcements,
+    NotificationType.survey => surveys,
+    NotificationType.feedback => feedback,
+    NotificationType.forum => forum,
+    NotificationType.system => dashboard,
+  };
 }
 
 /// Where tapping a notification should go. Built from the server `route`
@@ -85,23 +86,40 @@ class NotificationTarget {
 
     switch (parts.first) {
       case 'event':
-        if (id == null) return const NotificationTarget(NotificationDestination.eventsTab);
+        if (id == null) {
+          return const NotificationTarget(NotificationDestination.eventsTab);
+        }
         return NotificationTarget(
           parts.length > 2 && parts[2] == 'comments'
               ? NotificationDestination.eventComments
               : NotificationDestination.event,
           id: id,
+          adminMenuIndex: isAdmin ? AdminNotificationMenu.events : null,
         );
       case 'job':
         return id == null
             ? const NotificationTarget(NotificationDestination.jobsTab)
-            : NotificationTarget(NotificationDestination.job, id: id);
+            : NotificationTarget(
+                NotificationDestination.job,
+                id: id,
+                adminMenuIndex: isAdmin ? AdminNotificationMenu.jobs : null,
+              );
       case 'survey':
         return id == null
             ? const NotificationTarget(NotificationDestination.surveysList)
-            : NotificationTarget(NotificationDestination.survey, id: id);
+            : NotificationTarget(
+                NotificationDestination.survey,
+                id: id,
+                adminMenuIndex: isAdmin ? AdminNotificationMenu.surveys : null,
+              );
       case 'tracer':
-        return const NotificationTarget(NotificationDestination.tracer);
+        return id == null
+            ? const NotificationTarget(NotificationDestination.tracer)
+            : NotificationTarget(
+                NotificationDestination.tracerSurvey,
+                id: id,
+                adminMenuIndex: isAdmin ? AdminNotificationMenu.surveys : null,
+              );
       case 'announcement':
         return NotificationTarget(NotificationDestination.announcement, id: id);
       case 'feedback':
@@ -111,7 +129,11 @@ class NotificationTarget {
       case 'forum':
         return id == null
             ? null
-            : NotificationTarget(NotificationDestination.forumTopic, id: id);
+            : NotificationTarget(
+                NotificationDestination.forumTopic,
+                id: id,
+                adminMenuIndex: isAdmin ? AdminNotificationMenu.forum : null,
+              );
       case 'messages':
         if (isAdmin) {
           return NotificationTarget(
@@ -201,7 +223,8 @@ class NotificationTarget {
         if (id == null) {
           return const NotificationTarget(NotificationDestination.eventsTab);
         }
-        final comments = data['target'] == 'event_comments' ||
+        final comments =
+            data['target'] == 'event_comments' ||
             data.containsKey('commentId') ||
             data.containsKey('replyId');
         return NotificationTarget(

@@ -6,7 +6,7 @@
     <!-- Re-register scheduled reminders after a reboot / app update. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
-        android:label="alumni_system"
+        android:label="AESS"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -29,6 +29,61 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Share links are delivered by app_links, not Flutter's own
+                 route-name deep linking (the app uses an imperative
+                 Navigator, so the engine must not also consume them). -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
+            <!-- AESS App Links (Phase D): verified https links open the app.
+                 Verification needs /.well-known/assetlinks.json on the host
+                 with the production signing fingerprint — until then these
+                 links safely fall back to Flutter Web in the browser. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.web.app"
+                    android:pathPrefix="/tracer/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.web.app"
+                    android:pathPrefix="/surveys/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.firebaseapp.com"
+                    android:pathPrefix="/tracer/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.firebaseapp.com"
+                    android:pathPrefix="/surveys/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.web.app"
+                    android:pathPrefix="/events/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.firebaseapp.com"
+                    android:pathPrefix="/events/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.web.app"
+                    android:pathPrefix="/jobs/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.firebaseapp.com"
+                    android:pathPrefix="/jobs/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.web.app"
+                    android:pathPrefix="/community/"/>
+                <data
+                    android:scheme="https"
+                    android:host="ustp-aess.firebaseapp.com"
+                    android:pathPrefix="/community/"/>
             </intent-filter>
         </activity>
         <receiver

@@ -14,6 +14,8 @@ import 'package:alumni_system/features/events/widgets/event_status_badge.dart';
 import 'package:alumni_system/features/events/widgets/events_month_calendar.dart';
 import 'package:alumni_system/core/constants/event_category_constants.dart';
 import 'package:alumni_system/features/admin/events/widgets/admin_event_ui.dart';
+import 'package:alumni_system/features/share/share_link_sheet.dart';
+import 'package:alumni_system/features/share/shareable_content.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
@@ -402,42 +404,42 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-            AdminPageHeader(
-              title: 'Events',
-              subtitle: _showCalendar
-                  ? 'Plan by date — tap a highlighted day to manage events'
-                  : 'Create, monitor attendance, and keep alumni engaged',
-              titleColor: AdminEventTheme.textPrimary,
-              subtitleColor: AdminEventTheme.textSecondary,
-              titleFontSize: AdminDensity.titleFontSize,
-              actions: [
-                _viewToggle(),
-                FilledButton.icon(
-                  onPressed: () => _openEditor(),
-                  icon: const Icon(Icons.add_rounded, size: 17),
-                  label: const Text('New Event'),
-                  style: eventFilledButtonStyle(),
-                ),
-              ],
-            ),
-            const SizedBox(height: AdminEventTheme.space2),
-            _buildMetrics(),
-            const SizedBox(height: AdminEventTheme.space2),
-            _buildToolbar(),
-            const SizedBox(height: AdminEventTheme.space1),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: _loading && _filtered.isEmpty
-                    ? const AdminEventsListSkeleton()
-                    : _showCalendar
-                    ? _calendarView()
-                    : _filtered.isEmpty
-                    ? _empty()
-                    : _listView(),
-              ),
+        AdminPageHeader(
+          title: 'Events',
+          subtitle: _showCalendar
+              ? 'Plan by date — tap a highlighted day to manage events'
+              : 'Create, monitor attendance, and keep alumni engaged',
+          titleColor: AdminEventTheme.textPrimary,
+          subtitleColor: AdminEventTheme.textSecondary,
+          titleFontSize: AdminDensity.titleFontSize,
+          actions: [
+            _viewToggle(),
+            FilledButton.icon(
+              onPressed: () => _openEditor(),
+              icon: const Icon(Icons.add_rounded, size: 17),
+              label: const Text('New Event'),
+              style: eventFilledButtonStyle(),
             ),
           ],
+        ),
+        const SizedBox(height: AdminEventTheme.space2),
+        _buildMetrics(),
+        const SizedBox(height: AdminEventTheme.space2),
+        _buildToolbar(),
+        const SizedBox(height: AdminEventTheme.space1),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: _loading && _filtered.isEmpty
+                ? const AdminEventsListSkeleton()
+                : _showCalendar
+                ? _calendarView()
+                : _filtered.isEmpty
+                ? _empty()
+                : _listView(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -729,7 +731,10 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
             label: 'From',
             displayText: _from == null
                 ? 'Any date'
-                : DirectoryDateTimePickers.formatDate(_from!, includeYear: false),
+                : DirectoryDateTimePickers.formatDate(
+                    _from!,
+                    includeYear: false,
+                  ),
             active: _from != null,
             onTap: () async {
               final picked = await DirectoryDateTimePickers.pickDate(
@@ -1053,6 +1058,11 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       tooltip: 'Actions',
       onSelected: (value) async {
         switch (value) {
+          case 'share':
+            await showShareLinkSheet(
+              context,
+              ShareableContent.fromEvent(event),
+            );
           case 'details':
             await _openDetails(event);
           case 'edit':
@@ -1065,12 +1075,14 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
             await _delete(event);
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(value: 'details', child: Text('View details')),
-        PopupMenuItem(value: 'edit', child: Text('Edit')),
-        PopupMenuItem(value: 'archive', child: Text('Archive')),
-        PopupMenuItem(value: 'cancel', child: Text('Cancel event')),
-        PopupMenuItem(
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 'details', child: Text('View details')),
+        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+        if (!event.cancelled && event.status.trim().toLowerCase() != 'archived')
+          const PopupMenuItem(value: 'share', child: Text('Share link…')),
+        const PopupMenuItem(value: 'archive', child: Text('Archive')),
+        const PopupMenuItem(value: 'cancel', child: Text('Cancel event')),
+        const PopupMenuItem(
           value: 'delete',
           child: Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
         ),

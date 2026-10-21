@@ -6,6 +6,7 @@ import 'package:alumni_system/features/notifications/presentation/widgets/notifi
 import 'package:alumni_system/features/notifications/push/push_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
+import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
@@ -157,7 +158,7 @@ class _NotificationPreferencesScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PortalTheme.pageBg,
+      backgroundColor: Colors.white,
       appBar: PortalAppBar(
         title: 'Notification settings',
         actions: [
@@ -186,9 +187,7 @@ class _NotificationPreferencesScreenState
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: PortalTheme.navy),
-      );
+      return const NotificationSettingsSkeleton();
     }
     if (_error != null) {
       return PortalErrorState(error: _error, onRetry: _load);
@@ -204,6 +203,22 @@ class _NotificationPreferencesScreenState
               value: _prefs.inAppEnabled(type),
               locked: NotificationPreferences.isInAppLocked(type),
               onChanged: (v) => _update(_prefs.withInApp(type, v)),
+            ),
+        ]),
+        const SizedBox(height: 20),
+        _sectionTitle(
+          'Email',
+          'Email copies sent to your address on file. Turning a category '
+              'off stops its emails (including survey reminders) but never '
+              'its in-app notices. Sign-in and password codes always arrive.',
+        ),
+        _card([
+          for (final type in NotificationType.values)
+            _switchRow(
+              type: type,
+              value: _prefs.emailEnabled(type),
+              locked: NotificationPreferences.isEmailLocked(type),
+              onChanged: (v) => _update(_prefs.withEmail(type, v)),
             ),
         ]),
         if (widget.showPushSection) ...[
@@ -300,7 +315,8 @@ class _NotificationPreferencesScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
-        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
+        border: Border.all(color: PortalTheme.borderStrong),
+        boxShadow: PortalTheme.softShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),

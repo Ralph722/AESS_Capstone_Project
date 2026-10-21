@@ -35,6 +35,7 @@ class _UserSurveyTakeScreenState extends State<UserSurveyTakeScreen> {
   bool _isSaving = false;
   bool _isSubmitted = false;
   bool _dirty = false;
+  String? _blockedMessage;
 
   @override
   void dispose() {
@@ -53,6 +54,21 @@ class _UserSurveyTakeScreenState extends State<UserSurveyTakeScreen> {
   Future<void> _load() async {
     if (mounted) setState(() => _isLoading = true);
     final uid = AppSession.userId;
+    // A shared link (or notification) is only a locator: without an
+    // assignment this screen must not render the questions.
+    if (uid != null) {
+      final access = await _surveyService.getSurveyAccess(widget.surveyId, uid);
+      if (access.kind == SurveyAccessKind.notAssigned ||
+          access.kind == SurveyAccessKind.unavailable) {
+        if (!mounted) return;
+        setState(() {
+          _survey = access.survey;
+          _blockedMessage = access.userMessage;
+          _isLoading = false;
+        });
+        return;
+      }
+    }
     final results = await Future.wait<dynamic>([
       _surveyService.getSurvey(widget.surveyId),
       _surveyService.getQuestions(widget.surveyId),
@@ -273,14 +289,25 @@ class _UserSurveyTakeScreenState extends State<UserSurveyTakeScreen> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop || !_dirty || _isSubmitted) return;
         final discard = await confirmDiscardChanges(context);
-        if (!discard || !mounted) return;
+        if (!discard || !context.mounted) return;
         setState(() => _dirty = false);
         Navigator.of(context).pop();
       },
       child: Scaffold(
         backgroundColor: PortalTheme.pageBg,
         appBar: PortalAppBar(title: _survey?.title ?? 'Survey'),
-        body: _isLoading && _questions.isEmpty
+        body: _blockedMessage != null
+            ? PortalContentFrame(
+                maxWidth: PortalBreakpoints.chatMax,
+                child: PortalEmptyState(
+                  icon: Icons.lock_outline,
+                  title: 'Survey unavailable',
+                  subtitle: _blockedMessage!,
+                  actionLabel: 'Back',
+                  onAction: () => Navigator.of(context).maybePop(),
+                ),
+              )
+            : _isLoading && _questions.isEmpty
             ? const PortalContentFrame(
                 maxWidth: PortalBreakpoints.chatMax,
                 child: SurveyFormSkeleton(),

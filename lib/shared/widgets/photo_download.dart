@@ -43,7 +43,9 @@ Future<void> downloadPhoto(
       mime =
           RegExp(r'^data:([^;,]+)').firstMatch(value)?.group(1) ?? 'image/jpeg';
     } else {
-      final response = await http.get(Uri.parse(value));
+      final response = await http
+          .get(Uri.parse(value))
+          .timeout(const Duration(seconds: 30));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('download failed (${response.statusCode})');
       }

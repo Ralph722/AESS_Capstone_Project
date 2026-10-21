@@ -4,6 +4,7 @@ import 'package:alumni_system/features/admin/reports/models/custom_report_templa
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 
 typedef ReportsPresetDownload =
     Future<void> Function(
@@ -386,12 +387,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
                         printPreview: false,
                       )
                     : null,
-                style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  foregroundColor: AdminReportsTheme.primary,
-                  side: const BorderSide(color: AdminReportsTheme.border),
-                ),
+                style: AdminButtonStyles.outlined(),
                 child: Text(
                   format.label,
                   style: const TextStyle(

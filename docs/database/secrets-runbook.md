@@ -10,10 +10,10 @@ Set with `supabase secrets set NAME=value --project-ref <ref>` or in Dashboard �
 |---|---|---|
 | `GMAIL_USER` | `send-email` | The Gmail address that sends AESS email |
 | `GMAIL_APP_PASSWORD` | `send-email` | Google Account → Security → App passwords (requires 2-step verification) |
-| `GMAIL_SENDER_NAME` | `send-email` | Display name on outgoing email (falls back to "Alumni System") |
+| `GMAIL_SENDER_NAME` | `send-email`, `contact-verify` | Display name on outgoing email — set to `AESS-USTP`, matching Authentication → SMTP sender name (code falls back to "AESS-USTP") |
 | `GEMINI_API_KEY` | `tracer-help`, `ai-assist` | Google AI Studio. The only place the key lives; the Flutter app never holds it |
 | `GEMINI_MODEL` | `tracer-help`, `ai-assist` | Optional; defaults to `gemini-2.5-flash` |
-| `PUSH_DISPATCH_SECRET` | `send-push` | Any long random string; must equal the Vault secret `push_dispatch_secret` |
+| `PUSH_DISPATCH_SECRET` | `send-push`, `send-scheduled-emails` | Any long random string; must equal the Vault secret `push_dispatch_secret`. Also guards the automated survey-email function, which pg_cron reaches by swapping `/send-push` for `/send-scheduled-emails` in the Vault `push_dispatch_url` — no separate email Vault pair exists |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | `send-push` (web push) | Generate a VAPID key pair; the public key must match `lib/core/config/push_config.dart` |
 | `VAPID_SUBJECT` | `send-push` | A `mailto:` address or site URL; falls back to `SUPABASE_URL` |
 | `FCM_SERVICE_ACCOUNT` | `send-push` (Android) | Firebase console → Project settings → Service accounts → Generate key (whole JSON) |

@@ -134,9 +134,7 @@ void main() {
     expect(label('Choose one'), findsOneWidget);
   });
 
-  testWidgets('step mode marks untouched record values and locks email', (
-    tester,
-  ) async {
+  testWidgets('step mode locks the verified name and email', (tester) async {
     state.applyFromProfile(
       const TracerProfile(
         uid: 'u1',
@@ -158,7 +156,12 @@ void main() {
         section: GtsFormSection.personal,
       ),
     );
-    expect(label('From your alumni record'), findsOneWidget);
+    expect(label('Verified at registration'), findsOneWidget);
+    expect(label('From your alumni record'), findsNothing);
+    final editable = tester.widget<EditableText>(
+      find.byType(EditableText).first,
+    );
+    expect(editable.readOnly, isTrue);
 
     state.displayNameController.text = 'Maria S. Santos';
     await pump(

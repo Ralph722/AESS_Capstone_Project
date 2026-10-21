@@ -45,10 +45,18 @@ void main() {
       },
     );
 
-    expect(synced.displayName, 'New Name');
+    // Name stays locked to the verified record unless marriage opt-in.
+    expect(synced.displayName, 'Old Name');
+    final renamed = ChedGtsPrefill.mergeIntoProfile(
+      current: current,
+      answers: {'ched_1': 'New Name', 'ched_6': 'Married'},
+      allowNameChange: true,
+    );
+    expect(renamed.displayName, 'New Name');
     expect(synced.address, 'New Address');
-    expect(synced.email, 'new@school.edu');
-    expect(synced.mobileNumber, '09111111111');
+    // Contacts are saved only after verification.
+    expect(synced.email, 'old@school.edu');
+    expect(synced.mobileNumber, '09000000000');
     expect(synced.civilStatus, 'Single');
     expect(synced.gender, 'Male');
     expect(synced.birthDate?.year, 2000);
@@ -61,5 +69,31 @@ void main() {
     expect(synced.honorsAwards, 'Cum Laude');
     expect(synced.employmentStatus, GtsConstants.employed);
     expect(synced.studentId, '2023001');
+  });
+
+  test('Q3 is prefilled from the contact email, falling back to the login', () {
+    const base = TracerProfile(
+      uid: 'u1',
+      email: 'login@school.edu',
+      displayName: 'Ana',
+      studentId: '2023001',
+      program: 'BSIT',
+      batchYear: '2023',
+      yearGraduated: '2023',
+    );
+    expect(ChedGtsPrefill.fromProfile(base)['ched_3'], 'login@school.edu');
+
+    final withContact = TracerProfile.fromSupabaseRow({
+      'id': 'u1',
+      'email': 'login@school.edu',
+      'contact_email': 'ana@gmail.com',
+      'display_name': 'Ana',
+    });
+    expect(withContact.contactEmail, 'ana@gmail.com');
+    expect(ChedGtsPrefill.fromProfile(withContact)['ched_3'], 'ana@gmail.com');
+    expect(
+      withContact.copyWith(displayName: 'Ana R').contactEmail,
+      'ana@gmail.com',
+    );
   });
 }

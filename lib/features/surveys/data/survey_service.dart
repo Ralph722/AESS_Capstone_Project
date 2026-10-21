@@ -27,8 +27,42 @@ import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_prefill.dart';
 import 'package:alumni_system/features/surveys/data/classic_survey_visibility.dart';
+import 'package:alumni_system/features/share/shareable_content.dart';
+import 'package:intl/intl.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/core/utils/client_context.dart';
+
+enum SurveyAccessKind {
+  take,
+  viewCompleted,
+  notYetOpen,
+  closed,
+  notAssigned,
+  unavailable,
+}
+
+/// Result of [SurveyService.getSurveyAccess].
+class SurveyAccess {
+  const SurveyAccess(this.kind, {this.survey, this.assignment});
+
+  final SurveyAccessKind kind;
+  final Survey? survey;
+  final SurveyAssignment? assignment;
+
+  bool get canOpen =>
+      kind == SurveyAccessKind.take || kind == SurveyAccessKind.viewCompleted;
+
+  /// Alumni-facing explanation when [canOpen] is false.
+  String get userMessage => switch (kind) {
+    SurveyAccessKind.take || SurveyAccessKind.viewCompleted => '',
+    SurveyAccessKind.notYetOpen => 'This survey is not open yet.',
+    SurveyAccessKind.closed => 'This survey is closed.',
+    SurveyAccessKind.notAssigned =>
+      'This survey was not assigned to your account. '
+          'If you believe this is a mistake, please contact the alumni office.',
+    SurveyAccessKind.unavailable => 'This survey is no longer available.',
+  };
+}
 
 /// Surveys data access — Supabase only.
 class SurveyService {
@@ -104,11 +138,17 @@ class SurveyService {
         .toList();
   }
 
+  /// Columns needed to hydrate [Survey.fromSupabaseRow].
+  static const surveySelectColumns =
+      'id, title, description, status, target_programs, target_batch_years, '
+      'open_at, close_at, created_by, created_at, updated_at, '
+      'assignment_count, response_count, template_id, template_version, data';
+
   Future<Survey?> getSurvey(String surveyId) async {
     try {
       final row = await _supabase
           .from('surveys')
-          .select()
+          .select(surveySelectColumns)
           .eq('id', surveyId)
           .maybeSingle();
       if (row != null) {
@@ -121,6 +161,91 @@ class SurveyService {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Whether [userId] may open [surveyId] from a shared link or
+  /// notification. A link is only a locator: the alumnus must have an
+  /// assignment, and the survey must be published and in its window.
+  Future<SurveyAccess> getSurveyAccess(String surveyId, String userId) async {
+    final survey = await getSurvey(surveyId);
+    if (survey == null ||
+        survey.archived ||
+        survey.status == SurveyStatus.draft) {
+      return const SurveyAccess(SurveyAccessKind.unavailable);
+    }
+    final assignments = await getUserAssignments(userId);
+    SurveyAssignment? assignment;
+    for (final a in assignments) {
+      if (a.surveyId == surveyId) {
+        assignment = a;
+        break;
+      }
+    }
+    if (assignment == null) {
+      return SurveyAccess(SurveyAccessKind.notAssigned, survey: survey);
+    }
+    if (assignment.status == SurveyAssignmentStatus.completed) {
+      return SurveyAccess(
+        SurveyAccessKind.viewCompleted,
+        survey: survey,
+        assignment: assignment,
+      );
+    }
+    if (survey.isOpen) {
+      return SurveyAccess(
+        SurveyAccessKind.take,
+        survey: survey,
+        assignment: assignment,
+      );
+    }
+    if (survey.isNotYetOpen) {
+      return SurveyAccess(
+        SurveyAccessKind.notYetOpen,
+        survey: survey,
+        assignment: assignment,
+      );
+    }
+    return SurveyAccess(
+      SurveyAccessKind.closed,
+      survey: survey,
+      assignment: assignment,
+    );
+  }
+
+  /// Batch-load surveys by id (avoids N+1 on Home / assignment lists).
+  ///
+  /// Creator display names are skipped unless [resolveCreators] is true —
+  /// attention badges only need schedule / kind fields.
+  Future<Map<String, Survey>> getSurveysByIds(
+    Iterable<String> surveyIds, {
+    bool resolveCreators = false,
+  }) async {
+    final ids = surveyIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (ids.isEmpty) return {};
+    try {
+      final rows = await _supabase
+          .from('surveys')
+          .select(surveySelectColumns)
+          .inFilter('id', ids);
+      final out = <String, Survey>{};
+      for (final row in rows) {
+        var survey = Survey.fromSupabaseRow(row);
+        if (resolveCreators) {
+          final creatorLabel = await _resolveUserDisplayLabel(survey.createdBy);
+          if (creatorLabel != null) {
+            survey = survey.copyWith(createdByDisplayName: creatorLabel);
+          }
+        }
+        if (survey.id.isNotEmpty) out[survey.id] = survey;
+      }
+      return out;
+    } catch (_) {
+      return {};
+    }
   }
 
   Future<String?> _resolveUserDisplayLabel(String userId) async {
@@ -314,6 +439,15 @@ class SurveyService {
 
   Future<void> updateSurvey(Survey survey) async {
     await _upsertSurveyToSupabase(survey);
+    // Keep alumni list titles in sync (assignments store a title snapshot).
+    try {
+      await _supabase
+          .from('survey_assignments')
+          .update({'survey_title': survey.title})
+          .eq('survey_id', survey.id);
+    } catch (_) {
+      // Non-fatal: My Surveys prefers live surveys.title when loaded.
+    }
   }
 
   Future<void> deleteSurvey(String surveyId) async {
@@ -486,7 +620,10 @@ class SurveyService {
 
       final rows = await _supabase
           .from('survey_assignments')
-          .select()
+          .select(
+            'id, survey_id, user_id, survey_title, status, assigned_at, '
+            'last_reminder_at, reminder_count',
+          )
           .eq('user_id', supabaseUserId);
       final list = rows.map(SurveyAssignment.fromSupabaseRow).toList()
         ..sort((a, b) => b.assignedAt.compareTo(a.assignedAt));
@@ -611,6 +748,7 @@ class SurveyService {
     required Map<String, dynamic> answers,
     required bool submit,
     SurveyClientContext? clientContext,
+    bool marriageNameChangeOptedIn = false,
   }) async {
     final userId = AppSession.requireUserId();
     final survey = await getSurvey(surveyId);
@@ -628,9 +766,14 @@ class SurveyService {
           'This survey is closed and no longer accepts responses.',
         );
       }
-      throw Exception(
-        'This survey is not currently available for responses.',
-      );
+      throw Exception('This survey is not currently available for responses.');
+    }
+
+    // Possession of a survey id (e.g. from a shared link) is not access:
+    // only assigned alumni may save or submit a response.
+    final assignments = await getUserAssignments(userId);
+    if (!assignments.any((a) => a.surveyId == surveyId)) {
+      throw Exception('This survey was not assigned to your account.');
     }
 
     var pruned = Map<String, dynamic>.from(answers);
@@ -732,7 +875,11 @@ class SurveyService {
 
       if (submit) {
         if (survey?.isChedGtsBuiltin == true) {
-          await _syncProfileFromBuiltinChedGts(userId: userId, answers: pruned);
+          await _syncProfileFromBuiltinChedGts(
+            userId: userId,
+            answers: pruned,
+            marriageNameChangeOptedIn: marriageNameChangeOptedIn,
+          );
         } else {
           await _syncProfileFromSurveySubmission(
             userId: userId,
@@ -791,20 +938,46 @@ class SurveyService {
     } catch (_) {}
   }
 
+  /// Server-gated rename after marriage (updates live + roster + audit).
+  Future<void> applyMarriageNameChange(String newName) async {
+    await _supabase.rpc(
+      'apply_marriage_name_change',
+      params: {'p_new_name': newName.trim()},
+    );
+  }
+
   Future<void> _syncProfileFromBuiltinChedGts({
     required String userId,
     required Map<String, dynamic> answers,
+    bool marriageNameChangeOptedIn = false,
   }) async {
+    String? desiredName;
     try {
       final current = await _userProfileService.getTracerProfile(userId);
       if (current == null) return;
+      if (marriageNameChangeOptedIn) {
+        final raw = answers['ched_1']?.toString().trim() ?? '';
+        if (raw.isNotEmpty && raw != current.displayName.trim()) {
+          desiredName = raw;
+        }
+      }
       final synced = ChedGtsPrefill.mergeIntoProfile(
         current: current,
         answers: answers,
+        allowNameChange: marriageNameChangeOptedIn,
       );
-      await _userProfileService.saveTracerProfile(synced);
+      await _userProfileService.saveTracerProfile(synced, source: 'tracer');
       UserProfileEvents.notifyProfileFieldsChanged();
-    } catch (_) {}
+    } catch (_) {
+      // Profile sync is best-effort except for an opted-in rename below.
+      if (desiredName == null) return;
+    }
+    if (desiredName != null) {
+      // Civil status is Married in the DB after the save above, so the RPC
+      // gate passes; it writes both names and the audit row.
+      await applyMarriageNameChange(desiredName);
+      UserProfileEvents.notifyProfileFieldsChanged();
+    }
   }
 
   Future<void> _syncProfileFromSurveySubmission({
@@ -822,7 +995,7 @@ class SurveyService {
       );
       if (updates.isEmpty) return;
       final synced = ProfileSurveySync.applyUpdates(current, updates);
-      await _userProfileService.saveTracerProfile(synced);
+      await _userProfileService.saveTracerProfile(synced, source: 'survey');
     } catch (_) {}
   }
 
@@ -942,6 +1115,90 @@ class SurveyService {
     }
   }
 
+  /// Per-user CHED GTS wave progress for the admin directory: auth uid →
+  /// how many waves the member was assigned vs has submitted. A submitted
+  /// response without an assignment still counts (as both assigned and
+  /// submitted), and a `completed` assignment counts as submitted.
+  Future<Map<String, ({int assigned, int submitted})>>
+  getChedGtsProgressByUser() async {
+    try {
+      final surveyRows = await _supabase.from('surveys').select('id, data');
+      final chedIds = <String>[
+        for (final row in surveyRows)
+          if (_isChedGtsData(row['data'])) row['id']?.toString() ?? '',
+      ].where((id) => id.isNotEmpty).toList();
+      if (chedIds.isEmpty) return {};
+
+      final assignments = await fetchAllPages(
+        (from, to) => _supabase
+            .from('survey_assignments')
+            .select('survey_id, user_id, status')
+            .inFilter('survey_id', chedIds)
+            .order('survey_id')
+            .order('user_id')
+            .range(from, to),
+      );
+      final responses = await fetchAllPages(
+        (from, to) => _supabase
+            .from('survey_responses')
+            .select('survey_id, user_id')
+            .inFilter('survey_id', chedIds)
+            .eq('status', SurveyResponseStatus.submitted.name)
+            .order('survey_id')
+            .order('user_id')
+            .range(from, to),
+      );
+      return chedProgressFromRows(
+        assignments: assignments,
+        responses: responses,
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static bool _isChedGtsData(dynamic data) {
+    if (data is! Map) return false;
+    if (data['archived'] == true) return false;
+    return data['kind'] == 'ched_gts_builtin' ||
+        data['template_key'] == 'ched_gts_builtin';
+  }
+
+  /// Merges assignment/response rows into per-user wave counts.
+  static Map<String, ({int assigned, int submitted})> chedProgressFromRows({
+    required Iterable<Map<String, dynamic>> assignments,
+    required Iterable<Map<String, dynamic>> responses,
+  }) {
+    final assigned = <String, Set<String>>{};
+    final submitted = <String, Set<String>>{};
+
+    void add(Map<String, Set<String>> map, Map<String, dynamic> row) {
+      final user = row['user_id']?.toString() ?? '';
+      final survey = row['survey_id']?.toString() ?? '';
+      if (user.isEmpty || survey.isEmpty) return;
+      map.putIfAbsent(user, () => {}).add(survey);
+    }
+
+    for (final row in assignments) {
+      add(assigned, row);
+      if (row['status']?.toString() == SurveyAssignmentStatus.completed.name) {
+        add(submitted, row);
+      }
+    }
+    for (final row in responses) {
+      add(submitted, row);
+    }
+
+    final users = {...assigned.keys, ...submitted.keys};
+    return {
+      for (final user in users)
+        user: (
+          assigned: {...?assigned[user], ...?submitted[user]}.length,
+          submitted: (submitted[user] ?? const <String>{}).length,
+        ),
+    };
+  }
+
   /// Single-query survey stats for admin dashboard (avoids N+1 reads).
   Future<
     ({
@@ -1056,10 +1313,7 @@ class SurveyService {
       if (!dirty) return;
 
       // Update badge cursor / heal publish stamp only — do not bump updated_at.
-      await _supabase
-          .from('surveys')
-          .update({'data': data})
-          .eq('id', surveyId);
+      await _supabase.from('surveys').update({'data': data}).eq('id', surveyId);
     } catch (e) {
       throw Exception('Error marking survey responses seen: $e');
     }
@@ -1255,14 +1509,33 @@ class SurveyService {
     var inAppSent = 0;
     var emailSent = 0;
     var emailSkippedNoAddress = 0;
+    var emailSkippedOptedOut = 0;
     final emailEnabled = email && EmailDeliveryConfig.isConfigured;
     final emailSkippedNotConfigured = email && !EmailDeliveryConfig.isConfigured
         ? userIds.length
         : 0;
     final failures = <String>[];
 
-    final reminderMessage =
-        'Please complete "${survey.title}" in the Alumni System app.';
+    // The link is a locator only: opening it still requires sign-in and
+    // an assignment for this alumnus (see SurveyService.getSurveyAccess).
+    final shareable = ShareableContent.fromSurvey(survey);
+    final actionUrl = shareable.isShareable ? shareable.canonicalUrl : null;
+    final actionLabel = survey.isChedGtsBuiltin
+        ? 'Answer the tracer study'
+        : 'Answer the survey';
+    final description = survey.description.trim();
+    final reminderMessage = description.isNotEmpty
+        ? description
+        : survey.isChedGtsBuiltin
+        ? 'This is a reminder to complete the Graduate Tracer Study. '
+              'Your responses help USTP improve its programs and services '
+              'for future graduates.'
+        : 'This is a reminder to complete this USTP alumni survey. '
+              'Your feedback helps USTP improve its programs and services.';
+    final deadlineText = survey.closeAt == null
+        ? null
+        : 'Please respond on or before '
+              '${DateFormat('MMMM d, yyyy').format(survey.closeAt!.toLocal())}.';
 
     // In-app reminders: server-side, at most one per alumnus per survey per
     // day (repeat clicks the same day are skipped).
@@ -1298,13 +1571,20 @@ class SurveyService {
           emailSkippedNoAddress++;
         } else {
           try {
-            await emailService!.sendSurveyReminderEmail(
+            final sent = await emailService!.sendSurveyReminderEmail(
               toEmail: address,
               userName: name,
               surveyTitle: survey.title,
               message: reminderMessage,
+              actionUrl: actionUrl,
+              actionLabel: actionLabel,
+              deadlineText: deadlineText,
             );
-            emailSent++;
+            if (sent) {
+              emailSent++;
+            } else {
+              emailSkippedOptedOut++;
+            }
           } catch (e) {
             failures.add('$name (email): $e');
           }
@@ -1336,6 +1616,7 @@ class SurveyService {
       emailSent: emailSent,
       emailSkippedNoAddress: emailSkippedNoAddress,
       emailSkippedNotConfigured: emailSkippedNotConfigured,
+      emailSkippedOptedOut: emailSkippedOptedOut,
       failures: failures,
     );
   }

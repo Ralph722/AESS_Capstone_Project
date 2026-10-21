@@ -1,0 +1,13 @@
+﻿n,test,expected,actual
+1,alumni cannot call contact_email_taken,ERROR: permission denied,ERROR: permission denied for function contact_email_taken
+2,alumni cannot call service_apply_verified_contact,ERROR: permission denied,ERROR: permission denied for function service_apply_verified_contact
+3,own login email is not taken for self,false,false
+4,another account's email is taken,true,true
+5,invalid email is not taken,false,false
+6,alumni apply_verified_contact refuses email,"ERROR: To change your email, verify it first.","ERROR: To change your email, verify it first. Your sign-in email will update too."
+7,alumni can still apply a verified mobile,true,true
+8,auth email sync updates users.email,p21-new@example.com,p21-new@example.com
+9,auth email sync updates registered_email,p21-new@example.com,p21-new@example.com
+10,auth email sync updates email_address,p21-new@example.com,p21-new@example.com
+11,service apply saves contact email as verified,true|p21-new@example.com,true|p21-new@example.com
+12,contact email verified after service apply,p21-new@example.com|true,p21-new@example.com|true

@@ -1,17 +1,27 @@
 <!-- Sign-up confirmation email. Keep {{ .Token }}: the app asks for this code
-     (verifyOTP type "signup") and does not handle confirmation links. -->
-<div style="font-family: Arial, Helvetica, sans-serif; color: #151515; max-width: 480px; margin: 0 auto; padding: 24px;">
-  <h2 style="color: #1A1851; margin: 0 0 16px;">Confirm your AESS account</h2>
-  <p style="margin: 0 0 16px; line-height: 1.5;">
-    Welcome to the AESS Alumni Portal. Enter this code in the app to confirm your Gmail
-    address and finish creating your account:
-  </p>
-  <p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1A1851; margin: 0 0 16px;">
-    {{ .Token }}
-  </p>
-  <p style="margin: 0 0 16px; line-height: 1.5;">
-    The code expires in 1 hour. If you didn't sign up for the AESS Alumni Portal, you can
-    ignore this email.
-  </p>
-  <p style="margin: 0; color: #6B7280; font-size: 12px;">USTP Alumni Engagement and Support System</p>
+     (verifyOTP type "signup") and does not handle confirmation links.
+     Mirror this file into Supabase Dashboard -> Authentication -> Email
+     Templates -> "Confirm sign up" whenever it changes. -->
+<div style="font-family: Arial, Helvetica, sans-serif; color: #151515; max-width: 480px; margin: 0 auto;">
+  <div style="background: #1A1851; padding: 16px 24px; border-radius: 12px 12px 0 0;">
+    <div style="font-size: 18px; font-weight: bold; color: #FFFFFF;">AESS&#8209;USTP</div>
+    <div style="font-size: 11px; color: #FCB315;">USTP Alumni Engagement and Support System</div>
+  </div>
+  <div style="border: 1px solid #E1E5EA; border-top: none; border-radius: 0 0 12px 12px; padding: 20px 24px;">
+    <h2 style="color: #1A1851; margin: 0 0 16px; font-size: 20px;">Confirm your AESS&#8209;USTP account</h2>
+    <p style="margin: 0 0 16px; line-height: 1.5;">
+      Welcome to AESS&#8209;USTP. Enter this code in the app to confirm your email
+      address and finish creating your account:
+    </p>
+    <p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1A1851; background: #FFF7E0; border: 1px solid #FCB315; border-radius: 8px; padding: 12px 16px; text-align: center; margin: 0 0 16px;">
+      {{ .Token }}
+    </p>
+    <p style="margin: 0 0 16px; line-height: 1.5;">
+      The code expires in 1 hour. If you didn't sign up for AESS&#8209;USTP, you can
+      ignore this email.
+    </p>
+    <p style="margin: 0; color: #6B7280; font-size: 12px; line-height: 1.5;">
+      AESS&#8209;USTP &middot; University of Science and Technology of Southern Philippines
+    </p>
+  </div>
 </div>

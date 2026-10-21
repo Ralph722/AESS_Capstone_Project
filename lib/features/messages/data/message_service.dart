@@ -166,10 +166,41 @@ class MessageService {
   }) async {
     final message = await _repo.getMessageById(messageId);
     if (message == null) return;
+    final next = _reactionsAfterToggle(
+      current: message.reactions,
+      actorUserId: actorUserId,
+      emoji: emoji,
+    );
+    await applyReactions(messageId: messageId, reactions: next);
+  }
 
-    final reactions = Map<String, dynamic>.from(message.reactions);
-    final usersList = List<String>.from(reactions[emoji] ?? []);
+  /// Writes an already-computed reactions map (used by optimistic UI).
+  Future<void> applyReactions({
+    required String messageId,
+    required Map<String, dynamic> reactions,
+  }) async {
+    try {
+      await _repo.updateReactions(messageId, reactions);
+    } catch (e) {
+      throw Exception('Error updating reactions: $e');
+    }
+  }
 
+  static Map<String, dynamic> _reactionsAfterToggle({
+    required Map<String, dynamic> current,
+    required String actorUserId,
+    required String emoji,
+  }) {
+    final reactions = <String, dynamic>{};
+    for (final entry in current.entries) {
+      final list = entry.value;
+      reactions[entry.key] = List<String>.from(
+        list is List ? list.map((e) => e.toString()) : const <String>[],
+      );
+    }
+    final usersList = List<String>.from(
+      (reactions[emoji] as List?)?.map((e) => e.toString()) ?? const <String>[],
+    );
     if (usersList.contains(actorUserId)) {
       usersList.remove(actorUserId);
       if (usersList.isEmpty) {
@@ -181,12 +212,7 @@ class MessageService {
       usersList.add(actorUserId);
       reactions[emoji] = usersList;
     }
-
-    try {
-      await _repo.updateReactions(messageId, reactions);
-    } catch (e) {
-      throw Exception('Error updating reactions: $e');
-    }
+    return reactions;
   }
 
   Future<Set<String>> resolveAdminIdentityIds() =>

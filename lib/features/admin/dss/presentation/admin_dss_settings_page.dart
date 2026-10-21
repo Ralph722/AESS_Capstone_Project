@@ -9,9 +9,16 @@ import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 
 class AdminDssSettingsPanel extends StatefulWidget {
-  const AdminDssSettingsPanel({super.key, required this.onClose});
+  const AdminDssSettingsPanel({
+    super.key,
+    required this.onClose,
+    this.selectedSubnav = 2,
+    this.onSubnavSelected,
+  });
 
   final Future<void> Function() onClose;
+  final int selectedSubnav;
+  final ValueChanged<int>? onSubnavSelected;
 
   @override
   State<AdminDssSettingsPanel> createState() => _AdminDssSettingsPanelState();
@@ -105,7 +112,9 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Saved ${rule.displayName}'),
+          content: Text(
+            'Saved ${rule.displayName}. Return to Findings and Refresh insights.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -182,11 +191,16 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DssPageHeader(
-          title: 'Insight rule settings',
-          subtitle:
-              'Set when an alert should appear. Use plain percentages and minimum answers — then Save each rule.',
-          onBack: () => widget.onClose(),
-          backTooltip: 'Back to recommendations',
+          title: 'Rules',
+          subtitle: 'Thresholds and minimum answers for Findings and Watch items.',
+          onBack: widget.onSubnavSelected == null
+              ? () => widget.onClose()
+              : null,
+          backTooltip: 'Back to findings',
+          selectedSubnav: widget.onSubnavSelected != null
+              ? widget.selectedSubnav
+              : null,
+          onSubnavSelected: widget.onSubnavSelected,
         ),
         const SizedBox(height: AdminDssTheme.space2),
         if (_loading)
@@ -203,132 +217,168 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
           )
         else
           Expanded(
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.only(bottom: AdminDensity.space3),
-              itemCount: _rules.length,
-              separatorBuilder: (_, _) =>
-                  const SizedBox(height: AdminDensity.listItemGap),
-              itemBuilder: (context, i) {
-                final rule = _rules[i];
-                final sevColor = dssSeverityColor(rule.severity);
-                return DssSurfaceCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: sevColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(
-                                AdminDssTheme.radiusSm,
-                              ),
-                            ),
-                            child: Icon(
-                              dssRuleIcon(rule.ruleId),
-                              size: 18,
-                              color: sevColor,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              rule.displayName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13.5,
-                                color: AdminDssTheme.textPrimary,
-                              ),
-                            ),
-                          ),
-                          Switch.adaptive(
-                            value: rule.enabled,
-                            onChanged: (v) => _toggle(rule, v),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        rule.description,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: AdminDssTheme.textSecondary,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        DssCopy.settingsMinResponsesHint(rule),
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: AdminDssTheme.textMuted,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Click Save after editing this rule. Then go back and click Refresh insights.',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: AdminDssTheme.textMuted,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          DssMetaChip(
-                            label: _severityLabel(rule.severity),
-                            color: sevColor,
-                          ),
-                          DssMetaChip(label: _categoryLabel(rule.category)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller:
-                                  _controllers['${rule.ruleId}|threshold'],
-                              decoration: _fieldDecoration(
-                                DssCopy.settingsThresholdHint(rule),
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: 168,
-                            child: TextField(
-                              controller: _controllers['${rule.ruleId}|minN'],
-                              decoration: _fieldDecoration(
-                                'Minimum (at least '
-                                '${DssPolicy.minNFloor(rule.category)})',
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          FilledButton(
-                            onPressed: () => _save(rule),
-                            style: dssFilledButtonStyle(),
-                            child: const Text('Save'),
-                          ),
-                        ],
-                      ),
-                    ],
+              children: [
+                DssInsightBanner(
+                  text:
+                      'Save each rule, then Refresh insights on Findings so new thresholds apply.',
+                  icon: Icons.info_outline,
+                  trailing: TextButton.icon(
+                    onPressed: widget.onSubnavSelected == null
+                        ? () => widget.onClose()
+                        : () => widget.onSubnavSelected!(0),
+                    icon: const Icon(Icons.flag_outlined, size: 16),
+                    label: const Text('Findings'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AdminDssTheme.primary,
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: AdminDssTheme.space2),
+                for (var i = 0; i < _rules.length; i++) ...[
+                  if (i > 0) const SizedBox(height: AdminDensity.listItemGap),
+                  _buildRuleCard(_rules[i]),
+                ],
+              ],
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildRuleCard(DssRule rule) {
+    final sevColor = dssSeverityColor(rule.severity);
+    return DssSurfaceCard(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: sevColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+                ),
+                child: Icon(
+                  dssRuleIcon(rule.ruleId),
+                  size: 16,
+                  color: sevColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rule.displayName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: AdminDssTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        DssMetaChip(
+                          label: _severityLabel(rule.severity),
+                          color: sevColor,
+                        ),
+                        DssMetaChip(label: _categoryLabel(rule.category)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: rule.enabled,
+                onChanged: (v) => _toggle(rule, v),
+              ),
+            ],
+          ),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 4),
+              title: const Text(
+                'About this rule',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AdminDssTheme.textSecondary,
+                ),
+              ),
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    rule.description,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AdminDssTheme.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    DssCopy.settingsMinResponsesHint(rule),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AdminDssTheme.textMuted,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controllers['${rule.ruleId}|threshold'],
+                  decoration: _fieldDecoration(
+                    DssCopy.settingsThresholdHint(rule),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 168,
+                child: TextField(
+                  controller: _controllers['${rule.ruleId}|minN'],
+                  decoration: _fieldDecoration(
+                    'Minimum (at least '
+                    '${DssPolicy.minNFloor(rule.category)})',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () => _save(rule),
+                style: dssFilledButtonStyle(),
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -216,7 +216,9 @@ class EventsScreenState extends State<EventsScreen>
     if (event == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Event not found')));
+      ).showSnackBar(
+        const SnackBar(content: Text('This event is no longer available.')),
+      );
       return;
     }
 
@@ -274,7 +276,8 @@ class EventsScreenState extends State<EventsScreen>
             content: Text(
               closed ? 'Registration is closed' : 'This event is at capacity',
             ),
-            backgroundColor: const Color(0xFFFF6B6B),
+            backgroundColor: PortalTheme.danger,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -300,7 +303,8 @@ class EventsScreenState extends State<EventsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Response saved: ${status.label}'),
-          backgroundColor: const Color(0xFF4CAF50),
+          backgroundColor: PortalTheme.success,
+          behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -314,12 +318,7 @@ class EventsScreenState extends State<EventsScreen>
           _myRsvps = {..._myRsvps, event.id: previous};
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating response: $e'),
-          backgroundColor: const Color(0xFFFF6B6B),
-        ),
-      );
+      showPortalErrorSnack(context, e);
     } finally {
       if (mounted) {
         setState(() => _rsvpBusy.remove(event.id));
@@ -360,7 +359,10 @@ class EventsScreenState extends State<EventsScreen>
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
             if (isLoading)
-              const SliverToBoxAdapter(child: EventListSkeleton(grid: false))
+              const SliverFillRemaining(
+                hasScrollBody: true,
+                child: EventListSkeleton(grid: false, shrinkWrap: false),
+              )
             else if (_loadError != null)
               SliverFillRemaining(
                 hasScrollBody: false,

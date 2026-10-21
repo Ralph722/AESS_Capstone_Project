@@ -23,6 +23,9 @@ import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layou
 import 'package:alumni_system/features/admin/reports/widgets/gts_report_preview.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 
 typedef GtsListResponseLoader =
@@ -286,8 +289,23 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
 
   InputDecoration _input(String label) => InputDecoration(
     labelText: label,
+    labelStyle: const TextStyle(fontSize: 13, color: AdminReportsTheme.textSecondary),
     isDense: true,
-    border: const OutlineInputBorder(),
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AdminReportsTheme.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AdminReportsTheme.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AdminReportsTheme.primary, width: 1.5),
+    ),
   );
 
   Widget _section(String title, List<Widget> children) => Padding(
@@ -403,6 +421,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
           key: ValueKey('list-template-${_config.templateKey}'),
           initialValue: GtsListTemplates.byKey(_config.templateKey)?.key,
           isExpanded: true,
+          dropdownColor: Colors.white,
           hint: const Text('Custom list'),
           decoration: _input('Start from a ready-made list'),
           items: [
@@ -436,6 +455,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
             key: ValueKey('wave-${_config.surveyId}'),
             initialValue: _config.surveyId,
             isExpanded: true,
+            dropdownColor: Colors.white,
             decoration: _input('Answers from'),
             items: [
               for (final w in widget.waves)
@@ -720,6 +740,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
           key: ValueKey('sort-$current-${columns.length}'),
           initialValue: current,
           isExpanded: true,
+          dropdownColor: Colors.white,
           decoration: _input('Sort by'),
           items: [
             const DropdownMenuItem(
@@ -885,11 +906,12 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   // ---- Layout -------------------------------------------------------------
 
   Widget _card(Widget child) => Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
       color: AdminReportsTheme.card,
-      borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
+      borderRadius: BorderRadius.circular(14),
       border: Border.all(color: AdminReportsTheme.border),
+      boxShadow: AdminReportsTheme.cardShadow,
     ),
     child: child,
   );
@@ -982,6 +1004,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                   onPressed: result == null || _loading || _exporting != null
                       ? null
                       : () => unawaited(_download(f)),
+                  style: AdminButtonStyles.outlined(),
                   icon: _exporting == f
                       ? const SizedBox(
                           width: 14,
@@ -1172,37 +1195,46 @@ class _ListTableState extends State<_ListTable> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowHeight: 36,
-            dataRowMinHeight: 30,
-            dataRowMaxHeight: 48,
-            columnSpacing: 20,
-            headingTextStyle: _headingStyle,
-            dataTextStyle: _cellStyle,
-            columns: [
-              for (final c in widget.columns)
-                DataColumn(
-                  label: Tooltip(message: c.description, child: Text(c.header)),
-                ),
-            ],
-            rows: [
-              for (final r in shown)
-                DataRow(
-                  color: r.status.untracked
-                      ? const WidgetStatePropertyAll(_untrackedTint)
-                      : r.member == null
-                      ? const WidgetStatePropertyAll(AdminReportsTheme.surface)
-                      : null,
-                  cells: [
-                    for (final c in widget.columns)
-                      DataCell(
-                        _cell(GtsListColumns.cell(c, r, waveLabels: labels)),
-                      ),
-                  ],
-                ),
-            ],
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AdminReportsTheme.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: const WidgetStatePropertyAll(AdminReportsTheme.surface),
+              headingRowHeight: 38,
+              dataRowMinHeight: 32,
+              dataRowMaxHeight: 48,
+              columnSpacing: 20,
+              headingTextStyle: _headingStyle,
+              dataTextStyle: _cellStyle,
+              columns: [
+                for (final c in widget.columns)
+                  DataColumn(
+                    label: Tooltip(message: c.description, child: Text(c.header)),
+                  ),
+              ],
+              rows: [
+                for (final r in shown)
+                  DataRow(
+                    color: r.status.untracked
+                        ? const WidgetStatePropertyAll(_untrackedTint)
+                        : r.member == null
+                        ? const WidgetStatePropertyAll(AdminReportsTheme.surface)
+                        : null,
+                    cells: [
+                      for (final c in widget.columns)
+                        DataCell(
+                          _cell(GtsListColumns.cell(c, r, waveLabels: labels)),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
         if (rows.length > _limit) ...[
@@ -1320,9 +1352,17 @@ class _TallyTable extends StatelessWidget {
         ],
       );
     }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: table,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AdminReportsTheme.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: table,
+      ),
     );
   }
 
@@ -1376,21 +1416,51 @@ class _GtsListColumnPickerState extends State<GtsListColumnPicker> {
         (g, GtsListColumns.inGroup(g).where(_matches).toList()),
     ].where((e) => e.$2.isNotEmpty).toList();
     return AlertDialog(
-      title: const Text('Columns'),
+      shape: AdminDialogStandards.shape,
+      backgroundColor: AdminDialogStandards.backgroundColor,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: AdminDialogStandards.defaultInsetPadding,
+      contentPadding: AdminDialogStandards.defaultContentPadding,
+      titlePadding: EdgeInsets.zero,
+      actionsPadding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
+      title: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+        child: AdminModalHeader(
+          title: 'Configure Columns',
+          subtitle: 'Choose and reorder data columns to display.',
+          icon: Icons.view_column_outlined,
+          onClose: () => Navigator.of(context).pop(),
+        ),
+      ),
       content: SizedBox(
         width: 560,
         height: 520,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const Divider(height: 1, color: AdminColors.border),
+            const SizedBox(height: 12),
             TextField(
               controller: _search,
               autofocus: true,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 isDense: true,
-                prefixIcon: Icon(Icons.search, size: 18),
+                prefixIcon: const Icon(Icons.search, size: 18),
                 hintText: 'Search, e.g. occupation or 16',
-                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: AdminColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -1411,18 +1481,24 @@ class _GtsListColumnPickerState extends State<GtsListColumnPicker> {
         ),
       ),
       actions: [
-        Text(
-          '${_picked.length} selected',
-          style: const TextStyle(
-            fontSize: 12,
-            color: AdminReportsTheme.textMuted,
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Text(
+            '${_picked.length} selected',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AdminReportsTheme.textMuted,
+            ),
           ),
         ),
-        TextButton(
+        OutlinedButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: AdminButtonStyles.outlined(),
           child: const Text('Cancel'),
         ),
         FilledButton(
+          style: AdminButtonStyles.filled(),
           onPressed: () => Navigator.of(context).pop(_result()),
           child: const Text('Use these columns'),
         ),

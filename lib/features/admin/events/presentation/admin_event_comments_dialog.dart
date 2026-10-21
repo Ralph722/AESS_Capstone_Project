@@ -5,6 +5,7 @@ import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/models/event_comment_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/features/events/data/event_comment_service.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 // Admin Event Comments Dialog
 class AdminEventCommentsDialog extends StatefulWidget {
@@ -35,7 +36,7 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
   Widget _buildAvatar(
     EventComment comment, {
     double radius = 20,
-    Color background = const Color(0xFF090A4F),
+    Color background = AdminColors.primary,
     Color foreground = Colors.white,
   }) {
     final provider = AppImage.provider(comment.profileImageUrl);
@@ -204,7 +205,7 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
                   PopupMenuItem(
                     child: const Row(
                       children: [
-                        Icon(Icons.reply, size: 18, color: Color(0xFF090A4F)),
+                        Icon(Icons.reply, size: 18, color: AdminColors.primary),
                         SizedBox(width: 8),
                         Text('Reply'),
                       ],
@@ -294,7 +295,7 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: const Color(0xFF090A4F).withOpacity(0.2),
+                                    color: AdminColors.primary.withValues(alpha: 0.2),
                                   ),
                                 ),
                                 child: Row(
@@ -303,8 +304,8 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
                                     _buildAvatar(
                                       reply,
                                       radius: 16,
-                                      background: const Color(0xFFFFD700),
-                                      foreground: const Color(0xFF090A4F),
+                                      background: AdminColors.accent,
+                                      foreground: AdminColors.primary,
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -318,7 +319,7 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 13,
-                                                  color: Color(0xFF090A4F),
+                                                  color: AdminColors.primary,
                                                 ),
                                               ),
                                               const SizedBox(width: 6),
@@ -328,8 +329,8 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
                                                   vertical: 2,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFFFFD700)
-                                                      .withOpacity(0.2),
+                                                  color: AdminColors.accent
+                                                      .withValues(alpha: 0.2),
                                                   borderRadius:
                                                       BorderRadius.circular(4),
                                                 ),
@@ -338,7 +339,7 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
-                                                    color: Color(0xFF090A4F),
+                                                    color: AdminColors.primary,
                                                   ),
                                                 ),
                                               ),
@@ -401,10 +402,10 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
                           IconButton(
                             onPressed: () => _submitReply(comment),
                             icon: const Icon(Icons.send),
-                            color: const Color(0xFF090A4F),
+                            color: AdminColors.primary,
                             style: IconButton.styleFrom(
                               backgroundColor:
-                                  const Color(0xFF090A4F).withOpacity(0.1),
+                                  AdminColors.primary.withValues(alpha: 0.1),
                             ),
                           ),
                           IconButton(
@@ -434,7 +435,7 @@ class _AdminEventCommentsDialogState extends State<AdminEventCommentsDialog> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF090A4F),
+        color: AdminColors.primary,
         border: Border(
           bottom: BorderSide(color: Colors.grey.shade200),
         ),

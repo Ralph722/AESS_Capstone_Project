@@ -8,6 +8,7 @@ import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_search_field.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class AdminArchivesScreen extends StatefulWidget {
   const AdminArchivesScreen({super.key});
@@ -171,7 +172,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
-              color: Color(0xFF090A4F),
+              color: AdminColors.primary,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -262,7 +263,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
               Icon(
                 icon,
                 size: 18,
-                color: isSelected ? const Color(0xFF090A4F) : Colors.white70,
+                color: isSelected ? AdminColors.primary : Colors.white70,
               ),
               const SizedBox(width: 8),
               Text(
@@ -270,7 +271,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? const Color(0xFF090A4F) : Colors.white70,
+                  color: isSelected ? AdminColors.primary : Colors.white70,
                 ),
               ),
               const SizedBox(width: 8),
@@ -278,7 +279,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF090A4F).withOpacity(0.1)
+                      ? AdminColors.primary.withValues(alpha: 0.1)
                       : Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -287,7 +288,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? const Color(0xFF090A4F) : Colors.white,
+                    color: isSelected ? AdminColors.primary : Colors.white,
                   ),
                 ),
               ),
@@ -348,7 +349,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: hovered
-              ? const Color(0xFF090A4F).withValues(alpha: 0.25)
+              ? AdminColors.primary.withValues(alpha: 0.25)
               : Colors.grey.shade300,
           width: 1.5,
         ),
@@ -383,7 +384,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF090A4F),
+                          color: AdminColors.primary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -577,7 +578,7 @@ class _AdminArchivesScreenState extends State<AdminArchivesScreen> {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF090A4F),
+                          color: AdminColors.primary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

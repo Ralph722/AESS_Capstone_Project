@@ -42,7 +42,15 @@ class ReminderService {
     }
   }
 
+  /// Drops held local/FCM tap payloads (call on sign-out).
+  static void clearPendingTaps() {
+    _pendingTapRoute = null;
+    _pendingTapEventId = null;
+  }
+
   /// Channel used for pushed alerts; the server sends `channel_id` to match.
+  /// Distinct from on-device event RSVP reminders (`event_reminders`) so the
+  /// two sources do not share importance/settings and are easier to cancel.
   static const alertChannel = AndroidNotificationChannel(
     'aess_notifications',
     'Alumni notifications',
@@ -124,10 +132,16 @@ class ReminderService {
   }
 
   /// Schedules: 3 days before, 1 day before, and day-of (6 AM local).
+  ///
+  /// Local RSVP reminders use the `event_reminders` channel only. Server FCM
+  /// event alerts use [alertChannel] — cancel-before-schedule avoids stacking
+  /// duplicate local slots when the user re-RSVPs "going".
   Future<void> scheduleEventReminder(AlumniEvent event) async {
     if (!_supported) return;
     if (!_initialized) await initialize();
     if (!_initialized || AppSession.userId == null) return;
+
+    await cancelEventReminders(event.id);
 
     final eventDate = event.date.toLocal();
     final now = DateTime.now();

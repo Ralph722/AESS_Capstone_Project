@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// What the admin wants to export from a survey responses workspace.
 enum SurveyExportReportKind {
@@ -15,12 +16,7 @@ enum SurveyExportReportKind {
 }
 
 /// Output channel for a chosen report.
-enum SurveyExportFormat {
-  pdf,
-  excel,
-  csv,
-  print,
-}
+enum SurveyExportFormat { pdf, excel, csv, print }
 
 class SurveyExportChoice {
   const SurveyExportChoice({
@@ -131,12 +127,10 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
     _ReportSpec(
       kind: SurveyExportReportKind.responses,
       title: 'Submitted responses',
-      subtitle: 'A full list of everyone who already answered, with their answers',
+      subtitle:
+          'A full list of everyone who already answered, with their answers',
       icon: Icons.table_rows_outlined,
-      formats: const {
-        SurveyExportFormat.excel,
-        SurveyExportFormat.csv,
-      },
+      formats: const {SurveyExportFormat.excel, SurveyExportFormat.csv},
       formatHint: 'Choose Excel or CSV for spreadsheets.',
       details: _exportDetails(
         definition:
@@ -147,7 +141,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
           'When they submitted',
           'Each survey answer',
         ],
-        bestFor: 'Reviewing answers in Excel or sharing raw results with staff.',
+        bestFor:
+            'Reviewing answers in Excel or sharing raw results with staff.',
         limitation:
             'This is a data file, not a presentation. For meetings, use a summary report.',
       ),
@@ -172,7 +167,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
           'Results by course and batch',
           'Question summaries and short takeaways',
         ],
-        bestFor: 'Meetings, printouts, and quick status updates for the office.',
+        bestFor:
+            'Meetings, printouts, and quick status updates for the office.',
         limitation:
             'For tracer employment and related CHED questions, the “CHED outcomes '
             'summary” is clearer.',
@@ -190,7 +186,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
           SurveyExportFormat.csv,
           SurveyExportFormat.print,
         },
-        formatHint: 'PDF or Print works well for meetings; Excel or CSV for deeper review.',
+        formatHint:
+            'PDF or Print works well for meetings; Excel or CSV for deeper review.',
         details: _exportDetails(
           definition:
               'A short tracer report for this survey that answers the main CHED '
@@ -205,7 +202,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
             'Time to first job, starting pay, and curriculum help',
             'Reasons for further studies',
           ],
-          bestFor: 'School meetings, CHED reporting talks, and “what did this tracer find?”',
+          bestFor:
+              'School meetings, CHED reporting talks, and “what did this tracer find?”',
           limitation:
               'This covers the current survey only. To compare older and newer tracers, '
               'use Reports & Analytics → Downloads.',
@@ -214,7 +212,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
       _ReportSpec(
         kind: SurveyExportReportKind.ched,
         title: 'CHED GTS Excel pack',
-        subtitle: 'Detailed tracer workbook with personal, school, and job sheets',
+        subtitle:
+            'Detailed tracer workbook with personal, school, and job sheets',
         icon: Icons.verified_outlined,
         formats: const {SurveyExportFormat.excel},
         formatHint: 'Available as Excel only.',
@@ -228,7 +227,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
             'Employment information',
             'Survey answers arranged for office filing',
           ],
-          bestFor: 'Registrar handoff, archiving, and detailed CHED data review.',
+          bestFor:
+              'Registrar handoff, archiving, and detailed CHED data review.',
           limitation:
               'This is a workbook, not the official fillable PDF form. Use “Official '
               'fillable PDFs” if you need individual forms.',
@@ -237,7 +237,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
       _ReportSpec(
         kind: SurveyExportReportKind.chedFillable,
         title: 'Official fillable PDFs',
-        subtitle: 'One official CHED form per graduate who submitted, in a ZIP folder',
+        subtitle:
+            'One official CHED form per graduate who submitted, in a ZIP folder',
         icon: Icons.picture_as_pdf_outlined,
         formats: const {SurveyExportFormat.pdf},
         formatHint: 'Downloads a ZIP folder of filled PDF forms.',
@@ -250,7 +251,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
             'Answers taken from this survey',
             'Missing blanks may be completed from their profile when available',
           ],
-          bestFor: 'Printing, filing, or submitting individual official tracer forms.',
+          bestFor:
+              'Printing, filing, or submitting individual official tracer forms.',
           limitation:
               'Large groups are limited to 100 forms at a time. Export again for the '
               'next group if needed. Forms that cannot be filled are skipped.',
@@ -290,8 +292,8 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
 
   return showAdminDialogSurface<SurveyExportChoice>(
     context: context,
-    maxWidth: 460,
-    maxHeight: showCohortFilters ? 640 : 560,
+    maxWidth: 520,
+    maxHeight: showCohortFilters ? 760 : 680,
     child: _SurveyExportDialogBody(
       reports: reports,
       hasSubmitted: hasSubmitted,
@@ -462,292 +464,174 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
     final needsSubs = _reportNeedsSubmissions(_report);
     final blocked = needsSubs && !widget.hasSubmitted;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Download / export',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: AdminSurveyTheme.textPrimary,
-              letterSpacing: -0.2,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Pick what you need first, then choose how to save or print it.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: AdminSurveyTheme.textMuted,
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            '1. What do you need?',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AdminSurveyTheme.textSecondary,
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: widget.showCohortFilters ? 180 : 220,
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: widget.reports.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                final r = widget.reports[i];
-                final selected = r.kind == _report;
-                return Material(
-                  color: selected
-                      ? AdminSurveyTheme.primary.withValues(alpha: 0.06)
-                      : AdminSurveyTheme.surface,
-                  borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusMd),
-                  child: InkWell(
-                    borderRadius:
-                        BorderRadius.circular(AdminSurveyTheme.radiusMd),
-                    onTap: () {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Download / export',
+                  style: AdminText.sectionTitle.copyWith(fontSize: 17),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Pick what you need first, then choose how to save or print it.',
+                  style: AdminText.caption.copyWith(height: 1.4),
+                ),
+                const SizedBox(height: 18),
+                const Text('1. What do you need?', style: _stepStyle),
+                const SizedBox(height: 8),
+                for (var i = 0; i < widget.reports.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _ReportRow(
+                    report: widget.reports[i],
+                    selected: widget.reports[i].kind == _report,
+                    blockedReason:
+                        _reportNeedsSubmissions(widget.reports[i].kind) &&
+                            !widget.hasSubmitted
+                        ? 'Needs submitted responses'
+                        : null,
+                    onSelect: () {
+                      final r = widget.reports[i];
                       setState(() {
                         _report = r.kind;
-                        if (_format == null ||
-                            !r.formats.contains(_format)) {
+                        if (_format == null || !r.formats.contains(_format)) {
                           _format = _preferredFormat(r);
                         }
                       });
                     },
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: BoxDecoration(
-                        borderRadius:
-                            BorderRadius.circular(AdminSurveyTheme.radiusMd),
-                        border: Border.all(
-                          color: selected
-                              ? AdminSurveyTheme.primary
-                              : AdminSurveyTheme.border,
-                          width: selected ? 1.5 : 1,
-                        ),
+                    onDetails: () => _showReportDetails(widget.reports[i]),
+                  ),
+                ],
+                if (widget.showCohortFilters) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    '2. Limit by batch or course (optional)',
+                    style: _stepStyle,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Optional — leave as All to include everyone.',
+                    style: AdminText.caption.copyWith(height: 1.35),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AdminSurveyTheme.surface,
+                      borderRadius: BorderRadius.circular(
+                        AdminSurveyTheme.radiusMd,
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? AdminSurveyTheme.primary
-                                      .withValues(alpha: 0.1)
-                                  : AdminSurveyTheme.surface,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              r.icon,
-                              size: 18,
-                              color: selected
-                                  ? AdminSurveyTheme.primary
-                                  : AdminSurveyTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  r.title,
-                                  style: TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: selected
-                                        ? AdminSurveyTheme.primary
-                                        : AdminSurveyTheme.textPrimary,
+                      border: Border.all(color: AdminSurveyTheme.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: DirectoryFilterField<String?>(
+                            label: 'Batch',
+                            value: _batchYear,
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('All batches'),
+                              ),
+                              for (final item in widget.batchOptions)
+                                DropdownMenuItem<String?>(
+                                  value: item,
+                                  child: Text(
+                                    item,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  r.subtitle,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    height: 1.3,
-                                    color: AdminSurveyTheme.textMuted,
+                            ],
+                            onChanged: (v) => setState(() => _batchYear = v),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DirectoryFilterField<String?>(
+                            label: 'Course',
+                            value: _course,
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('All courses'),
+                              ),
+                              for (final item in widget.courseOptions)
+                                DropdownMenuItem<String?>(
+                                  value: item,
+                                  child: Text(
+                                    item,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                              ],
-                            ),
+                            ],
+                            onChanged: (v) => setState(() => _course = v),
                           ),
-                          if (!selected)
-                            IconButton(
-                              tooltip: 'Details',
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
-                              icon: const Icon(
-                                Icons.info_outline,
-                                size: 18,
-                                color: AdminSurveyTheme.textMuted,
-                              ),
-                              onPressed: () => _showReportDetails(r),
-                            )
-                          else
-                            const Icon(
-                              Icons.check_circle,
-                              size: 18,
-                              color: AdminSurveyTheme.primary,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          if (widget.showCohortFilters) ...[
-            const SizedBox(height: 16),
-            const Text(
-              '2. Limit by batch or course (optional)',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AdminSurveyTheme.textSecondary,
-                letterSpacing: 0.2,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Optional — leave as All to include everyone.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                color: AdminSurveyTheme.textMuted,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AdminSurveyTheme.surface,
-                borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusMd),
-                border: Border.all(color: AdminSurveyTheme.border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: DirectoryFilterField<String?>(
-                      label: 'Batch',
-                      value: _batchYear,
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('All batches'),
                         ),
-                        for (final item in widget.batchOptions)
-                          DropdownMenuItem<String?>(
-                            value: item,
-                            child: Text(
-                              item,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
                       ],
-                      onChanged: (v) => setState(() => _batchYear = v),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: DirectoryFilterField<String?>(
-                      label: 'Course',
-                      value: _course,
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('All courses'),
-                        ),
-                        for (final item in widget.courseOptions)
-                          DropdownMenuItem<String?>(
-                            value: item,
-                            child: Text(
-                              item,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                      onChanged: (v) => setState(() => _course = v),
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Text(
-            widget.showCohortFilters
-                ? '3. How do you want it?'
-                : '2. How do you want it?',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AdminSurveyTheme.textSecondary,
-              letterSpacing: 0.2,
-            ),
-          ),
-          if (spec.formatHint != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              spec.formatHint!,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AdminSurveyTheme.textMuted,
-              ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final f in SurveyExportFormat.values)
-                _FormatChip(
-                  label: _report == SurveyExportReportKind.chedFillable &&
-                          f == SurveyExportFormat.pdf
-                      ? 'ZIP'
-                      : _formatLabel(f),
-                  icon: _report == SurveyExportReportKind.chedFillable &&
-                          f == SurveyExportFormat.pdf
-                      ? Icons.folder_zip_outlined
-                      : _formatIcon(f),
-                  selected: _format == f,
-                  enabled: spec.formats.contains(f) && !blocked,
-                  onTap: () => setState(() => _format = f),
+                const SizedBox(height: 16),
+                Text(
+                  widget.showCohortFilters
+                      ? '3. How do you want it?'
+                      : '2. How do you want it?',
+                  style: _stepStyle,
                 ),
-            ],
-          ),
-          if (blocked) ...[
-            const SizedBox(height: 10),
-            const Text(
-              'No submitted responses yet for this report.',
-              style: TextStyle(
-                fontSize: 12.5,
-                color: AdminSurveyTheme.warning,
-              ),
+                if (spec.formatHint != null) ...[
+                  const SizedBox(height: 4),
+                  Text(spec.formatHint!, style: AdminText.caption),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final f in SurveyExportFormat.values)
+                      _FormatChip(
+                        label:
+                            _report == SurveyExportReportKind.chedFillable &&
+                                f == SurveyExportFormat.pdf
+                            ? 'ZIP'
+                            : _formatLabel(f),
+                        icon:
+                            _report == SurveyExportReportKind.chedFillable &&
+                                f == SurveyExportFormat.pdf
+                            ? Icons.folder_zip_outlined
+                            : _formatIcon(f),
+                        selected: _format == f,
+                        enabled: spec.formats.contains(f) && !blocked,
+                        onTap: () => setState(() => _format = f),
+                      ),
+                  ],
+                ),
+                if (blocked) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'This report needs at least one submitted response.',
+                    style: AdminText.caption.copyWith(
+                      color: AdminColors.warning,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-          const SizedBox(height: 18),
-          Row(
+          ),
+        ),
+        const Divider(height: 1, color: AdminColors.border),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+          child: Row(
             children: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -779,9 +663,7 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
                   size: 18,
                 ),
                 label: Text(
-                  _format == SurveyExportFormat.print
-                      ? 'Print'
-                      : 'Download',
+                  _format == SurveyExportFormat.print ? 'Print' : 'Download',
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AdminSurveyTheme.primary,
@@ -789,7 +671,150 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
               ),
             ],
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+const _stepStyle = TextStyle(
+  fontSize: 12,
+  fontWeight: FontWeight.w700,
+  letterSpacing: 0.2,
+  color: AdminColors.textSecondary,
+);
+
+class _ReportRow extends StatelessWidget {
+  const _ReportRow({
+    required this.report,
+    required this.selected,
+    required this.blockedReason,
+    required this.onSelect,
+    required this.onDetails,
+  });
+
+  final _ReportSpec report;
+  final bool selected;
+
+  /// Shown inside the row when the report can't be downloaded yet.
+  final String? blockedReason;
+  final VoidCallback onSelect;
+  final VoidCallback onDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AdminSurfaces.radiusMd);
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected
+            ? AdminColors.primary.withValues(alpha: 0.06)
+            : AdminColors.surface,
+        borderRadius: radius,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onSelect,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(
+                color: selected ? AdminColors.primary : AdminColors.border,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AdminColors.primary.withValues(alpha: 0.1)
+                        : AdminColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    report.icon,
+                    size: 18,
+                    color: selected
+                        ? AdminColors.primary
+                        : AdminColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        report.title,
+                        style: AdminText.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: selected
+                              ? AdminColors.primary
+                              : AdminColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        report.subtitle,
+                        style: AdminText.caption.copyWith(height: 1.3),
+                      ),
+                      if (blockedReason != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              size: 13,
+                              color: AdminColors.warning,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                blockedReason!,
+                                style: AdminText.caption.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AdminColors.warning,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (selected)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 6),
+                    child: Icon(
+                      Icons.check_circle,
+                      size: 18,
+                      color: AdminColors.primary,
+                    ),
+                  ),
+                IconButton(
+                  tooltip: 'Details',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  icon: const Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: AdminColors.textSecondary,
+                  ),
+                  onPressed: onDetails,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -815,13 +840,13 @@ class _FormatChip extends StatelessWidget {
     final fg = !enabled
         ? AdminSurveyTheme.textMuted.withValues(alpha: 0.45)
         : selected
-            ? AdminSurveyTheme.primary
-            : AdminSurveyTheme.textSecondary;
+        ? AdminSurveyTheme.primary
+        : AdminSurveyTheme.textSecondary;
     final bg = !enabled
         ? AdminSurveyTheme.surface
         : selected
-            ? AdminSurveyTheme.primary.withValues(alpha: 0.08)
-            : AdminSurveyTheme.card;
+        ? AdminSurveyTheme.primary.withValues(alpha: 0.08)
+        : AdminSurveyTheme.card;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(999),
@@ -895,20 +920,14 @@ class _ExportDetailsPanel extends StatelessWidget {
                   children: [
                     Text(
                       report.title,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AdminSurveyTheme.textPrimary,
-                        letterSpacing: -0.2,
-                      ),
+                      style: AdminText.sectionTitle.copyWith(fontSize: 17),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       report.subtitle,
-                      style: const TextStyle(
-                        fontSize: 13,
+                      style: AdminText.body.copyWith(
                         height: 1.35,
-                        color: AdminSurveyTheme.textMuted,
+                        color: AdminColors.textSecondary,
                       ),
                     ),
                   ],
@@ -965,52 +984,46 @@ class _ExportDetailCard extends StatelessWidget {
               children: [
                 Text(
                   section.label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: AdminSurveyTheme.primary,
-                    letterSpacing: 0.1,
+                  style: AdminText.caption.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AdminColors.primary,
                   ),
                 ),
                 const SizedBox(height: 4),
-                if (bullets != null && bullets.isNotEmpty)
-                  ...[
-                    for (final item in bullets)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 6),
-                              child: Icon(
-                                Icons.circle,
-                                size: 5,
-                                color: AdminSurveyTheme.textMuted,
+                if (bullets != null && bullets.isNotEmpty) ...[
+                  for (final item in bullets)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6),
+                            child: Icon(
+                              Icons.circle,
+                              size: 5,
+                              color: AdminSurveyTheme.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item,
+                              style: AdminText.body.copyWith(
+                                height: 1.4,
+                                color: AdminColors.textSecondary,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                item,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  height: 1.4,
-                                  color: AdminSurveyTheme.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                  ]
-                else if (section.body.isNotEmpty)
+                    ),
+                ] else if (section.body.isNotEmpty)
                   Text(
                     section.body,
-                    style: const TextStyle(
-                      fontSize: 13.5,
+                    style: AdminText.body.copyWith(
                       height: 1.45,
-                      color: AdminSurveyTheme.textSecondary,
+                      color: AdminColors.textSecondary,
                     ),
                   ),
               ],

@@ -5,8 +5,10 @@ import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// DSS admin chrome — aliases Alumni Directory tokens (same as Surveys).
 abstract final class AdminDssTheme {
@@ -36,26 +38,10 @@ abstract final class AdminDssTheme {
   static const radiusMd = AdminDirectoryTheme.radiusMd;
 }
 
-ButtonStyle dssOutlinedButtonStyle() => OutlinedButton.styleFrom(
-  foregroundColor: AdminDssTheme.textPrimary,
-  side: const BorderSide(color: AdminDssTheme.border),
-  minimumSize: const Size(0, AdminDssTheme.buttonHeight),
-  padding: const EdgeInsets.symmetric(horizontal: 14),
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-  ),
-);
+ButtonStyle dssOutlinedButtonStyle() => AdminButtonStyles.outlined();
 
-ButtonStyle dssFilledButtonStyle({Color? background}) => FilledButton.styleFrom(
-  backgroundColor: background ?? AdminDssTheme.primary,
-  foregroundColor: Colors.white,
-  minimumSize: const Size(0, AdminDssTheme.buttonHeight),
-  padding: const EdgeInsets.symmetric(horizontal: 16),
-  elevation: 0,
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-  ),
-);
+ButtonStyle dssFilledButtonStyle({Color? background}) =>
+    AdminButtonStyles.filled(background: background);
 
 Color dssStatusColor(DssFlagStatus status) => switch (status) {
   DssFlagStatus.open => AdminDssTheme.danger,
@@ -93,6 +79,9 @@ class DssPageHeader extends StatelessWidget {
     this.actions = const [],
     this.onBack,
     this.backTooltip = 'Back',
+    this.selectedSubnav,
+    this.onSubnavSelected,
+    this.trailingSubnav,
   });
 
   final String title;
@@ -100,26 +89,152 @@ class DssPageHeader extends StatelessWidget {
   final List<Widget> actions;
   final VoidCallback? onBack;
   final String backTooltip;
+  final int? selectedSubnav;
+  final ValueChanged<int>? onSubnavSelected;
+  final Widget? trailingSubnav;
 
   @override
   Widget build(BuildContext context) {
-    return AdminPageHeader(
-      title: title,
-      subtitle: subtitle,
-      titleFontSize: AdminDensity.titleFontSize,
-      titleColor: AdminDssTheme.textPrimary,
-      subtitleColor: AdminDssTheme.textSecondary,
-      leading: onBack == null
-          ? null
-          : IconButton(
-              tooltip: backTooltip,
-              onPressed: onBack,
-              style: AdminDensity.iconButtonStyle(
-                foregroundColor: AdminDssTheme.textSecondary,
-              ),
-              icon: const Icon(Icons.arrow_back, size: 20),
+    final hasTabs = selectedSubnav != null && onSubnavSelected != null;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AdminColors.border),
+        boxShadow: AdminSurfaces.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
             ),
-      actions: actions,
+            child: Row(
+              children: [
+                if (onBack != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: IconButton(
+                      tooltip: backTooltip,
+                      onPressed: onBack,
+                      style: IconButton.styleFrom(
+                        backgroundColor: AdminColors.surface,
+                        foregroundColor: AdminColors.textPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: const BorderSide(color: AdminColors.border),
+                        ),
+                        minimumSize: const Size(36, 36),
+                      ),
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AdminColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AdminColors.primary.withValues(alpha: 0.16),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.insights_rounded,
+                        size: 20,
+                        color: AdminColors.primary,
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: AdminDensity.titleFontSize,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: AdminColors.textPrimary,
+                        ),
+                      ),
+                      if (subtitle != null && subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AdminDensity.subtitleFontSize,
+                            color: AdminColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(width: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.end,
+                    children: actions,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (hasTabs) ...[
+            const Divider(height: 1, thickness: 1, color: AdminColors.border),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AdminTabBar(
+                      selectedIndex: selectedSubnav!.clamp(0, 2),
+                      onSelected: onSubnavSelected!,
+                      isScrollable: true,
+                      background: Colors.transparent,
+                      tabs: const [
+                        AdminTabSpec(
+                          label: 'Findings',
+                          icon: Icons.flag_outlined,
+                        ),
+                        AdminTabSpec(
+                          label: 'History',
+                          icon: Icons.timeline,
+                        ),
+                        AdminTabSpec(
+                          label: 'Rules',
+                          icon: Icons.tune,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (trailingSubnav != null) ...[
+                    const SizedBox(width: 8),
+                    trailingSubnav!,
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -136,8 +251,7 @@ class DssStatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         status.label,
@@ -346,13 +460,21 @@ class DssFlagListCard extends StatefulWidget {
 class _DssFlagListCardState extends State<DssFlagListCard> {
   bool _hovered = false;
 
+  static String _nextAction(DssFlag flag) => switch (flag.status) {
+    DssFlagStatus.open => 'Start',
+    DssFlagStatus.inProgress => 'Continue',
+    DssFlagStatus.watch => 'Monitor',
+    DssFlagStatus.resolved => 'Review',
+    DssFlagStatus.dismissed => 'Reopen',
+    DssFlagStatus.superseded => 'History',
+  };
+
   @override
   Widget build(BuildContext context) {
     final flag = widget.flag;
-    final severity = flag.severity ?? DssSeverity.warning;
-    final sevColor = dssSeverityColor(severity);
     final title = DssCopy.displayTitle(flag);
     final why = DssCopy.whyFlagged(flag);
+    final next = _nextAction(flag);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AdminDensity.listItemGap),
@@ -382,65 +504,115 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
                       ? AdminDirectoryTheme.cardShadowHover
                       : AdminDirectoryTheme.cardShadow,
                 ),
-                child: IntrinsicHeight(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(width: 4, color: sevColor),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: AdminDssTheme.textPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${flag.cohortLabel} · ${flag.status.label} · ${DssCopy.responsesLabel(flag)}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AdminDssTheme.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              DssDueChip(flag: flag),
-                              const SizedBox(width: 8),
-                              DssPriorityChip(flag: flag),
-                              if (flag.evidenceStrength != null &&
-                                  flag.evidenceStrength !=
-                                      DssEvidenceStrength.strong) ...[
-                                const SizedBox(width: 8),
-                                DssEvidenceChip(flag: flag),
-                              ],
-                              if (flag.certainty != null && flag.isFinding) ...[
-                                const SizedBox(width: 8),
-                                DssCertaintyChip(flag: flag),
-                              ],
-                              const Icon(
-                                Icons.chevron_right,
-                                color: AdminDssTheme.textMuted,
-                                size: 20,
-                              ),
-                            ],
-                          ),
+                      Container(
+                        width: 36,
+                        height: 36,
+                        margin: const EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(
+                          color: AdminColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AdminColors.border),
                         ),
+                        child: Icon(
+                          dssRuleIcon(flag.ruleId),
+                          size: 18,
+                          color: AdminColors.primary,
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: AdminDssTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              why,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                color: AdminDssTheme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AdminColors.surface,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: AdminColors.border),
+                                  ),
+                                  child: Text(
+                                    flag.cohortLabel,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AdminColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                DssStatusChip(status: flag.status),
+                                Text(
+                                  '· ${DssCopy.responsesLabel(flag)}',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: AdminDssTheme.textMuted,
+                                  ),
+                                ),
+                                Text(
+                                  '· Next: $next',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: AdminColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      DssDueChip(flag: flag),
+                      const SizedBox(width: 6),
+                      DssPriorityChip(flag: flag),
+                      if (flag.evidenceStrength != null &&
+                          flag.evidenceStrength !=
+                              DssEvidenceStrength.strong) ...[
+                        const SizedBox(width: 6),
+                        DssEvidenceChip(flag: flag),
+                      ],
+                      if (flag.certainty != null && flag.isFinding) ...[
+                        const SizedBox(width: 6),
+                        DssCertaintyChip(flag: flag),
+                      ],
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: AdminDssTheme.textMuted,
+                        size: 20,
                       ),
                     ],
                   ),
@@ -454,16 +626,220 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
   }
 }
 
+/// Derived workflow stage for a finding (display only).
+enum DssWorkflowStage { detected, inProgress, resolved, outcome }
+
+extension DssWorkflowStageX on DssWorkflowStage {
+  String get label => switch (this) {
+    DssWorkflowStage.detected => 'Detected',
+    DssWorkflowStage.inProgress => 'In progress',
+    DssWorkflowStage.resolved => 'Resolved',
+    DssWorkflowStage.outcome => 'Outcome',
+  };
+}
+
+/// Stage strip: Detected → In progress → Resolved → Outcome.
+class DssStageStrip extends StatelessWidget {
+  const DssStageStrip({
+    super.key,
+    required this.flag,
+    this.hasUndecidedIntervention = false,
+    this.outcomeReady = false,
+  });
+
+  final DssFlag flag;
+  final bool hasUndecidedIntervention;
+  final bool outcomeReady;
+
+  static DssWorkflowStage stageOf(
+    DssFlag flag, {
+    required bool hasUndecidedIntervention,
+    required bool outcomeReady,
+  }) {
+    if (flag.status == DssFlagStatus.watch) {
+      return DssWorkflowStage.detected;
+    }
+    if (flag.status == DssFlagStatus.superseded) {
+      return DssWorkflowStage.resolved;
+    }
+    if (flag.status == DssFlagStatus.dismissed) {
+      return DssWorkflowStage.resolved;
+    }
+    if (flag.status == DssFlagStatus.open) {
+      return DssWorkflowStage.detected;
+    }
+    if (flag.status == DssFlagStatus.inProgress) {
+      return DssWorkflowStage.inProgress;
+    }
+    // Resolved (or closed with intervention follow-up).
+    if (outcomeReady ||
+        (hasUndecidedIntervention && flag.status == DssFlagStatus.resolved)) {
+      return DssWorkflowStage.outcome;
+    }
+    if (flag.status == DssFlagStatus.resolved) {
+      return hasUndecidedIntervention
+          ? DssWorkflowStage.outcome
+          : DssWorkflowStage.resolved;
+    }
+    return DssWorkflowStage.resolved;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = stageOf(
+      flag,
+      hasUndecidedIntervention: hasUndecidedIntervention,
+      outcomeReady: outcomeReady,
+    );
+    final stages = DssWorkflowStage.values;
+    final currentIndex = stages.indexOf(current);
+    String hint = switch (flag.status) {
+      DssFlagStatus.watch => 'Watch — wait for more answers, or dismiss.',
+      DssFlagStatus.superseded => 'Superseded — read-only.',
+      DssFlagStatus.open => 'Next: Start',
+      DssFlagStatus.inProgress => 'Next: act, add Proof, Resolve finding',
+      DssFlagStatus.resolved =>
+        hasUndecidedIntervention || outcomeReady
+            ? 'Next: check outcome and decide'
+            : 'Closed — awaiting next wave',
+      DssFlagStatus.dismissed => 'Dismissed — Reopen if needed',
+    };
+
+    return DssSurfaceCard(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              for (var i = 0; i < stages.length; i++) ...[
+                if (i > 0)
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      color: i <= currentIndex
+                          ? AdminDssTheme.primary.withValues(alpha: 0.45)
+                          : AdminDssTheme.border,
+                    ),
+                  ),
+                _StageDot(
+                  label: stages[i].label,
+                  active: i == currentIndex,
+                  done: i < currentIndex,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hint,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: AdminDssTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StageDot extends StatelessWidget {
+  const _StageDot({
+    required this.label,
+    required this.active,
+    required this.done,
+  });
+
+  final String label;
+  final bool active;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active || done
+        ? AdminDssTheme.primary
+        : AdminDssTheme.textMuted;
+    return Column(
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: active
+                ? AdminDssTheme.primary
+                : done
+                ? AdminDssTheme.primary.withValues(alpha: 0.2)
+                : AdminDssTheme.surface,
+            border: Border.all(color: color, width: active ? 0 : 1.5),
+          ),
+          child: Icon(
+            done && !active ? Icons.check : Icons.circle,
+            size: done && !active ? 12 : 8,
+            color: active
+                ? Colors.white
+                : done
+                ? AdminDssTheme.primary
+                : AdminDssTheme.textMuted,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Module sub-navigation: Findings | History | Rules.
+class DssModuleSubnav extends StatelessWidget {
+  const DssModuleSubnav({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  /// 0 = Findings, 1 = History, 2 = Rules.
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AdminTabBar(
+      selectedIndex: selectedIndex.clamp(0, 2),
+      onSelected: onSelected,
+      isScrollable: true,
+      background: Colors.transparent,
+      tabs: const [
+        AdminTabSpec(label: 'Findings', icon: Icons.flag_outlined),
+        AdminTabSpec(label: 'History', icon: Icons.timeline),
+        AdminTabSpec(label: 'Rules', icon: Icons.tune),
+      ],
+    );
+  }
+}
+
 class DssInsightBanner extends StatelessWidget {
   const DssInsightBanner({
     super.key,
     required this.text,
     this.onDismiss,
+    this.trailing,
     this.icon = Icons.auto_awesome,
   });
 
   final String text;
   final VoidCallback? onDismiss;
+  final Widget? trailing;
   final IconData icon;
 
   @override
@@ -486,6 +862,7 @@ class DssInsightBanner extends StatelessWidget {
               ),
             ),
           ),
+          if (trailing != null) trailing!,
           if (onDismiss != null)
             IconButton(
               tooltip: 'Dismiss',

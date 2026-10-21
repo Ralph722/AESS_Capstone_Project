@@ -39,6 +39,29 @@ abstract final class AdminDensity {
   /// Content width for dashboard dual-pane / table layouts.
   static const double desktopSplitMin = 900;
 
+  /// Phone / very narrow admin windows — prefer drawer nav and stacked chrome.
+  /// Aligned with [kAdminSurfaceBreakpoint] in `admin_surface.dart`.
+  static const double phoneMax = 700;
+
+  /// Tablet band upper bound (mini-rail / compact header).
+  static const double tabletMax = 1100;
+
+  /// Whether [width] is a phone-sized admin viewport.
+  static bool isPhoneWidth(double width) => width < phoneMax;
+
+  /// Whether [width] is tablet-sized (between phone and full desktop chrome).
+  static bool isTabletWidth(double width) =>
+      width >= phoneMax && width < tabletMax;
+
+  /// Whether [width] is wide enough for the persistent expanded sidebar.
+  static bool isDesktopWidth(double width) => width >= tabletMax;
+
+  /// Auto-collapse the admin sidebar into a mini-rail below this width.
+  static bool autoCollapseSidebar(double width) => width < tabletMax;
+
+  /// Prefer drawer navigation instead of a persistent sidebar.
+  static bool useDrawerNavigation(double width) => isPhoneWidth(width);
+
   // —— Controls ——
   /// Primary / toolbar button min height (WCAG 2.2 AA pointer target floor
   /// for densified desktop chrome; denser than Material's default 48).

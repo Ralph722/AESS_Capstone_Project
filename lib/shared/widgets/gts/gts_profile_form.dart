@@ -4,6 +4,7 @@ import 'package:alumni_system/core/constants/course_constants.dart';
 import 'package:alumni_system/core/constants/gts_constants.dart';
 import 'package:alumni_system/core/constants/philippine_location_constants.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
+import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
 import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -14,6 +15,7 @@ class GtsProfileFormState {
     displayNameController = TextEditingController();
     addressController = TextEditingController();
     emailController = TextEditingController();
+    contactEmailController = TextEditingController();
     telephoneController = TextEditingController();
     mobileController = TextEditingController();
     provinceController = TextEditingController();
@@ -27,6 +29,10 @@ class GtsProfileFormState {
   late final TextEditingController displayNameController;
   late final TextEditingController addressController;
   late final TextEditingController emailController;
+
+  /// Contact email (separate from the login email); only shown when
+  /// [GtsProfileFormFields.showContactEmail] is on.
+  late final TextEditingController contactEmailController;
   late final TextEditingController telephoneController;
   late final TextEditingController mobileController;
   late final TextEditingController provinceController;
@@ -46,10 +52,37 @@ class GtsProfileFormState {
   /// Once a graduation year is on file only the alumni office can change it.
   bool yearLocked = false;
 
+  /// Name as loaded from the verified record. Name is read-only in this
+  /// form; only the Tracer marriage flow may change it (server RPC).
+  String savedDisplayName = '';
+
+  /// Contacts as saved when the profile was loaded.
+  String savedContactEmail = '';
+  String savedMobile = '';
+
+  String savedContact(ContactChannel channel) => switch (channel) {
+    ContactChannel.email => savedContactEmail,
+    ContactChannel.mobile => savedMobile,
+  };
+
+  String currentContact(ContactChannel channel) => switch (channel) {
+    ContactChannel.email => contactEmailController.text.trim(),
+    ContactChannel.mobile => mobileController.text.trim(),
+  };
+
+  /// Whether [channel] was edited away from the saved value (formatting
+  /// alone does not count; a cleared field is caught by validation).
+  bool contactChanged(ContactChannel channel) {
+    final now = currentContact(channel);
+    return now.isNotEmpty &&
+        !ContactNormalizer.same(channel, now, savedContact(channel));
+  }
+
   void dispose() {
     displayNameController.dispose();
     addressController.dispose();
     emailController.dispose();
+    contactEmailController.dispose();
     telephoneController.dispose();
     mobileController.dispose();
     provinceController.dispose();
@@ -60,10 +93,14 @@ class GtsProfileFormState {
 
   void applyFromProfile(TracerProfile profile) {
     displayNameController.text = profile.displayName;
+    savedDisplayName = profile.displayName.trim();
     addressController.text = profile.address;
     emailController.text = profile.email;
+    contactEmailController.text = profile.preferredEmail;
+    savedContactEmail = profile.preferredEmail;
     telephoneController.text = profile.telephoneNumber;
     mobileController.text = profile.mobileNumber;
+    savedMobile = profile.mobileNumber;
     provinceController.text = profile.province;
     collegeController.text = profile.collegeUniversity.isNotEmpty
         ? profile.collegeUniversity
@@ -116,7 +153,10 @@ class GtsProfileFormState {
     return TracerProfile(
       uid: uid,
       email: resolvedEmail,
-      displayName: displayNameController.text.trim(),
+      // Never persist a form-edited name; renames go through the RPC.
+      displayName: savedDisplayName.isNotEmpty
+          ? savedDisplayName
+          : displayNameController.text.trim(),
       studentId: studentId,
       program: program,
       batchYear: yearGraduatedController.text.trim(),
@@ -201,11 +241,22 @@ class GtsProfileFormFields extends StatelessWidget {
     this.enabled = true,
     this.chedStyleLabels = true,
     this.section,
+    this.showContactEmail = false,
+    this.contactFooter,
   });
 
   final GtsProfileFormState state;
   final VoidCallback onChanged;
   final bool emailReadOnly;
+
+  /// Full-form mode: the email field becomes "Login email" and an editable
+  /// contact email follows it. A changed contact email or mobile number must
+  /// be valid so it can be verified.
+  final bool showContactEmail;
+
+  /// Full-form mode: shown under the contact email and mobile fields
+  /// (verification status).
+  final Widget? Function(ContactChannel channel)? contactFooter;
   final bool showEmploymentStatus;
   final bool enabled;
 
@@ -301,9 +352,14 @@ class GtsProfileFormFields extends StatelessWidget {
           children: [
             _nameField(),
             _addressField(),
-            _emailField(),
+            if (showContactEmail) ...[
+              _contactEmailField(),
+              ?contactFooter?.call(ContactChannel.email),
+            ] else
+              _emailField(),
             _telephoneField(),
             _mobileField(),
+            ?contactFooter?.call(ContactChannel.mobile),
             _civilStatusField(),
             _sexField(),
             _birthdayField(context),
@@ -343,7 +399,11 @@ class GtsProfileFormFields extends StatelessWidget {
     controller: state.displayNameController,
     label: _req(GtsConstants.labelName),
     icon: Icons.person_outline,
-    helperText: _recordHint('displayName'),
+    // Locked once a verified name is on file (empty record can still fill it).
+    readOnly: state.savedDisplayName.isNotEmpty,
+    helperText: state.savedDisplayName.isNotEmpty
+        ? 'Verified at registration'
+        : _recordHint('displayName'),
   );
 
   Widget _addressField() => _text(
@@ -356,12 +416,38 @@ class GtsProfileFormFields extends StatelessWidget {
 
   Widget _emailField() => _text(
     controller: state.emailController,
-    label: _req(GtsConstants.labelEmail),
-    icon: Icons.email_outlined,
+    label: showContactEmail ? 'Login email' : _req(GtsConstants.labelEmail),
+    icon: showContactEmail ? Icons.lock_outline : Icons.email_outlined,
     readOnly: emailReadOnly,
-    helperText: emailReadOnly ? 'From your account' : null,
+    helperText: showContactEmail
+        ? 'Used to sign in'
+        : emailReadOnly
+        ? 'From your account'
+        : null,
     keyboard: TextInputType.emailAddress,
   );
+
+  Widget _contactEmailField() => _text(
+    controller: state.contactEmailController,
+    label: _req(GtsConstants.labelEmail),
+    icon: Icons.email_outlined,
+    keyboard: TextInputType.emailAddress,
+    helperText:
+        'This is also how you sign in. Changing it needs a one-time code.',
+    validator: (v) => _contactError(ContactChannel.email, v),
+  );
+
+  /// Required; a changed value must be one that can be verified.
+  String? _contactError(ContactChannel channel, String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return 'Required';
+    if (showContactEmail &&
+        state.contactChanged(channel) &&
+        ContactNormalizer.normalize(channel, v) == null) {
+      return ContactNormalizer.invalidMessage(channel);
+    }
+    return null;
+  }
 
   Widget _telephoneField() => _text(
     controller: state.telephoneController,
@@ -377,6 +463,7 @@ class GtsProfileFormFields extends StatelessWidget {
     icon: Icons.smartphone_outlined,
     keyboard: TextInputType.phone,
     helperText: _recordHint('mobileNumber'),
+    validator: (v) => _contactError(ContactChannel.mobile, v),
   );
 
   Widget _civilStatusField() => _dropdown(
@@ -740,6 +827,7 @@ class GtsProfileFormFields extends StatelessWidget {
     String? helperText,
     bool readOnly = false,
     bool required = true,
+    FormFieldValidator<String>? validator,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
@@ -751,9 +839,11 @@ class GtsProfileFormFields extends StatelessWidget {
         readOnly: readOnly,
         enabled: enabled,
         style: _fieldStyle,
-        validator: required
-            ? (v) => v == null || v.trim().isEmpty ? 'Required' : null
-            : null,
+        validator:
+            validator ??
+            (required
+                ? (v) => v == null || v.trim().isEmpty ? 'Required' : null
+                : null),
         decoration: onboardingFieldDecoration(
           label: label,
           hint: hint,

@@ -8,24 +8,25 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Visual tokens for admin tables (aligned with directory/survey navy).
 abstract final class AdminTableTheme {
-  static const Color primary = Color(0xFF1A1851);
-  static const Color headerBg = Color(0xFFF8FAFC);
-  static const Color rowBg = Colors.white;
-  static const Color rowHover = Color(0xFFF1F5F9);
-  static const Color rowSelected = Color(0xFFE8E7F2);
-  static const Color border = Color(0xFFE5E7EB);
-  static const Color textPrimary = Color(0xFF0F172A);
-  static const Color textSecondary = Color(0xFF64748B);
-  static const Color textMuted = Color(0xFF94A3B8);
-  static const Color success = Color(0xFF16A34A);
-  static const Color successBg = Color(0xFFDCFCE7);
-  static const Color danger = Color(0xFFDC2626);
-  static const Color dangerBg = Color(0xFFFEE2E2);
-  static const Color warning = Color(0xFFEA580C);
-  static const Color warningBg = Color(0xFFFFF7ED);
+  static const Color primary = AdminColors.primary;
+  static const Color headerBg = AdminColors.background;
+  static const Color rowBg = AdminColors.card;
+  static const Color rowHover = AdminColors.rowHover;
+  static const Color rowSelected = AdminColors.primaryTint;
+  static const Color border = AdminColors.border;
+  static const Color textPrimary = AdminColors.textPrimary;
+  static const Color textSecondary = AdminColors.textSecondary;
+  static const Color textMuted = AdminColors.textMuted;
+  static const Color success = AdminColors.success;
+  static const Color successBg = AdminColors.successBg;
+  static const Color danger = AdminColors.danger;
+  static const Color dangerBg = AdminColors.dangerBg;
+  static const Color warning = AdminColors.warning;
+  static const Color warningBg = AdminColors.warningBg;
 
   static const double headerHeight = AdminDensity.tableHeaderHeight;
   static const double rowMinHeight = AdminDensity.tableRowMinHeight;
@@ -80,9 +81,7 @@ class AdminDataHeader extends StatelessWidget {
           vertical: 6,
         ),
         decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AdminTableTheme.border),
-          ),
+          border: Border(bottom: BorderSide(color: AdminTableTheme.border)),
         ),
         child: Row(
           children: [
@@ -141,8 +140,8 @@ class _AdminDataRowState extends State<AdminDataRow> {
     final bg = widget.selected
         ? AdminTableTheme.rowSelected
         : _hovered
-            ? AdminTableTheme.rowHover
-            : AdminTableTheme.rowBg;
+        ? AdminTableTheme.rowHover
+        : AdminTableTheme.rowBg;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -169,9 +168,7 @@ class _AdminDataRowState extends State<AdminDataRow> {
               vertical: 6,
             ),
             decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: AdminTableTheme.border),
-              ),
+              border: Border(bottom: BorderSide(color: AdminTableTheme.border)),
             ),
             child: Row(
               children: [
@@ -185,10 +182,7 @@ class _AdminDataRowState extends State<AdminDataRow> {
                 ),
                 if (widget.trailing != null) ...[
                   const SizedBox(width: 4),
-                  SizedBox(
-                    width: widget.trailingWidth,
-                    child: widget.trailing,
-                  ),
+                  SizedBox(width: widget.trailingWidth, child: widget.trailing),
                 ],
               ],
             ),
@@ -203,6 +197,10 @@ class _AdminDataRowState extends State<AdminDataRow> {
 ///
 /// Use [shrinkWrap] when embedding inside an outer scroll view (e.g. Activity
 /// Logs). Otherwise the table expands and owns its own scroll.
+///
+/// When [minTableWidth] is set (or inferred from fixed column widths), the
+/// table gains a horizontal scrollbar on narrow viewports instead of
+/// crushing flex columns.
 class AdminDataTable extends StatelessWidget {
   const AdminDataTable({
     super.key,
@@ -218,6 +216,8 @@ class AdminDataTable extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.borderRadius = 12,
     this.showBorder = true,
+    this.minTableWidth,
+    this.enableHorizontalScroll = false,
   });
 
   final List<AdminDataColumn> columns;
@@ -233,6 +233,39 @@ class AdminDataTable extends StatelessWidget {
   final double borderRadius;
   final bool showBorder;
 
+  /// Minimum intrinsic width before horizontal scrolling kicks in.
+  /// When set (or when [enableHorizontalScroll] is true), the table gains a
+  /// horizontal scrollbar on narrow viewports.
+  final double? minTableWidth;
+
+  /// When true, wrap the table in a horizontal scroll view if the
+  /// available width is below [minTableWidth] / inferred minimum.
+  final bool enableHorizontalScroll;
+
+  double? get _resolvedMinWidth {
+    if (minTableWidth != null) return minTableWidth;
+    if (!enableHorizontalScroll) return null;
+    var fixed = 0.0;
+    var flexCount = 0;
+    for (final c in columns) {
+      if (c.width != null) {
+        fixed += c.width!;
+      } else {
+        flexCount += c.flex;
+      }
+    }
+    if (fixed <= 0) return null;
+    final leading = leadingHeader == null ? 0.0 : leadingWidth;
+    final trailing = trailingHeader == null ? 0.0 : trailingWidth;
+    // Give each flex unit a readable minimum so name/email columns don't vanish.
+    final flexMin = flexCount * 96.0;
+    return fixed +
+        flexMin +
+        leading +
+        trailing +
+        AdminTableTheme.horizontalPadding * 2;
+  }
+
   @override
   Widget build(BuildContext context) {
     final header = AdminDataHeader(
@@ -245,7 +278,8 @@ class AdminDataTable extends StatelessWidget {
 
     final list = ListView.builder(
       shrinkWrap: shrinkWrap,
-      physics: physics ??
+      physics:
+          physics ??
           (shrinkWrap
               ? const NeverScrollableScrollPhysics()
               : const AlwaysScrollableScrollPhysics()),
@@ -275,8 +309,104 @@ class AdminDataTable extends StatelessWidget {
           )
         : body;
 
-    if (padding == EdgeInsets.zero) return framed;
-    return Padding(padding: padding, child: framed);
+    final minWidth = _resolvedMinWidth;
+    Widget result = framed;
+    if (enableHorizontalScroll && minWidth != null && minWidth > 0) {
+      result = LayoutBuilder(
+        builder: (context, constraints) {
+          final needsScroll =
+              constraints.maxWidth.isFinite && constraints.maxWidth < minWidth;
+          if (!needsScroll) return framed;
+          return _AdminHorizontalScrollWrapper(
+            minWidth: minWidth,
+            maxHeight: constraints.maxHeight.isFinite
+                ? constraints.maxHeight
+                : null,
+            child: framed,
+          );
+        },
+      );
+    }
+
+    if (padding == EdgeInsets.zero) return result;
+    return Padding(padding: padding, child: result);
+  }
+}
+
+/// Wraps arbitrary wide admin table chrome in a horizontal scrollbar when
+/// the viewport is narrower than [minWidth].
+class AdminHorizontalScroll extends StatelessWidget {
+  const AdminHorizontalScroll({
+    super.key,
+    required this.child,
+    this.minWidth = 720,
+  });
+
+  final Widget child;
+  final double minWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.maxWidth.isFinite ||
+            constraints.maxWidth >= minWidth) {
+          return child;
+        }
+        return _AdminHorizontalScrollWrapper(
+          minWidth: minWidth,
+          maxHeight: constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : null,
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+class _AdminHorizontalScrollWrapper extends StatefulWidget {
+  const _AdminHorizontalScrollWrapper({
+    required this.minWidth,
+    required this.child,
+    this.maxHeight,
+  });
+
+  final double minWidth;
+  final Widget child;
+  final double? maxHeight;
+
+  @override
+  State<_AdminHorizontalScrollWrapper> createState() =>
+      _AdminHorizontalScrollWrapperState();
+}
+
+class _AdminHorizontalScrollWrapperState
+    extends State<_AdminHorizontalScrollWrapper> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      controller: _controller,
+      thumbVisibility: true,
+      notificationPredicate: (n) => n.metrics.axis == Axis.horizontal,
+      child: SingleChildScrollView(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: widget.minWidth,
+          height: widget.maxHeight,
+          child: widget.child,
+        ),
+      ),
+    );
   }
 }
 
@@ -302,6 +432,10 @@ class AdminTableBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: fg.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -345,10 +479,7 @@ class AdminTableIdentityCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        if (leading != null) ...[
-          leading!,
-          const SizedBox(width: 10),
-        ],
+        if (leading != null) ...[leading!, const SizedBox(width: 10)],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,10 +574,7 @@ List<Widget> _buildCells(
               ),
             ),
           )
-        : Align(
-            alignment: col.alignment,
-            child: cells![i],
-          );
+        : Align(alignment: col.alignment, child: cells![i]);
 
     if (col.width != null) {
       out.add(SizedBox(width: col.width, child: child));

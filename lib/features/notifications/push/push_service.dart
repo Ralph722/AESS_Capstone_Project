@@ -8,7 +8,9 @@ import 'package:alumni_system/core/config/push_config.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/events/data/reminder_service.dart';
+import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 import 'package:alumni_system/features/notifications/application/notification_router.dart';
+import 'package:alumni_system/features/share/share_link_router.dart';
 import 'package:alumni_system/features/notifications/push/fcm_push_bridge.dart';
 import 'package:alumni_system/features/notifications/push/web_push_bridge.dart';
 
@@ -185,6 +187,20 @@ class PushService {
   /// the session is still valid. The browser/OS permission is left as is.
   Future<void> unregisterForSignOut() async {
     _syncedForUser = null;
+    // Drop held deep links / local taps so the next account cannot inherit them.
+    ShareLinkRouter.clearPending();
+    ReminderService.clearPendingTaps();
+    ImageStorageService.clearSignedUrlCache();
+    try {
+      await ReminderService().cancelAllReminders();
+    } catch (e) {
+      debugPrint('PushService.cancelAllReminders failed: $e');
+    }
+    try {
+      await FcmPushBridge.stopListening();
+    } catch (e) {
+      debugPrint('PushService.stopListening failed: $e');
+    }
     if (!AppSession.isSignedIn) return;
     try {
       final token = await _currentDeviceToken();
@@ -231,13 +247,16 @@ class PushService {
       create: create,
     );
     if (sub == null) return;
-    await _supabase.rpc('register_push_token', params: {
-      'p_provider': 'webpush',
-      'p_platform': 'web',
-      'p_token': sub.endpoint,
-      'p_subscription': sub.json,
-      'p_device_label': webPushDeviceLabel(),
-    });
+    await _supabase.rpc(
+      'register_push_token',
+      params: {
+        'p_provider': 'webpush',
+        'p_platform': 'web',
+        'p_token': sub.endpoint,
+        'p_subscription': sub.json,
+        'p_device_label': webPushDeviceLabel(),
+      },
+    );
   }
 
   Future<void> _registerAndroid() async {
@@ -255,12 +274,15 @@ class PushService {
   }
 
   Future<void> _registerAndroidToken(String token) async {
-    await _supabase.rpc('register_push_token', params: {
-      'p_provider': 'fcm',
-      'p_platform': 'android',
-      'p_token': token,
-      'p_device_label': 'Android device',
-    });
+    await _supabase.rpc(
+      'register_push_token',
+      params: {
+        'p_provider': 'fcm',
+        'p_platform': 'android',
+        'p_token': token,
+        'p_device_label': 'Android device',
+      },
+    );
   }
 
   Future<void> _unregister(String token) async {
@@ -268,18 +290,23 @@ class PushService {
   }
 
   void _showForegroundAlert(RemoteMessage message) {
+    // After sign-out, listeners may race with stopListening — never alert unsigned.
+    if (!AppSession.isSignedIn) return;
     final notification = message.notification;
     final title = notification?.title ?? message.data['title'] as String?;
     if (title == null || title.isEmpty) return;
-    final tag = message.data['notificationId'] as String? ??
+    final tag =
+        message.data['notificationId'] as String? ??
         message.messageId ??
         DateTime.now().microsecondsSinceEpoch.toString();
-    unawaited(ReminderService().showPushedAlert(
-      tag: tag,
-      title: title,
-      body: notification?.body ?? '',
-      route: FcmPushBridge.routeOf(message),
-    ));
+    unawaited(
+      ReminderService().showPushedAlert(
+        tag: tag,
+        title: title,
+        body: notification?.body ?? '',
+        route: FcmPushBridge.routeOf(message),
+      ),
+    );
   }
 
   Future<String?> _choice() async {

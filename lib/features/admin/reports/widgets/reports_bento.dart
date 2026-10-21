@@ -11,12 +11,12 @@ import 'package:alumni_system/features/admin/reports/widgets/reports_details_but
 abstract final class ReportsBentoPalette {
   static const series = <Color>[
     AdminReportsTheme.primary,
-    Color(0xFF4F46E5),
-    Color(0xFF818CF8),
     AdminReportsTheme.gold,
-    Color(0xFF0EA5E9),
-    Color(0xFFC7D2FE),
-    Color(0xFF94A3B8),
+    Color(0xFF2563EB),
+    Color(0xFFD97706),
+    Color(0xFF38BDF8),
+    Color(0xFF64748B),
+    Color(0xFFCBD5E1),
   ];
 
   static Color at(int index) => series[index % series.length];
@@ -358,17 +358,12 @@ class ReportsStatCard extends StatelessWidget {
     final pillTint = pillColor ?? AdminReportsTheme.textMuted;
     final detailsText = details;
 
-    final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(height: 3, color: accent),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 10, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
+    final body = Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
                   children: [
                     Container(
                       width: 24,
@@ -470,10 +465,7 @@ class ReportsStatCard extends StatelessWidget {
                 ],
               ],
             ),
-          ),
-        ),
-      ],
-    );
+          );
 
     return Material(
       color: Colors.transparent,

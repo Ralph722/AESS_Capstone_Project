@@ -77,12 +77,8 @@ class ReportsCohortFilterBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
       decoration: BoxDecoration(
         color: AdminReportsTheme.card,
-        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
-        border: Border.all(
-          color: active
-              ? AdminReportsTheme.primary.withValues(alpha: 0.22)
-              : AdminReportsTheme.border,
-        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AdminReportsTheme.border),
         boxShadow: AdminReportsTheme.cardShadow,
       ),
       child: LayoutBuilder(

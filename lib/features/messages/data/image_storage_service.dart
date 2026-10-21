@@ -22,6 +22,8 @@ class ImageStorageService {
   static const Duration _signedUrlLifetime = Duration(hours: 1);
   static final Map<String, ({String url, DateTime expiresAt})> _signedUrls = {};
   static const int maxUploadBytes = 1024 * 1024;
+  /// Raw gallery/camera pick limit before compress (shared by chat + avatars).
+  static const int maxSourceBytes = 12 * 1024 * 1024;
   static final RegExp _safePathSegment = RegExp(r'^[a-zA-Z0-9_-]{1,128}$');
 
   static bool isJpegBytes(Uint8List bytes) =>
@@ -93,6 +95,13 @@ class ImageStorageService {
   static bool isMessageAttachmentRef(String? ref) =>
       ref != null && ref.startsWith(messageRefPrefix);
 
+  /// Drops cached signed URLs (call on sign-out so the next account cannot
+  /// reuse another user's temporary links from memory).
+  static void clearSignedUrlCache() => _signedUrls.clear();
+
+  /// Forces the next [resolveMessageImageUrl] call for [ref] to mint a new URL.
+  static void invalidateSignedUrl(String ref) => _signedUrls.remove(ref);
+
   /// Returns a URL that can be displayed or downloaded for a stored chat image.
   ///
   /// Private attachment references become signed URLs (cached until shortly
@@ -109,6 +118,18 @@ class ImageStorageService {
       return cached.url;
     }
     final path = ref.substring(messageRefPrefix.length);
+    // Reject path traversal / unexpected segments before asking Storage.
+    final slash = path.indexOf('/');
+    if (slash <= 0 || slash >= path.length - 1) {
+      throw ArgumentError('Invalid message attachment path.');
+    }
+    final folder = path.substring(0, slash);
+    final file = path.substring(slash + 1);
+    sanitizePathSegment(folder, label: 'userId');
+    if (!file.endsWith('.jpg') ||
+        !_safePathSegment.hasMatch(file.substring(0, file.length - 4))) {
+      throw ArgumentError('Invalid message attachment file name.');
+    }
     final url = await (client ?? Supabase.instance.client).storage
         .from(messageBucket)
         .createSignedUrl(path, _signedUrlLifetime.inSeconds);

@@ -17,6 +17,9 @@ class AlumniMember {
   final bool hasProfileUpdates;
   final DateTime? adminViewedAt;
 
+  /// When the latest unreviewed profile change happened (Updates tab sort).
+  final DateTime? profileUpdatedAt;
+
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -47,6 +50,7 @@ class AlumniMember {
     this.lastActiveAt,
     this.hasProfileUpdates = false,
     this.adminViewedAt,
+    this.profileUpdatedAt,
     DateTime? createdAt,
     this.updatedAt,
     this.batchYear = '',
@@ -94,6 +98,9 @@ class AlumniMember {
       adminViewedAt: row['admin_viewed_at'] != null
           ? _parseDateTime(row['admin_viewed_at'])
           : null,
+      profileUpdatedAt: row['profile_updated_at'] != null
+          ? _parseDateTime(row['profile_updated_at'])
+          : null,
       createdAt: _parseDateTime(row['created_at']),
       updatedAt: row['updated_at'] != null
           ? _parseDateTime(row['updated_at'])
@@ -126,6 +133,7 @@ class AlumniMember {
       'last_active_at': lastActiveAt?.toUtc().toIso8601String(),
       'has_profile_updates': hasProfileUpdates,
       'admin_viewed_at': adminViewedAt?.toUtc().toIso8601String(),
+      'profile_updated_at': profileUpdatedAt?.toUtc().toIso8601String(),
       'contact_number': contactNumber,
       'email_address': emailAddress,
       'address': address,
@@ -160,6 +168,7 @@ class AlumniMember {
     DateTime? lastActiveAt,
     bool? hasProfileUpdates,
     DateTime? adminViewedAt,
+    DateTime? profileUpdatedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? batchYear,
@@ -185,6 +194,7 @@ class AlumniMember {
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       hasProfileUpdates: hasProfileUpdates ?? this.hasProfileUpdates,
       adminViewedAt: adminViewedAt ?? this.adminViewedAt,
+      profileUpdatedAt: profileUpdatedAt ?? this.profileUpdatedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       batchYear: batchYear ?? this.batchYear,
@@ -221,6 +231,18 @@ enum AlumniDirectorySort {
   courseAsc,
   createdNewest,
   lastActiveNewest,
+}
+
+/// Which slice of the roster the directory list shows (tab selection).
+enum AlumniDirectoryView {
+  /// Everyone except deactivated members.
+  all,
+
+  /// Members with unreviewed profile changes, newest change first.
+  updates,
+
+  /// Deactivated members only.
+  deactivated,
 }
 
 enum AlumniRegistrationFilter { all, registered, notRegistered }

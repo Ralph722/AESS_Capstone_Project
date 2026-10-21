@@ -25,7 +25,7 @@ List<T> adminPaginate<T>(List<T> items, int page, int pageSize) {
 /// Number of pages for [totalItems] given [pageSize].
 int adminPageCount(int totalItems, int pageSize) {
   if (totalItems <= 0 || pageSize <= 0) return 1;
-  return ((totalItems + pageSize - 1) / pageSize).ceil();
+  return (totalItems + pageSize - 1) ~/ pageSize;
 }
 
 /// Clamps [page] into a valid range for the current totals.

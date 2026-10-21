@@ -4,6 +4,9 @@ import 'package:alumni_system/features/admin/dss/application/dss_action_service.
 import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Tracer reminder to the flag group's non-respondents. Returns the server
 /// result, or null when cancelled.
@@ -130,135 +133,158 @@ class _DssActionDialogState extends State<_DssActionDialog> {
         ? 'the tracer survey'
         : '"${widget.flag.surveyTitle.trim()}"';
 
-    return AlertDialog(
-      titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-      contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-      actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminDssTheme.radiusMd),
-      ),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _isJobs ? 'Send matching jobs' : 'Send tracer reminder',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AdminDssTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _isJobs
-                ? 'To respondents in ${widget.flag.cohortLabel} who said they are not employed.'
-                : 'To alumni in ${widget.flag.cohortLabel} who have not submitted $survey.',
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: AdminDssTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 520,
-        child: _loading
-            ? const SizedBox(
-                height: 160,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_isJobs) ..._jobSection(),
-                    _sectionHeader(
-                      _isJobs ? 'Recipients' : 'Can be notified in the app',
-                      count: notifiable.length,
-                      allSelected:
-                          notifiable.isNotEmpty &&
-                          _selectedPeople.length == notifiable.length,
-                      onToggleAll: notifiable.isEmpty
-                          ? null
-                          : (all) => setState(() {
-                              _selectedPeople.clear();
-                              if (all) {
-                                _selectedPeople.addAll(
-                                  notifiable.map((p) => p.authUid!),
-                                );
-                              }
-                            }),
-                    ),
-                    if (notifiable.isEmpty)
-                      _emptyText(
-                        _isJobs
-                            ? 'No unemployed respondents with an account in this group.'
-                            : 'Everyone registered in this group has already submitted.',
-                      )
-                    else
-                      ...notifiable.map(_personTile),
-                    if (unregistered.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _sectionHeader(
-                        'Not registered yet',
-                        count: unregistered.length,
-                      ),
-                      _emptyText(
-                        'These alumni have no account, so they cannot get in-app '
-                        'reminders. Reach them by email, text or Facebook: '
-                        '${_names(unregistered)}.',
-                      ),
-                    ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AdminDssTheme.danger,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(
-                      'Sending logs this action on the flag and moves it to '
-                      'In Progress. Anyone already notified today is skipped.',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: AdminDssTheme.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
+    return Dialog(
+      backgroundColor: AdminDialogStandards.backgroundColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: AdminDialogStandards.elevation,
+      shape: AdminDialogStandards.shape,
+      insetPadding: AdminDialogStandards.defaultInsetPadding,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 540),
+        child: Padding(
+          padding: AdminDialogStandards.defaultContentPadding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AdminModalHeader(
+                title: _isJobs ? 'Send Matching Jobs' : 'Send Tracer Reminder',
+                subtitle: _isJobs
+                    ? 'To respondents in ${widget.flag.cohortLabel} who said they are not employed.'
+                    : 'To alumni in ${widget.flag.cohortLabel} who have not submitted $survey.',
+                icon: _isJobs ? Icons.work_outline_rounded : Icons.send_outlined,
+                onClose: _sending ? null : () => Navigator.of(context).pop(),
               ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _sending ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton.icon(
-          onPressed: canSend ? _send : null,
-          icon: _sending
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
+              const SizedBox(height: 18),
+              if (_loading)
+                const SizedBox(
+                  height: 160,
+                  child: Center(child: CircularProgressIndicator()),
                 )
-              : const Icon(Icons.send_outlined, size: 16),
-          label: Text(
-            _sending
-                ? 'Sending…'
-                : 'Send to ${_selectedPeople.length} '
-                      '${_selectedPeople.length == 1 ? 'person' : 'people'}',
+              else
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isJobs) ..._jobSection(),
+                        _sectionHeader(
+                          _isJobs ? 'Recipients' : 'Can be notified in the app',
+                          count: notifiable.length,
+                          allSelected:
+                              notifiable.isNotEmpty &&
+                              _selectedPeople.length == notifiable.length,
+                          onToggleAll: notifiable.isEmpty
+                              ? null
+                              : (all) => setState(() {
+                                  _selectedPeople.clear();
+                                  if (all) {
+                                    _selectedPeople.addAll(
+                                      notifiable.map((p) => p.authUid!),
+                                    );
+                                  }
+                                }),
+                        ),
+                        if (notifiable.isEmpty)
+                          _emptyText(
+                            _isJobs
+                                ? 'No unemployed respondents with an account in this group.'
+                                : 'Everyone registered in this group has already submitted.',
+                          )
+                        else
+                          ...notifiable.map(_personTile),
+                        if (unregistered.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _sectionHeader(
+                            'Not registered yet',
+                            count: unregistered.length,
+                          ),
+                          _emptyText(
+                            'These alumni have no account, so they cannot get in-app '
+                            'reminders. Reach them by email, text or Facebook: '
+                            '${_names(unregistered)}.',
+                          ),
+                        ],
+                        if (_error != null) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            _error!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AdminColors.danger,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AdminColors.surface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AdminColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                size: 15,
+                                color: AdminColors.textMuted,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Sending logs this action on the flag and moves it to '
+                                  'In Progress. Anyone already notified today is skipped.',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: AdminColors.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: _sending ? null : () => Navigator.of(context).pop(),
+                    style: AdminButtonStyles.outlined(),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: canSend ? _send : null,
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_outlined, size: 16),
+                    label: Text(
+                      _sending
+                          ? 'Sending…'
+                          : 'Send to ${_selectedPeople.length} '
+                              '${_selectedPeople.length == 1 ? 'person' : 'people'}',
+                    ),
+                    style: AdminButtonStyles.filled(),
+                  ),
+                ],
+              ),
+            ],
           ),
-          style: dssFilledButtonStyle(),
         ),
-      ],
+      ),
     );
   }
 

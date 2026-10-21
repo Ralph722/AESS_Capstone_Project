@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
+import 'package:alumni_system/core/utils/avatar_image_prepare.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
@@ -317,7 +318,11 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     final profile = _currentProfile(userId);
     _profileSave = _runAfter(
       _profileSave,
-      () => _profileService.saveTracerProfile(profile, syncRoster: false),
+      () => _profileService.saveTracerProfile(
+        profile,
+        syncRoster: false,
+        source: 'onboarding',
+      ),
     );
   }
 
@@ -337,14 +342,24 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
 
       if (kIsWeb) {
         final bytes = await image.readAsBytes();
+        if (bytes.length > ImageStorageService.maxSourceBytes) {
+          _snack('Image is too large. Please choose a file under 12 MB.');
+          return;
+        }
         if (!mounted) return;
         setState(() {
           _selectedImageBytes = bytes;
           _selectedImage = null;
         });
       } else {
+        final file = File(image.path);
+        if (await file.length() > ImageStorageService.maxSourceBytes) {
+          _snack('Image is too large. Please choose a file under 12 MB.');
+          return;
+        }
+        if (!mounted) return;
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = file;
           _selectedImageBytes = null;
         });
       }
@@ -372,11 +387,20 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     _photoUploadSource = source;
     _photoUpload = _runAfter(_profileSave, () async {
       final imageBytes = bytes ?? await file!.readAsBytes();
+      if (imageBytes.length > ImageStorageService.maxSourceBytes) {
+        throw ArgumentError('Image is too large. Please choose a file under 12 MB.');
+      }
+      // Same square JPEG pipeline as Profile → photo (fills circular avatar).
+      final prepared = await AvatarImagePrepare.toSquareJpeg(imageBytes);
       final url = await _imageStorage.uploadProfileImage(
         userId: userId,
-        bytes: imageBytes,
+        bytes: prepared,
       );
-      await _profileService.saveProfileImageUrl(uid: userId, imageUrl: url);
+      await _profileService.saveProfileImageUrl(
+        uid: userId,
+        imageUrl: url,
+        source: 'onboarding',
+      );
       UserProfileEvents.notifyAvatarChanged(url);
       if (mounted) setState(() => _profileImageUrl = url);
     });
@@ -395,6 +419,7 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
         await _profileService.saveTracerProfile(
           _currentProfile(userId),
           syncRoster: false,
+          source: 'onboarding',
         );
         _profileSave = Future.value(true);
       }

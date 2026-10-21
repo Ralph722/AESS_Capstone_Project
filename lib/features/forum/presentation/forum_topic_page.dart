@@ -17,7 +17,9 @@ import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_composer.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
+import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
+import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 
@@ -55,6 +57,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
   String? _error;
   ForumTopic? _topic;
   List<ForumPost> _posts = const [];
+  final Set<String> _helpfulBusy = {};
 
   StreamSubscription<ForumTopic?>? _topicSub;
   StreamSubscription<List<ForumPost>>? _postsSub;
@@ -140,6 +143,44 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     if (userId == null) return;
     final role = await _authService.getUserRole(userId);
     if (mounted) setState(() => _isAdmin = role == UserRole.admin);
+  }
+
+  Future<void> _toggleHelpful(ForumPost post) async {
+    if (_helpfulBusy.contains(post.id)) return;
+    final previous = post;
+    final nextHelpful = !post.helpfulByMe;
+    final nextCount = (post.helpfulCount + (nextHelpful ? 1 : -1)).clamp(
+      0,
+      1 << 30,
+    );
+    setState(() {
+      _helpfulBusy.add(post.id);
+      _posts = [
+        for (final p in _posts)
+          if (p.id == post.id)
+            p.copyWith(helpfulByMe: nextHelpful, helpfulCount: nextCount)
+          else
+            p,
+      ];
+    });
+    try {
+      await _forumService.toggleHelpful(post.id, previous.helpfulByMe);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _posts = [
+          for (final p in _posts)
+            if (p.id == post.id) previous else p,
+        ];
+      });
+      showPortalErrorSnack(context, e);
+    } finally {
+      if (mounted) {
+        setState(() => _helpfulBusy.remove(post.id));
+      } else {
+        _helpfulBusy.remove(post.id);
+      }
+    }
   }
 
   Future<void> _loadAll({bool silent = false}) async {
@@ -259,7 +300,10 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(portalFriendlyError(e)),
+            backgroundColor: PortalTheme.danger,
+          ),
         );
       }
     } finally {
@@ -276,89 +320,137 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       'Misinformation',
       'Other',
     ];
-    final controller = TextEditingController();
-    String selected = presets.first;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setLocal) {
-            return AlertDialog(
-              title: Text(
-                postId == null ? 'Report discussion' : 'Report reply',
-              ),
-              content: SizedBox(
-                width: 360,
-                child: Column(
+    final controller = TextEditingController(text: presets.first);
+    var selected = presets.first;
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        // Keep dialog above the soft keyboard on phones.
+        useSafeArea: true,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (ctx, setLocal) {
+              final narrow = MediaQuery.sizeOf(ctx).width < 400;
+              return PortalActionDialog(
+                title: postId == null ? 'Report discussion?' : 'Report reply?',
+                message:
+                    'Choose a reason. Reports help moderators keep the '
+                    'community safe.',
+                body: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: presets
-                          .map(
-                            (p) => ChoiceChip(
-                              label: Text(p),
-                              selected: selected == p,
-                              onSelected: (_) => setLocal(() {
-                                selected = p;
-                                if (p != 'Other') controller.text = p;
-                              }),
+                      children: [
+                        for (final p in presets)
+                          ChoiceChip(
+                            label: Text(p),
+                            selected: selected == p,
+                            visualDensity: narrow
+                                ? VisualDensity.compact
+                                : VisualDensity.standard,
+                            selectedColor:
+                                PortalTheme.navy.withValues(alpha: 0.12),
+                            labelStyle: TextStyle(
+                              color: selected == p
+                                  ? PortalTheme.navy
+                                  : PortalTheme.textPrimary,
+                              fontWeight: selected == p
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              fontSize: 13,
                             ),
-                          )
-                          .toList(),
+                            side: BorderSide(
+                              color: selected == p
+                                  ? PortalTheme.navy.withValues(alpha: 0.35)
+                                  : PortalTheme.border,
+                            ),
+                            onSelected: (_) => setLocal(() {
+                              selected = p;
+                              if (p != 'Other') controller.text = p;
+                            }),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: controller,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
+                      // One fewer lines on narrow phones so the field stays
+                      // visible with the keyboard open; content still scrolls.
+                      maxLines: narrow ? 2 : 3,
+                      minLines: 2,
+                      // Keep the focused field above the keyboard while scrolling.
+                      scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+                      style: PortalTheme.body,
+                      decoration: InputDecoration(
                         labelText: 'Details',
-                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                        filled: true,
+                        fillColor: PortalTheme.pageBg,
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(PortalTheme.radiusLg),
+                          borderSide: const BorderSide(color: PortalTheme.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(PortalTheme.radiusLg),
+                          borderSide: const BorderSide(color: PortalTheme.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(PortalTheme.radiusLg),
+                          borderSide: const BorderSide(
+                            color: PortalTheme.navy,
+                            width: 1.4,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              actions: [
-                TextButton(
-                  style: PortalTheme.ghostButton(dense: true),
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style: PortalMenu.dangerButton(dense: true),
-                  child: const Text('Submit report'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    final reason = controller.text.trim().isEmpty
-        ? selected
-        : controller.text.trim();
-    controller.dispose();
-    if (ok != true) return;
-    try {
-      await _forumService.reportContent(
-        topicId: widget.topicId,
-        postId: postId,
-        reason: reason,
+                actions: [
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: PortalMenu.dangerButton(dense: false),
+                    child: const Text('Submit report'),
+                  ),
+                  TextButton(
+                    style: PortalActionDialog.quietButton(),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Report submitted. Thank you.')),
+      final reason = controller.text.trim().isEmpty
+          ? selected
+          : controller.text.trim();
+      if (ok != true) return;
+      try {
+        await _forumService.reportContent(
+          topicId: widget.topicId,
+          postId: postId,
+          reason: reason,
         );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Report submitted. Thank you.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) showPortalErrorSnack(context, e);
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
-        );
-      }
+    } finally {
+      // Dispose after the dialog exit animation finishes.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.dispose();
+      });
     }
   }
 
@@ -376,11 +468,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) showPortalErrorSnack(context, e);
     }
   }
 
@@ -394,37 +482,53 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
   Future<void> _editPost(ForumPost post) async {
     final controller = TextEditingController(text: post.body);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit reply'),
-        content: TextField(
-          controller: controller,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            labelText: 'Reply',
-          ),
-        ),
-        actions: [
-          TextButton(
-            style: PortalTheme.ghostButton(dense: true),
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: PortalTheme.primaryButton(dense: true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) {
-      controller.dispose();
-      return;
-    }
     try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => PortalActionDialog(
+          title: 'Edit reply?',
+          message: 'Update your reply. Changes are visible to everyone.',
+          body: TextField(
+            controller: controller,
+            maxLines: 6,
+            style: PortalTheme.body,
+            decoration: InputDecoration(
+              labelText: 'Reply',
+              alignLabelWithHint: true,
+              filled: true,
+              fillColor: PortalTheme.pageBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                borderSide: const BorderSide(color: PortalTheme.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                borderSide: const BorderSide(color: PortalTheme.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                borderSide: const BorderSide(
+                  color: PortalTheme.navy,
+                  width: 1.4,
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: PortalTheme.primaryButton(),
+              child: const Text('Save'),
+            ),
+            TextButton(
+              style: PortalActionDialog.quietButton(),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
       final moderation = await _moderationService.reviewReply(
         body: controller.text,
         topicTitle: _topic?.title,
@@ -439,13 +543,11 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       await _forumService.editPost(postId: post.id, body: controller.text);
       await _loadAll(silent: true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) showPortalErrorSnack(context, e);
     } finally {
-      controller.dispose();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.dispose();
+      });
     }
   }
 
@@ -1079,8 +1181,9 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
-                    onPressed: () =>
-                        _forumService.toggleHelpful(post.id, post.helpfulByMe),
+                    onPressed: _helpfulBusy.contains(post.id)
+                        ? null
+                        : () => _toggleHelpful(post),
                     icon: Icon(
                       post.helpfulByMe
                           ? Icons.thumb_up

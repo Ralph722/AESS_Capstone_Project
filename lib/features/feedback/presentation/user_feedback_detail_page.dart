@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/features/feedback/models/feedback_model.dart';
 import 'package:alumni_system/features/feedback/data/feedback_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
+import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
@@ -22,6 +23,7 @@ class _UserFeedbackDetailScreenState extends State<UserFeedbackDetailScreen> {
   final _service = FeedbackService();
   FeedbackSubmission? _item;
   bool _loading = true;
+  Object? _loadError;
 
   @override
   void initState() {
@@ -30,7 +32,10 @@ class _UserFeedbackDetailScreenState extends State<UserFeedbackDetailScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final item = await _service.getFeedbackById(widget.feedbackId);
       if (!mounted) return;
@@ -40,10 +45,10 @@ class _UserFeedbackDetailScreenState extends State<UserFeedbackDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      setState(() {
+        _loading = false;
+        _loadError = e;
+      });
     }
   }
 
@@ -63,14 +68,21 @@ class _UserFeedbackDetailScreenState extends State<UserFeedbackDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PortalTheme.pageBg,
+      backgroundColor: Colors.white,
       appBar: const PortalAppBar(title: 'Feedback details'),
       body: PortalContentFrame(
         maxWidth: PortalBreakpoints.chatMax,
         child: _loading
             ? const FeedbackDetailSkeleton()
-            : _item == null
-                ? const Center(child: Text('Feedback not found.'))
+            : _loadError != null
+                ? PortalErrorState(error: _loadError, onRetry: _load)
+                : _item == null
+                ? const PortalEmptyState(
+                    icon: Icons.feedback_outlined,
+                    title: 'Feedback unavailable',
+                    subtitle:
+                        'This feedback item is no longer available.',
+                  )
                 : RefreshIndicator(
                     onRefresh: _load,
                     color: PortalTheme.navy,
@@ -148,7 +160,7 @@ class _MetaCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: PortalTheme.card,
         borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(color: PortalTheme.border),
+        border: Border.all(color: PortalTheme.borderStrong),
         boxShadow: PortalTheme.softShadow,
       ),
       child: Column(
@@ -211,7 +223,7 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: PortalTheme.card,
         borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(color: PortalTheme.border),
+        border: Border.all(color: PortalTheme.borderStrong),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

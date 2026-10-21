@@ -17,6 +17,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/safe_link_text.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 Future<void> showAdminEventDetail({
   required BuildContext context,
@@ -494,7 +495,7 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
                         children: [
                           CircleAvatar(
                             radius: 18,
-                            backgroundColor: const Color(0xFF090A4F),
+                            backgroundColor: AdminColors.primary,
                             backgroundImage: avatar,
                             child: avatar == null
                                 ? Text(
@@ -654,7 +655,7 @@ class _AdminEventDetailPanelState extends State<AdminEventDetailPanel>
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF090A4F),
+              color: AdminColors.primary,
             ),
           ),
         ],

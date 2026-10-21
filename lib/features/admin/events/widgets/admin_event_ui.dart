@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 
 /// Visual chrome for admin Events — reuses [AdminDirectoryTheme] (no second navy).
@@ -40,24 +41,7 @@ abstract final class AdminEventTheme {
       AdminDirectoryTheme.surfaceCard(hovered: hovered);
 }
 
-ButtonStyle eventOutlinedButtonStyle() => OutlinedButton.styleFrom(
-      foregroundColor: AdminEventTheme.textPrimary,
-      side: const BorderSide(color: AdminEventTheme.border),
-      minimumSize: const Size(0, AdminEventTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-      ),
-    );
+ButtonStyle eventOutlinedButtonStyle() => AdminButtonStyles.outlined();
 
 ButtonStyle eventFilledButtonStyle({Color? background}) =>
-    FilledButton.styleFrom(
-      backgroundColor: background ?? AdminEventTheme.primary,
-      foregroundColor: Colors.white,
-      minimumSize: const Size(0, AdminEventTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-      ),
-    );
+    AdminButtonStyles.filled(background: background);

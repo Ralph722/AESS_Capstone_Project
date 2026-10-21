@@ -410,6 +410,13 @@ verify_jwt = false
 [functions.ai-assist]
 verify_jwt = false
 
+[functions.contact-verify]
+verify_jwt = false
+
+# Invoked by pg_cron/pg_net with the x-dispatch-secret header, no user JWT.
+[functions.send-scheduled-emails]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

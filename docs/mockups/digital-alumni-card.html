@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AESS Digital Alumni Card - Mockup</title>
+<style>:root{color-scheme:light}body{margin:0;padding:24px;background:#f4f6fa;display:flex;justify-content:center}#adc-root{width:100%;max-width:520px}</style>
+</head>
+<body>
+<div id="adc-root">
+<style>
+#adc-root{--navy:#1A1851;--navy2:#24226b;--gold:#FCB315;--ink:#0F172A;--muted:#64748B;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+#adc-root .stage{position:relative;border-radius:16px;overflow:hidden;background:light-dark(#4b4f63,#202230);padding:28px 16px;display:flex;justify-content:center}
+#adc-root .dialog{width:100%;max-width:420px;background:light-dark(#ffffff,#16171f);color:light-dark(#0F172A,#E7E9F0);border-radius:20px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:14px}
+#adc-root .dhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#adc-root .dtitle{font-size:17px;font-weight:700;margin:0}
+#adc-root .dsub{font-size:12.5px;color:light-dark(#64748B,#9AA3B5);margin:2px 0 0}
+#adc-root .x{width:34px;height:34px;border-radius:50%;border:0;background:light-dark(#F1F5F9,#262838);color:inherit;font-size:18px;line-height:1;cursor:pointer}
+#adc-root .scene{perspective:1200px;width:100%;aspect-ratio:1.586;cursor:pointer;border:0;padding:0;background:none;display:block}
+#adc-root .flipper{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+#adc-root .scene[aria-pressed="true"] .flipper{transform:rotateY(180deg)}
+#adc-root .face{position:absolute;inset:0;border-radius:14px;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;text-align:left}
+#adc-root .front{background:radial-gradient(120% 90% at 100% 0%,#2e2b86 0%,var(--navy) 55%,#121040 100%);color:#fff;padding:4.2% 4.6%;display:flex;flex-direction:column}
+#adc-root .front::before{content:"";position:absolute;right:-18%;bottom:-38%;width:62%;aspect-ratio:1;border-radius:50%;border:10px solid rgba(252,179,21,.16)}
+#adc-root .front::after{content:"";position:absolute;left:-30%;top:38%;width:160%;height:22%;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.07) 45%,rgba(252,179,21,.10) 50%,rgba(255,255,255,.07) 55%,transparent 70%);transform:rotate(-12deg)}
+#adc-root .top{display:flex;align-items:center;gap:8px;position:relative;z-index:1}
+#adc-root .emb{width:11%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--gold);background:#0b0a33 center/cover no-repeat;flex:none}
+#adc-root .org{flex:1;min-width:0}
+#adc-root .org b{display:block;font-size:clamp(8px,2.5vw,11px);letter-spacing:.06em;font-weight:800}
+#adc-root .org span{display:block;font-size:clamp(6.5px,1.9vw,8.5px);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#adc-root .pill{background:var(--gold);color:var(--navy);font-weight:800;font-size:clamp(6.5px,1.9vw,8.5px);letter-spacing:.08em;padding:3px 7px;border-radius:999px;white-space:nowrap}
+#adc-root .mid{flex:1;display:flex;gap:4.5%;align-items:center;position:relative;z-index:1}
+#adc-root .photo{width:24%;aspect-ratio:.82;border-radius:10px;border:2px solid var(--gold);background:linear-gradient(160deg,#5b6bd6,#2b2f8f);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:clamp(16px,5.6vw,26px);color:#fff;flex:none}
+#adc-root .who{min-width:0;display:flex;flex-direction:column;gap:3px}
+#adc-root .name{font-size:clamp(13px,4.4vw,19px);font-weight:800;line-height:1.15}
+#adc-root .prog{font-size:clamp(8.5px,2.6vw,11.5px);opacity:.92}
+#adc-root .meta{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px}
+#adc-root .meta div{font-size:clamp(7.5px,2.2vw,9.5px);opacity:.75}
+#adc-root .meta strong{display:block;font-size:clamp(9px,2.7vw,12px);opacity:1;color:#fff;font-weight:700;letter-spacing:.02em}
+#adc-root .bot{display:flex;align-items:center;justify-content:space-between;gap:8px;position:relative;z-index:1}
+#adc-root .status{display:flex;align-items:center;gap:5px;background:rgba(22,163,74,.18);border:1px solid rgba(74,222,128,.45);color:#d1fae5;font-size:clamp(7.5px,2.2vw,9.5px);font-weight:700;padding:3px 8px;border-radius:999px}
+#adc-root .dot{width:6px;height:6px;border-radius:50%;background:#4ade80}
+#adc-root .clock{font-size:clamp(7.5px,2.2vw,9.5px);opacity:.85;font-variant-numeric:tabular-nums;text-align:right}
+#adc-root .back{transform:rotateY(180deg);background:#FBFAF6;color:var(--ink);display:flex;flex-direction:column}
+#adc-root .band{background:var(--navy);color:#fff;padding:3% 4.6%;display:flex;justify-content:space-between;align-items:center;font-size:clamp(7.5px,2.3vw,10px);font-weight:700;letter-spacing:.05em}
+#adc-root .band span:last-child{color:var(--gold)}
+#adc-root .bbody{flex:1;display:flex;gap:4.5%;padding:3.6% 4.6% 2.6%}
+#adc-root .qrcol{width:32%;display:flex;flex-direction:column;align-items:center;gap:3px;flex:none}
+#adc-root .qr{width:100%;aspect-ratio:1;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:6%}
+#adc-root .qr svg{width:100%;height:100%;display:block}
+#adc-root .code{font-family:ui-monospace,Consolas,monospace;font-weight:700;font-size:clamp(8px,2.5vw,11px);letter-spacing:.12em;color:var(--navy)}
+#adc-root .ref{font-size:clamp(6.5px,1.9vw,8.5px);color:var(--muted);font-variant-numeric:tabular-nums}
+#adc-root .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+#adc-root .row{display:flex;justify-content:space-between;gap:6px;border-bottom:1px dashed #E2E8F0;padding-bottom:3px}
+#adc-root .row span{font-size:clamp(7px,2.1vw,9px);color:var(--muted)}
+#adc-root .row b{font-size:clamp(7.5px,2.3vw,10px);font-weight:700;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#adc-root .terms{font-size:clamp(6.3px,1.85vw,8.2px);color:var(--muted);line-height:1.35;margin-top:auto}
+#adc-root .actions{display:flex;gap:10px}
+#adc-root .btn{flex:1;height:42px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+#adc-root .btn.primary{background:var(--navy);color:#fff;border:0}
+#adc-root .btn.ghost{background:transparent;color:light-dark(#1A1851,#C9CCF5);border:1px solid light-dark(#CBD5E1,#3a3d52)}
+#adc-root .hint{font-size:12px;color:light-dark(#64748B,#9AA3B5);text-align:center;margin:-4px 0 0}
+#adc-root .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){#adc-root .flipper{transition:none}}
+</style>
+<p class="sr">Preview of the digital alumni card dialog; flip the card to see the front and back.</p>
+<div class="stage">
+  <section class="dialog" role="dialog" aria-labelledby="adc-title">
+    <div class="dhead">
+      <div>
+        <h3 class="dtitle" id="adc-title">Your digital alumni card</h3>
+        <p class="dsub">Show this when you don't have your physical card.</p>
+      </div>
+      <button class="x" type="button" aria-label="Close">×</button>
+    </div>
+
+    <div class="scene" id="adc-scene" role="button" tabindex="0" aria-pressed="false" aria-label="Alumni card, front side. Flip card">
+      <div class="flipper">
+        <div class="face front">
+          <div class="top">
+            <div class="emb" style="background-image:url('data:image/jpeg;base64,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')"></div>
+            <div class="org">
+              <b>USTP ALUMNI</b>
+              <span>Alumni Engagement and Support System</span>
+            </div>
+            <span class="pill">DIGITAL ID</span>
+          </div>
+          <div class="mid">
+            <div class="photo" aria-hidden="true">JD</div>
+            <div class="who">
+              <div class="name">Juan Dela Cruz</div>
+              <div class="prog">BS Information Technology</div>
+              <div class="meta">
+                <div>Student ID<strong>2020-30512</strong></div>
+                <div>Batch<strong>2020</strong></div>
+                <div>Graduated<strong>2024</strong></div>
+              </div>
+            </div>
+          </div>
+          <div class="bot">
+            <span class="status"><span class="dot"></span>Verified active alumnus</span>
+            <span class="clock" id="adc-clock">Oct 16, 2026 · 1:26:45 AM</span>
+          </div>
+        </div>
+
+        <div class="face back">
+          <div class="band"><span>SCAN TO VERIFY</span><span>USTP ALUMNI OFFICE</span></div>
+          <div class="bbody">
+            <div class="qrcol">
+              <div class="qr"><svg id="adc-qr" viewBox="0 0 25 25" shape-rendering="crispEdges" role="img" aria-label="Verification QR code"></svg></div>
+              <div class="code" id="adc-code">K7Q-4MZ</div>
+              <div class="ref" id="adc-ref">Refreshes in 0:60</div>
+            </div>
+            <div class="info">
+              <div class="row"><span>Email</span><b>juan.delacruz@gmail.com</b></div>
+              <div class="row"><span>Member since</span><b>Sep 2026</b></div>
+              <div class="row"><span>Card issued</span><b>Oct 16, 2026</b></div>
+              <div class="row"><span>Campus</span><b>USTP Cagayan de Oro</b></div>
+              <p class="terms">Non-transferable. Valid only while shown live in the AESS app. Staff may ask for a government ID. If found misused, report to the USTP Alumni Office.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="hint">Tap the card to flip it</p>
+
+    <div class="actions">
+      <button class="btn ghost" type="button">Close</button>
+      <button class="btn primary" id="adc-flip" type="button">Show back</button>
+    </div>
+  </section>
+</div>
+<script>
+(function(){
+  var root=document.getElementById('adc-root');
+  var scene=root.querySelector('#adc-scene');
+  var flipBtn=root.querySelector('#adc-flip');
+  function flip(){
+    var back=scene.getAttribute('aria-pressed')!=='true';
+    scene.setAttribute('aria-pressed',back?'true':'false');
+    scene.setAttribute('aria-label','Alumni card, '+(back?'back':'front')+' side. Flip card');
+    flipBtn.textContent=back?'Show front':'Show back';
+  }
+  scene.addEventListener('click',flip);
+  scene.addEventListener('keydown',function(e){
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();flip();}
+  });
+  flipBtn.addEventListener('click',flip);
+
+  var qr=root.querySelector('#adc-qr');
+  var codeEl=root.querySelector('#adc-code');
+  var refEl=root.querySelector('#adc-ref');
+  var clockEl=root.querySelector('#adc-clock');
+  var ns='http://www.w3.org/2000/svg';
+  var letters='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function finder(x,y,out){
+    for(var i=0;i<7;i++)for(var j=0;j<7;j++){
+      var edge=i===0||i===6||j===0||j===6, core=i>=2&&i<=4&&j>=2&&j<=4;
+      if(edge||core)out.push([x+i,y+j]);
+    }
+  }
+  function reserved(x,y){
+    return (x<8&&y<8)||(x>16&&y<8)||(x<8&&y>16);
+  }
+  function drawQr(seed){
+    while(qr.firstChild)qr.removeChild(qr.firstChild);
+    var cells=[];finder(0,0,cells);finder(18,0,cells);finder(0,18,cells);
+    var s=seed;
+    for(var x=0;x<25;x++)for(var y=0;y<25;y++){
+      if(reserved(x,y))continue;
+      s=(s*1103515245+12345)&0x7fffffff;
+      if(s%100<47)cells.push([x,y]);
+    }
+    cells.forEach(function(c){
+      var r=document.createElementNS(ns,'rect');
+      r.setAttribute('x',c[0]);r.setAttribute('y',c[1]);
+      r.setAttribute('width',1);r.setAttribute('height',1);
+      r.setAttribute('fill','#1A1851');
+      qr.appendChild(r);
+    });
+    var c='';
+    for(var k=0;k<6;k++){s=(s*1103515245+12345)&0x7fffffff;c+=letters[s%letters.length];if(k===2)c+='-';}
+    codeEl.textContent=c;
+  }
+  var seed=20261016,left=60;
+  drawQr(seed);
+  var fmt=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'});
+  var tfmt=new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit'});
+  function tick(){
+    var now=new Date();
+    clockEl.textContent=fmt.format(now)+' · '+tfmt.format(now);
+    left-=1;
+    if(left<=0){left=60;seed+=7919;drawQr(seed);}
+    refEl.textContent='Refreshes in 0:'+String(Math.round(left)).padStart(2,'0');
+  }
+  tick();
+  setInterval(tick,1000);
+})();
+</script>
+</div>
+
+</body>
+</html>

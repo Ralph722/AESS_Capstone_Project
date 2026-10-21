@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/alumni/tracer/data/tracer_reminder_service.dart';
 import 'package:alumni_system/features/alumni/tracer/presentation/tracer_reminder_sheet.dart';
+import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
+import 'package:alumni_system/features/contact_verification/presentation/contact_password_dialog.dart';
 import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_contacts.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_wizard.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
@@ -22,6 +25,7 @@ class ChedGtsTakeScreen extends StatefulWidget {
     this.prefilledAnswers = const {},
     this.closeAt,
     this.aiHelpEnabled = true,
+    this.contactOriginals,
   });
 
   final String surveyId;
@@ -34,6 +38,9 @@ class ChedGtsTakeScreen extends StatefulWidget {
   /// Shows "Help me answer" on Q19/Q20 (admin switch per survey).
   final bool aiHelpEnabled;
 
+  /// Profile contacts; a changed Q3/Q5 must be verified before submit.
+  final ChedGtsContactOriginals? contactOriginals;
+
   static Future<bool> open(
     BuildContext context, {
     required String surveyId,
@@ -41,6 +48,7 @@ class ChedGtsTakeScreen extends StatefulWidget {
     Map<String, dynamic> prefilledAnswers = const {},
     DateTime? closeAt,
     bool aiHelpEnabled = true,
+    ChedGtsContactOriginals? contactOriginals,
   }) async {
     final submitted = await Navigator.of(context, rootNavigator: true)
         .push<bool>(
@@ -51,6 +59,7 @@ class ChedGtsTakeScreen extends StatefulWidget {
               prefilledAnswers: prefilledAnswers,
               closeAt: closeAt,
               aiHelpEnabled: aiHelpEnabled,
+              contactOriginals: contactOriginals,
             ),
           ),
         );
@@ -64,14 +73,40 @@ class ChedGtsTakeScreen extends StatefulWidget {
 class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
   final _surveyService = SurveyService();
   final _reminderService = TracerReminderService();
+  final _contactService = ContactVerificationService();
   late Map<String, dynamic> _answers;
   bool _saving = false;
   bool _dirty = false;
+
+  /// Set by the wizard when the alumnus opts in after choosing Married.
+  bool _marriageNameChangeOptedIn = false;
+
+  /// Contacts verified this session, as the server stores them.
+  final Map<ContactChannel, String> _verified = {};
+
+  /// Verified contacts already saved to the profile (a verification can be
+  /// saved once, so a retried submit skips these).
+  final Map<ContactChannel, String> _applied = {};
+
+  /// Login email set during this submit, if the alumnus changed Q3.
+  String? _newLoginEmail;
+
+  List<ContactChannel> get _unverifiedContacts {
+    final originals = widget.contactOriginals;
+    return originals == null
+        ? const []
+        : ChedGtsContacts.unverified(_answers, originals, _verified);
+  }
 
   @override
   void initState() {
     super.initState();
     _answers = Map<String, dynamic>.from(widget.initialAnswers);
+    // Name is locked to the verified prefill unless marriage opt-in unlocks it.
+    final prefilledName = widget.prefilledAnswers['ched_1'];
+    if (prefilledName != null && prefilledName.toString().trim().isNotEmpty) {
+      _answers['ched_1'] = prefilledName;
+    }
     unawaited(_surveyService.recordSurveyOpened(widget.surveyId));
   }
 
@@ -95,6 +130,7 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
         surveyId: widget.surveyId,
         answers: _answers,
         submit: submit,
+        marriageNameChangeOptedIn: _marriageNameChangeOptedIn,
       );
       _dirty = false;
       return true;
@@ -106,12 +142,83 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
     }
   }
 
+  /// Saves verified Q3/Q5 changes to the profile. False when one failed.
+  Future<bool> _saveVerifiedContacts() async {
+    final originals = widget.contactOriginals;
+    if (originals == null) return true;
+    if (_unverifiedContacts.isNotEmpty) {
+      _toast('Please verify your new contact details first.', error: true);
+      return false;
+    }
+    setState(() => _saving = true);
+    _newLoginEmail = null;
+    try {
+      for (final c in ChedGtsContacts.changed(_answers, originals)) {
+        final target = _verified[c]!;
+        if (_applied[c] == target) continue;
+        String? password;
+        if (c == ContactChannel.email &&
+            _contactService.needsPasswordRecheck()) {
+          if (!mounted) return false;
+          password = await showContactPasswordDialog(context);
+          if (!mounted) return false;
+          if (password == null) {
+            _toast(
+              'Confirm your password to change your sign-in email.',
+              error: true,
+            );
+            return false;
+          }
+        }
+        final result = await _contactService.saveVerified(
+          c,
+          target,
+          password: password,
+        );
+        _applied[c] = result.target;
+        if (result.loginChanged) _newLoginEmail = result.target;
+      }
+      return true;
+    } on ContactVerificationException catch (e) {
+      if (mounted) {
+        setState(() {
+          for (final c in ContactChannel.values) {
+            if (_applied[c] != _verified[c]) _verified.remove(c);
+          }
+        });
+      }
+      _toast(e.message, error: true);
+      return false;
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _submit() async {
+    if (!await _saveVerifiedContacts() || !mounted) return;
     if (await _save(submit: true) && mounted) {
       unawaited(
         _reminderService.cancelReminder(widget.surveyId).catchError((_) {}),
       );
-      Navigator.of(context).pop(true);
+      final login = _newLoginEmail;
+      if (login != null && mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => PortalActionDialog(
+            title: 'Survey submitted',
+            message:
+                'From now on, sign in with $login. Your password is unchanged.',
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: PortalTheme.primaryButton(),
+                child: const Text('Got it'),
+              ),
+            ],
+          ),
+        );
+      }
+      if (mounted) Navigator.of(context).pop(true);
     }
   }
 
@@ -144,7 +251,9 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
   }
 
   Future<void> _close() async {
-    if (!_dirty) {
+    final originals = widget.contactOriginals;
+    final unverified = _unverifiedContacts;
+    if (!_dirty && unverified.isEmpty) {
       Navigator.of(context).pop(false);
       return;
     }
@@ -152,9 +261,13 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
       context: context,
       builder: (ctx) => PortalActionDialog(
         title: 'Save your progress?',
-        message:
+        message: [
+          if (_dirty)
             'You have unsaved answers. Save a draft so you can continue '
-            'where you left off.',
+                'where you left off.',
+          if (unverified.isNotEmpty && originals != null)
+            ChedGtsContacts.revertMessage(unverified, originals),
+        ].join('\n\n'),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(ctx, _LeaveChoice.save),
@@ -176,6 +289,15 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
     );
     if (!mounted || choice == null) return;
     if (choice == _LeaveChoice.save) {
+      if (unverified.isNotEmpty && originals != null) {
+        setState(() {
+          _answers = ChedGtsContacts.revertUnverified(
+            _answers,
+            originals,
+            _verified,
+          );
+        });
+      }
       if (!await _save(submit: false) || !mounted) return;
       await _offerReminder();
     }
@@ -193,8 +315,17 @@ class _ChedGtsTakeScreenState extends State<ChedGtsTakeScreen> {
         _answers = a;
         _dirty = true;
       }),
+      onMarriageNameOptChanged: (v) => _marriageNameChangeOptedIn = v,
       onSubmit: _submit,
       onClose: _close,
+      contactOriginals: widget.contactOriginals,
+      verifiedContacts: _verified,
+      onContactVerified: (channel, target) => setState(() {
+        _verified[channel] = target;
+        _answers = {..._answers, ChedGtsContacts.itemId(channel): target};
+        _dirty = true;
+      }),
+      contactService: _contactService,
     );
   }
 }

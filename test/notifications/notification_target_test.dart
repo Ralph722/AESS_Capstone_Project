@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:alumni_system/features/events/data/reminder_service.dart';
+import 'package:alumni_system/features/notifications/application/notification_router.dart';
 import 'package:alumni_system/features/notifications/application/notification_target.dart';
 import 'package:alumni_system/features/notifications/models/notification_model.dart';
 import 'package:alumni_system/features/notifications/models/notification_preferences.dart';
@@ -264,6 +266,23 @@ void main() {
       expect(NotificationPreferences.parseTimeMinutes('25:00'), isNull);
       expect(NotificationPreferences.parseTimeMinutes('x'), isNull);
       expect(NotificationPreferences.parseTimeMinutes(null), isNull);
+    });
+  });
+
+  group('pending deep-link cleanup', () {
+    test('NotificationRouter.clearPending drops held routes', () {
+      NotificationRouter.clearPending();
+      expect(NotificationRouter.hasPending, isFalse);
+
+      NotificationRouter.debugHoldRoute('event/e-pending');
+      expect(NotificationRouter.hasPending, isTrue);
+
+      NotificationRouter.clearPending();
+      expect(NotificationRouter.hasPending, isFalse);
+    });
+
+    test('ReminderService.clearPendingTaps is safe to call', () {
+      ReminderService.clearPendingTaps();
     });
   });
 }

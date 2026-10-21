@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
+import 'package:alumni_system/features/contact_verification/presentation/contact_verify_card.dart';
 import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_contacts.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
@@ -19,7 +24,8 @@ String chedSectionLabel(ChedGtsSection section) => switch (section) {
 double chedWizardSideInset(double width) =>
     PortalBreakpoints.centeredInset(width, maxWidth: PortalBreakpoints.chatMax);
 
-/// Full-screen, distraction-free section wizard: A → B → C → D → Review.
+/// Full-screen, distraction-free section wizard: A → B → C → D → Review,
+/// plus "Verify your contact details" when Q3 email or Q5 mobile changed.
 ///
 /// Required items are validated per section; missing ones are listed in a
 /// dialog and can be shown on their own ("focus on missing" mode).
@@ -33,6 +39,11 @@ class ChedGtsWizard extends StatefulWidget {
     this.saving = false,
     this.helpSurveyId,
     this.prefilledAnswers = const {},
+    this.contactOriginals,
+    this.verifiedContacts = const {},
+    this.onContactVerified,
+    this.contactService,
+    this.onMarriageNameOptChanged,
   });
 
   final Map<String, dynamic> answers;
@@ -49,16 +60,29 @@ class ChedGtsWizard extends StatefulWidget {
   /// See [ChedGtsForm.helpSurveyId].
   final String? helpSurveyId;
 
+  /// Profile contacts when the tracer opened. Null skips verification.
+  final ChedGtsContactOriginals? contactOriginals;
+
+  /// Contacts verified this session, as the server stores them.
+  final Map<ContactChannel, String> verifiedContacts;
+  final void Function(ContactChannel channel, String target)? onContactVerified;
+  final ContactVerificationService? contactService;
+
+  /// Reports the marriage name-change opt-in so submit can call the RPC.
+  final ValueChanged<bool>? onMarriageNameOptChanged;
+
   @override
   State<ChedGtsWizard> createState() => _ChedGtsWizardState();
 }
 
 class _ChedGtsWizardState extends State<ChedGtsWizard> {
   static const _sections = ChedGtsSection.values;
+  static final _reviewStep = _sections.length;
+  static final _verifyStep = _sections.length + 1;
 
   final _scroll = ScrollController();
 
-  /// 0–3 = sections, 4 = review.
+  /// 0–3 = sections, 4 = review, 5 = verify contacts.
   int _step = 0;
 
   /// Items shown in "focus on missing" mode. Only ever grows while active so
@@ -69,9 +93,45 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
   /// Outline unanswered required items after a failed Next.
   bool _highlight = false;
 
-  bool get _isReview => _step >= _sections.length;
-  ChedGtsSection? get _section => _isReview ? null : _sections[_step];
-  int get _totalSteps => _sections.length + 1;
+  /// Marriage name-change: prompted once per switch into Married.
+  bool _marriageNameOptedIn = false;
+  bool _marriedPrompted = false;
+  bool _marriedPromptOpen = false;
+  late String _originalName;
+
+  @override
+  void initState() {
+    super.initState();
+    _originalName = widget.answers['ched_1']?.toString().trim() ?? '';
+    _marriedPrompted =
+        (widget.answers['ched_6']?.toString().trim() ?? '') == 'Married';
+  }
+
+  bool get _isReview => _step == _reviewStep;
+  bool get _isVerify => _step == _verifyStep;
+  ChedGtsSection? get _section =>
+      _step < _sections.length ? _sections[_step] : null;
+
+  List<ContactChannel> get _changedContacts {
+    final originals = widget.contactOriginals;
+    return originals == null
+        ? const []
+        : ChedGtsContacts.changed(widget.answers, originals);
+  }
+
+  List<ContactChannel> get _unverifiedContacts {
+    final originals = widget.contactOriginals;
+    return originals == null
+        ? const []
+        : ChedGtsContacts.unverified(
+            widget.answers,
+            originals,
+            widget.verifiedContacts,
+          );
+  }
+
+  bool get _hasVerifyStep => _isVerify || _changedContacts.isNotEmpty;
+  int get _totalSteps => _sections.length + 1 + (_hasVerifyStep ? 1 : 0);
 
   @override
   void dispose() {
@@ -139,6 +199,11 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
   Future<void> _submit() async {
     final missing = ChedGtsVisibility.missingRequired(widget.answers);
     if (missing.isEmpty) {
+      if (_isReview && _changedContacts.isNotEmpty) {
+        _setStep(_verifyStep);
+        return;
+      }
+      if (_unverifiedContacts.isNotEmpty) return;
       await widget.onSubmit();
       return;
     }
@@ -246,7 +311,60 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
         };
       });
     }
-    widget.onChanged(answers);
+
+    var next = answers;
+    final prevStatus = widget.answers['ched_6']?.toString().trim() ?? '';
+    final newStatus = answers['ched_6']?.toString().trim() ?? '';
+    final becameMarried = prevStatus != 'Married' && newStatus == 'Married';
+    if (newStatus != 'Married' && _marriageNameOptedIn) {
+      // Leaving Married cancels the opt-in and restores the verified name.
+      next = {...answers, 'ched_1': _originalName};
+      setState(() => _marriageNameOptedIn = false);
+      widget.onMarriageNameOptChanged?.call(false);
+      _marriedPrompted = false;
+    } else if (newStatus != 'Married') {
+      _marriedPrompted = false;
+    }
+    widget.onChanged(next);
+    if (becameMarried && !_marriedPrompted) {
+      _marriedPrompted = true;
+      unawaited(_promptMarriageNameChange());
+    }
+  }
+
+  Future<void> _promptMarriageNameChange() async {
+    if (_marriedPromptOpen || !mounted) return;
+    _marriedPromptOpen = true;
+    try {
+      final update = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => PortalActionDialog(
+          title: 'Update your name?',
+          message:
+              'You set your civil status to Married. If you now use a '
+              'different name, you can update it here. This is optional — '
+              'you can keep your current name.',
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: PortalTheme.primaryButton(),
+              child: const Text('Update name'),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              style: PortalTheme.secondaryButton(),
+              child: const Text('Keep current name'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      final optedIn = update == true;
+      setState(() => _marriageNameOptedIn = optedIn);
+      widget.onMarriageNameOptChanged?.call(optedIn);
+    } finally {
+      _marriedPromptOpen = false;
+    }
   }
 
   @override
@@ -284,12 +402,16 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
             ),
             children: [
               _SectionTitleCard(
-                eyebrow: section == null
-                    ? 'Final step'
-                    : 'Section ${section.name.toUpperCase()}',
-                title: section == null
-                    ? 'Review & submit'
-                    : chedSectionLabel(section),
+                eyebrow: section != null
+                    ? 'Section ${section.name.toUpperCase()}'
+                    : _isReview && _hasVerifyStep
+                    ? 'Almost done'
+                    : 'Final step',
+                title: section != null
+                    ? chedSectionLabel(section)
+                    : _isVerify
+                    ? 'Verify your contact details'
+                    : 'Review & submit',
               ),
               const SizedBox(height: 14),
               if (_focusIds != null && section != null) ...[
@@ -306,7 +428,22 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
                 ),
                 const SizedBox(height: 14),
               ],
-              if (section == null)
+              if (_isVerify)
+                _VerifyContactsStep(
+                  answers: widget.answers,
+                  originals: widget.contactOriginals!,
+                  changed: _changedContacts,
+                  verified: widget.verifiedContacts,
+                  enabled: !widget.saving,
+                  service: widget.contactService,
+                  onValueChanged: (channel, value) => widget.onChanged({
+                    ...widget.answers,
+                    ChedGtsContacts.itemId(channel): value,
+                  }),
+                  onVerified: (channel, target) =>
+                      widget.onContactVerified?.call(channel, target),
+                )
+              else if (section == null)
                 _ReviewStep(
                   answers: widget.answers,
                   onJumpToSection: (s) => _setStep(_sections.indexOf(s)),
@@ -323,13 +460,24 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
                   highlightMissing: _highlight,
                   helpSurveyId: widget.helpSurveyId,
                   prefilledAnswers: widget.prefilledAnswers,
+                  nameLocked: !_marriageNameOptedIn,
                 ),
               const SizedBox(height: 12),
               _WizardActions(
-                isReview: _isReview,
+                nextLabel: _isVerify
+                    ? 'Submit CHED GTS'
+                    : _isReview
+                    ? (_changedContacts.isNotEmpty
+                          ? 'Continue to verification'
+                          : 'Submit CHED GTS')
+                    : 'Next',
                 saving: widget.saving,
                 onBack: _step == 0 ? null : _goBack,
-                onNext: _isReview ? _submit : _goNext,
+                onNext: section != null
+                    ? _goNext
+                    : _isVerify && _unverifiedContacts.isNotEmpty
+                    ? null
+                    : _submit,
               ),
             ],
           ),
@@ -527,16 +675,18 @@ class _WizardTopBar extends StatelessWidget implements PreferredSizeWidget {
 
 class _WizardActions extends StatelessWidget {
   const _WizardActions({
-    required this.isReview,
+    required this.nextLabel,
     required this.saving,
     required this.onBack,
     required this.onNext,
   });
 
-  final bool isReview;
+  final String nextLabel;
   final bool saving;
   final VoidCallback? onBack;
-  final VoidCallback onNext;
+
+  /// Null disables the button.
+  final VoidCallback? onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -566,7 +716,7 @@ class _WizardActions extends StatelessWidget {
                       color: Colors.white,
                     ),
                   )
-                : Text(isReview ? 'Submit CHED GTS' : 'Next'),
+                : Text(nextLabel),
           ),
         ),
       ],
@@ -687,6 +837,115 @@ class _ReviewStep extends StatelessWidget {
             onEdit: () => onJumpToSection(section),
           ),
           const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _VerifyContactsStep extends StatelessWidget {
+  const _VerifyContactsStep({
+    required this.answers,
+    required this.originals,
+    required this.changed,
+    required this.verified,
+    required this.enabled,
+    required this.onValueChanged,
+    required this.onVerified,
+    this.service,
+  });
+
+  final Map<String, dynamic> answers;
+  final ChedGtsContactOriginals originals;
+  final List<ContactChannel> changed;
+  final Map<ContactChannel, String> verified;
+  final bool enabled;
+  final void Function(ContactChannel channel, String value) onValueChanged;
+  final void Function(ContactChannel channel, String target) onVerified;
+  final ContactVerificationService? service;
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = changed
+        .where(
+          (c) => !ContactNormalizer.same(
+            c,
+            verified[c],
+            ChedGtsContacts.answer(answers, c),
+          ),
+        )
+        .length;
+    final done = pending == 0;
+    final color = done ? PortalTheme.success : PortalTheme.navy;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(PortalTheme.space3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                done
+                    ? Icons.check_circle_rounded
+                    : Icons.verified_user_outlined,
+                color: color,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  changed.isEmpty
+                      ? 'Your contact details match your profile, so there '
+                            'is nothing to verify. You can submit now.'
+                      : done
+                      ? 'All set! Submit to save your answers and your new '
+                            'contact details. A new email becomes how you '
+                            'sign in.'
+                      : 'You changed your contact details. Check that they '
+                            "are right, then confirm they're yours with a "
+                            'one-time code. A new email becomes how you '
+                            'sign in.',
+                  style: PortalTheme.body.copyWith(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: done ? PortalTheme.success : PortalTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        for (final c in changed) ...[
+          const SizedBox(height: 12),
+          ContactVerifyCard(
+            key: ValueKey('contact-verify-${c.wire}'),
+            channel: c,
+            label: c == ContactChannel.email
+                ? 'Email address (Q3)'
+                : 'Mobile number (Q5)',
+            original: originals.of(c),
+            value: ChedGtsContacts.answer(answers, c),
+            verified: ContactNormalizer.same(
+              c,
+              verified[c],
+              ChedGtsContacts.answer(answers, c),
+            ),
+            verifiedText: c == ContactChannel.email
+                ? 'Email verified. It will become your sign-in email when '
+                      'you submit.'
+                : null,
+            enabled: enabled,
+            service: service,
+            onValueChanged: (v) => onValueChanged(c, v),
+            onVerified: (t) => onVerified(c, t),
+          ),
         ],
       ],
     );

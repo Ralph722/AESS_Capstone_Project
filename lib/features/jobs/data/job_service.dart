@@ -9,10 +9,14 @@ class JobService {
 
   final SupabaseClient _supabase;
 
+  /// Columns needed by [JobPosting.fromSupabaseRow].
+  static const jobSelectColumns =
+      'id, title, company, location, description, status, data, views, updated_at';
+
   /// Session-scoped view debounce (prevents rapid duplicate increments).
   static final Set<String> _viewedThisSession = <String>{};
 
-  /// Avoid re-scanning all active jobs for expiration on every Home/Jobs open.
+  /// Avoid re-running expire on every admin refresh.
   static DateTime? _lastExpireRun;
   static const _expireCooldown = Duration(minutes: 5);
 
@@ -24,12 +28,13 @@ class JobService {
     }
   }
 
-  /// Active jobs for alumni — runs expiration first.
+  /// Active jobs for alumni — read-only. Deadline filtering is client-side;
+  /// server expiry runs via [expirePastDeadlineJobs] (admin / cron RPC).
   Future<List<JobPosting>> getActiveJobs() async {
-    await expirePastDeadlineJobs();
     final jobs = await _getJobsFromSupabase(status: 'active');
-    jobs.sort((a, b) => b.postedDate.compareTo(a.postedDate));
-    return jobs;
+    final visible = jobs.where((j) => j.isActiveForAlumni).toList()
+      ..sort((a, b) => b.postedDate.compareTo(a.postedDate));
+    return visible;
   }
 
   Future<List<JobPosting>> getAllJobs({bool expireFirst = true}) async {
@@ -50,7 +55,7 @@ class JobService {
     try {
       final row = await _supabase
           .from('jobs')
-          .select()
+          .select(jobSelectColumns)
           .eq('id', jobId)
           .maybeSingle();
       if (row == null) return null;
@@ -96,8 +101,8 @@ class JobService {
     }
   }
 
-  /// Marks past-deadline active jobs as expired.
-  /// Cooldown prevents duplicate full-table scans on rapid Home/Jobs opens.
+  /// Marks past-deadline active jobs as expired (admin / maintenance).
+  /// Prefers the server RPC; falls back to a client scan if the RPC is missing.
   Future<int> expirePastDeadlineJobs({bool force = false}) async {
     final now = DateTime.now();
     if (!force &&
@@ -108,7 +113,17 @@ class JobService {
     _lastExpireRun = now;
 
     try {
-      // Only columns needed to detect + update expired actives.
+      final result = await _supabase.rpc('expire_past_deadline_jobs');
+      if (result is int) return result;
+      if (result is num) return result.toInt();
+      return 0;
+    } catch (_) {
+      return _expirePastDeadlineJobsClientSide();
+    }
+  }
+
+  Future<int> _expirePastDeadlineJobsClientSide() async {
+    try {
       final rows = await _supabase
           .from('jobs')
           .select('id, status, data')
@@ -177,7 +192,7 @@ class JobService {
 
   Future<List<JobPosting>> _getJobsFromSupabase({String? status}) async {
     try {
-      var query = _supabase.from('jobs').select();
+      var query = _supabase.from('jobs').select(jobSelectColumns);
       if (status != null) {
         query = query.eq('status', status);
       }

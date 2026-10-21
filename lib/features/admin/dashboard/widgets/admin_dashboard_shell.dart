@@ -20,7 +20,14 @@ import 'package:alumni_system/features/notifications/presentation/notification_p
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/auth/presentation/auth_shell.dart';
 import 'package:alumni_system/features/auth/presentation/widgets/change_password_form.dart';
+import 'package:alumni_system/features/admin/profile/data/admin_profile_service.dart';
+import 'package:alumni_system/features/admin/profile/presentation/admin_profile_avatar.dart';
+import 'package:alumni_system/features/admin/profile/presentation/admin_profile_dialog.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
+import 'package:alumni_system/core/constants/ustp_colors.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Search / command-palette result that opens the Change password dialog.
 /// Negative so it can never collide with an [AdminNavItem.index].
@@ -303,7 +310,6 @@ class AdminDashboardSidebar extends StatefulWidget {
     required this.selectedMenuItem,
     required this.onMenuSelected,
     required this.currentUser,
-    required this.onLogout,
     this.collapsed = false,
     this.onToggleCollapse,
   });
@@ -311,7 +317,6 @@ class AdminDashboardSidebar extends StatefulWidget {
   final int selectedMenuItem;
   final ValueChanged<int> onMenuSelected;
   final User? currentUser;
-  final VoidCallback onLogout;
 
   /// When true, renders an icon-only mini-rail (desktop Console pattern).
   final bool collapsed;
@@ -325,16 +330,30 @@ class AdminDashboardSidebar extends StatefulWidget {
   State<AdminDashboardSidebar> createState() => _AdminDashboardSidebarState();
 }
 
-/// Layout tokens for the admin sidebar (Phase 2 — layout only).
+/// Layout and colour tokens for the white admin sidebar.
 abstract final class _AdminSidebarLayout {
-  static const Color navy = Color(0xFF090A4F);
-  static const Color navyDeep = Color(0xFF1A1B5E);
-  static const Color gold = Color(0xFFFFD700);
+  static const Color navy = UstpColors.blue;
+  static const Color navyDeep = UstpColors.darkNavy;
+  static const Color divider = Colors.white12;
 
-  static const double itemHeight = 40;
+  /// The current screen is marked in white; inactive items are dimmed so
+  /// the highlight stands out with the gold indicator.
+  static const Color selectedFg = Colors.white;
+  static const Color hoverFg = Colors.white;
+  static const Color indicator = UstpColors.gold;
+  static final Color inactiveFg = Colors.white.withValues(alpha: 0.8);
+  static final Color sectionTitle = Colors.white.withValues(alpha: 0.6);
+  static final Color selectedBg = Colors.white.withValues(alpha: 0.14);
+  static final Color selectedHoverBg = Colors.white.withValues(alpha: 0.2);
+  static final Color selectedBorder = UstpColors.gold.withValues(alpha: 0.55);
+  static final Color hoverBg = Colors.white.withValues(alpha: 0.08);
+  static final Color focusOverlay = Colors.white.withValues(alpha: 0.08);
+  static final Color focusBorder = UstpColors.gold;
+
+  static const double itemHeight = AdminDensity.buttonHeight;
   static const double iconGutter = 36;
   static const double railPadH = 10;
-  static const double sectionGap = 6;
+  static const double sectionGap = 4;
   static const double radius = 8;
   static const Duration collapse = Duration(milliseconds: 220);
   static const Duration itemMotion = Duration(milliseconds: 140);
@@ -343,11 +362,16 @@ abstract final class _AdminSidebarLayout {
 
 /// Shared chrome tokens for header controls + floating panels (Phase 14).
 abstract final class _AdminChrome {
-  static const Color surface = Color(0xFFF4F6FA);
-  static const Color border = Color(0xFFE5E7EB);
+  static const Color surface = AdminColors.shellBackground;
+  static const Color border = AdminColors.border;
   static const Color panelShadow = Color(0x2E000000);
 
   static const double controlHeight = 38;
+  static const double barPadV = 6;
+
+  /// Header bar height; its 1px bottom border is painted inside this height.
+  static const double barHeight = controlHeight + barPadV * 2;
+
   static const double controlRadius = 8;
   static const double panelRadius = 10;
   static const double panelElevation = 12;
@@ -355,6 +379,104 @@ abstract final class _AdminChrome {
 
   static const Duration fast = Duration(milliseconds: 140);
   static const Duration panel = Duration(milliseconds: 160);
+}
+
+/// Persistent brand header at the top of the sidebar.
+class _SidebarBrandHeader extends StatelessWidget {
+  const _SidebarBrandHeader({required this.collapsed});
+
+  final bool collapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: _AdminChrome.barHeight,
+      padding: EdgeInsets.symmetric(
+        horizontal: collapsed ? 12 : _AdminSidebarLayout.railPadH,
+        vertical: 8,
+      ),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: _AdminSidebarLayout.divider,
+            width: 1,
+          ),
+        ),
+      ),
+      child: collapsed
+          ? Center(
+              child: Tooltip(
+                message: 'AESS Admin Portal',
+                waitDuration: _AdminSidebarLayout.tooltipWait,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: Image.asset(
+                    'assets/images/system_logo.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            )
+          : Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: Image.asset(
+                    'assets/images/system_logo.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'AESS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        'Admin Portal',
+                        style: TextStyle(
+                          color: UstpColors.gold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
 }
 
 class _AdminDashboardSidebarState extends State<AdminDashboardSidebar> {
@@ -407,52 +529,40 @@ class _AdminDashboardSidebarState extends State<AdminDashboardSidebar> {
     );
   }
 
-  Widget _buildCollapseButton({required bool collapsed}) {
-    if (widget.onToggleCollapse == null) return const SizedBox.shrink();
-    return Tooltip(
-      message: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
-      waitDuration: _AdminSidebarLayout.tooltipWait,
-      child: IconButton(
-        onPressed: widget.onToggleCollapse,
-        visualDensity: VisualDensity.compact,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        icon: Icon(
-          collapsed ? Icons.chevron_right : Icons.chevron_left,
-          size: 20,
-          color: Colors.white.withValues(alpha: 0.9),
-        ),
-        tooltip: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
-      ),
+  static const Widget _divider = Divider(
+    color: _AdminSidebarLayout.divider,
+    height: 1,
+    thickness: 1,
+  );
+
+  Widget _buildFooter({required bool collapsed}) {
+    final onToggle = widget.onToggleCollapse;
+    if (onToggle == null) return const SizedBox.shrink();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _divider,
+        _SidebarCollapseToggle(collapsed: collapsed, onPressed: onToggle),
+      ],
     );
   }
 
   Widget _buildCollapsed() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 14, 8, 10),
-          child: Column(
-            children: [
-              _SidebarLogoMark(size: 36, radius: 9),
-              const SizedBox(height: 6),
-              _buildCollapseButton(collapsed: true),
-            ],
-          ),
-        ),
-        const Divider(color: Colors.white12, height: 1),
+        const _SidebarBrandHeader(collapsed: true),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
             children: [
               for (var s = 0; s < kAdminNavSections.length; s++) ...[
                 if (s > 0)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Divider(
                       height: 1,
                       thickness: 1,
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: _AdminSidebarLayout.divider,
                       indent: 10,
                       endIndent: 10,
                     ),
@@ -469,8 +579,7 @@ class _AdminDashboardSidebarState extends State<AdminDashboardSidebar> {
             ],
           ),
         ),
-        const Divider(color: Colors.white12, height: 1),
-        _SidebarAdminFooter(collapsed: true, onLogout: widget.onLogout),
+        _buildFooter(collapsed: true),
       ],
     );
   }
@@ -478,58 +587,14 @@ class _AdminDashboardSidebarState extends State<AdminDashboardSidebar> {
   Widget _buildExpanded() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 14, 8, 12),
-          child: Row(
-            children: [
-              const _SidebarLogoMark(size: 40, radius: 10),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Semantics(
-                  header: true,
-                  label: 'Alumni Portal Admin',
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Alumni Portal',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                          height: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Admin',
-                        style: TextStyle(
-                          color: _AdminSidebarLayout.gold,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3,
-                          height: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              _buildCollapseButton(collapsed: false),
-            ],
-          ),
-        ),
-        const Divider(color: Colors.white12, height: 1),
+        const _SidebarBrandHeader(collapsed: false),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
               _AdminSidebarLayout.railPadH,
-              10,
+              8,
               _AdminSidebarLayout.railPadH,
-              10,
+              6,
             ),
             children: [
               for (final section in kAdminNavSections)
@@ -541,124 +606,66 @@ class _AdminDashboardSidebarState extends State<AdminDashboardSidebar> {
             ],
           ),
         ),
-        const Divider(color: Colors.white12, height: 1),
-        _SidebarAdminFooter(collapsed: false, onLogout: widget.onLogout),
+        _buildFooter(collapsed: false),
       ],
     );
   }
 }
 
-/// Sidebar footer — a single Logout action pinned to the bottom of the rail.
-///
-/// Account details, feedback shortcut, and the identity card were removed in
-/// favour of a clean, full-width Logout (icon-only when the rail is collapsed).
-class _SidebarAdminFooter extends StatelessWidget {
-  const _SidebarAdminFooter({required this.collapsed, required this.onLogout});
+/// Collapse/expand control pinned to the bottom of the sidebar. Logout lives
+/// in the header account menu.
+class _SidebarCollapseToggle extends StatelessWidget {
+  const _SidebarCollapseToggle({
+    required this.collapsed,
+    required this.onPressed,
+  });
 
   final bool collapsed;
-  final VoidCallback onLogout;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     if (collapsed) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(8, 10, 8, 14),
-        child: Tooltip(
-          message: 'Logout',
-          waitDuration: _AdminSidebarLayout.tooltipWait,
-          child: IconButton(
-            onPressed: onLogout,
-            visualDensity: VisualDensity.compact,
-            tooltip: 'Logout',
-            icon: Icon(Icons.logout, size: 20, color: Colors.red.shade300),
+        padding: const EdgeInsets.all(8),
+        child: IconButton(
+          onPressed: onPressed,
+          visualDensity: VisualDensity.compact,
+          tooltip: 'Expand sidebar',
+          icon: Icon(
+            Icons.keyboard_double_arrow_right_rounded,
+            size: 20,
+            color: _AdminSidebarLayout.inactiveFg,
           ),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: const EdgeInsets.fromLTRB(
+        _AdminSidebarLayout.railPadH,
+        8,
+        _AdminSidebarLayout.railPadH,
+        8,
+      ),
       child: SizedBox(
         width: double.infinity,
-        height: 40,
-        child: OutlinedButton.icon(
-          onPressed: onLogout,
-          icon: const Icon(Icons.logout, size: 18),
-          label: const Text('Logout', style: TextStyle(fontSize: 13)),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.red.shade200,
-            side: BorderSide(
-              color: Colors.red.shade200.withValues(alpha: 0.45),
+        height: AdminDensity.buttonHeight,
+        child: TextButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(Icons.keyboard_double_arrow_left_rounded, size: 18),
+          label: const Text('Collapse sidebar'),
+          style: TextButton.styleFrom(
+            foregroundColor: _AdminSidebarLayout.inactiveFg,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            textStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(_AdminSidebarLayout.radius),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AdminAvatar extends StatelessWidget {
-  const _AdminAvatar({required this.initials, required this.size});
-
-  final String initials;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFD700), Color(0xFFFFC107)],
-        ),
-        borderRadius: BorderRadius.circular(size * 0.28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: _AdminSidebarLayout.navy,
-          fontWeight: FontWeight.w800,
-          fontSize: size * 0.34,
-          letterSpacing: 0.2,
-        ),
-      ),
-    );
-  }
-}
-
-class _SidebarLogoMark extends StatelessWidget {
-  const _SidebarLogoMark({required this.size, required this.radius});
-
-  final double size;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: EdgeInsets.all(size * 0.12),
-        child: Image.asset(
-          'assets/images/system_logo.png',
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Icon(
-            Icons.school,
-            color: _AdminSidebarLayout.navy,
-            size: size * 0.5,
           ),
         ),
       ),
@@ -692,14 +699,19 @@ class _CollapsedNavItemState extends State<_CollapsedNavItem> {
   @override
   Widget build(BuildContext context) {
     final isSelected = widget.selectedMenuItem == widget.index;
+    final active = _hovered || _focused;
     final bg = isSelected
-        ? Colors.white.withValues(alpha: _hovered || _focused ? 0.2 : 0.14)
-        : _hovered || _focused
-        ? Colors.white.withValues(alpha: 0.1)
+        ? (active
+              ? _AdminSidebarLayout.selectedHoverBg
+              : _AdminSidebarLayout.selectedBg)
+        : active
+        ? _AdminSidebarLayout.hoverBg
         : Colors.transparent;
     final fg = isSelected
-        ? _AdminSidebarLayout.gold
-        : Colors.white.withValues(alpha: _hovered || _focused ? 1.0 : 0.95);
+        ? _AdminSidebarLayout.selectedFg
+        : active
+        ? _AdminSidebarLayout.hoverFg
+        : _AdminSidebarLayout.inactiveFg;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -725,12 +737,12 @@ class _CollapsedNavItemState extends State<_CollapsedNavItem> {
                     _AdminSidebarLayout.radius,
                   ),
                   hoverColor: Colors.transparent,
-                  focusColor: Colors.white.withValues(alpha: 0.08),
+                  focusColor: _AdminSidebarLayout.focusOverlay,
                   child: AnimatedContainer(
                     duration: _AdminSidebarLayout.itemMotion,
                     curve: Curves.easeOut,
                     width: 56,
-                    height: 40,
+                    height: _AdminSidebarLayout.itemHeight,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: bg,
@@ -739,9 +751,9 @@ class _CollapsedNavItemState extends State<_CollapsedNavItem> {
                       ),
                       border: Border.all(
                         color: _focused
-                            ? Colors.white.withValues(alpha: 0.85)
+                            ? _AdminSidebarLayout.focusBorder
                             : isSelected
-                            ? _AdminSidebarLayout.gold.withValues(alpha: 0.55)
+                            ? _AdminSidebarLayout.selectedBorder
                             : Colors.transparent,
                         width: _focused ? 2 : 1,
                       ),
@@ -783,13 +795,13 @@ class _SidebarSection extends StatelessWidget {
             header: true,
             label: '${section.title} section',
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
               child: Text(
                 section.title.toUpperCase(),
                 style: TextStyle(
                   color: _hasSelection
-                      ? _AdminSidebarLayout.gold
-                      : Colors.white.withValues(alpha: 0.72),
+                      ? _AdminSidebarLayout.selectedFg
+                      : _AdminSidebarLayout.sectionTitle,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -837,17 +849,19 @@ class _SidebarItemState extends State<_SidebarItem> {
   @override
   Widget build(BuildContext context) {
     final isSelected = widget.selectedMenuItem == widget.index;
+    final active = _hovered || _focused;
     final bg = isSelected
-        ? Colors.white.withValues(alpha: _hovered || _focused ? 0.18 : 0.12)
-        : _hovered || _focused
-        ? Colors.white.withValues(alpha: 0.1)
+        ? (active
+              ? _AdminSidebarLayout.selectedHoverBg
+              : _AdminSidebarLayout.selectedBg)
+        : active
+        ? _AdminSidebarLayout.hoverBg
         : Colors.transparent;
-    final iconColor = isSelected
-        ? _AdminSidebarLayout.gold
-        : Colors.white.withValues(alpha: _hovered || _focused ? 1.0 : 0.95);
-    final labelColor = isSelected
-        ? Colors.white
-        : Colors.white.withValues(alpha: _hovered || _focused ? 1.0 : 0.95);
+    final fg = isSelected
+        ? _AdminSidebarLayout.selectedFg
+        : active
+        ? _AdminSidebarLayout.hoverFg
+        : _AdminSidebarLayout.inactiveFg;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1),
@@ -867,7 +881,7 @@ class _SidebarItemState extends State<_SidebarItem> {
                 onTap: () => widget.onMenuSelected(widget.index),
                 borderRadius: BorderRadius.circular(_AdminSidebarLayout.radius),
                 hoverColor: Colors.transparent,
-                focusColor: Colors.white.withValues(alpha: 0.08),
+                focusColor: _AdminSidebarLayout.focusOverlay,
                 child: AnimatedContainer(
                   duration: _AdminSidebarLayout.itemMotion,
                   curve: Curves.easeOut,
@@ -880,7 +894,7 @@ class _SidebarItemState extends State<_SidebarItem> {
                     ),
                     border: _focused
                         ? Border.all(
-                            color: Colors.white.withValues(alpha: 0.85),
+                            color: _AdminSidebarLayout.focusBorder,
                             width: 2,
                           )
                         : null,
@@ -894,19 +908,19 @@ class _SidebarItemState extends State<_SidebarItem> {
                         height: isSelected ? 20 : 0,
                         margin: const EdgeInsets.only(left: 2, right: 6),
                         decoration: BoxDecoration(
-                          color: _AdminSidebarLayout.gold,
+                          color: _AdminSidebarLayout.indicator,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                       SizedBox(
                         width: _AdminSidebarLayout.iconGutter,
-                        child: Icon(widget.icon, size: 18, color: iconColor),
+                        child: Icon(widget.icon, size: 18, color: fg),
                       ),
                       Expanded(
                         child: AnimatedDefaultTextStyle(
                           duration: _AdminSidebarLayout.itemMotion,
                           style: TextStyle(
-                            color: labelColor,
+                            color: fg,
                             fontWeight: isSelected
                                 ? FontWeight.w700
                                 : FontWeight.w500,
@@ -935,22 +949,28 @@ class _SidebarItemState extends State<_SidebarItem> {
 class AdminDashboardTopHeader extends StatefulWidget {
   const AdminDashboardTopHeader({
     super.key,
-    required this.currentUser,
+    required this.profile,
     required this.onMenuSelected,
     required this.metrics,
     this.onLogout,
     this.selectedMenuItem = 0,
+    this.onOpenNavigation,
   });
 
-  final User? currentUser;
+  /// Signed-in admin's name and photo; updated by the Edit profile dialog.
+  final AdminProfileController profile;
   final ValueChanged<int> onMenuSelected;
   final AdminDashboardMetrics metrics;
 
   /// Signs the admin out from the header account menu.
   final VoidCallback? onLogout;
 
-  /// Currently active nav index — drives the header page title.
+  /// Currently active nav index; feeds the search panel's recent pages.
   final int selectedMenuItem;
+
+  /// When set (phone drawer mode), shows a leading menu button that opens
+  /// the navigation drawer.
+  final VoidCallback? onOpenNavigation;
 
   @override
   State<AdminDashboardTopHeader> createState() =>
@@ -994,10 +1014,9 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
   NotificationType? _notificationCategoryFilter;
   bool _attentionFilter = false;
 
-  static const _navy = Color(0xFF090A4F);
+  static const _navy = AdminColors.primary;
 
-  int get _totalBadgeCount =>
-      widget.metrics.attentionCount + _unreadBadgeCount;
+  int get _totalBadgeCount => widget.metrics.attentionCount + _unreadBadgeCount;
 
   List<_AdminActivityAlert> get _activityAlerts {
     final m = widget.metrics;
@@ -1010,7 +1029,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               '${m.unreadMessages} message${m.unreadMessages == 1 ? '' : 's'}',
           subtitle: 'Unread alumni messages',
           icon: Icons.mail_outline,
-          color: const Color(0xFFE53935),
+          color: AdminColors.danger,
           menuIndex: 6,
           urgent: true,
           notificationType: NotificationType.message,
@@ -1024,7 +1043,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               '${m.pendingSurveyAssignments} new survey response${m.pendingSurveyAssignments == 1 ? '' : 's'}',
           subtitle: 'Review newly submitted responses',
           icon: Icons.pending_actions,
-          color: const Color(0xFFFF9800),
+          color: AdminColors.warning,
           menuIndex: 10,
           notificationType: NotificationType.survey,
         ),
@@ -1037,7 +1056,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               '${m.openFeedback} feedback item${m.openFeedback == 1 ? '' : 's'}',
           subtitle: 'Open feedback awaiting review',
           icon: Icons.feedback_outlined,
-          color: const Color(0xFF1A1851),
+          color: AdminColors.primary,
           menuIndex: 14,
           notificationType: NotificationType.feedback,
         ),
@@ -1050,7 +1069,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               '${m.registeredWithoutTracer} incomplete tracer${m.registeredWithoutTracer == 1 ? '' : 's'}',
           subtitle: 'Registered alumni missing tracer data',
           icon: Icons.assignment_late_outlined,
-          color: const Color(0xFF607D8B),
+          color: AdminColors.textSecondary,
           menuIndex: 2,
           // No NotificationType — visible under All / Attention only.
         ),
@@ -1463,7 +1482,6 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                                   highlightIndex: highlightIndex,
                                   flatHits: visibleHits,
                                 ),
-                            if (!hasQuery) _buildSearchFutureHint(),
                             const SizedBox(height: 8),
                           ],
                         ],
@@ -1489,7 +1507,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+        border: Border(bottom: BorderSide(color: AdminColors.border)),
       ),
       child: Row(
         children: [
@@ -1632,9 +1650,9 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF4F6FA),
+                    color: AdminColors.shellBackground,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: AdminColors.border),
                   ),
                   child: Icon(hit.icon, size: 16, color: _navy),
                 ),
@@ -1692,40 +1710,6 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchFutureHint() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF4F6FA),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.auto_awesome_outlined,
-              size: 14,
-              color: Colors.grey.shade500,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Alumni, events & surveys search coming soon',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -1818,7 +1802,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                             _buildNotificationSectionLabel(
                               'Needs attention',
                               icon: Icons.priority_high,
-                              accent: const Color(0xFFDC2626),
+                              accent: AdminColors.danger,
                             ),
                             ...filteredAlerts.map(_buildActivityAlertTile),
                             if (filteredNotifications.isNotEmpty)
@@ -1910,7 +1894,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 10),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+        border: Border(bottom: BorderSide(color: AdminColors.border)),
       ),
       child: Row(
         children: [
@@ -1931,7 +1915,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFDC2626).withValues(alpha: 0.1),
+                color: AdminColors.danger.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -1939,7 +1923,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFFDC2626),
+                  color: AdminColors.danger,
                 ),
               ),
             ),
@@ -2047,7 +2031,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
           selected: _attentionFilter,
           onTap: () => _setNotificationFilter(attention: true),
           count: _activityAlerts.length,
-          accent: const Color(0xFFDC2626),
+          accent: AdminColors.danger,
         ),
       for (final type in NotificationType.values)
         if (presentTypes.contains(type))
@@ -2064,7 +2048,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+        border: Border(bottom: BorderSide(color: AdminColors.border)),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -2104,12 +2088,12 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
             decoration: BoxDecoration(
               color: selected
                   ? color.withValues(alpha: 0.1)
-                  : const Color(0xFFF4F6FA),
+                  : AdminColors.shellBackground,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: selected
                     ? color.withValues(alpha: 0.35)
-                    : const Color(0xFFE5E7EB),
+                    : AdminColors.border,
               ),
             ),
             child: Row(
@@ -2365,12 +2349,12 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
             decoration: BoxDecoration(
               color: emphasized
                   ? c.withValues(alpha: 0.1)
-                  : const Color(0xFFF4F6FA),
+                  : AdminColors.shellBackground,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: emphasized
                     ? c.withValues(alpha: 0.3)
-                    : const Color(0xFFE5E7EB),
+                    : AdminColors.border,
               ),
             ),
             child: Row(
@@ -2450,7 +2434,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                             height: 8,
                             margin: const EdgeInsets.only(left: 6),
                             decoration: const BoxDecoration(
-                              color: Color(0xFFDC2626),
+                              color: AdminColors.danger,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -2560,7 +2544,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                               height: 8,
                               margin: const EdgeInsets.only(left: 6),
                               decoration: const BoxDecoration(
-                                color: Color(0xFFDC2626),
+                                color: AdminColors.danger,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -2687,6 +2671,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 1100;
     final tight = width < 900;
+    final showIdentity = width >= 1100;
     final searchWidth = tight ? 180.0 : (compact ? 240.0 : 320.0);
     // Keep overlay follower width in sync without mutating during layout.
     if (_searchFieldWidth != searchWidth) {
@@ -2705,27 +2690,103 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
             color: Colors.white,
             border: Border(bottom: BorderSide(color: _AdminChrome.border)),
           ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              compact ? 10 : 16,
-              6,
-              compact ? 10 : 16,
-              6,
-            ),
+          child: Container(
+            height: _AdminChrome.barHeight,
+            padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16),
             child: Row(
               children: [
-                const Spacer(),
+                if (widget.onOpenNavigation != null) ...[
+                  IconButton(
+                    tooltip: 'Open navigation',
+                    style: AdminDensity.iconButtonStyle(
+                      foregroundColor: _navy,
+                    ),
+                    onPressed: widget.onOpenNavigation,
+                    icon: const Icon(Icons.menu_rounded),
+                  ),
+                  SizedBox(width: _AdminChrome.controlGap),
+                ],
+                Expanded(
+                  child: _buildLocationTitle(
+                    widget.selectedMenuItem,
+                    compact: compact,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 _buildSearchField(width: searchWidth, compact: compact),
                 SizedBox(width: _AdminChrome.controlGap),
                 _buildQuickActionsButton(showLabel: !compact),
                 SizedBox(width: _AdminChrome.controlGap),
                 _buildNotificationBell(),
                 SizedBox(width: _AdminChrome.controlGap),
-                _buildProfileChip(),
+                _buildProfileChip(showIdentity: showIdentity),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLocationTitle(int selectedIndex, {required bool compact}) {
+    String sectionTitle = 'Overview';
+    String pageTitle = 'Dashboard';
+    IconData pageIcon = Icons.dashboard_outlined;
+
+    for (final section in kAdminNavSections) {
+      for (final item in section.items) {
+        if (item.index == selectedIndex) {
+          sectionTitle = section.title;
+          pageTitle = item.label;
+          pageIcon = item.icon;
+          break;
+        }
+      }
+    }
+
+    return Semantics(
+      header: true,
+      label: 'Current page: $sectionTitle, $pageTitle',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(pageIcon, size: 18, color: AdminColors.primary),
+          const SizedBox(width: 8),
+          if (!compact) ...[
+            Text(
+              sectionTitle,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AdminColors.textSecondary,
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                '/',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: AdminColors.border,
+                ),
+              ),
+            ),
+          ],
+          Flexible(
+            child: Text(
+              pageTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AdminColors.textPrimary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2791,10 +2852,13 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               decoration: InputDecoration(
                 isDense: true,
                 hintText: compact ? 'Search…' : 'Search pages, sections…',
-                hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                prefixIcon: Icon(
+                hintStyle: const TextStyle(
+                  color: AdminColors.textSecondary,
+                  fontSize: 13,
+                ),
+                prefixIcon: const Icon(
                   Icons.search,
-                  color: Colors.grey.shade600,
+                  color: AdminColors.textSecondary,
                   size: 18,
                 ),
                 prefixIconConstraints: const BoxConstraints(
@@ -2822,6 +2886,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                             onTap: _showCommandPalette,
                             borderRadius: BorderRadius.circular(5),
                             child: Center(
+                              widthFactor: 1,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
@@ -3101,7 +3166,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDC2626),
+                    color: AdminColors.danger,
                     borderRadius: BorderRadius.circular(9),
                     border: Border.all(color: Colors.white, width: 1.5),
                   ),
@@ -3129,111 +3194,126 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     );
   }
 
-  Widget _buildProfileChip() {
-    final email = widget.currentUser?.email ?? 'admin@alumni.com';
-    final rawName =
-        (widget.currentUser?.userMetadata?['display_name'] as String?)?.trim();
-    final name = (rawName != null && rawName.isNotEmpty)
-        ? rawName
-        : email.split('@').first;
-
-    final parts = name
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    final initials = parts.isEmpty
-        ? 'A'
-        : parts.length == 1
-        ? parts.first
-              .substring(0, parts.first.length >= 2 ? 2 : 1)
-              .toUpperCase()
-        : '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-
-    return PopupMenuButton<String>(
-      tooltip: 'Account',
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(_AdminChrome.panelRadius),
-      ),
-      onSelected: (value) => _onProfileAction(value),
-      itemBuilder: (ctx) => _profileMenuItems(name, email),
-      child: Semantics(
-        button: true,
-        label: 'Account menu for $name, Administrator',
-        child: ExcludeSemantics(child: _AdminAvatar(initials: initials, size: 32)),
+  Widget _buildProfileChip({required bool showIdentity}) {
+    return ValueListenableBuilder<AdminProfile>(
+      valueListenable: widget.profile,
+      builder: (context, profile, _) => PopupMenuButton<String>(
+        tooltip: 'Account',
+        position: PopupMenuPosition.under,
+        offset: const Offset(0, 6),
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: PortalMenu.shadowColor,
+        elevation: 8,
+        shape: PortalMenu.menuShape,
+        constraints: const BoxConstraints(minWidth: 260, maxWidth: 320),
+        onSelected: _onProfileAction,
+        itemBuilder: (_) => _profileMenuItems(profile),
+        child: Semantics(
+          button: true,
+          label: 'Account menu for ${profile.name}, Administrator',
+          child: ExcludeSemantics(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showIdentity) ...[
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 160),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          profile.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AdminColors.textPrimary,
+                            height: 1.25,
+                          ),
+                        ),
+                        const Text(
+                          'Administrator',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AdminColors.textSecondary,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                AdminProfileAvatar(profile: profile, size: 32),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  List<PopupMenuEntry<String>> _profileMenuItems(String name, String email) {
+  List<PopupMenuEntry<String>> _profileMenuItems(AdminProfile profile) {
     return [
       PopupMenuItem<String>(
         enabled: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        height: 64,
+        child: Row(
           children: [
-            Text(
-              name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: _navy,
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              email,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'Administrator',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+            AdminProfileAvatar(profile: profile, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    profile.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: PortalMenu.itemText.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: _navy,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    profile.email.isEmpty ? 'Administrator' : profile.email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.caption,
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
       const PopupMenuDivider(),
-      const PopupMenuItem<String>(
+      portalMenuItem(
         value: 'profile',
-        child: ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.person_outline, size: 20),
-          title: Text('My profile'),
-        ),
+        label: 'Edit profile',
+        icon: Icons.manage_accounts_outlined,
       ),
-      const PopupMenuItem<String>(
+      portalMenuItem(
         value: 'password',
-        child: ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.lock_outline, size: 20),
-          title: Text('Change password'),
-        ),
+        label: 'Change password',
+        icon: Icons.lock_outline,
       ),
-      const PopupMenuItem<String>(
+      portalMenuItem(
         value: 'help',
-        child: ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.help_outline, size: 20),
-          title: Text('Help'),
-        ),
+        label: 'Help',
+        icon: Icons.help_outline,
       ),
       const PopupMenuDivider(),
-      PopupMenuItem<String>(
+      portalMenuItem(
         value: 'logout',
-        child: ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.logout, size: 20, color: Colors.red.shade700),
-          title: Text('Logout', style: TextStyle(color: Colors.red.shade700)),
-        ),
+        label: 'Logout',
+        icon: Icons.logout_rounded,
+        destructive: true,
       ),
     ];
   }
@@ -3241,7 +3321,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
   void _onProfileAction(String value) {
     switch (value) {
       case 'profile':
-        _showAccountDetails();
+        _showEditProfile();
       case 'password':
         _showChangePasswordDialog();
       case 'help':
@@ -3268,68 +3348,35 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     );
   }
 
-  Future<void> _showAccountDetails() async {
-    final email = widget.currentUser?.email ?? 'admin@alumni.com';
-    final rawName =
-        (widget.currentUser?.userMetadata?['display_name'] as String?)?.trim();
-    final name = (rawName != null && rawName.isNotEmpty)
-        ? rawName
-        : email.split('@').first;
-    await showDialog<void>(
+  Future<void> _showEditProfile() async {
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('My profile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              name,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-            ),
-            const SizedBox(height: 4),
-            Text(email, style: TextStyle(color: Colors.grey.shade700)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD700).withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Role · Administrator',
-                style: TextStyle(
-                  color: _navy,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      barrierLabel: 'Edit profile',
+      builder: (_) => AdminProfileDialog(controller: widget.profile),
     );
+    if (!mounted || saved != true) return;
+    showAuthFeedback(context, 'Profile updated.', error: false);
   }
 
   Future<void> _showHelp() async {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Help & support'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: PortalMenu.dialogShape,
+        title: const Text('Help & support', style: PortalTheme.pageTitle),
         content: const Text(
           'Use the search bar (Ctrl/⌘ K) to jump to any page or action. '
           'For assistance with the Alumni Portal, contact your system '
           'administrator or submit a message from the Feedback screen.',
+          style: PortalTheme.bodySecondary,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
+            style: PortalTheme.ghostButton(dense: true),
             child: const Text('Close'),
           ),
         ],
@@ -3426,7 +3473,7 @@ class _AdminCommandPalette extends StatefulWidget {
 }
 
 class _AdminCommandPaletteState extends State<_AdminCommandPalette> {
-  static const _navy = Color(0xFF090A4F);
+  static const _navy = AdminColors.primary;
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -3610,7 +3657,7 @@ class _AdminCommandPaletteState extends State<_AdminCommandPalette> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+        border: Border(bottom: BorderSide(color: AdminColors.border)),
       ),
       child: TextField(
         controller: _controller,
@@ -3626,7 +3673,7 @@ class _AdminCommandPaletteState extends State<_AdminCommandPalette> {
                   margin: const EdgeInsets.symmetric(vertical: 9),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF4F6FA),
+                    color: AdminColors.shellBackground,
                     borderRadius: BorderRadius.circular(5),
                     border: Border.all(color: const Color(0xFFD1D5DB)),
                   ),
@@ -3732,10 +3779,10 @@ class _AdminCommandPaletteState extends State<_AdminCommandPalette> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: entry.kind == _CommandPaletteKind.actions
-                          ? const Color(0xFFFFC107).withValues(alpha: 0.16)
-                          : const Color(0xFFF4F6FA),
+                          ? AdminColors.accent.withValues(alpha: 0.16)
+                          : AdminColors.shellBackground,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      border: Border.all(color: AdminColors.border),
                     ),
                     child: Icon(entry.icon, size: 17, color: _navy),
                   ),
@@ -3837,7 +3884,7 @@ class _AdminCommandPaletteState extends State<_AdminCommandPalette> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       decoration: const BoxDecoration(
         color: Color(0xFFF9FAFB),
-        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+        border: Border(top: BorderSide(color: AdminColors.border)),
       ),
       child: Row(
         children: [

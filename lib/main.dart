@@ -3,8 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/config/supabase_config.dart';
 import 'package:alumni_system/core/navigation/app_navigator.dart';
+import 'package:alumni_system/features/alumni/card/data/alumni_card_verify_launch.dart';
+import 'package:alumni_system/features/alumni/card/presentation/alumni_card_verify_page.dart';
 import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
 import 'package:alumni_system/features/notifications/push/push_service.dart';
+import 'package:alumni_system/features/share/share_link_router.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/environment_banner.dart';
 import 'package:alumni_system/shared/widgets/user/portal_overlay_theme.dart';
 
@@ -14,11 +18,23 @@ void main() async {
 
   final configError = SupabaseConfig.configurationError;
   if (configError != null) throw StateError(configError);
+  // Release builds must target live defaults without a demo/staging ribbon.
+  if (kReleaseMode && SupabaseConfig.environment.isNotEmpty) {
+    throw StateError(
+      'Release builds must omit AESS_ENV '
+      '(got "${SupabaseConfig.environment}").',
+    );
+  }
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.anonKey,
   );
   PushService.instance.initialize();
+  // Share links: web reads the launch URL here; Android App Links are
+  // delivered async. Validated destinations are held by NotificationRouter
+  // until AuthGate / the signed-in shell is ready (login continuation).
+  ShareLinkRouter.captureWebLaunch();
+  ShareLinkRouter.initializeAppLinks();
 
   runApp(const MyApp());
 }
@@ -57,7 +73,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Alumni Portal',
+      title: 'AESS',
       debugShowCheckedModeBanner: false,
       navigatorKey: AppNavigator.navigatorKey,
       scaffoldMessengerKey: AppNavigator.messengerKey,
@@ -71,7 +87,7 @@ class MyApp extends StatelessWidget {
         child: child,
         builder: (context, suspended, child) => Theme(
           data: suspended
-              ? Theme.of(context)
+              ? AdminOverlayTheme.apply(Theme.of(context))
               : PortalOverlayTheme.apply(Theme.of(context)),
           child: EnvironmentBanner(
             label: SupabaseConfig.environmentLabel,
@@ -79,8 +95,15 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
+      // Staff QR scan: /?verify=<token> skips login and shows the result page.
       // AuthGate restores an existing Supabase session (if any) before Login.
-      home: const AuthGate(),
+      home: () {
+        final verifyCode = AlumniCardVerifyLaunch.takeCode();
+        if (verifyCode != null) {
+          return AlumniCardVerifyPage(code: verifyCode);
+        }
+        return const AuthGate();
+      }(),
     );
   }
 }

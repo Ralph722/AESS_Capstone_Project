@@ -11,6 +11,8 @@ import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart'
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/features/admin/forum/widgets/admin_forum_ui.dart';
+import 'package:alumni_system/features/share/share_link_sheet.dart';
+import 'package:alumni_system/features/share/shareable_content.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_instant_content.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
@@ -86,12 +88,13 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
     }
     try {
       final catalog = await _forumService.getAllTopics();
-      final programs = catalog
-          .map((t) => t.authorProgram.trim())
-          .where((p) => p.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      final programs =
+          catalog
+              .map((t) => t.authorProgram.trim())
+              .where((p) => p.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
 
       final page = _forumService.applyTopicQuery(
         catalog,
@@ -144,8 +147,8 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
   }
 
   bool get _hasActiveFilters {
-    final notAll = !(_filters.length == 1 &&
-        _filters.contains(ForumListFilter.all));
+    final notAll =
+        !(_filters.length == 1 && _filters.contains(ForumListFilter.all));
     return _search.isNotEmpty ||
         notAll ||
         _lockedOnly ||
@@ -200,19 +203,21 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
     );
     for (final t in _topics) {
       const esc = CsvSafe.cell;
-      buf.writeln([
-        esc(t.title),
-        esc(t.authorName),
-        esc(t.authorProgram),
-        esc(t.authorBatch),
-        t.replyCount,
-        t.isPinned ? 'Yes' : 'No',
-        t.isLocked ? 'Yes' : 'No',
-        t.isSolved ? 'Yes' : 'No',
-        t.isAnnouncement ? 'Yes' : 'No',
-        esc(t.tags.map((e) => e.label).join('; ')),
-        DateFormat('yyyy-MM-dd').format(t.createdAt),
-      ].join(','));
+      buf.writeln(
+        [
+          esc(t.title),
+          esc(t.authorName),
+          esc(t.authorProgram),
+          esc(t.authorBatch),
+          t.replyCount,
+          t.isPinned ? 'Yes' : 'No',
+          t.isLocked ? 'Yes' : 'No',
+          t.isSolved ? 'Yes' : 'No',
+          t.isAnnouncement ? 'Yes' : 'No',
+          esc(t.tags.map((e) => e.label).join('; ')),
+          DateFormat('yyyy-MM-dd').format(t.createdAt),
+        ].join(','),
+      );
     }
 
     if (!mounted) return;
@@ -306,42 +311,42 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-            ForumPageHeader(
-              title: 'Forum Moderation',
-              subtitle: _mode == _AdminForumMode.reports
-                  ? 'Review alumni reports on discussions and replies.'
-                  : 'Moderate alumni discussions and announcements.',
-              actions: [
-                _buildModeToggle(),
-                if (_mode == _AdminForumMode.discussions) ...[
-                  OutlinedButton.icon(
-                    onPressed: _topics.isEmpty || _loading ? null : _exportCsv,
-                    icon: const Icon(Icons.download_outlined, size: 17),
-                    label: const Text('Export'),
-                    style: forumOutlinedButtonStyle(),
-                  ),
-                  FilledButton.icon(
-                    onPressed: _loading ? null : _newAnnouncement,
-                    icon: const Icon(Icons.campaign_outlined, size: 17),
-                    label: const Text('New announcement'),
-                    style: forumFilledButtonStyle(),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: AdminForumTheme.space2),
-            _buildMetrics(),
-            const SizedBox(height: AdminForumTheme.space2),
+        ForumPageHeader(
+          title: 'Forum Moderation',
+          subtitle: _mode == _AdminForumMode.reports
+              ? 'Review alumni reports on discussions and replies.'
+              : 'Moderate alumni discussions and announcements.',
+          actions: [
+            _buildModeToggle(),
             if (_mode == _AdminForumMode.discussions) ...[
-              _buildToolbar(),
-              const SizedBox(height: AdminForumTheme.space1),
-              Expanded(child: _buildListPane()),
-            ] else ...[
-              _buildReportsToolbar(),
-              const SizedBox(height: AdminForumTheme.space1),
-              Expanded(child: _buildReportsPane()),
+              OutlinedButton.icon(
+                onPressed: _topics.isEmpty || _loading ? null : _exportCsv,
+                icon: const Icon(Icons.download_outlined, size: 17),
+                label: const Text('Export'),
+                style: forumOutlinedButtonStyle(),
+              ),
+              FilledButton.icon(
+                onPressed: _loading ? null : _newAnnouncement,
+                icon: const Icon(Icons.campaign_outlined, size: 17),
+                label: const Text('New announcement'),
+                style: forumFilledButtonStyle(),
+              ),
             ],
           ],
+        ),
+        const SizedBox(height: AdminForumTheme.space2),
+        _buildMetrics(),
+        const SizedBox(height: AdminForumTheme.space2),
+        if (_mode == _AdminForumMode.discussions) ...[
+          _buildToolbar(),
+          const SizedBox(height: AdminForumTheme.space1),
+          Expanded(child: _buildListPane()),
+        ] else ...[
+          _buildReportsToolbar(),
+          const SizedBox(height: AdminForumTheme.space1),
+          Expanded(child: _buildReportsPane()),
+        ],
+      ],
     );
   }
 
@@ -358,9 +363,7 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
           ButtonSegment(
             value: _AdminForumMode.reports,
             label: Text(
-              _statOpenReports > 0
-                  ? 'Reports ($_statOpenReports)'
-                  : 'Reports',
+              _statOpenReports > 0 ? 'Reports ($_statOpenReports)' : 'Reports',
             ),
             icon: const Icon(Icons.flag_outlined, size: 16),
           ),
@@ -596,10 +599,7 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
       loadingSkeleton: const PortalCardListSkeleton(),
       isEmpty: visible.isEmpty && !_loading,
       empty: _error != null
-          ? ForumErrorState(
-              message: _error!,
-              onRetry: () => _refresh(),
-            )
+          ? ForumErrorState(message: _error!, onRetry: () => _refresh())
           : DirectoryEmptyState(
               title: _reports.isEmpty && _reportStatus == 'open'
                   ? 'No open reports'
@@ -677,9 +677,7 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
             width: 148,
             value: _sort,
             items: ForumSort.values
-                .map(
-                  (s) => DropdownMenuItem(value: s, child: Text(s.label)),
-                )
+                .map((s) => DropdownMenuItem(value: s, child: Text(s.label)))
                 .toList(),
             onChanged: (v) {
               if (v == null) return;
@@ -747,10 +745,7 @@ class _AdminForumScreenState extends State<AdminForumScreen> {
       loadingSkeleton: const PortalCardListSkeleton(),
       isEmpty: visible.isEmpty && !_loading,
       empty: _error != null
-          ? ForumErrorState(
-              message: _error!,
-              onRetry: () => _refresh(),
-            )
+          ? ForumErrorState(message: _error!, onRetry: () => _refresh())
           : DirectoryEmptyState(
               title: emptyCatalog ? 'No forum topics yet' : 'No matches',
               subtitle: emptyCatalog
@@ -902,6 +897,11 @@ class _AdminTopicRow extends StatelessWidget {
                     switch (value) {
                       case 'view':
                         onOpen();
+                      case 'share':
+                        await showShareLinkSheet(
+                          context,
+                          ShareableContent.fromTopic(topic),
+                        );
                       case 'copy':
                         await copyForumTopicLink(context, topic.id);
                       case 'lock':
@@ -912,8 +912,9 @@ class _AdminTopicRow extends StatelessWidget {
                                 title: topic.isLocked
                                     ? 'Unlock topic'
                                     : 'Lock topic',
-                                confirmLabel:
-                                    topic.isLocked ? 'Unlock' : 'Lock',
+                                confirmLabel: topic.isLocked
+                                    ? 'Unlock'
+                                    : 'Lock',
                               );
                         if (!topic.isLocked && reason == null) return;
                         await forum.setTopicLocked(
@@ -923,17 +924,11 @@ class _AdminTopicRow extends StatelessWidget {
                         );
                         onChanged();
                       case 'pin':
-                        await forum.setTopicPinned(
-                          topic.id,
-                          !topic.isPinned,
-                        );
+                        await forum.setTopicPinned(topic.id, !topic.isPinned);
                         onChanged();
                       case 'solved':
                         if (topic.isAnnouncement) return;
-                        await forum.setTopicSolved(
-                          topic.id,
-                          !topic.isSolved,
-                        );
+                        await forum.setTopicSolved(topic.id, !topic.isSolved);
                         onChanged();
                       case 'delete':
                         final reason = await showForumModerationReasonDialog(
@@ -975,6 +970,10 @@ class _AdminTopicRow extends StatelessWidget {
                     const PopupMenuItem(
                       value: 'view',
                       child: Text('Open discussion'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: Text('Share link…'),
                     ),
                     const PopupMenuItem(
                       value: 'copy',
@@ -1056,8 +1055,9 @@ class _AdminReportRow extends StatelessWidget {
                     color: report.isOpen
                         ? AdminForumTheme.warning.withValues(alpha: 0.12)
                         : ForumTheme.solvedBg,
-                    borderRadius:
-                        BorderRadius.circular(AdminForumTheme.radiusSm),
+                    borderRadius: BorderRadius.circular(
+                      AdminForumTheme.radiusSm,
+                    ),
                   ),
                   child: Icon(
                     report.isOpen
@@ -1119,10 +1119,7 @@ class _AdminReportRow extends StatelessWidget {
                     child: const Text('Resolve'),
                   ),
                 if (onReopen != null)
-                  TextButton(
-                    onPressed: onReopen,
-                    child: const Text('Reopen'),
-                  ),
+                  TextButton(onPressed: onReopen, child: const Text('Reopen')),
               ],
             ),
           ),

@@ -42,13 +42,11 @@ Future<void> showMessageImageViewer({
                         child: CircularProgressIndicator(color: Colors.white),
                       ),
                       error: _brokenImage(),
-                      builder: (url) => Image.network(
+                      builder: (url, {required errorBuilder}) => Image.network(
                         url,
                         fit: BoxFit.contain,
                         gaplessPlayback: true,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _brokenImage();
-                        },
+                        errorBuilder: errorBuilder,
                       ),
                     ),
             ),

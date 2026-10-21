@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_reports_aggregate.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Crucial CHED choice/multi fields for graduate-status overview charts.
 /// Skips early demographics and free-text / matrix-only items.
@@ -257,6 +259,7 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
       children: [
         SurveySectionCard(
           title: 'Filters',
+          subtitle: 'Filters apply to the charts below',
           trailing: (_batchFilter != null || _courseFilter != null)
               ? TextButton(
                   onPressed: () {
@@ -517,14 +520,7 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        color: AdminSurveyTheme.textPrimary,
-      ),
-    );
+    return Text(text, style: AdminText.sectionTitle);
   }
 }
 
@@ -537,38 +533,85 @@ class _FunnelCard extends StatelessWidget {
     final total = snapshot.assigned == 0 ? 1 : snapshot.assigned;
     return _AnalyticsCard(
       title: 'Participation funnel',
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: AdminColors.successBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AdminColors.success.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle_outline_rounded,
+              size: 13,
+              color: AdminColors.success,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${snapshot.completionRate.toStringAsFixed(0)}% Completed',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: AdminColors.success,
+              ),
+            ),
+          ],
+        ),
+      ),
       child: Column(
         children: [
           _FunnelBar(
             label: 'Not started',
             value: snapshot.notStarted,
             total: total,
-            color: AdminSurveyTheme.warning,
+            color: const Color(0xFFC2410C),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _FunnelBar(
             label: 'In progress',
             value: snapshot.inProgress,
             total: total,
-            color: AdminSurveyTheme.primary,
+            color: const Color(0xFFD97706),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _FunnelBar(
             label: 'Completed',
             value: snapshot.completed,
             total: total,
-            color: AdminSurveyTheme.success,
+            color: const Color(0xFF059669),
           ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Completion ${snapshot.completionRate.toStringAsFixed(0)}%',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 12.5,
-                color: AdminSurveyTheme.textSecondary,
-              ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AdminColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AdminColors.border),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total alumni assigned: ${snapshot.assigned}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: AdminColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  '${snapshot.completed} of ${snapshot.assigned} submitted',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: AdminColors.primary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -592,7 +635,8 @@ class _FunnelBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pct = value / total;
+    final pct = total == 0 ? 0.0 : (value / total);
+    final pctString = (pct * 100).toStringAsFixed(0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -601,22 +645,30 @@ class _FunnelBar extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(fontSize: 13),
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AdminColors.textPrimary,
+                ),
               ),
             ),
             Text(
-              '$value',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              '$value ($pctString%)',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+                color: color,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
             value: pct.clamp(0.0, 1.0),
             minHeight: 8,
-            backgroundColor: AdminSurveyTheme.surface,
+            backgroundColor: AdminColors.border.withValues(alpha: 0.5),
             color: color,
           ),
         ),
@@ -689,6 +741,8 @@ class _TrendCard extends StatelessWidget {
   const _TrendCard({required this.points});
   final List<SurveySubmissionTrendPoint> points;
 
+  static final _day = DateFormat.MMMd();
+
   @override
   Widget build(BuildContext context) {
     final max = points.fold<int>(0, (m, p) => p.count > m ? p.count : m);
@@ -715,17 +769,23 @@ class _TrendCard extends StatelessWidget {
               children: [
                 for (final p in points)
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 1),
-                      child: Container(
-                        height: max == 0
-                            ? 4
-                            : (4 + (p.count / max) * 68).clamp(4, 72),
-                        decoration: BoxDecoration(
-                          color: p.count == 0
-                              ? AdminSurveyTheme.border
-                              : AdminSurveyTheme.primary.withValues(alpha: 0.75),
-                          borderRadius: BorderRadius.circular(2),
+                    child: Tooltip(
+                      message: '${_day.format(p.day)} · ${p.count} '
+                          '${p.count == 1 ? 'submission' : 'submissions'}',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1),
+                        child: Container(
+                          height: max == 0
+                              ? 4
+                              : (4 + (p.count / max) * 68).clamp(4, 72),
+                          decoration: BoxDecoration(
+                            color: p.count == 0
+                                ? AdminSurveyTheme.border
+                                : AdminSurveyTheme.primary.withValues(
+                                    alpha: 0.75,
+                                  ),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
                     ),
@@ -733,6 +793,16 @@ class _TrendCard extends StatelessWidget {
               ],
             ),
           ),
+          if (points.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Text(_day.format(points.first.day), style: AdminText.caption),
+                const Spacer(),
+                Text(_day.format(points.last.day), style: AdminText.caption),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -923,28 +993,32 @@ class _AnalyticsCard extends StatelessWidget {
     required this.title,
     required this.child,
     this.dense = false,
+    this.trailing,
   });
 
   final String title;
   final Widget child;
   final bool dense;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(dense ? 12 : 14),
+      padding: EdgeInsets.all(dense ? 12 : 16),
       decoration: AdminSurveyTheme.surfaceCard(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: dense ? 13 : 14,
-              fontWeight: FontWeight.w700,
-              color: AdminSurveyTheme.textPrimary,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: AdminText.cardTitle.copyWith(fontWeight: FontWeight.w700),
+              ),
+              if (trailing != null) trailing!,
+            ],
           ),
           SizedBox(height: dense ? 8 : 12),
           child,

@@ -46,8 +46,14 @@ class EventService {
     return events;
   }
 
-  Future<List<AlumniEvent>> getUpcomingEvents() async {
-    await autoArchivePastEvents();
+  Future<List<AlumniEvent>> getUpcomingEvents({
+    bool runAutoArchive = true,
+  }) async {
+    // Archive in the background so Home / lists are not blocked on a second
+    // full fetch plus per-event status updates.
+    if (runAutoArchive) {
+      unawaited(autoArchivePastEvents());
+    }
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -62,13 +68,20 @@ class EventService {
     }).toList()..sort((a, b) => a.date.compareTo(b.date));
   }
 
+  /// Columns needed by [AlumniEvent.fromSupabaseRow].
+  static const eventSelectColumns =
+      'id, theme, batch_year, date, venue, status, comments_count, '
+      'start_time, end_time, description, created_at, cover_image_url, '
+      'category, capacity, registration_deadline, agenda, views_count, '
+      'cancelled, venue_latitude, venue_longitude';
+
   Future<AlumniEvent?> getEventById(String eventId) async {
     final id = eventId.trim();
     if (id.isEmpty) return null;
     try {
       final row = await _supabase
           .from('events')
-          .select()
+          .select(eventSelectColumns)
           .eq('id', id)
           .maybeSingle();
       if (row == null) return null;
@@ -210,8 +223,10 @@ class EventService {
     try {
       final rows = await _supabase
           .from('events')
-          .select()
-          .eq('status', 'Active');
+          .select(eventSelectColumns)
+          .eq('status', 'Active')
+          .order('date', ascending: true)
+          .limit(200);
       return rows.map(AlumniEvent.fromSupabaseRow).toList();
     } catch (_) {
       return [];
@@ -222,8 +237,10 @@ class EventService {
     try {
       final rows = await _supabase
           .from('events')
-          .select()
-          .eq('status', 'Archived');
+          .select(eventSelectColumns)
+          .eq('status', 'Archived')
+          .order('date', ascending: false)
+          .limit(100);
       return rows.map(AlumniEvent.fromSupabaseRow).toList();
     } catch (_) {
       return [];
@@ -234,8 +251,9 @@ class EventService {
     try {
       final rows = await _supabase
           .from('events')
-          .select()
-          .order('date', ascending: true);
+          .select(eventSelectColumns)
+          .order('date', ascending: true)
+          .limit(300);
       return rows.map(AlumniEvent.fromSupabaseRow).toList();
     } catch (_) {
       return [];

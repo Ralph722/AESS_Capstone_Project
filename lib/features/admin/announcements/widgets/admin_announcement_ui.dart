@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/announcements/models/announcement_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 
 /// Visual chrome for admin Announcements — reuses [AdminDirectoryTheme].
@@ -67,27 +68,9 @@ abstract final class AdminAnnouncementTheme {
 ButtonStyle announcementFilledButtonStyle({
   Color? background,
   Color foreground = Colors.white,
-}) =>
-    FilledButton.styleFrom(
-      backgroundColor: background ?? AdminAnnouncementTheme.primary,
-      foregroundColor: foreground,
-      minimumSize: const Size(0, AdminAnnouncementTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminAnnouncementTheme.radiusSm),
-      ),
-    );
+}) => AdminButtonStyles.filled(background: background, foreground: foreground);
 
-ButtonStyle announcementOutlinedButtonStyle() => OutlinedButton.styleFrom(
-      foregroundColor: AdminAnnouncementTheme.textPrimary,
-      side: const BorderSide(color: AdminAnnouncementTheme.border),
-      minimumSize: const Size(0, AdminAnnouncementTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminAnnouncementTheme.radiusSm),
-      ),
-    );
+ButtonStyle announcementOutlinedButtonStyle() => AdminButtonStyles.outlined();
 
 class AnnouncementStatusChip extends StatelessWidget {
   const AnnouncementStatusChip({super.key, required this.status});

@@ -1,32 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:alumni_system/core/constants/gts_constants.dart';
+import 'package:alumni_system/features/admin/activity/models/audit_log_model.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
+import 'package:alumni_system/features/alumni/profile/data/profile_change_diff.dart';
+import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
+import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
+import 'package:alumni_system/shared/widgets/user/skeleton.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Design tokens for the admin alumni directory (dense desktop spacing).
+/// Colors and surfaces alias [AdminColors] / [AdminSurfaces].
 abstract final class AdminDirectoryTheme {
-  static const primary = Color(0xFF1A1851);
+  static const primary = AdminColors.primary;
   static const navy = primary;
-  static const navyLight = Color(0xFF1A1851);
-  static const gold = Color(0xFFFBBF24);
-  static const background = Color(0xFFF8FAFC);
-  static const surface = Color(0xFFF1F5F9);
-  static const card = Colors.white;
-  static const border = Color(0xFFE5E7EB);
-  static const textPrimary = Color(0xFF0F172A);
-  static const textSecondary = Color(0xFF64748B);
-  static const textMuted = Color(0xFF94A3B8);
-  static const success = Color(0xFF16A34A);
-  static const successBg = Color(0xFFDCFCE7);
-  static const warning = Color(0xFFEA580C);
-  static const warningBg = Color(0xFFFFF7ED);
-  static const info = Color(0xFF1A1851);
-  static const infoBg = Color(0xFFE8E7F2);
-  static const danger = Color(0xFFDC2626);
-  static const dangerBg = Color(0xFFFEE2E2);
+  static const navyLight = AdminColors.primary;
+  static const gold = AdminColors.accent;
+  static const background = AdminColors.background;
+  static const surface = AdminColors.surface;
+  static const card = AdminColors.card;
+  static const border = AdminColors.border;
+  static const textPrimary = AdminColors.textPrimary;
+  static const textSecondary = AdminColors.textSecondary;
+  static const textMuted = AdminColors.textMuted;
+  static const success = AdminColors.success;
+  static const successBg = AdminColors.successBg;
+  static const warning = AdminColors.warning;
+  static const warningBg = AdminColors.warningBg;
+  static const info = AdminColors.info;
+  static const infoBg = AdminColors.infoBg;
+  static const danger = AdminColors.danger;
+  static const dangerBg = AdminColors.dangerBg;
 
   /// Spacing aliases → [AdminDensity] (Phase 2 global density system).
   static const space1 = AdminDensity.space1;
@@ -37,31 +46,16 @@ abstract final class AdminDirectoryTheme {
 
   /// Search / filter / toolbar control target height (~40–44px).
   static const toolbarControlHeight = 40.0;
-  static const radiusSm = 8.0;
-  static const radiusMd = 12.0;
-  static const radiusLg = 16.0;
+  static const radiusSm = AdminSurfaces.radiusSm;
+  static const radiusMd = AdminSurfaces.radiusMd;
+  static const radiusLg = AdminSurfaces.radiusLg;
 
-  static List<BoxShadow> get cardShadow => [
-    BoxShadow(
-      color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-      blurRadius: 10,
-      offset: const Offset(0, 2),
-    ),
-  ];
+  static List<BoxShadow> get cardShadow => AdminSurfaces.cardShadow;
 
-  static List<BoxShadow> get cardShadowHover => [
-    BoxShadow(
-      color: const Color(0xFF0F172A).withValues(alpha: 0.1),
-      blurRadius: 20,
-      offset: const Offset(0, 6),
-    ),
-  ];
+  static List<BoxShadow> get cardShadowHover => AdminSurfaces.cardShadowHover;
 
-  static BoxDecoration surfaceCard({bool hovered = false}) => BoxDecoration(
-    color: card,
-    borderRadius: BorderRadius.circular(radiusLg),
-    boxShadow: hovered ? cardShadowHover : cardShadow,
-  );
+  static BoxDecoration surfaceCard({bool hovered = false}) =>
+      AdminSurfaces.card(hovered: hovered);
 }
 
 class DirectoryPageHeader extends StatelessWidget {
@@ -83,8 +77,8 @@ class DirectoryPageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AdminPageHeader(
-      title: 'Official Alumni Roster',
-      subtitle: 'Manage registered alumni records.',
+      title: 'Alumni Directory',
+      subtitle: 'Official roster used to validate alumni registration.',
       titleFontSize: AdminDensity.titleFontSize,
       titleColor: AdminDirectoryTheme.textPrimary,
       subtitleColor: AdminDirectoryTheme.textSecondary,
@@ -118,48 +112,32 @@ class _HeaderActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final outlined = OutlinedButton.styleFrom(
-      foregroundColor: AdminDirectoryTheme.textPrimary,
-      side: const BorderSide(color: AdminDirectoryTheme.border),
-      minimumSize: const Size(0, AdminDirectoryTheme.buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-      ),
-    );
-
     return Wrap(
       spacing: AdminDirectoryTheme.space1,
       runSpacing: AdminDirectoryTheme.space1,
       alignment: WrapAlignment.end,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        OutlinedButton.icon(
-          onPressed: isLoading || isExporting || !canExport ? null : onExport,
-          icon: isExporting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.picture_as_pdf_outlined, size: 17),
-          label: Text(isExporting ? 'Exporting…' : 'Export'),
-          style: outlined,
+        Tooltip(
+          message: 'Download CHED GTS PDFs as a ZIP',
+          child: OutlinedButton.icon(
+            onPressed: isLoading || isExporting || !canExport ? null : onExport,
+            icon: isExporting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined, size: 17),
+            label: Text(isExporting ? 'Exporting…' : 'Export CHED GTS'),
+            style: AdminButtonStyles.outlined(),
+          ),
         ),
         FilledButton.icon(
           onPressed: isLoading ? null : onAdd,
           icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
           label: const Text('Add Alumni'),
-          style: FilledButton.styleFrom(
-            backgroundColor: AdminDirectoryTheme.primary,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(0, AdminDirectoryTheme.buttonHeight),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-            ),
-          ),
+          style: AdminButtonStyles.filled(),
         ),
       ],
     );
@@ -310,6 +288,47 @@ class DirectoryStatsGrid extends StatelessWidget {
   }
 }
 
+/// Directory KPI strip: every card on one equal-height row on desktop
+/// (4 or 5 cards); 2 / 1 columns on narrow widths like [DirectoryStatsGrid].
+class DirectoryKpiRow extends StatelessWidget {
+  const DirectoryKpiRow({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    const spacing = AdminDirectoryTheme.space2;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        if (width >= AdminDensity.statsFourColMin) {
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  if (i > 0) const SizedBox(width: spacing),
+                  Expanded(child: children[i]),
+                ],
+              ],
+            ),
+          );
+        }
+        final columns = width >= AdminDensity.statsTwoColMin ? 2 : 1;
+        final itemWidth = (width - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final child in children)
+              SizedBox(width: itemWidth, child: child),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class DirectoryToolbarCard extends StatelessWidget {
   const DirectoryToolbarCard({
     super.key,
@@ -323,6 +342,8 @@ class DirectoryToolbarCard extends StatelessWidget {
     required this.filters,
     this.activeFilterChips = const [],
     this.searchHint = 'Search by name, ID number, course, or email…',
+    this.refreshTooltip = 'Refresh roster',
+    this.singleRowMinWidth,
   });
 
   final TextEditingController searchController;
@@ -336,165 +357,222 @@ class DirectoryToolbarCard extends StatelessWidget {
   final List<Widget> activeFilterChips;
   final String searchHint;
 
+  /// Tooltip for the toolbar reload icon (defaults to Directory wording).
+  final String refreshTooltip;
+
+  /// When set and the card's content is at least this wide, search, filters
+  /// and refresh share one row and Reset moves next to the active chips.
+  /// [filters] then gets an unbounded width, so it must size itself.
+  final double? singleRowMinWidth;
+
   @override
   Widget build(BuildContext context) {
+    final minWidth = singleRowMinWidth;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: AdminDirectoryTheme.surfaceCard(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: minWidth == null
+          ? _buildTwoRows()
+          : LayoutBuilder(
+              builder: (context, constraints) =>
+                  constraints.maxWidth >= minWidth
+                  ? _buildSingleRow()
+                  : _buildTwoRows(),
+            ),
+    );
+  }
+
+  Widget _buildSingleRow() {
+    final showChipRow = activeFilterChips.isNotEmpty || hasActiveFilters;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: _buildSearchField()),
+            const SizedBox(width: 8),
+            filters,
+            const SizedBox(width: 8),
+            _buildRefreshButton(),
+          ],
+        ),
+        if (showChipRow) ...[
+          const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: AnimatedBuilder(
-                  animation: searchController,
-                  builder: (context, _) {
-                    return SizedBox(
-                      height: AdminDirectoryTheme.toolbarControlHeight,
-                      child: TextField(
-                        controller: searchController,
-                        onChanged: onSearchChanged,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          height: 1.2,
-                          color: AdminDirectoryTheme.textPrimary,
-                        ),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          hintText: searchHint,
-                          hintStyle: const TextStyle(
-                            color: AdminDirectoryTheme.textMuted,
-                            fontSize: 13.5,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            color: AdminDirectoryTheme.textMuted,
-                            size: 18,
-                          ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 40,
-                            minHeight: AdminDirectoryTheme.toolbarControlHeight,
-                          ),
-                          filled: true,
-                          fillColor: AdminDirectoryTheme.background,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AdminDirectoryTheme.radiusSm,
-                            ),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AdminDirectoryTheme.radiusSm,
-                            ),
-                            borderSide: const BorderSide(
-                              color: AdminDirectoryTheme.border,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AdminDirectoryTheme.radiusSm,
-                            ),
-                            borderSide: const BorderSide(
-                              color: AdminDirectoryTheme.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                          suffixIcon: searchController.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.close, size: 16),
-                                  tooltip: 'Clear search',
-                                  onPressed: onClearSearch,
-                                  style: AdminDensity.iconButtonStyle(
-                                    foregroundColor:
-                                        AdminDirectoryTheme.textSecondary,
-                                  ),
-                                ),
-                          suffixIconConstraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: AdminDirectoryTheme.toolbarControlHeight,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: activeFilterChips,
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: isLoading ? null : onRefresh,
-                tooltip: 'Refresh roster',
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(
-                    AdminDirectoryTheme.toolbarControlHeight,
-                    AdminDirectoryTheme.toolbarControlHeight,
-                  ),
-                  fixedSize: const Size(
-                    AdminDirectoryTheme.toolbarControlHeight,
-                    AdminDirectoryTheme.toolbarControlHeight,
-                  ),
-                  backgroundColor: AdminDirectoryTheme.background,
-                  foregroundColor: AdminDirectoryTheme.textPrimary,
-                  side: const BorderSide(color: AdminDirectoryTheme.border),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      AdminDirectoryTheme.radiusSm,
-                    ),
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                ),
-                icon: isLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh, size: 18),
-              ),
+              if (hasActiveFilters) _buildResetButton(),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: filters),
-              if (hasActiveFilters) ...[
-                const SizedBox(width: 4),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: TextButton.icon(
-                    onPressed: onResetFilters,
-                    icon: const Icon(Icons.filter_alt_off_outlined, size: 14),
-                    label: const Text('Reset'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AdminDirectoryTheme.textSecondary,
-                      minimumSize: const Size(
-                        0,
-                        AdminDirectoryTheme.toolbarControlHeight,
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      visualDensity: VisualDensity.compact,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (activeFilterChips.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(spacing: 6, runSpacing: 6, children: activeFilterChips),
-          ],
         ],
+      ],
+    );
+  }
+
+  Widget _buildTwoRows() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: _buildSearchField()),
+            const SizedBox(width: 8),
+            _buildRefreshButton(),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: filters),
+            if (hasActiveFilters) ...[
+              const SizedBox(width: 4),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: _buildResetButton(),
+              ),
+            ],
+          ],
+        ),
+        if (activeFilterChips.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: activeFilterChips),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildResetButton() {
+    return TextButton.icon(
+      onPressed: onResetFilters,
+      icon: const Icon(Icons.filter_alt_off_outlined, size: 14),
+      label: const Text('Reset'),
+      style: TextButton.styleFrom(
+        foregroundColor: AdminDirectoryTheme.textSecondary,
+        minimumSize: const Size(0, AdminDirectoryTheme.toolbarControlHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return AnimatedBuilder(
+      animation: searchController,
+      builder: (context, _) {
+        return SizedBox(
+          height: AdminDirectoryTheme.toolbarControlHeight,
+          child: TextField(
+            controller: searchController,
+            onChanged: onSearchChanged,
+            style: const TextStyle(
+              fontSize: 13.5,
+              height: 1.2,
+              color: AdminDirectoryTheme.textPrimary,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: searchHint,
+              hintStyle: const TextStyle(
+                color: AdminDirectoryTheme.textMuted,
+                fontSize: 13.5,
+              ),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: AdminDirectoryTheme.textMuted,
+                size: 18,
+              ),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 40,
+                minHeight: AdminDirectoryTheme.toolbarControlHeight,
+              ),
+              filled: true,
+              fillColor: AdminDirectoryTheme.background,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(
+                  AdminDirectoryTheme.radiusSm,
+                ),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(
+                  AdminDirectoryTheme.radiusSm,
+                ),
+                borderSide: const BorderSide(color: AdminDirectoryTheme.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(
+                  AdminDirectoryTheme.radiusSm,
+                ),
+                borderSide: const BorderSide(
+                  color: AdminDirectoryTheme.primary,
+                  width: 1.5,
+                ),
+              ),
+              suffixIcon: searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.close, size: 16),
+                      tooltip: 'Clear search',
+                      onPressed: onClearSearch,
+                      style: AdminDensity.iconButtonStyle(
+                        foregroundColor: AdminDirectoryTheme.textSecondary,
+                      ),
+                    ),
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 36,
+                minHeight: AdminDirectoryTheme.toolbarControlHeight,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRefreshButton() {
+    return IconButton(
+      onPressed: isLoading ? null : onRefresh,
+      tooltip: refreshTooltip,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(
+          AdminDirectoryTheme.toolbarControlHeight,
+          AdminDirectoryTheme.toolbarControlHeight,
+        ),
+        fixedSize: const Size(
+          AdminDirectoryTheme.toolbarControlHeight,
+          AdminDirectoryTheme.toolbarControlHeight,
+        ),
+        backgroundColor: AdminDirectoryTheme.background,
+        foregroundColor: AdminDirectoryTheme.textPrimary,
+        side: const BorderSide(color: AdminDirectoryTheme.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
+        ),
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+      ),
+      icon: isLoading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh, size: 18),
     );
   }
 }
@@ -617,6 +695,7 @@ class DirectoryFilterField<T> extends StatelessWidget {
     required String label,
     FloatingLabelBehavior floatingLabelBehavior = FloatingLabelBehavior.auto,
     Color borderColor = AdminDirectoryTheme.border,
+    Color fillColor = Colors.white,
   }) {
     final radius = BorderRadius.circular(AdminDirectoryTheme.radiusSm);
     return InputDecoration(
@@ -626,9 +705,15 @@ class DirectoryFilterField<T> extends StatelessWidget {
         fontSize: 11,
         color: AdminDirectoryTheme.textSecondary,
       ),
+      // Flutter scales a floated label to 75%; 14.5 renders at ~11px.
+      floatingLabelStyle: const TextStyle(
+        fontSize: 14.5,
+        fontWeight: FontWeight.w600,
+        color: AdminDirectoryTheme.textSecondary,
+      ),
       floatingLabelBehavior: floatingLabelBehavior,
       filled: true,
-      fillColor: AdminDirectoryTheme.background,
+      fillColor: fillColor,
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       border: OutlineInputBorder(
         borderRadius: radius,
@@ -653,6 +738,7 @@ class DirectoryFilterField<T> extends StatelessWidget {
       initialValue: value,
       isExpanded: true,
       isDense: true,
+      dropdownColor: Colors.white,
       iconSize: 18,
       borderRadius: radius,
       icon: const Icon(
@@ -795,7 +881,8 @@ abstract final class DirectoryDateTimePickers {
       context: context,
       firstDate: firstDate ?? DateTime(now.year - 25),
       lastDate: lastDate ?? DateTime(now.year + 2),
-      initialDateRange: initialDateRange ??
+      initialDateRange:
+          initialDateRange ??
           DateTimeRange(
             start: DateTime(now.year, now.month - 3, now.day),
             end: now,
@@ -924,9 +1011,7 @@ class _DirectoryPickerFilterShell extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: enabled ? onTap : null,
-              borderRadius: BorderRadius.circular(
-                AdminDirectoryTheme.radiusSm,
-              ),
+              borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusSm),
             ),
           ),
         ),
@@ -1067,56 +1152,19 @@ class DirectoryTimeFilterChip extends StatelessWidget {
 }
 
 class DirectoryResultsBar extends StatelessWidget {
-  const DirectoryResultsBar({
-    super.key,
-    required this.message,
-    this.pendingReviewCount = 0,
-  });
+  const DirectoryResultsBar({super.key, required this.message});
 
   final String message;
-  final int pendingReviewCount;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          message,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: AdminDirectoryTheme.textSecondary,
-          ),
-        ),
-        const Spacer(),
-        if (pendingReviewCount > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AdminDirectoryTheme.warningBg,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.notifications_active_outlined,
-                  size: 14,
-                  color: AdminDirectoryTheme.warning,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '$pendingReviewCount pending review',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AdminDirectoryTheme.warning,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
+    return Text(
+      message,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: AdminDirectoryTheme.textSecondary,
+      ),
     );
   }
 }
@@ -1231,6 +1279,7 @@ class DirectoryMemberCard extends StatefulWidget {
     this.isSelected = false,
     this.isChecked = false,
     this.onCheckedChanged,
+    this.chedProgress,
   });
 
   final AlumniMember member;
@@ -1242,6 +1291,9 @@ class DirectoryMemberCard extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback? onReactivate;
+
+  /// CHED GTS waves assigned vs submitted; null while loading or unknown.
+  final ChedGtsProgress? chedProgress;
 
   @override
   State<DirectoryMemberCard> createState() => _DirectoryMemberCardState();
@@ -1343,6 +1395,7 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
                               child: _MemberStatusColumn(
                                 member: member,
                                 isActive: isActive,
+                                chedProgress: widget.chedProgress,
                               ),
                             ),
                           ],
@@ -1379,6 +1432,7 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
                             _MemberStatusColumn(
                               member: member,
                               isActive: isActive,
+                              chedProgress: widget.chedProgress,
                             ),
                             const SizedBox(height: 4),
                             menu,
@@ -1397,14 +1451,19 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
   }
 }
 
+/// CHED GTS wave progress for one member: waves assigned vs submitted.
+typedef ChedGtsProgress = ({int assigned, int submitted});
+
 /// Column definitions for the wide desktop directory table.
 const kDirectoryTableColumns = <AdminDataColumn>[
   AdminDataColumn(label: 'NAME', flex: 3),
-  AdminDataColumn(label: 'COURSE', flex: 2),
-  AdminDataColumn(label: 'STUDENT ID', width: 120),
+  AdminDataColumn(label: 'COURSE', width: 96),
+  AdminDataColumn(label: 'BATCH', width: 64),
+  AdminDataColumn(label: 'STUDENT ID', width: 112),
   AdminDataColumn(label: 'EMAIL', flex: 2),
-  AdminDataColumn(label: 'LAST ACTIVE', width: 130),
-  AdminDataColumn(label: 'STATUS', width: 130),
+  AdminDataColumn(label: 'LAST ACTIVE', width: 120),
+  AdminDataColumn(label: 'CHED GTS', width: 100),
+  AdminDataColumn(label: 'STATUS', width: 116),
 ];
 
 /// Dense desktop table row for the alumni directory (wide layouts).
@@ -1420,6 +1479,7 @@ class DirectoryMemberTableRow extends StatelessWidget {
     this.isSelected = false,
     this.isChecked = false,
     this.onCheckedChanged,
+    this.chedProgress,
   });
 
   final AlumniMember member;
@@ -1431,6 +1491,34 @@ class DirectoryMemberTableRow extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback? onReactivate;
+
+  /// CHED GTS waves assigned vs submitted; null while loading or unknown.
+  final ChedGtsProgress? chedProgress;
+
+  Widget get _chedCell {
+    final progress = chedProgress;
+    if (progress == null || progress.assigned == 0) {
+      return const AdminTableTextCell('—', muted: true);
+    }
+    if (progress.submitted >= progress.assigned) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: AdminTableBadge(
+          label: 'Complete',
+          bg: AdminTableTheme.successBg,
+          fg: AdminTableTheme.success,
+        ),
+      );
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: AdminTableBadge(
+        label: '${progress.submitted}/${progress.assigned}',
+        bg: AdminTableTheme.warningBg,
+        fg: AdminTableTheme.warning,
+      ),
+    );
+  }
 
   String get _statusLabel {
     if (member.isDeactivated) return 'Deactivated';
@@ -1453,13 +1541,15 @@ class DirectoryMemberTableRow extends StatelessWidget {
     if (showActiveBadge && member.isRegisteredUser) {
       return AdminTableTheme.successBg;
     }
-    if (member.isRegisteredUser) return const Color(0xFFE8E7F2);
+    if (member.isRegisteredUser) return AdminColors.infoBg;
     return AdminTableTheme.warningBg;
   }
 
   @override
   Widget build(BuildContext context) {
     final email = member.registeredEmail?.trim();
+    final hasEmail = email != null && email.isNotEmpty;
+    final batch = member.effectiveBatchYear;
     final lastActive = member.lastActiveAt == null
         ? '—'
         : DateFormat.MMMd().add_jm().format(member.lastActiveAt!);
@@ -1490,15 +1580,16 @@ class DirectoryMemberTableRow extends StatelessWidget {
           member.course.isEmpty ? 'No course' : member.course,
           muted: member.course.isEmpty,
         ),
+        AdminTableTextCell(batch.isEmpty ? '—' : batch, muted: batch.isEmpty),
         AdminTableTextCell(
           member.studentId.isEmpty ? '—' : member.studentId,
           muted: member.studentId.isEmpty,
         ),
-        AdminTableTextCell(
-          email == null || email.isEmpty ? '—' : email,
-          muted: email == null || email.isEmpty,
-        ),
+        hasEmail
+            ? Tooltip(message: email, child: AdminTableTextCell(email))
+            : const AdminTableTextCell('—', muted: true),
         AdminTableTextCell(lastActive, muted: member.lastActiveAt == null),
+        _chedCell,
         Align(
           alignment: Alignment.centerLeft,
           child: AdminTableBadge(
@@ -1768,6 +1859,13 @@ class _MemberMetaGrid extends StatelessWidget {
         value: member.studentId.isEmpty ? 'Not provided' : member.studentId,
       ),
       _MemberMetaItem(
+        icon: Icons.calendar_today_outlined,
+        label: 'Batch',
+        value: member.effectiveBatchYear.isEmpty
+            ? 'Not provided'
+            : member.effectiveBatchYear,
+      ),
+      _MemberMetaItem(
         icon: Icons.mail_outline,
         label: 'Email',
         value: email == null || email.isEmpty ? 'Not provided' : email,
@@ -1857,10 +1955,15 @@ class _MemberMetaItem extends StatelessWidget {
 }
 
 class _MemberStatusColumn extends StatelessWidget {
-  const _MemberStatusColumn({required this.member, required this.isActive});
+  const _MemberStatusColumn({
+    required this.member,
+    required this.isActive,
+    this.chedProgress,
+  });
 
   final AlumniMember member;
   final bool isActive;
+  final ChedGtsProgress? chedProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -1906,13 +2009,19 @@ class _MemberStatusColumn extends StatelessWidget {
         ),
       );
     }
-    if (member.tracerProfileComplete) {
+    final ched = chedProgress;
+    if (ched != null && ched.assigned > 0) {
+      final done = ched.submitted >= ched.assigned;
       badges.add(
-        const _DirectoryBadge(
-          label: 'Tracer complete',
-          bg: AdminDirectoryTheme.successBg,
-          fg: AdminDirectoryTheme.success,
-          icon: Icons.task_alt,
+        _DirectoryBadge(
+          label: done
+              ? 'CHED complete'
+              : 'CHED ${ched.submitted}/${ched.assigned}',
+          bg: done
+              ? AdminDirectoryTheme.successBg
+              : AdminDirectoryTheme.warningBg,
+          fg: done ? AdminDirectoryTheme.success : AdminDirectoryTheme.warning,
+          icon: done ? Icons.task_alt : Icons.assignment_outlined,
         ),
       );
     }
@@ -2391,47 +2500,37 @@ class MemberDetailSection extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AdminDirectoryTheme.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: AdminDirectoryTheme.navy.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+        border: Border.all(color: AdminColors.border),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
-                    color: AdminDirectoryTheme.navy.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
+                    color: AdminColors.primaryTint,
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
                   ),
-                  child: Icon(icon, size: 20, color: AdminDirectoryTheme.navy),
+                  child: Icon(icon, size: 17, color: AdminColors.primary),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AdminDirectoryTheme.navy,
-                    ),
+                  child: Semantics(
+                    header: true,
+                    child: Text(title, style: AdminText.sectionTitle),
                   ),
                 ),
                 if (trailing != null) trailing!,
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             ...children,
           ],
         ),
@@ -2440,6 +2539,7 @@ class MemberDetailSection extends StatelessWidget {
   }
 }
 
+/// Label/value row. Empty values are hidden unless [emptyText] is given.
 class MemberDetailInfoRow extends StatelessWidget {
   const MemberDetailInfoRow({
     super.key,
@@ -2447,50 +2547,171 @@ class MemberDetailInfoRow extends StatelessWidget {
     required this.value,
     this.icon,
     this.highlight = false,
+    this.emptyText,
+    this.trailing,
+    this.changed = false,
   });
 
   final String label;
   final String value;
   final IconData? icon;
   final bool highlight;
+  final String? emptyText;
+
+  /// Shown after a non-empty value, e.g. a verification badge.
+  final Widget? trailing;
+
+  /// Marks the field as changed since the admin last reviewed the profile.
+  final bool changed;
+
+  static const double _labelWidth = 160;
+  static const double _stackBelow = 360;
 
   @override
   Widget build(BuildContext context) {
-    if (value.trim().isEmpty) return const SizedBox.shrink();
+    final isEmpty = value.trim().isEmpty;
+    if (isEmpty && emptyText == null) return const SizedBox.shrink();
+
+    final text = Text(
+      isEmpty ? emptyText! : value,
+      style: isEmpty
+          ? const TextStyle(
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+              color: AdminColors.textMuted,
+            )
+          : TextStyle(
+              fontSize: 14,
+              height: 1.35,
+              fontWeight: highlight ? FontWeight.w600 : FontWeight.w400,
+              color: AdminColors.textPrimary,
+            ),
+    );
+    final valueText = isEmpty || trailing == null
+        ? text
+        : Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [text, trailing!],
+          );
+    final labelText = Text(
+      label,
+      style: const TextStyle(
+        fontSize: 13,
+        height: 1.35,
+        fontWeight: FontWeight.w500,
+        color: AdminColors.textSecondary,
+      ),
+    );
+    final labelWidget = changed
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(child: labelText),
+              const SizedBox(width: 6),
+              Tooltip(
+                message: 'Changed since last review',
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: AdminDirectoryTheme.warning,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          )
+        : labelText;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 18, color: Colors.grey.shade500),
-            const SizedBox(width: 10),
-          ],
-          SizedBox(
-            width: icon != null ? 110 : 120,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: highlight ? FontWeight.w600 : FontWeight.normal,
-                color: highlight
-                    ? AdminDirectoryTheme.navy
-                    : AdminDirectoryTheme.navy.withValues(alpha: 0.9),
-              ),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.only(bottom: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < _stackBelow;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (icon != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(icon, size: 16, color: AdminColors.textMuted),
+                ),
+                const SizedBox(width: 10),
+              ],
+              if (stacked)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [labelWidget, const SizedBox(height: 2), valueText],
+                  ),
+                )
+              else ...[
+                SizedBox(width: _labelWidth, child: labelWidget),
+                const SizedBox(width: 12),
+                Expanded(child: valueText),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+enum ContactVerificationStatus { verified, demo, notVerified }
+
+/// Verification badge for an alumnus's contact email or mobile number.
+class ContactVerificationBadge extends StatelessWidget {
+  const ContactVerificationBadge({super.key, required this.status});
+
+  ContactVerificationBadge.email(TracerProfile profile, {super.key})
+    : status = profile.contactEmailVerified
+          ? ContactVerificationStatus.verified
+          : ContactVerificationStatus.notVerified;
+
+  ContactVerificationBadge.mobile(TracerProfile profile, {super.key})
+    : status = profile.mobileVerified
+          ? ContactVerificationStatus.verified
+          : profile.mobileDemoConfirmed
+          ? ContactVerificationStatus.demo
+          : ContactVerificationStatus.notVerified;
+
+  final ContactVerificationStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, tooltip, icon, bg, fg) = switch (status) {
+      ContactVerificationStatus.verified => (
+        'Verified',
+        'Confirmed with a one-time code.',
+        Icons.verified_outlined,
+        AdminTableTheme.successBg,
+        AdminTableTheme.success,
+      ),
+      ContactVerificationStatus.demo => (
+        'Demo code',
+        'Confirmed with an on-screen demo code. Text message checks are not '
+            'live yet, so this is not counted as verified.',
+        Icons.science_outlined,
+        AdminTableTheme.warningBg,
+        AdminTableTheme.warning,
+      ),
+      ContactVerificationStatus.notVerified => (
+        'Not verified',
+        'Not yet confirmed by the alumnus.',
+        Icons.help_outline,
+        AdminTableTheme.headerBg,
+        AdminTableTheme.textSecondary,
+      ),
+    };
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        label: '$label. $tooltip',
+        excludeSemantics: true,
+        child: AdminTableBadge(label: label, icon: icon, bg: bg, fg: fg),
       ),
     );
   }
@@ -2552,6 +2773,1051 @@ class MemberDetailEmptyPanel extends StatelessWidget {
           ),
           if (child != null) ...[const SizedBox(height: 20), child!],
         ],
+      ),
+    );
+  }
+}
+
+/// Status chip used in the member detail header.
+class MemberDetailChip extends StatelessWidget {
+  const MemberDetailChip({
+    super.key,
+    required this.label,
+    required this.bg,
+    required this.fg,
+    this.icon,
+    this.tooltip,
+    this.onTap,
+  });
+
+  final String label;
+  final Color bg;
+  final Color fg;
+  final IconData? icon;
+  final String? tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: fg),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: fg,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (onTap != null) {
+      chip = MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(onTap: onTap, child: chip),
+      );
+    }
+    if (tooltip != null) chip = Tooltip(message: tooltip!, child: chip);
+    return chip;
+  }
+}
+
+/// Identity and status for the member detail panel: photo, name, details
+/// line (course · ID · batch · email) and status chips.
+class MemberDetailPanelHeader extends StatelessWidget {
+  const MemberDetailPanelHeader({
+    super.key,
+    required this.member,
+    required this.onClose,
+    this.imageUrl,
+    this.tracerPercent,
+    this.activityCount = 0,
+    this.onActivityTap,
+    this.actions = const [],
+  });
+
+  static const activeWindow = Duration(days: 30);
+
+  final AlumniMember member;
+  final VoidCallback onClose;
+  final String? imageUrl;
+
+  /// Loaded tracer completion (0–100); no chip when null.
+  final double? tracerPercent;
+  final int activityCount;
+  final VoidCallback? onActivityTap;
+  final List<Widget> actions;
+
+  static String detailsLine(AlumniMember member) {
+    final batch = member.effectiveBatchYear;
+    final email = member.registeredEmail?.trim() ?? '';
+    return [
+      if (member.course.trim().isNotEmpty) member.course.trim(),
+      if (member.studentId.trim().isNotEmpty) 'ID ${member.studentId.trim()}',
+      if (batch.isNotEmpty) 'Batch $batch',
+      if (email.isNotEmpty) email,
+    ].join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = member.isActiveWithin(activeWindow);
+    final percent = tracerPercent?.clamp(0, 100).round();
+    final details = detailsLine(member);
+
+    final chips = <Widget>[
+      if (member.isDeactivated)
+        const MemberDetailChip(
+          label: 'Deactivated',
+          bg: AdminColors.dangerBg,
+          fg: AdminColors.danger,
+          icon: Icons.block,
+        )
+      else if (member.isRegisteredUser)
+        const MemberDetailChip(
+          label: 'Registered',
+          bg: AdminColors.infoBg,
+          fg: AdminColors.info,
+          icon: Icons.verified_outlined,
+        )
+      else
+        const MemberDetailChip(
+          label: 'Not registered',
+          bg: AdminColors.warningBg,
+          fg: AdminColors.warning,
+          icon: Icons.person_outline,
+        ),
+      if (isActive)
+        const MemberDetailChip(
+          label: 'Active (30d)',
+          bg: AdminColors.successBg,
+          fg: AdminColors.success,
+          icon: Icons.circle,
+          tooltip: 'Used the app in the last 30 days',
+        ),
+      if (percent != null)
+        MemberDetailChip(
+          label: 'Tracer $percent%',
+          bg: percent >= 100 ? AdminColors.successBg : AdminColors.warningBg,
+          fg: percent >= 100 ? AdminColors.success : AdminColors.warning,
+          icon: percent >= 100 ? Icons.task_alt : Icons.pending_outlined,
+        ),
+      if (member.hasProfileUpdates)
+        const MemberDetailChip(
+          label: 'Profile updated',
+          bg: AdminColors.warningBg,
+          fg: AdminColors.warning,
+        ),
+      if (activityCount > 0)
+        MemberDetailChip(
+          label: '$activityCount activities',
+          bg: AdminColors.surface,
+          fg: AdminColors.textSecondary,
+          icon: Icons.history,
+          tooltip: 'Open activity logs',
+          onTap: onActivityTap,
+        ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 10, 12, 12),
+      decoration: const BoxDecoration(
+        color: AdminColors.card,
+        border: Border(bottom: BorderSide(color: AdminColors.border)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            tooltip: 'Close details',
+            onPressed: onClose,
+            style: IconButton.styleFrom(
+              foregroundColor: AdminColors.textSecondary,
+              minimumSize: const Size(
+                AdminDensity.buttonHeight,
+                AdminDensity.buttonHeight,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          _MemberDetailAvatar(
+            name: member.fullName,
+            imageUrl: imageUrl,
+            isActive: isActive,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    member.fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AdminColors.textPrimary,
+                    ),
+                  ),
+                ),
+                if (details.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    details,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.caption,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: chips),
+              ],
+            ),
+          ),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Row(mainAxisSize: MainAxisSize.min, children: actions),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberDetailAvatar extends StatelessWidget {
+  const _MemberDetailAvatar({
+    required this.name,
+    required this.imageUrl,
+    required this.isActive,
+  });
+
+  final String name;
+  final String? imageUrl;
+  final bool isActive;
+
+  static const double _size = 48;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = imageUrl?.trim() ?? '';
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipOval(
+          child: SizedBox(
+            width: _size,
+            height: _size,
+            child: image.isNotEmpty
+                ? AppImage.widget(
+                    image,
+                    width: _size,
+                    height: _size,
+                    fit: BoxFit.cover,
+                  )
+                : ColoredBox(
+                    color: AdminColors.primaryTint,
+                    child: Center(
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AdminColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        if (isActive)
+          Positioned(
+            right: -1,
+            bottom: -1,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: AdminColors.success,
+                shape: BoxShape.circle,
+                border: Border.all(color: AdminColors.card, width: 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Slim notice above member detail content (not registered, missing
+/// tracer fields, …).
+class MemberDetailNotice extends StatelessWidget {
+  const MemberDetailNotice({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.message,
+    this.warning = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? message;
+  final bool warning;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = warning ? AdminColors.warning : AdminColors.primary;
+    final bg = warning ? AdminColors.warningBg : AdminColors.primaryTint;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: fg.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: fg),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AdminColors.textPrimary,
+                  ),
+                ),
+                if (message != null && message!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    message!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AdminColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// GTS labels for the required tracer fields that are empty in [tracer]
+/// (same field list as [TracerProfile.requiredFieldKeys]).
+List<String> memberDetailMissingTracerLabels(TracerProfile tracer) {
+  const labels = {
+    'displayName': GtsConstants.labelName,
+    'address': GtsConstants.labelPermanentAddress,
+    'email': GtsConstants.labelEmail,
+    'telephoneNumber': GtsConstants.labelTelephone,
+    'mobileNumber': GtsConstants.labelMobile,
+    'civilStatus': GtsConstants.labelCivilStatus,
+    'gender': GtsConstants.labelSex,
+    'birthDate': GtsConstants.labelBirthday,
+    'regionOfOrigin': GtsConstants.labelRegionOfOrigin,
+    'province': GtsConstants.labelProvince,
+    'locationOfResidence': GtsConstants.labelLocationOfResidence,
+    'program': GtsConstants.labelDegreeSpecialization,
+    'collegeUniversity': GtsConstants.labelCollegeUniversity,
+    'yearGraduated': GtsConstants.labelYearGraduated,
+    'employmentStatus': GtsConstants.labelEmploymentStatus,
+  };
+  final missing = TracerProfile.missingRequiredKeys({
+    'displayName': tracer.displayName,
+    'address': tracer.address,
+    'email': tracer.email,
+    'telephoneNumber': tracer.telephoneNumber,
+    'mobileNumber': tracer.mobileNumber,
+    'civilStatus': tracer.civilStatus,
+    'gender': tracer.gender,
+    'birthDate': tracer.birthDate,
+    'regionOfOrigin': tracer.regionOfOrigin,
+    'province': tracer.province,
+    'locationOfResidence': tracer.locationOfResidence,
+    'program': tracer.program,
+    'collegeUniversity': tracer.collegeUniversity,
+    'yearGraduated': tracer.yearGraduated,
+    'employmentStatus': tracer.employmentStatus,
+  });
+  return [for (final key in missing) labels[key] ?? key];
+}
+
+/// Banner for an incomplete tracer profile, naming the missing fields.
+class MemberDetailCompletenessBanner extends StatelessWidget {
+  const MemberDetailCompletenessBanner({
+    super.key,
+    required this.percent,
+    required this.missingLabels,
+  });
+
+  final double percent;
+  final List<String> missingLabels;
+
+  @override
+  Widget build(BuildContext context) {
+    final rounded = percent.clamp(0, 100).round();
+    return MemberDetailNotice(
+      icon: Icons.info_outline,
+      warning: true,
+      title: 'Tracer profile $rounded% complete',
+      message: missingLabels.isEmpty
+          ? 'Some tracer profile fields are still missing.'
+          : 'Missing: ${missingLabels.join(', ')}',
+    );
+  }
+}
+
+/// Two columns side by side when at least [AdminDensity.desktopSplitMin]
+/// wide; one column (left, then right) below that.
+class MemberDetailColumns extends StatelessWidget {
+  const MemberDetailColumns({
+    super.key,
+    required this.left,
+    this.right = const [],
+    this.gap = 16,
+  });
+
+  final List<Widget> left;
+  final List<Widget> right;
+  final double gap;
+
+  List<Widget> _spaced(List<Widget> items) => [
+    for (var i = 0; i < items.length; i++) ...[
+      if (i > 0) SizedBox(height: gap),
+      items[i],
+    ],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < AdminDensity.desktopSplitMin) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _spaced([...left, ...right]),
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _spaced(left),
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _spaced(right),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+const _activityAcronyms = {'CHED', 'GTS', 'PDF', 'DSS', 'FCM', 'SMS', 'ID'};
+
+/// Readable form of an audit action code: `UPDATE_ROSTER_MEMBER` →
+/// "Update roster member". Known acronyms stay upper case.
+String memberDetailActionLabel(String action) {
+  final words = action
+      .trim()
+      .split(RegExp(r'[_\s]+'))
+      .where((w) => w.isNotEmpty)
+      .toList();
+  if (words.isEmpty) return action;
+  final out = <String>[];
+  for (var i = 0; i < words.length; i++) {
+    final upper = words[i].toUpperCase();
+    if (_activityAcronyms.contains(upper)) {
+      out.add(upper);
+    } else {
+      final lower = words[i].toLowerCase();
+      out.add(
+        i == 0 ? '${lower[0].toUpperCase()}${lower.substring(1)}' : lower,
+      );
+    }
+  }
+  return out.join(' ');
+}
+
+/// Timeline filter category for an audit entry: where the change came from.
+String memberDetailActivitySource(AuditLog log) {
+  final source = log.changes?['source']?.toString() ?? '';
+  if (source.isNotEmpty) return source;
+  if (log.userRole == 'admin') return 'admin';
+  return 'other';
+}
+
+const _activitySourceOrder = [
+  'profile',
+  'tracer',
+  'survey',
+  'onboarding',
+  'admin',
+  'other',
+];
+
+String _activitySourceFilterLabel(String source) => switch (source) {
+  'admin' => 'Admin',
+  'other' => 'Other',
+  _ => profileChangeSourceLabel(source),
+};
+
+String _activitySourceChipLabel(String source) => switch (source) {
+  'admin' => 'Admin action',
+  'other' => '',
+  _ => 'Via ${profileChangeSourceLabel(source)}',
+};
+
+String _relativeActivityTime(DateTime timestamp) {
+  final diff = DateTime.now().difference(timestamp);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  return '';
+}
+
+/// Audit entries as a timeline inside one bordered card, with a source
+/// filter and expandable field-level diffs for profile changes.
+class MemberDetailActivityList extends StatefulWidget {
+  const MemberDetailActivityList({super.key, required this.logs, this.limit});
+
+  final List<AuditLog> logs;
+
+  /// Maximum rows the source returns; a note is shown when it is reached.
+  final int? limit;
+
+  static final _format = DateFormat.yMMMd().add_jm();
+
+  @override
+  State<MemberDetailActivityList> createState() =>
+      _MemberDetailActivityListState();
+}
+
+class _MemberDetailActivityListState extends State<MemberDetailActivityList> {
+  String _filter = 'all';
+
+  @override
+  Widget build(BuildContext context) {
+    final logs = widget.logs;
+    final limit = widget.limit;
+    final reachedLimit = limit != null && logs.length >= limit;
+
+    final present = logs.map(memberDetailActivitySource).toSet();
+    final categories = [
+      for (final source in _activitySourceOrder)
+        if (present.contains(source)) source,
+    ];
+    final filtered = _filter == 'all'
+        ? logs
+        : logs
+              .where((log) => memberDetailActivitySource(log) == _filter)
+              .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (reachedLimit) ...[
+          Text('Showing the latest $limit entries', style: AdminText.caption),
+          const SizedBox(height: 8),
+        ],
+        if (categories.length > 1) ...[
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final source in ['all', ...categories])
+                FilterChip(
+                  label: Text(
+                    source == 'all'
+                        ? 'All'
+                        : _activitySourceFilterLabel(source),
+                  ),
+                  selected: _filter == source,
+                  onSelected: (_) => setState(() => _filter = source),
+                  labelStyle: const TextStyle(fontSize: 12),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (filtered.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'No entries in this category.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AdminColors.textSecondary,
+              ),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AdminColors.card,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+              border: Border.all(color: AdminColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < filtered.length; i++) ...[
+                  if (i > 0)
+                    const Divider(height: 1, color: AdminColors.border),
+                  _MemberDetailActivityRow(
+                    log: filtered[i],
+                    format: MemberDetailActivityList._format,
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MemberDetailActivityRow extends StatefulWidget {
+  const _MemberDetailActivityRow({required this.log, required this.format});
+
+  final AuditLog log;
+  final DateFormat format;
+
+  @override
+  State<_MemberDetailActivityRow> createState() =>
+      _MemberDetailActivityRowState();
+}
+
+class _MemberDetailActivityRowState extends State<_MemberDetailActivityRow> {
+  bool _expanded = false;
+
+  AuditLog get log => widget.log;
+
+  Map<String, dynamic>? get _fields {
+    final fields = log.changes?['fields'];
+    if (log.action != 'PROFILE_UPDATE' || fields is! Map || fields.isEmpty) {
+      return null;
+    }
+    return fields.map((k, v) => MapEntry(k.toString(), v));
+  }
+
+  bool get _hasFromTo =>
+      (log.action == 'NAME_CHANGE' || log.action == 'LOGIN_EMAIL_CHANGE') &&
+      log.changes?['from'] != null &&
+      log.changes?['to'] != null;
+
+  String get _title {
+    switch (log.action) {
+      case 'PROFILE_UPDATE':
+        return 'Profile updated';
+      case 'NAME_CHANGE':
+        return 'Name changed';
+      case 'LOGIN_EMAIL_CHANGE':
+        return log.changes?['loginChanged'] == true
+            ? 'Login email changed'
+            : 'Contact email confirmed';
+      default:
+        return memberDetailActionLabel(log.action);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = log.status.toUpperCase() == 'SUCCESS';
+    final fg = ok ? AdminColors.success : AdminColors.danger;
+    final fields = _fields;
+    final description = log.description.isNotEmpty
+        ? log.description
+        : '${log.resource} · ${log.resourceId}';
+    final relative = _relativeActivityTime(log.timestamp);
+    final meta = [
+      if (relative.isNotEmpty) relative,
+      widget.format.format(log.timestamp),
+      if (log.userName.trim().isNotEmpty) log.userName,
+    ].join(' · ');
+    final sourceChip = _activitySourceChipLabel(
+      memberDetailActivitySource(log),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              fields != null
+                  ? Icons.edit_outlined
+                  : ok
+                  ? Icons.check_circle_outline
+                  : Icons.error_outline,
+              size: 18,
+              color: fields != null ? AdminColors.primary : fg,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Tooltip(
+                        message: log.action,
+                        child: Text(
+                          _title,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AdminColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (sourceChip.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AdminColors.infoBg,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          sourceChip,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AdminColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (fields == null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: AdminColors.textSecondary,
+                    ),
+                  ),
+                ],
+                if (_hasFromTo) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '${log.changes!['from']} → ${log.changes!['to']}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AdminColors.textPrimary,
+                    ),
+                  ),
+                ],
+                if (fields != null) ...[
+                  const SizedBox(height: 6),
+                  _fieldSummary(fields),
+                  if (_expanded) ...[
+                    const SizedBox(height: 8),
+                    for (final entry in fields.entries)
+                      _fieldDiffRow(entry.key, entry.value),
+                  ],
+                ],
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 2,
+                  children: [
+                    Text(meta, style: AdminText.caption),
+                    Text(
+                      log.status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _fieldSummary(Map<String, dynamic> fields) {
+    final labels = [
+      for (final key in fields.keys) profileFieldLabels[key] ?? key,
+    ];
+    final shown = labels.take(4).toList();
+    final extra = labels.length - shown.length;
+    return InkWell(
+      onTap: () => setState(() => _expanded = !_expanded),
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                extra > 0
+                    ? '${shown.join(', ')} +$extra more'
+                    : shown.join(', '),
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AdminColors.textSecondary,
+                ),
+              ),
+            ),
+            Icon(
+              _expanded ? Icons.expand_less : Icons.expand_more,
+              size: 18,
+              color: AdminColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fieldDiffRow(String key, dynamic value) {
+    final label = profileFieldLabels[key] ?? key;
+    var from = '';
+    var to = '';
+    if (value is Map) {
+      from = value['from']?.toString() ?? '';
+      to = value['to']?.toString() ?? '';
+    }
+    final text = (from.isEmpty && to.isEmpty)
+        ? 'Changed'
+        : '${from.isEmpty ? '—' : from} → ${to.isEmpty ? '—' : to}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AdminColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: AdminColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Question/answer pairs for a non-CHED survey snapshot. When the survey's
+/// questions are unavailable, answers are listed by position with the stored
+/// key in a tooltip.
+class MemberDetailAnswerList extends StatelessWidget {
+  const MemberDetailAnswerList({
+    super.key,
+    required this.questions,
+    required this.answers,
+  });
+
+  final List<SurveyQuestion> questions;
+  final Map<String, dynamic> answers;
+
+  static String formatAnswer(dynamic answer) {
+    if (answer == null) return '—';
+    if (answer is List) return answer.join(', ');
+    return answer.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (questions.isEmpty && answers.isEmpty) {
+      return const Text(
+        'No answers recorded for this response.',
+        style: TextStyle(fontSize: 13, color: AdminColors.textSecondary),
+      );
+    }
+    final blocks = questions.isNotEmpty
+        ? [
+            for (final q in questions)
+              _MemberDetailAnswerBlock(
+                label: q.prompt,
+                value: formatAnswer(answers[q.id]),
+              ),
+          ]
+        : [
+            for (final (i, entry) in answers.entries.indexed)
+              _MemberDetailAnswerBlock(
+                label: 'Answer ${i + 1} (question no longer available)',
+                value: formatAnswer(entry.value),
+                tooltip: entry.key,
+              ),
+          ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: blocks,
+    );
+  }
+}
+
+class _MemberDetailAnswerBlock extends StatelessWidget {
+  const _MemberDetailAnswerBlock({
+    required this.label,
+    required this.value,
+    this.tooltip,
+  });
+
+  final String label;
+  final String value;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget labelText = Text(
+      label,
+      style: const TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: 13,
+        color: AdminColors.textPrimary,
+      ),
+    );
+    if (tooltip != null) {
+      labelText = Tooltip(message: tooltip!, child: labelText);
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          labelText,
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: AdminColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Loading placeholder for member detail tab content.
+class MemberDetailSkeleton extends StatelessWidget {
+  const MemberDetailSkeleton({super.key});
+
+  Widget _card(int lines) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+        border: Border.all(color: AdminColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Skeleton(width: 160, height: 14),
+          for (var i = 0; i < lines; i++) ...[
+            const SizedBox(height: 14),
+            const Row(
+              children: [
+                Skeleton(width: 120, height: 10),
+                SizedBox(width: 24),
+                Expanded(child: Skeleton(height: 10)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerScope(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: MemberDetailColumns(
+          left: [_card(8)],
+          right: [_card(3), _card(1)],
+        ),
       ),
     );
   }

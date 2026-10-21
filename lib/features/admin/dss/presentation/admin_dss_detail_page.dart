@@ -17,6 +17,7 @@ import 'package:alumni_system/features/admin/dss/widgets/dss_action_dialogs.dart
 import 'package:alumni_system/features/admin/dss/widgets/dss_outcome_card.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
 
 /// Inline DSS flag detail panel (Surveys-style workspace).
 class AdminDssDetailPanel extends StatefulWidget {
@@ -323,7 +324,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Flag reopened'),
+          content: Text('Finding reopened'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -472,6 +473,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: AdminDialogStandards.shape,
+        elevation: AdminDialogStandards.elevation,
         title: const Text('Remove evidence?'),
         content: Text(
           '"${entry.title}" will be hidden from this list. The action log '
@@ -676,6 +681,11 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         (flag.status == DssFlagStatus.watch && _interventions.isEmpty)) {
       return const [];
     }
+    // Record / plan entry lives in the unified Intervention section while
+    // the finding is still open or in progress.
+    final recordInInterventionSection =
+        flag.status == DssFlagStatus.open ||
+        flag.status == DssFlagStatus.inProgress;
     return [
       DssOutcomeCard(
         flag: flag,
@@ -683,9 +693,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         check: _outcomeCheck,
         busy: _saving,
         canRecord:
-            flag.status == DssFlagStatus.open ||
-            flag.status == DssFlagStatus.inProgress ||
-            flag.status == DssFlagStatus.resolved,
+            !recordInInterventionSection &&
+            (flag.status == DssFlagStatus.open ||
+                flag.status == DssFlagStatus.inProgress ||
+                flag.status == DssFlagStatus.resolved),
         onRecord: _recordIntervention,
         onCheck: (i) => _checkOutcome(i),
         onEditPlan: _editInterventionPlan,
@@ -693,6 +704,113 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       ),
       const SizedBox(height: AdminDssTheme.space2),
     ];
+  }
+
+  /// Unified Intervention section: type for Resolve + optional plan details
+  /// (dss_interventions) without merging the two stores.
+  Widget _interventionCard(DssFlag flag) {
+    final closed = flag.status.isClosed;
+    final undecided = _undecidedIntervention;
+    final options = List<String>.from(
+      DssCopy.interventionsForRule(flag.ruleId),
+    );
+    if (_intervention != null &&
+        _intervention!.isNotEmpty &&
+        !options.contains(_intervention)) {
+      options.insert(0, _intervention!);
+    }
+    final value = options.contains(_intervention) ? _intervention : null;
+
+    return DssSurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Intervention',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
+              color: AdminDssTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Required to Resolve finding. Optional plan details track next-wave outcome.',
+            style: TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            key: ValueKey('intervention-${flag.ruleId}-$value'),
+            initialValue: value,
+            dropdownColor: Colors.white,
+            decoration: _fieldDecoration('Intervention (required to resolve)'),
+            items: options
+                .map((i) => DropdownMenuItem(value: i, child: Text(i)))
+                .toList(),
+            onChanged: closed ? null : (v) => setState(() => _intervention = v),
+          ),
+          if (_intervention == 'Other') ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _interventionDetailCtrl,
+              minLines: 2,
+              maxLines: 3,
+              style: const TextStyle(fontSize: 13),
+              decoration: _fieldDecoration(
+                'Describe offline action (counts as proof)',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+          if (undecided != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AdminDssTheme.infoBg,
+                borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+              ),
+              child: Text(
+                'Plan on record: ${undecided.interventionType}'
+                '${undecided.description.isEmpty ? '' : ' — ${undecided.description}'}'
+                '\nOutcome: ${undecided.outcomeStatus.label}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AdminDssTheme.textPrimary,
+                ),
+              ),
+            ),
+          ],
+          if (!closed && _hasOutcomes) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (undecided == null)
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _recordIntervention,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add plan details'),
+                    style: dssOutlinedButtonStyle(),
+                  )
+                else if (undecided.canEditPlan)
+                  OutlinedButton.icon(
+                    onPressed: _saving
+                        ? null
+                        : () => _editInterventionPlan(undecided),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('Edit plan details'),
+                    style: dssOutlinedButtonStyle(),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _addNoteOnly() async {
@@ -731,7 +849,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DssPageHeader(
-            title: 'Flag detail',
+            title: 'Finding',
             onBack: () => widget.onClose(),
             actions: const [],
           ),
@@ -756,7 +874,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               flag.cohortLabel +
               (flag.surveyTitle.isEmpty ? '' : ' · ${flag.surveyTitle}'),
           onBack: () => widget.onClose(),
-          backTooltip: 'Back to recommendations',
+          backTooltip: 'Back to findings',
           actions: [DssStatusChip(status: flag.status)],
         ),
         const SizedBox(height: AdminDssTheme.space2),
@@ -768,26 +886,12 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                     Expanded(
                       flex: 3,
                       child: ListView(
-                        children: [
-                          _findingCard(flag, playbook),
-                          const SizedBox(height: AdminDssTheme.space2),
-                          if (flag.isActive) ...[
-                            _priorityCard(flag),
-                            const SizedBox(height: AdminDssTheme.space2),
-                          ],
-                          if (showSuggestions) ...[
-                            _suggestionsCard(),
-                            const SizedBox(height: AdminDssTheme.space2),
-                          ],
-                          ..._outcomeCards(flag),
-                          if (flag.status == DssFlagStatus.resolved ||
-                              flag.followupValue != null ||
-                              flag.impactVerdict != null) ...[
-                            _impactCard(flag),
-                            const SizedBox(height: AdminDssTheme.space2),
-                          ],
-                          if (_canAct(flag)) _actCard(flag),
-                        ],
+                        children: _stageAwareBody(
+                          flag,
+                          playbook,
+                          includeStatus: false,
+                          showSuggestions: showSuggestions,
+                        ),
                       ),
                     ),
                     const SizedBox(width: AdminDssTheme.space2),
@@ -797,7 +901,6 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                         children: [
                           _statusPanel(flag),
                           const SizedBox(height: AdminDssTheme.space2),
-                          ..._accountabilityCards(flag),
                           _notesCard(df),
                         ],
                       ),
@@ -806,36 +909,114 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 )
               : ListView(
                   children: [
-                    _findingCard(flag, playbook),
-                    const SizedBox(height: AdminDssTheme.space2),
-                    if (flag.isActive) ...[
-                      _priorityCard(flag),
-                      const SizedBox(height: AdminDssTheme.space2),
-                    ],
-                    if (showSuggestions) ...[
-                      _suggestionsCard(),
-                      const SizedBox(height: AdminDssTheme.space2),
-                    ],
-                    ..._outcomeCards(flag),
-                    if (flag.status == DssFlagStatus.resolved ||
-                        flag.followupValue != null ||
-                        flag.impactVerdict != null) ...[
-                      _impactCard(flag),
-                      const SizedBox(height: AdminDssTheme.space2),
-                    ],
-                    if (_canAct(flag)) ...[
-                      _actCard(flag),
-                      const SizedBox(height: AdminDssTheme.space2),
-                    ],
-                    _statusPanel(flag),
-                    const SizedBox(height: AdminDssTheme.space2),
-                    ..._accountabilityCards(flag),
+                    ..._stageAwareBody(
+                      flag,
+                      playbook,
+                      includeStatus: true,
+                      showSuggestions: showSuggestions,
+                    ),
                     _notesCard(df),
                   ],
                 ),
         ),
       ],
     );
+  }
+
+  /// Orders sections by workflow stage so the next action sits above context.
+  List<Widget> _stageAwareBody(
+    DssFlag flag,
+    List<DssPlaybookStep> playbook, {
+    required bool includeStatus,
+    required bool showSuggestions,
+  }) {
+    final hasUndecided = _undecidedIntervention != null;
+    final outcomeReady = _outcomeCheck != null && !(_outcomeCheck!.provisional);
+    final stage = DssStageStrip.stageOf(
+      flag,
+      hasUndecidedIntervention: hasUndecided,
+      outcomeReady: outcomeReady,
+    );
+
+    final children = <Widget>[
+      DssStageStrip(
+        flag: flag,
+        hasUndecidedIntervention: hasUndecided,
+        outcomeReady: outcomeReady,
+      ),
+    ];
+
+    void ensureGap() {
+      if (children.isNotEmpty && children.last is! SizedBox) {
+        children.add(const SizedBox(height: AdminDssTheme.space2));
+      }
+    }
+
+    void push(Widget w) {
+      ensureGap();
+      children.add(w);
+    }
+
+    void pushAll(List<Widget> widgets) {
+      if (widgets.isEmpty) return;
+      ensureGap();
+      children.addAll(widgets);
+    }
+
+    final finding = _findingCard(flag, playbook);
+    final priority = flag.isActive ? _priorityCard(flag) : null;
+    final intervention = _showInterventionSection(flag)
+        ? _interventionCard(flag)
+        : null;
+    final accountability = _accountabilityCards(flag);
+    final act = _canAct(flag) ? _actCard(flag) : null;
+    final outcomes = _outcomeCards(flag);
+    final showImpact =
+        flag.status == DssFlagStatus.resolved ||
+        flag.followupValue != null ||
+        flag.impactVerdict != null;
+    final impact = showImpact ? _impactCard(flag) : null;
+    final suggestions = showSuggestions ? _suggestionsCard() : null;
+    final status = includeStatus ? _statusPanel(flag) : null;
+
+    switch (stage) {
+      case DssWorkflowStage.detected:
+        push(finding);
+        if (priority != null) push(priority);
+        if (status != null) push(status);
+        if (intervention != null) push(intervention);
+        pushAll(accountability);
+        if (act != null) push(act);
+        pushAll(outcomes);
+        if (impact != null) push(impact);
+        if (suggestions != null) push(suggestions);
+      case DssWorkflowStage.inProgress:
+        if (status != null) push(status);
+        if (intervention != null) push(intervention);
+        pushAll(accountability);
+        if (act != null) push(act);
+        push(finding);
+        if (priority != null) push(priority);
+        pushAll(outcomes);
+        if (impact != null) push(impact);
+        if (suggestions != null) push(suggestions);
+      case DssWorkflowStage.resolved:
+        push(finding);
+        if (status != null) push(status);
+        pushAll(outcomes);
+        if (impact != null) push(impact);
+        if (act != null) push(act);
+        if (suggestions != null) push(suggestions);
+      case DssWorkflowStage.outcome:
+        pushAll(outcomes);
+        if (impact != null) push(impact);
+        if (status != null) push(status);
+        push(finding);
+        if (act != null) push(act);
+        if (suggestions != null) push(suggestions);
+    }
+
+    return children;
   }
 
   /// "Explain with AI" and its result. AI text is always labeled and never
@@ -934,10 +1115,78 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     final why = DssCopy.whyFlagged(flag);
     final next = DssCopy.displayRecommendedAction(flag);
     final headline = DssCopy.displayHeadline(flag);
-    // Data-quality flags already explain the issue in [why] + chips;
-    // the long headline mostly restates the same numbers.
     final showHeadline =
         flag.ruleId != 'DATA_QUALITY_LOW' && !_isNearDuplicate(headline, why);
+
+    final detailLines = <Widget>[
+      if (showHeadline)
+        Text(
+          headline,
+          style: const TextStyle(
+            color: AdminDssTheme.textSecondary,
+            height: 1.4,
+            fontSize: 12.5,
+          ),
+        ),
+      if (DssCopy.rollupNote(flag) case final note?)
+        Text(
+          note,
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            color: AdminDssTheme.textSecondary,
+          ),
+        ),
+      for (final note in [
+        DssCopy.notEmployedReasonsNote(flag),
+        DssCopy.coverageNote(flag),
+        DssCopy.rosterBasisNote(flag),
+      ].nonNulls)
+        Text(
+          note,
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            color: AdminDssTheme.textSecondary,
+          ),
+        ),
+      if (flag.certainty != null && flag.isFinding)
+        Text(
+          DssCopy.certaintyHint(flag),
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            color: AdminDssTheme.textSecondary,
+          ),
+        ),
+      Text(
+        DssCopy.sourceLabel(flag),
+        style: const TextStyle(
+          fontSize: 12,
+          height: 1.35,
+          color: AdminDssTheme.textMuted,
+        ),
+      ),
+      if (_recheckNote(flag) case final note?)
+        Text(
+          note,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            fontWeight: flag.recheckRecovered
+                ? FontWeight.w600
+                : FontWeight.normal,
+            color: flag.recheckRecovered
+                ? AdminDssTheme.success
+                : AdminDssTheme.textMuted,
+          ),
+        ),
+      if (flag.confidence == DssConfidence.low && flag.isFinding)
+        Text(
+          DssCopy.confidenceLabel(flag),
+          style: const TextStyle(fontSize: 12, color: AdminDssTheme.textMuted),
+        ),
+    ];
 
     return DssSurfaceCard(
       child: Column(
@@ -951,10 +1200,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               color: AdminDssTheme.textPrimary,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           if (_evidenceBanner(flag) case final banner?) ...[
             banner,
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
           ],
           Text(
             why,
@@ -965,22 +1214,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               color: AdminDssTheme.textPrimary,
             ),
           ),
-          if (showHeadline) ...[
-            const SizedBox(height: 6),
-            Text(
-              headline,
-              style: const TextStyle(
-                color: AdminDssTheme.textSecondary,
-                height: 1.4,
-                fontSize: 12.5,
-              ),
-            ),
-          ],
-          if (DssAiService.isAvailable) ...[
-            const SizedBox(height: 10),
-            _aiExplanationSection(flag),
-          ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1001,81 +1235,52 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 DssCertaintyChip(flag: flag),
             ],
           ),
-          if (DssCopy.rollupNote(flag) case final note?) ...[
-            const SizedBox(height: 8),
-            Text(
-              note,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                color: AdminDssTheme.textSecondary,
-              ),
-            ),
-          ],
-          for (final note in [
-            DssCopy.notEmployedReasonsNote(flag),
-            DssCopy.coverageNote(flag),
-            DssCopy.rosterBasisNote(flag),
-          ].nonNulls) ...[
-            const SizedBox(height: 8),
-            Text(
-              note,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                color: AdminDssTheme.textSecondary,
-              ),
-            ),
-          ],
-          if (flag.certainty != null && flag.isFinding) ...[
-            const SizedBox(height: 8),
-            Text(
-              DssCopy.certaintyHint(flag),
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                color: AdminDssTheme.textSecondary,
-              ),
-            ),
-          ],
           const SizedBox(height: 8),
           Text(
-            DssCopy.sourceLabel(flag),
+            DssCopy.thresholdLabel(flag),
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 12.5,
               height: 1.35,
-              color: AdminDssTheme.textMuted,
+              fontWeight: FontWeight.w600,
+              color: AdminDssTheme.textPrimary,
             ),
           ),
-          if (_recheckNote(flag) case final note?) ...[
-            const SizedBox(height: 8),
-            Text(
-              note,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                fontWeight: flag.recheckRecovered
-                    ? FontWeight.w600
-                    : FontWeight.normal,
-                color: flag.recheckRecovered
-                    ? AdminDssTheme.success
-                    : AdminDssTheme.textMuted,
+          if (detailLines.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                title: const Text(
+                  'Supporting details',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AdminDssTheme.textSecondary,
+                  ),
+                ),
+                children: [
+                  for (final w in detailLines)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Align(alignment: Alignment.centerLeft, child: w),
+                    ),
+                ],
               ),
             ),
           ],
-          if (flag.confidence == DssConfidence.low && flag.isFinding) ...[
-            const SizedBox(height: 8),
-            Text(
-              DssCopy.confidenceLabel(flag),
-              style: const TextStyle(
-                fontSize: 12,
-                color: AdminDssTheme.textMuted,
-              ),
-            ),
+          if (DssAiService.isAvailable) ...[
+            const SizedBox(height: 4),
+            _aiExplanationSection(flag),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
           const Text(
-            'What to do next',
+            'Recommended action',
             style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 13.5,
@@ -1092,45 +1297,52 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             ),
           ),
           if (shownPlaybook.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            if (cause != null) ...[
-              Text(
-                'Steps for: ${cause.label}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AdminDssTheme.textPrimary,
+            const SizedBox(height: 4),
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                title: Text(
+                  cause == null ? 'Playbook steps' : 'Playbook: ${cause.label}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AdminDssTheme.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-            ],
-            ...shownPlaybook.asMap().entries.map(
-              (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${e.key + 1}.',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AdminDssTheme.primary,
-                        fontSize: 12.5,
+                children: [
+                  for (final e in shownPlaybook.asMap().entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${e.key + 1}.',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AdminDssTheme.primary,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              e.value.step,
+                              style: const TextStyle(
+                                color: AdminDssTheme.textSecondary,
+                                height: 1.35,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        e.value.step,
-                        style: const TextStyle(
-                          color: AdminDssTheme.textSecondary,
-                          height: 1.35,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
           ],
@@ -1139,45 +1351,43 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     );
   }
 
-  /// Explains Watch, Not enough data and Limited evidence above the finding.
+  /// Compact sample-size banner; full hint is in the tooltip.
   Widget? _evidenceBanner(DssFlag flag) {
     final label = DssCopy.evidenceLabel(flag);
     final hint = DssCopy.evidenceHint(flag);
     if (label == null || hint == null) return null;
     final finding = flag.isFinding;
     final color = finding ? AdminDssTheme.info : const Color(0xFFB45309);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            finding ? Icons.info_outline : Icons.visibility_outlined,
-            size: 16,
-            color: color,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$label. ',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  TextSpan(text: hint),
-                ],
-              ),
-              style: TextStyle(fontSize: 12.5, height: 1.4, color: color),
+    return Tooltip(
+      message: hint,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+          border: Border.all(color: AdminDssTheme.border),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              finding ? Icons.info_outline : Icons.visibility_outlined,
+              size: 16,
+              color: color,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1457,9 +1667,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Recomputed on the same tracer wave as the finding. It shows '
-            'whether more answers changed the numbers, not whether the '
-            'intervention worked; see Intervention outcome for that.',
+            'Same wave only — not intervention success. See Intervention outcome for that.',
             style: TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
           ),
           const SizedBox(height: 8),
@@ -1640,12 +1848,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           ),
           if (flag.linkedAnnouncementId != null) ...[
             const SizedBox(height: 8),
-            Text(
-              'Linked draft: ${flag.linkedAnnouncementId}',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AdminDssTheme.textMuted,
-              ),
+            const Text(
+              'A reminder/announcement draft is linked (counts as proof).',
+              style: TextStyle(fontSize: 11, color: AdminDssTheme.textMuted),
             ),
           ],
         ],
@@ -1679,44 +1884,65 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Set by the rules from the facts below, not by AI. Critical 7+, '
-            'High 5–6, Medium 3–4, Low 0–2.',
-            style: TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
-          ),
-          const SizedBox(height: 8),
-          for (final r in p.reasons)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 28,
-                    child: Text(
-                      r.points == 0 ? '·' : '+${r.points}',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: r.points == 0
-                            ? AdminDssTheme.textMuted
-                            : AdminDssTheme.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      r.text,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        color: AdminDssTheme.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 2),
+              title: const Text(
+                'How this score was set',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AdminDssTheme.textMuted,
+                ),
               ),
+              children: [
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Rule-based, not AI. Critical 7+, High 5–6, Medium 3–4, Low 0–2.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: AdminDssTheme.textMuted,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final r in p.reasons)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          child: Text(
+                            r.points == 0 ? '·' : '+${r.points}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: r.points == 0
+                                  ? AdminDssTheme.textMuted
+                                  : AdminDssTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            r.text,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AdminDssTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -1725,6 +1951,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
   static bool _canAct(DssFlag flag) =>
       flag.status != DssFlagStatus.watch &&
       flag.status != DssFlagStatus.superseded;
+
+  static bool _showInterventionSection(DssFlag flag) =>
+      flag.status == DssFlagStatus.open ||
+      flag.status == DssFlagStatus.inProgress;
 
   Widget _statusPanel(DssFlag flag) => switch (flag.status) {
     DssFlagStatus.superseded => _supersededCard(flag),
@@ -1787,15 +2017,15 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       body:
           'A newer CHED GTS wave checked the same finding'
           '${at == null ? '' : ' on ${DateFormat.yMMMd().format(at.toLocal())}'}'
-          '${newer == null ? ' and has no active flag for it' : ''}. '
-          'This flag is kept as history and can no longer change.',
+          '${newer == null ? ' and has no active finding for it' : ''}. '
+          'This finding is kept as history and can no longer change.',
       children: [
         if (newer != null) ...[
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _saving ? null : () => _openFlag(newer),
             icon: const Icon(Icons.arrow_forward, size: 16),
-            label: const Text('Open newer flag'),
+            label: const Text('Open newer finding'),
             style: dssFilledButtonStyle(),
           ),
         ],
@@ -1805,7 +2035,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
 
   Widget _watchCard(DssFlag flag) {
     return _statusCardShell(
-      title: 'Watch',
+      title: 'Watch item',
       body:
           'Too few valid answers for a finding. Refresh insights makes it a '
           'finding once enough alumni answer; until then you can dismiss it '
@@ -1878,9 +2108,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           const SizedBox(height: 4),
           Text(
             closed
-                ? 'This flag is closed. Reopen if the issue returns.'
-                : 'Start → act → Resolve. Proof = reminder draft, an evidence '
-                      'entry, or Other + details.',
+                ? 'Closed. Reopen if the issue returns.'
+                : 'Start → act → Resolve finding. Proof unlocks Resolve.',
             style: const TextStyle(
               fontSize: 11.5,
               color: AdminDssTheme.textMuted,
@@ -1897,49 +2126,10 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             ),
           ],
           const SizedBox(height: 10),
-          Builder(
-            builder: (context) {
-              final options = List<String>.from(
-                DssCopy.interventionsForRule(flag.ruleId),
-              );
-              if (_intervention != null &&
-                  _intervention!.isNotEmpty &&
-                  !options.contains(_intervention)) {
-                options.insert(0, _intervention!);
-              }
-              final value = options.contains(_intervention)
-                  ? _intervention
-                  : null;
-              return DropdownButtonFormField<String>(
-                key: ValueKey('intervention-${flag.ruleId}-$value'),
-                initialValue: value,
-                decoration: _fieldDecoration(
-                  'Intervention (required to resolve)',
-                ),
-                items: options
-                    .map((i) => DropdownMenuItem(value: i, child: Text(i)))
-                    .toList(),
-                onChanged: (v) => setState(() => _intervention = v),
-              );
-            },
-          ),
-          if (_intervention == 'Other') ...[
-            const SizedBox(height: 10),
-            TextField(
-              controller: _interventionDetailCtrl,
-              minLines: 2,
-              maxLines: 3,
-              style: const TextStyle(fontSize: 13),
-              decoration: _fieldDecoration(
-                'Describe offline action (counts as proof)',
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ],
-          const SizedBox(height: 10),
           DropdownButtonFormField<String>(
             key: ValueKey(_assignedTo ?? ''),
             initialValue: _assignedTo ?? '',
+            dropdownColor: Colors.white,
             decoration: _fieldDecoration('Assign owner'),
             items: [
               const DropdownMenuItem(value: '', child: Text('Unassigned')),
@@ -2013,17 +2203,17 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   style: dssFilledButtonStyle(
                     background: AdminDssTheme.success,
                   ),
-                  child: const Text('Resolve'),
+                  child: const Text('Resolve finding'),
                 ),
               if (flag.status == DssFlagStatus.open)
                 Tooltip(
-                  message: 'Start the flag before resolving',
+                  message: 'Start the finding before resolving',
                   child: FilledButton(
                     onPressed: null,
                     style: dssFilledButtonStyle(
                       background: AdminDssTheme.success,
                     ),
-                    child: const Text('Resolve'),
+                    child: const Text('Resolve finding'),
                   ),
                 ),
               if (flag.status != DssFlagStatus.dismissed && !closed)
@@ -2051,9 +2241,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             const SizedBox(height: 8),
             Text(
               !hasProof
-                  ? 'Resolve unlocks after a reminder draft, an evidence entry '
-                        '(or Other + details) and a note.'
-                  : 'Finish the checklist items above to unlock Resolve.',
+                  ? 'Resolve finding unlocks after a reminder draft, a Proof '
+                        'entry (or Other + details) and a note.'
+                  : 'Finish the checklist items above to unlock Resolve finding.',
               style: const TextStyle(
                 fontSize: 11.5,
                 color: AdminDssTheme.warning,
@@ -2106,7 +2296,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         row(assigned, 'Owner assigned (recommended)'),
         row(intervention, 'Intervention chosen'),
         row(note, 'Resolution note ready'),
-        row(proof, 'Proof: reminder draft, evidence entry or Other details'),
+        row(proof, 'Proof: reminder draft, Proof entry or Other details'),
       ],
     );
   }
@@ -2313,7 +2503,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         color: AdminDssTheme.textSecondary,
       ),
       filled: true,
-      fillColor: AdminDssTheme.background,
+      fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: radius,

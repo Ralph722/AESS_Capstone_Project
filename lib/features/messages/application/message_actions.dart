@@ -18,59 +18,63 @@ abstract final class MessageActions {
       text: message['messageText'] as String? ?? '',
     );
 
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Edit message'),
-            content: TextField(
-              controller: controller,
-              maxLines: null,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Edit your message…',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                style: PortalTheme.ghostButton(dense: true),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: PortalTheme.primaryButton(dense: true),
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!confirmed) return;
-    final newText = controller.text.trim();
-    if (newText.isEmpty || newText == message['messageText']) return;
-
-    final docId = message['docId'] as String?;
-    if (docId == null) return;
-
     try {
-      await service.updateMessage(docId, newText);
-      if (showSuccessSnack && context.mounted) {
+      final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Edit message'),
+              content: TextField(
+                controller: controller,
+                maxLines: null,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Edit your message…',
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  style: PortalTheme.ghostButton(dense: true),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: PortalTheme.primaryButton(dense: true),
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+
+      if (!confirmed) return;
+      final newText = controller.text.trim();
+      if (newText.isEmpty || newText == message['messageText']) return;
+
+      final docId = message['docId'] as String?;
+      if (docId == null) return;
+
+      try {
+        await service.updateMessage(docId, newText);
+        if (showSuccessSnack && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Message updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Message updated successfully'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Error updating message: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -133,20 +137,75 @@ abstract final class MessageActions {
     }
   }
 
+  /// Computes the reactions map after toggling [emoji] for [actorUserId].
+  static Map<String, dynamic> reactionsAfterToggle({
+    required Map<String, dynamic> current,
+    required String actorUserId,
+    required String emoji,
+  }) {
+    final reactions = <String, dynamic>{};
+    for (final entry in current.entries) {
+      final list = entry.value;
+      reactions[entry.key] = List<String>.from(
+        list is List ? list.map((e) => e.toString()) : const <String>[],
+      );
+    }
+    final usersList = List<String>.from(
+      (reactions[emoji] as List?)?.map((e) => e.toString()) ?? const <String>[],
+    );
+    if (usersList.contains(actorUserId)) {
+      usersList.remove(actorUserId);
+      if (usersList.isEmpty) {
+        reactions.remove(emoji);
+      } else {
+        reactions[emoji] = usersList;
+      }
+    } else {
+      usersList.add(actorUserId);
+      reactions[emoji] = usersList;
+    }
+    return reactions;
+  }
+
   static Future<void> toggleReaction({
     required BuildContext context,
     required MessageService service,
     required String messageId,
     required String actorUserId,
     required String emoji,
+    Map<String, dynamic>? currentReactions,
+    void Function(Map<String, dynamic> reactions)? onOptimistic,
   }) async {
+    Map<String, dynamic>? previousCopy;
+    if (currentReactions != null) {
+      previousCopy = <String, dynamic>{};
+      for (final entry in currentReactions.entries) {
+        final list = entry.value;
+        previousCopy[entry.key] = List<String>.from(
+          list is List ? list.map((e) => e.toString()) : const <String>[],
+        );
+      }
+    }
+    final next = previousCopy == null
+        ? null
+        : reactionsAfterToggle(
+            current: previousCopy,
+            actorUserId: actorUserId,
+            emoji: emoji,
+          );
+    if (next != null) onOptimistic?.call(next);
     try {
-      await service.toggleReaction(
-        messageId: messageId,
-        actorUserId: actorUserId,
-        emoji: emoji,
-      );
+      if (next != null) {
+        await service.applyReactions(messageId: messageId, reactions: next);
+      } else {
+        await service.toggleReaction(
+          messageId: messageId,
+          actorUserId: actorUserId,
+          emoji: emoji,
+        );
+      }
     } catch (e) {
+      if (previousCopy != null) onOptimistic?.call(previousCopy);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

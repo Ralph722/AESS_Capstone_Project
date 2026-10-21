@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
+import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Alumni forum visual tokens — aliases [PortalTheme].
@@ -563,27 +564,20 @@ Future<String?> showForumModerationReasonDialog(
     'Other',
   ];
 
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) {
-      return StatefulBuilder(
-        builder: (ctx, setState) {
-          return AlertDialog(
-            title: Text(title),
-            content: SizedBox(
-              width: 360,
-              child: Column(
+  try {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return PortalActionDialog(
+              title: title.endsWith('?') ? title : '$title?',
+              message:
+                  'Optional reason (visible to alumni when relevant).',
+              body: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Optional reason (visible to alumni when relevant)',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: ForumTheme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -592,6 +586,22 @@ Future<String?> showForumModerationReasonDialog(
                       return ChoiceChip(
                         label: Text(p),
                         selected: selectedChip,
+                        selectedColor:
+                            PortalTheme.navy.withValues(alpha: 0.12),
+                        labelStyle: TextStyle(
+                          color: selectedChip
+                              ? PortalTheme.navy
+                              : PortalTheme.textPrimary,
+                          fontWeight: selectedChip
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                        side: BorderSide(
+                          color: selectedChip
+                              ? PortalTheme.navy.withValues(alpha: 0.35)
+                              : PortalTheme.border,
+                        ),
                         onSelected: (_) {
                           setState(() {
                             selected = p;
@@ -604,35 +614,60 @@ Future<String?> showForumModerationReasonDialog(
                   const SizedBox(height: 12),
                   TextField(
                     controller: controller,
-                    decoration: const InputDecoration(
+                    style: PortalTheme.body,
+                    decoration: InputDecoration(
                       labelText: 'Reason',
-                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: PortalTheme.pageBg,
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(PortalTheme.radiusLg),
+                        borderSide:
+                            const BorderSide(color: PortalTheme.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(PortalTheme.radiusLg),
+                        borderSide:
+                            const BorderSide(color: PortalTheme.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(PortalTheme.radiusLg),
+                        borderSide: const BorderSide(
+                          color: PortalTheme.navy,
+                          width: 1.4,
+                        ),
+                      ),
                     ),
                     maxLines: 2,
                   ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                style: PortalTheme.ghostButton(dense: true),
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: PortalTheme.primaryButton(dense: true),
-                child: Text(confirmLabel ?? 'Confirm'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: PortalTheme.primaryButton(),
+                  child: Text(confirmLabel ?? 'Confirm'),
+                ),
+                TextButton(
+                  style: PortalActionDialog.quietButton(),
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
 
-  final reason = controller.text.trim();
-  controller.dispose();
-  if (ok != true) return null;
-  return reason;
+    final reason = controller.text.trim();
+    if (ok != true) return null;
+    return reason;
+  } finally {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
+  }
 }

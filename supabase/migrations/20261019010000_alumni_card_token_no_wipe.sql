@@ -1,0 +1,108 @@
+-- Fix alumni card verify false "Expired / Not valid".
+--
+-- Previously issue_alumni_card_token() called cleanup(member_id), which deleted
+-- ALL tokens for that alumnus (including still-valid ones). Two live card
+-- widgets (Profile keep-alive + Home dialog) re-issued on timers and wiped
+-- each other's codes while the UI still showed a countdown.
+--
+-- Now cleanup only removes expired rows. Issuing inserts a new token without
+-- deleting other still-valid codes for the same member (they expire in ≤60s).
+
+create or replace function public.alumni_card_tokens_cleanup(
+  p_member_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Expired only. p_member_id is kept for call-site compatibility but no
+  -- longer wipes active codes for that member.
+  delete from public.alumni_card_tokens
+  where expires_at <= now();
+
+  -- Optional hygiene: drop very old rows for one member if any survived.
+  if p_member_id is not null then
+    delete from public.alumni_card_tokens
+    where member_id = p_member_id
+      and expires_at <= now();
+  end if;
+end;
+$$;
+
+revoke all on function public.alumni_card_tokens_cleanup(uuid) from public;
+grant execute on function public.alumni_card_tokens_cleanup(uuid) to service_role;
+
+create or replace function public.issue_alumni_card_token()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  uid uuid := auth.uid();
+  member public.alumni_members%rowtype;
+  v_token text;
+  v_short text;
+  v_expires timestamptz;
+begin
+  if uid is null then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'unauthenticated',
+      'message', 'You must be signed in to show your alumni card.'
+    );
+  end if;
+
+  if not public.caller_is_active() then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'inactive',
+      'message', 'This account cannot issue a card code right now.'
+    );
+  end if;
+
+  select * into member
+  from public.alumni_members m
+  where m.auth_uid = uid
+  limit 1;
+
+  if not found then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'unmatched',
+      'message', 'Your card will be available once the Alumni Office confirms your record.'
+    );
+  end if;
+
+  if member.is_deactivated then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'deactivated',
+      'message', 'This alumni account is deactivated.'
+    );
+  end if;
+
+  -- Expired rows only — do not delete still-valid codes for this member.
+  perform public.alumni_card_tokens_cleanup(null);
+
+  v_token := encode(extensions.gen_random_bytes(24), 'hex');
+  v_short := public.alumni_card_new_short_code();
+  v_expires := now() + interval '60 seconds';
+
+  insert into public.alumni_card_tokens (member_id, token, short_code, expires_at)
+  values (member.id, v_token, v_short, v_expires);
+
+  return jsonb_build_object(
+    'ok', true,
+    'token', v_token,
+    'shortCode', v_short,
+    'expiresAt', v_expires
+  );
+end;
+$$;
+
+revoke all on function public.issue_alumni_card_token() from public;
+grant execute on function public.issue_alumni_card_token()
+  to authenticated, service_role;

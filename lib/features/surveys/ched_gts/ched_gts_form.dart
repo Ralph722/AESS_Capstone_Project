@@ -9,6 +9,18 @@ import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 typedef ChedGtsAnswersChanged = void Function(Map<String, dynamic> answers);
 
+/// How each question card shows its description and notes.
+enum ChedGtsNotesStyle {
+  /// Inside an "About this question" dropdown that starts closed.
+  dropdown,
+
+  /// Earlier cards: a separate always-visible box per note.
+  inline,
+}
+
+/// App-wide default; set to [ChedGtsNotesStyle.inline] for the earlier cards.
+const ChedGtsNotesStyle kChedGtsNotesStyle = ChedGtsNotesStyle.dropdown;
+
 InputDecoration _portalFieldDecoration({
   required String label,
   String? hint,
@@ -55,9 +67,14 @@ class ChedGtsForm extends StatefulWidget {
     this.highlightMissing = false,
     this.helpSurveyId,
     this.prefilledAnswers = const {},
+    this.notesStyle = kChedGtsNotesStyle,
+    this.nameLocked = false,
   });
 
   final Map<String, dynamic> answers;
+
+  /// How question descriptions and notes are shown.
+  final ChedGtsNotesStyle notesStyle;
 
   /// Answers pre-filled from the profile. Details that may be out of date
   /// get a re-check note until edited.
@@ -79,6 +96,10 @@ class ChedGtsForm extends StatefulWidget {
   /// When set (and not [readOnly]), Q19/Q20 show "Help me answer" backed by
   /// the `tracer-help` Edge Function for this survey.
   final String? helpSurveyId;
+
+  /// Q1 name is read-only (verified record) unless the marriage opt-in
+  /// unlocks it in the wizard.
+  final bool nameLocked;
 
   @override
   State<ChedGtsForm> createState() => _ChedGtsFormState();
@@ -216,6 +237,7 @@ class _ChedGtsFormState extends State<ChedGtsForm> {
           value: _answers[item.id],
           textController: _textControllers[item.id],
           readOnly: widget.readOnly,
+          notesStyle: widget.notesStyle,
           missing: missing.contains(item.id),
           fromProfile:
               !widget.readOnly &&
@@ -225,6 +247,7 @@ class _ChedGtsFormState extends State<ChedGtsForm> {
                 widget.prefilledAnswers,
               ),
           onChanged: (v) => _set(item.id, v),
+          nameLocked: item.id == 'ched_1' && widget.nameLocked,
           onHelp: _helpFor(item),
           helpUsed: _applied.isNotEmpty,
           recommendation: item.id == 'ched_20' && q20Recommendation != null
@@ -317,7 +340,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Guidance note under the question; long notes collapse to two lines.
+/// Inline-style profile note ([ChedGtsNotesStyle.inline]).
 class _ProfileValueNote extends StatelessWidget {
   const _ProfileValueNote();
 
@@ -344,8 +367,7 @@ class _ProfileValueNote extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Filled in from your profile. If this has changed, update it '
-              'to your current details.',
+              _ItemCard.profileNote,
               style: PortalTheme.meta.copyWith(
                 height: 1.4,
                 color: PortalTheme.navyMid,
@@ -358,6 +380,8 @@ class _ProfileValueNote extends StatelessWidget {
   }
 }
 
+/// Inline-style description ([ChedGtsNotesStyle.inline]); long text
+/// collapses to two lines.
 class _HelpNote extends StatefulWidget {
   const _HelpNote({required this.text});
 
@@ -447,6 +471,94 @@ class _HelpNoteState extends State<_HelpNote> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// "About this question" dropdown holding the question's description and
+/// notes, one per block with dividers between them. Starts closed.
+class _AboutQuestion extends StatefulWidget {
+  const _AboutQuestion({required this.notes});
+
+  final List<Widget> notes;
+
+  @override
+  State<_AboutQuestion> createState() => _AboutQuestionState();
+}
+
+class _AboutQuestionState extends State<_AboutQuestion> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: _open,
+          child: InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'About this question',
+                      style: PortalTheme.bodySecondary.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _open ? 0.5 : 0,
+                    duration: PortalTheme.fast,
+                    child: const Icon(
+                      Icons.expand_more_rounded,
+                      size: 20,
+                      color: PortalTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: PortalTheme.fast,
+          alignment: Alignment.topCenter,
+          child: _open
+              ? Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                    border: Border.all(
+                      color: PortalTheme.border.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < widget.notes.length; i++) ...[
+                        if (i > 0)
+                          const Divider(
+                            height: 24,
+                            thickness: 1,
+                            color: PortalTheme.border,
+                          ),
+                        widget.notes[i],
+                      ],
+                    ],
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
     );
   }
 }
@@ -600,13 +712,23 @@ class _ItemCard extends StatelessWidget {
     this.textController,
     this.missing = false,
     this.fromProfile = false,
+    this.nameLocked = false,
     this.onHelp,
     this.helpUsed = false,
     this.recommendation,
     this.helpPointer = false,
+    this.notesStyle = kChedGtsNotesStyle,
   });
 
+  static const profileNote =
+      'Filled in from your profile. If this has changed, update it to your '
+      'current details.';
+  static const optionalNote =
+      'Optional — you may skip this item or write None / N/A if it does not '
+      'apply.';
+
   final ChedGtsItem item;
+  final ChedGtsNotesStyle notesStyle;
   final dynamic value;
   final ValueChanged<dynamic> onChanged;
   final bool readOnly;
@@ -615,6 +737,9 @@ class _ItemCard extends StatelessWidget {
 
   /// Still shows a pre-filled profile value that may be out of date.
   final bool fromProfile;
+
+  /// Q1 only: verified name, locked unless marriage opt-in.
+  final bool nameLocked;
   final VoidCallback? onHelp;
   final bool helpUsed;
 
@@ -623,6 +748,110 @@ class _ItemCard extends StatelessWidget {
 
   /// Adds "Not sure? Tap Help me answer on question 19." under the note.
   final bool helpPointer;
+
+  static final TextStyle _noteStyle = PortalTheme.bodySecondary.copyWith(
+    fontSize: 13,
+    height: 1.45,
+  );
+
+  List<Widget> _notes() {
+    final helpText = item.helpText;
+    return [
+      if (recommendation == null && helpText != null)
+        Text(helpText, style: _noteStyle),
+      if (fromProfile) Text(profileNote, style: _noteStyle),
+      if (helpPointer)
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(text: 'Not sure? Tap '),
+              TextSpan(
+                text: 'Help me answer',
+                style: _noteStyle.copyWith(
+                  color: PortalTheme.navy,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const TextSpan(text: ' on question 19.'),
+            ],
+          ),
+          style: _noteStyle,
+        ),
+      if (!item.required && !item.isOthersSpecify)
+        Text(optionalNote, style: _noteStyle),
+    ];
+  }
+
+  List<Widget> _dropdownNotes() {
+    final notes = _notes();
+    return [
+      if (recommendation != null) ...[
+        const SizedBox(height: 10),
+        recommendation!,
+      ],
+      if (notes.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        _AboutQuestion(notes: notes),
+      ],
+    ];
+  }
+
+  List<Widget> _inlineNotes() {
+    return [
+      if (recommendation != null) ...[
+        const SizedBox(height: 10),
+        recommendation!,
+      ] else if (item.helpText != null) ...[
+        const SizedBox(height: 8),
+        _HelpNote(text: item.helpText!),
+      ],
+      if (fromProfile) ...[
+        const SizedBox(height: 8),
+        const _ProfileValueNote(),
+      ],
+      if (helpPointer) ...[
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            const Icon(
+              Icons.auto_awesome_rounded,
+              size: 14,
+              color: PortalTheme.navy,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(text: 'Not sure? Tap '),
+                    TextSpan(
+                      text: 'Help me answer',
+                      style: PortalTheme.meta.copyWith(
+                        color: PortalTheme.navy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const TextSpan(text: ' on question 19.'),
+                  ],
+                ),
+                style: PortalTheme.meta.copyWith(height: 1.35),
+              ),
+            ),
+          ],
+        ),
+      ],
+      if (!item.required && !item.isOthersSpecify) ...[
+        const SizedBox(height: 6),
+        Text(
+          optionalNote,
+          style: PortalTheme.meta.copyWith(
+            height: 1.35,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -680,58 +909,10 @@ class _ItemCard extends StatelessWidget {
               ],
             ),
           ],
-          if (recommendation != null) ...[
-            const SizedBox(height: 10),
-            recommendation!,
-          ] else if (item.helpText != null) ...[
-            const SizedBox(height: 8),
-            _HelpNote(text: item.helpText!),
-          ],
-          if (fromProfile) ...[
-            const SizedBox(height: 8),
-            const _ProfileValueNote(),
-          ],
-          if (helpPointer) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 14,
-                  color: PortalTheme.navy,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(text: 'Not sure? Tap '),
-                        TextSpan(
-                          text: 'Help me answer',
-                          style: PortalTheme.meta.copyWith(
-                            color: PortalTheme.navy,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const TextSpan(text: ' on question 19.'),
-                      ],
-                    ),
-                    style: PortalTheme.meta.copyWith(height: 1.35),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          if (!item.required && !item.isOthersSpecify) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Optional — you may skip this item or write None / N/A if it does not apply.',
-              style: PortalTheme.meta.copyWith(
-                height: 1.35,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
+          ...switch (notesStyle) {
+            ChedGtsNotesStyle.dropdown => _dropdownNotes(),
+            ChedGtsNotesStyle.inline => _inlineNotes(),
+          },
           if (onHelp != null) ...[
             const SizedBox(height: 10),
             Align(
@@ -753,15 +934,16 @@ class _ItemCard extends StatelessWidget {
     switch (item.type) {
       case ChedGtsFieldType.text:
       case ChedGtsFieldType.longText:
+        final locked = readOnly || nameLocked;
         return TextField(
           controller: textController,
-          readOnly: readOnly,
+          readOnly: locked,
           maxLines: item.type == ChedGtsFieldType.longText ? 4 : 1,
           onChanged: onChanged,
           decoration: _portalFieldDecoration(
             label: item.required ? 'Your answer *' : 'Optional — skip if N/A',
             hint: item.required ? null : 'None / N/A or leave blank',
-            readOnly: readOnly,
+            readOnly: locked,
           ),
         );
       case ChedGtsFieldType.date:

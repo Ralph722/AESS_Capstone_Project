@@ -228,7 +228,9 @@ class _ReminderSheetState extends State<_ReminderSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Remind me every hour if I don't open it",
+                          // Shorter + NBSP before "it" so small phones don't
+                          // orphan that word on its own line.
+                          "Remind me hourly if I don't open\u00A0it",
                           style: PortalMenu.itemText,
                         ),
                         const SizedBox(height: 2),

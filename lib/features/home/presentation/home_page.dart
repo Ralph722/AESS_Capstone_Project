@@ -28,7 +28,7 @@ import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/features/surveys/models/current_tracer.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
-import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
+import 'package:alumni_system/features/alumni/card/presentation/alumni_card_dialog.dart';
 import 'package:alumni_system/shared/widgets/aess_logo.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -54,7 +54,6 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   final JobService _jobService = JobService();
   final MessageService _messageService = MessageService();
   final NotificationService _notificationService = NotificationService();
-  final UserProfileService _userProfileService = UserProfileService();
   final SupabaseClient _supabase = Supabase.instance.client;
   StreamSubscription<int>? _messagesCountSubscription;
   StreamSubscription<int>? _notificationsCountSubscription;
@@ -80,11 +79,16 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   List<JobPosting> _activeJobs = [];
   List<HomeCalendarItem> _calendarItems = [];
   List<ForumTopic> _communityTopics = [];
-  bool isLoadingEvents = false;
-  bool isLoadingCommunity = false;
+  bool isLoadingEvents = true;
+  bool isLoadingCommunity = true;
   bool isLoadingCalendar = false;
+  bool isLoadingStats = true;
   String? _eventsError;
   String? _communityError;
+
+  /// Shared by attention banner + calendar so Home does not fetch assignments twice.
+  List<SurveyAssignment>? _homeAssignments;
+  Map<String, Survey>? _homeSurveys;
 
   // Profile data
   String? _profileImageUrl;
@@ -138,15 +142,37 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
 
   Future<void> _loadDashboardContent() async {
     if (mounted) {
-      setState(() => isLoadingCalendar = true);
+      setState(() {
+        isLoadingCalendar = true;
+        isLoadingStats = true;
+        isLoadingEvents = true;
+        isLoadingCommunity = true;
+        _homeAssignments = null;
+        _homeSurveys = null;
+      });
     }
+
+    // Stat cards only need announcements + events + community counts — clear
+    // their skeleton as soon as those three finish, not after calendar/surveys.
+    final eventsFuture = _loadUpcomingEvents();
+    final communityFuture = _loadCommunitySection();
+    final announcementsFuture = _loadAnnouncements();
+    final statsFuture = Future.wait([
+      eventsFuture,
+      communityFuture,
+      announcementsFuture,
+    ]);
+    unawaited(
+      statsFuture.then((_) {
+        if (mounted) setState(() => isLoadingStats = false);
+      }),
+    );
+
     await Future.wait([
-      _loadUpcomingEvents(),
+      statsFuture,
       _loadCalendarJobs(),
       _loadUserProfile(),
       _loadSurveyAttention(),
-      _loadAnnouncements(),
-      _loadCommunitySection(),
       _ensureUserRow(),
     ]);
     await _buildCalendarItems();
@@ -157,29 +183,24 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       final userId = AppSession.userId;
       if (userId == null) return;
 
+      // One round-trip for Home header (was users + getTracerProfile).
       final row = await _supabase
           .from('users')
-          .select('display_name, profile_image_base64')
+          .select(
+            'display_name, profile_image_base64, program, year_graduated',
+          )
           .eq('id', userId)
           .maybeSingle();
-      final tracer = await _userProfileService.getTracerProfile(userId);
-      if (mounted) {
-        setState(() {
-          _profileImageUrl = row?['profile_image_base64'] as String?;
-          _displayName =
-              (row?['display_name'] as String?)?.trim().isNotEmpty == true
-              ? row!['display_name'] as String
-              : tracer?.displayName;
-          _program = tracer?.program.trim().isNotEmpty == true
-              ? tracer!.program.trim()
-              : null;
-          _batchYear = tracer?.batchYear.trim().isNotEmpty == true
-              ? tracer!.batchYear.trim()
-              : (tracer?.yearGraduated.trim().isNotEmpty == true
-                    ? tracer!.yearGraduated.trim()
-                    : null);
-        });
-      }
+      if (!mounted || row == null) return;
+      final display = (row['display_name'] as String?)?.trim();
+      final program = (row['program'] as String?)?.trim();
+      final year = (row['year_graduated'] as String?)?.trim();
+      setState(() {
+        _profileImageUrl = row['profile_image_base64'] as String?;
+        _displayName = (display != null && display.isNotEmpty) ? display : null;
+        _program = (program != null && program.isNotEmpty) ? program : null;
+        _batchYear = (year != null && year.isNotEmpty) ? year : null;
+      });
     } catch (_) {}
   }
 
@@ -190,14 +211,16 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       _communityError = null;
     });
     try {
-      final page = await _forumService.fetchTopics(
-        const ForumTopicQuery(pageSize: 12),
-      );
+      final results = await Future.wait([
+        _forumService.fetchTopics(const ForumTopicQuery(pageSize: 12)),
+        _countForumPostsToday(),
+      ]);
+      final page = results[0] as ForumTopicPage;
+      final todayCount = results[1] as int;
       final topics = page.topics
           .where((t) => !t.isAnnouncement)
           .take(3)
           .toList();
-      final todayCount = await _countForumPostsToday();
       if (mounted) {
         setState(() {
           _communityTopics = topics;
@@ -221,13 +244,12 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       final now = DateTime.now();
       final start = DateTime(now.year, now.month, now.day);
       final end = start.add(const Duration(days: 1));
-      final rows = await _supabase
+      return await _supabase
           .from('forum_topics')
-          .select('id')
+          .count(CountOption.exact)
           .gte('created_at', start.toUtc().toIso8601String())
           .lt('created_at', end.toUtc().toIso8601String())
           .eq('is_announcement', false);
-      return rows.length;
     } catch (_) {
       return 0;
     }
@@ -239,6 +261,8 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       if (userId == null) return;
       final assignments = await _surveyService.getUserAssignments(userId);
       final surveys = await _surveysFor(assignments);
+      _homeAssignments = assignments;
+      _homeSurveys = surveys;
       final currentTracer = CurrentTracer.pick(
         assignments,
         (id) => surveys[id],
@@ -282,7 +306,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
           );
         } else {
           customPending++;
-          surveySubtitle ??= 'Respond when you can — separate from Tracer';
+          surveySubtitle ??= 'Pending · respond when ready';
         }
       }
 
@@ -308,13 +332,10 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
 
   Future<Map<String, Survey>> _surveysFor(
     List<SurveyAssignment> assignments,
-  ) async {
-    final surveys = <String, Survey>{};
-    for (final a in assignments) {
-      final s = await _surveyService.getSurvey(a.surveyId);
-      if (s != null) surveys[a.surveyId] = s;
-    }
-    return surveys;
+  ) {
+    return _surveyService.getSurveysByIds(
+      assignments.map((a) => a.surveyId),
+    );
   }
 
   String _formatDueLabel(DateTime closeAt) {
@@ -596,8 +617,10 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
     try {
       final userId = AppSession.userId;
       if (userId == null) return;
-      final assignments = await _surveyService.getUserAssignments(userId);
-      final surveys = await _surveysFor(assignments);
+      // Reuse attention-banner fetch when available (avoids a second round-trip).
+      final assignments =
+          _homeAssignments ?? await _surveyService.getUserAssignments(userId);
+      final surveys = _homeSurveys ?? await _surveysFor(assignments);
       final currentTracer = CurrentTracer.pick(
         assignments,
         (id) => surveys[id],
@@ -644,6 +667,11 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
     try {
       final userId = AppSession.userId;
       if (userId == null) return;
+      // Paint cached count immediately on revisit while a fresh fetch runs.
+      final cached = _announcementService.cachedPublishedForUser(userId);
+      if (cached != null && mounted) {
+        setState(() => announcementsCount = cached.length);
+      }
       final list = await _announcementService.getPublishedForUser(userId);
       if (mounted) {
         setState(() {
@@ -857,7 +885,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
         program: _program,
         batchYear: _batchYear,
         profileImageUrl: _profileImageUrl,
-        onTap: () => _navigateToScreen(PortalTabs.profile),
+        onTap: () => showAlumniCardDialog(context),
       ),
       HomeNeedsAttentionPanel(
         tracerComplete: !_openTracerAttention,
@@ -878,7 +906,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
         announcementsCount: announcementsCount,
         communityTodayCount: communityTodayCount,
         eventsCount: eventsCount,
-        loading: false,
+        loading: isLoadingStats,
         onAnnouncements: _openAnnouncements,
         onCommunity: () => _navigateToScreen(PortalTabs.community),
         onEvents: () => _navigateToScreen(PortalTabs.events),
@@ -928,16 +956,7 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
   List<Widget> _calendarBlock() {
     return [
       if (isLoadingCalendar && _calendarItems.isEmpty)
-        _SectionPad(
-          child: Container(
-            height: 320,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-              border: Border.all(color: PortalTheme.border),
-            ),
-          ),
-        )
+        const _SectionPad(child: HomeCalendarSkeleton())
       else
         HomeImportantDatesCalendar(
           items: _calendarItems,

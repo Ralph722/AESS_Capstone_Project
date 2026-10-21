@@ -6,15 +6,18 @@ import 'package:alumni_system/features/admin/roster/models/alumni_member_model.d
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 import 'package:alumni_system/features/admin/roster/presentation/admin_alumni_member_detail_page.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_roster_import_service.dart';
+import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/admin_alumni_directory_dialogs.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_instant_content.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/web_file_upload.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
@@ -35,6 +38,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
   bool get wantKeepAlive => true;
   final _memberService = AlumniMemberService();
   final _importService = AlumniRosterImportService();
+  final _surveyService = SurveyService();
   final _auditService = AuditService();
   final _searchController = TextEditingController();
   Timer? _searchDebounce;
@@ -42,12 +46,16 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
   List<AlumniMember> _allMembers = [];
   List<AlumniMember> _displayed = [];
   bool _isLoading = false;
+  bool _isRefreshing = false;
 
   String? _courseFilter;
   String? _batchFilter;
   AlumniRegistrationFilter _registrationFilter = AlumniRegistrationFilter.all;
   AlumniActiveFilter _activeFilter = AlumniActiveFilter.all;
   AlumniDirectorySort _sort = AlumniDirectorySort.nameAsc;
+
+  /// Directory tab: 0 = all alumni, 1 = profile updates, 2 = deactivated.
+  int _viewIndex = 0;
   AlumniMember? _selectedMember;
   bool _exportingChedBatch = false;
   int _page = 0;
@@ -57,6 +65,10 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
   int _notRegisteredCount = 0;
   int _activeAlumniCount = 0;
   int _profileUpdatesCount = 0;
+  int _deactivatedCount = 0;
+
+  /// CHED GTS wave progress by auth uid (directory CHED GTS column).
+  Map<String, ChedGtsProgress> _chedProgress = {};
 
   @override
   void initState() {
@@ -81,6 +93,12 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       _registrationFilter != AlumniRegistrationFilter.all ||
       _activeFilter != AlumniActiveFilter.all;
 
+  AlumniDirectoryView get _view => switch (_viewIndex) {
+    1 => AlumniDirectoryView.updates,
+    2 => AlumniDirectoryView.deactivated,
+    _ => AlumniDirectoryView.all,
+  };
+
   List<String> get _batchOptions {
     final years =
         _allMembers
@@ -98,9 +116,13 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     var notRegistered = 0;
     var active = 0;
     var profileUpdates = 0;
+    var deactivated = 0;
     const activeWindow = Duration(days: 30);
     for (final m in _allMembers) {
-      if (m.isDeactivated) continue;
+      if (m.isDeactivated) {
+        deactivated++;
+        continue;
+      }
       if (m.isRegisteredUser) {
         registered++;
         if (m.isActiveWithin(activeWindow)) active++;
@@ -113,6 +135,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     _notRegisteredCount = notRegistered;
     _activeAlumniCount = active;
     _profileUpdatesCount = profileUpdates;
+    _deactivatedCount = deactivated;
   }
 
   void _clearFilters() {
@@ -141,7 +164,13 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
 
   Future<void> _loadMembers() async {
     final firstLoad = _allMembers.isEmpty;
-    if (firstLoad) setState(() => _isLoading = true);
+    setState(() {
+      if (firstLoad) {
+        _isLoading = true;
+      } else {
+        _isRefreshing = true;
+      }
+    });
     try {
       final members = await _memberService.getAllMembers(
         includeDeactivated: true,
@@ -159,6 +188,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
         _recomputeDerivedStats();
         _applyFilters();
         _isLoading = false;
+        _isRefreshing = false;
         if (_selectedMember != null) {
           try {
             _selectedMember = _allMembers.firstWhere(
@@ -169,11 +199,35 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           }
         }
       });
+      unawaited(_loadChedProgress());
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      _showSnack('Error loading roster: $e', isError: true);
+      setState(() {
+        _isLoading = false;
+        _isRefreshing = false;
+      });
+      _showSnack(
+        _friendlyError(
+          e,
+          "Couldn't load the roster. Check your connection and try Refresh.",
+        ),
+        isError: true,
+      );
     }
+  }
+
+  /// CHED GTS column data loads after the roster so the list paints first;
+  /// cells show a dash until progress arrives.
+  Future<void> _loadChedProgress() async {
+    final progress = await _surveyService.getChedGtsProgressByUser();
+    if (!mounted) return;
+    setState(() => _chedProgress = progress);
+  }
+
+  ChedGtsProgress? _chedFor(AlumniMember member) {
+    final uid = member.authUid;
+    if (uid == null || uid.isEmpty) return null;
+    return _chedProgress[uid];
   }
 
   void _applyFilters() {
@@ -185,8 +239,26 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       registrationFilter: _registrationFilter,
       activeFilter: _activeFilter,
       sort: _sort,
-      hideDeactivated: true,
+      view: _view,
     );
+  }
+
+  /// Service validation messages are shown as-is; wrapped technical errors
+  /// ("Error …: PostgrestException…") fall back to [fallback].
+  String _friendlyError(Object error, String fallback) {
+    var text = error is AlumniMemberDuplicateException
+        ? error.message
+        : '$error';
+    while (text.startsWith('Exception: ')) {
+      text = text.substring('Exception: '.length);
+    }
+    text = text.trim();
+    final technical =
+        text.isEmpty ||
+        text.startsWith('Error ') ||
+        text.contains('Exception') ||
+        text.length > 160;
+    return technical ? fallback : text;
   }
 
   Future<void> _exportChedGtsPdfBatch() async {
@@ -230,7 +302,8 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       builder: (ctx) => PopScope(
         canPop: false,
         child: AlertDialog(
-          title: const Text('Building CHED GTS ZIP'),
+          shape: directoryAlertDialogShape,
+          title: directoryDialogTitle('Building CHED GTS ZIP'),
           content: ValueListenableBuilder<(int, int, String?)>(
             valueListenable: progress,
             builder: (_, value, __) {
@@ -299,7 +372,10 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       await batch.logBatchFailure(error: e, selectedCount: selected.length);
       if (!mounted) return;
-      _showSnack('CHED GTS batch export failed: $e', isError: true);
+      _showSnack(
+        _friendlyError(e, 'CHED GTS export failed. Please try again.'),
+        isError: true,
+      );
     } finally {
       progress.dispose();
       if (mounted) setState(() => _exportingChedBatch = false);
@@ -319,188 +395,61 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError
-            ? const Color(0xFFFF6B6B)
-            : const Color(0xFF4CAF50),
+        backgroundColor: isError ? AdminColors.danger : AdminColors.success,
       ),
     );
   }
 
   Future<void> _showAddOrEditDialog({AlumniMember? existing}) async {
-    final nameController = TextEditingController(
-      text: existing?.fullName ?? '',
+    var successMessage = '';
+    await showRosterEntryDialog(
+      context,
+      existing: existing,
+      onSubmit: (input) async {
+        try {
+          if (existing == null) {
+            final created = await _memberService.createMember(
+              fullName: input.fullName,
+              course: input.course,
+              studentId: input.studentId,
+              yearGraduated: input.yearGraduated,
+            );
+            await _auditService.logAction(
+              action: 'CREATE_ROSTER_MEMBER',
+              resource: 'AlumniMember',
+              resourceId: created.id,
+              description: 'Added roster: ${created.fullName}',
+            );
+            successMessage = '${created.fullName} added to roster';
+          } else {
+            await _memberService.updateRosterMember(
+              id: existing.id,
+              fullName: input.fullName,
+              course: input.course,
+              studentId: input.studentId,
+              yearGraduated: input.yearGraduated,
+            );
+            await _auditService.logAction(
+              action: 'UPDATE_ROSTER_MEMBER',
+              resource: 'AlumniMember',
+              resourceId: existing.id,
+              description: 'Updated roster: ${input.fullName.trim()}',
+            );
+            successMessage = 'Roster entry updated';
+          }
+          return null;
+        } catch (e) {
+          return _friendlyError(
+            e,
+            "Couldn't save the roster entry. Please try again.",
+          );
+        }
+      },
     );
-    final idController = TextEditingController(text: existing?.studentId ?? '');
-    final yearController = TextEditingController(
-      text: existing?.effectiveBatchYear ?? '',
-    );
-    String? selectedCourse = existing != null && existing.course.isNotEmpty
-        ? CourseConstants.normalize(existing.course)
-        : CourseConstants.courses.first;
-
-    final saved = await showAdminDialogSurface<bool>(
-      context: context,
-      maxWidth: kAdminDialogSm,
-      child: StatefulBuilder(
-        builder: (ctx, setDialogState) => Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AdminDirectoryTheme.navy.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      existing == null
-                          ? Icons.person_add_alt_1
-                          : Icons.edit_outlined,
-                      color: AdminDirectoryTheme.navy,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      existing == null
-                          ? 'Add to official roster'
-                          : 'Edit roster entry',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AdminDirectoryTheme.navy,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Used to validate registration (name, course, and ID must match).',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: nameController,
-                decoration: _dialogFieldDecoration(
-                  'Full name',
-                  Icons.person_outline,
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: selectedCourse,
-                decoration: _dialogFieldDecoration(
-                  'Course',
-                  Icons.school_outlined,
-                ),
-                items: CourseConstants.courses
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) => setDialogState(() => selectedCourse = v),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: idController,
-                decoration: _dialogFieldDecoration(
-                  'ID number',
-                  Icons.badge_outlined,
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: yearController,
-                keyboardType: TextInputType.number,
-                decoration: _dialogFieldDecoration(
-                  'Year graduated (optional)',
-                  Icons.calendar_today_outlined,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AdminDirectoryTheme.navy,
-                      minimumSize: const Size(0, AdminDensity.buttonHeight),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    child: Text(
-                      existing == null ? 'Add member' : 'Save changes',
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (saved != true || !mounted) {
-      nameController.dispose();
-      idController.dispose();
-      yearController.dispose();
-      return;
-    }
-
-    try {
-      if (existing == null) {
-        final created = await _memberService.createMember(
-          fullName: nameController.text,
-          course: selectedCourse!,
-          studentId: idController.text,
-          yearGraduated: yearController.text,
-        );
-        await _auditService.logAction(
-          action: 'CREATE_ROSTER_MEMBER',
-          resource: 'AlumniMember',
-          resourceId: created.id,
-          description: 'Added roster: ${created.fullName}',
-        );
-        _showSnack('${created.fullName} added to roster');
-      } else {
-        await _memberService.updateRosterMember(
-          id: existing.id,
-          fullName: nameController.text,
-          course: selectedCourse!,
-          studentId: idController.text,
-          yearGraduated: yearController.text,
-        );
-        await _auditService.logAction(
-          action: 'UPDATE_ROSTER_MEMBER',
-          resource: 'AlumniMember',
-          resourceId: existing.id,
-          description: 'Updated roster: ${nameController.text.trim()}',
-        );
-        _showSnack('Roster entry updated');
-      }
-      await _loadMembers();
-    } on AlumniMemberDuplicateException catch (e) {
-      _showSnack(e.message, isError: true);
-    } catch (e) {
-      _showSnack('$e', isError: true);
-    } finally {
-      nameController.dispose();
-      idController.dispose();
-      yearController.dispose();
-    }
+    // The dialog can be dismissed (Esc / outside tap) while a save finishes.
+    if (successMessage.isEmpty || !mounted) return;
+    _showSnack(successMessage);
+    await _loadMembers();
   }
 
   Future<void> _importExcel() async {
@@ -534,7 +483,8 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           await showDialog<void>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Import issues'),
+              shape: directoryAlertDialogShape,
+              title: directoryDialogTitle('Import issues'),
               content: SingleChildScrollView(
                 child: Text(result.errors.take(20).join('\n')),
               ),
@@ -554,92 +504,24 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       _showSnack(e.message, isError: true);
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
-      _showSnack('Import failed: $e', isError: true);
+      _showSnack(
+        _friendlyError(
+          e,
+          "Import failed. Check that the file is a valid Excel roster and try again.",
+        ),
+        isError: true,
+      );
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _confirmDelete(AlumniMember member) async {
     final registered = member.isRegisteredUser;
-    final action = await showDialog<String>(
-      context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    registered
-                        ? Icons.person_off_outlined
-                        : Icons.delete_outline,
-                    color: Colors.red.shade400,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      registered
-                          ? 'Remove registered alumni?'
-                          : 'Delete roster entry?',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AdminDirectoryTheme.navy,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                registered
-                    ? 'Deactivate blocks sign-in and can be undone later. '
-                          'Remove account also erases their personal details '
-                          '(name, email, contact info, photo) from the portal. '
-                          'Their tracer answers stay in the statistics without '
-                          'identifying details, and the roster entry stays deactivated. '
-                          'This cannot be undone.'
-                    : 'Remove ${member.fullName} from the official roster? '
-                          'They will not be able to register.',
-                style: TextStyle(color: Colors.grey.shade700, height: 1.4),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  if (registered) ...[
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx, 'deactivate'),
-                      child: const Text('Deactivate'),
-                    ),
-                  ],
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, 'delete'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                    ),
-                    child: Text(registered ? 'Remove account' : 'Delete'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (action == null || !mounted) return;
+    final choice = await showRosterRemoveDialog(context, member: member);
+    if (choice == null || !mounted) return;
+    final action = choice == RosterRemoveAction.deactivate
+        ? 'deactivate'
+        : 'delete';
 
     try {
       if (action == 'deactivate') {
@@ -654,7 +536,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       }
       if (action == 'deactivate' || !registered) {
         await _auditService.logAction(
-          action: action == 'deactivate' ? 'DEACTIVATE_ROSTER' : 'DELETE_ROSTER',
+          action: action == 'deactivate'
+              ? 'DEACTIVATE_ROSTER'
+              : 'DELETE_ROSTER',
           resource: 'AlumniMember',
           resourceId: member.id,
           description: '$action: ${member.fullName}',
@@ -666,7 +550,33 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
         setState(() => _selectedMember = null);
       }
     } catch (e) {
-      _showSnack('$e', isError: true);
+      _showSnack(
+        _friendlyError(e, "Couldn't complete that action. Please try again."),
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _reactivate(AlumniMember member) async {
+    try {
+      await _memberService.reactivateMember(member.id);
+      await _auditService.logAction(
+        action: 'REACTIVATE_ROSTER',
+        resource: 'AlumniMember',
+        resourceId: member.id,
+        description: 'reactivate: ${member.fullName}',
+        userRole: 'admin',
+      );
+      _showSnack('${member.fullName} reactivated');
+      await _loadMembers();
+    } catch (e) {
+      _showSnack(
+        _friendlyError(
+          e,
+          "Couldn't reactivate ${member.fullName}. Please try again.",
+        ),
+        isError: true,
+      );
     }
   }
 
@@ -715,20 +625,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     return member.isActiveWithin(const Duration(days: 30));
   }
 
-  InputDecoration _dialogFieldDecoration(String label, IconData icon) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, color: AdminDirectoryTheme.navy),
-      filled: true,
-      fillColor: AdminDirectoryTheme.surface,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -737,99 +633,120 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-            if (!showingDetail) ...[
-              DirectoryPageHeader(
-                onAdd: _openAddAlumniChooser,
-                onExport: _exportChedGtsPdfBatch,
-                isLoading: _isLoading,
-                canExport: _allMembers.isNotEmpty,
-                isExporting: _exportingChedBatch,
+        if (!showingDetail) ...[
+          DirectoryPageHeader(
+            onAdd: _openAddAlumniChooser,
+            onExport: _exportChedGtsPdfBatch,
+            isLoading: _isLoading,
+            canExport: _allMembers.isNotEmpty,
+            isExporting: _exportingChedBatch,
+          ),
+          const SizedBox(height: AdminDirectoryTheme.space2),
+          DirectoryKpiRow(
+            children: [
+              AdminKpiCard(
+                dense: true,
+                label: 'On roster',
+                value: '${_allMembers.length}',
+                caption: _deactivatedCount > 0
+                    ? 'Total alumni records, incl. $_deactivatedCount deactivated'
+                    : 'Total alumni records',
+                icon: Icons.groups_outlined,
+                palette: AdminAccents.blue,
               ),
-              const SizedBox(height: AdminDirectoryTheme.space2),
-              DirectoryStatsGrid(
-                children: [
-                  DirectoryStatCard(
-                    label: 'On roster',
-                    value: '${_allMembers.length}',
-                    description: 'Total alumni records',
-                    icon: Icons.groups_outlined,
-                    accent: AdminDirectoryTheme.primary,
-                  ),
-                  DirectoryStatCard(
-                    label: 'Registered alumni',
-                    value: '$_registeredCount',
-                    description: 'Signed in to the app',
-                    icon: Icons.verified_outlined,
-                    accent: AdminDirectoryTheme.info,
-                    onTap: () => setState(() {
-                      _registrationFilter = AlumniRegistrationFilter.registered;
-                      _page = 0;
-                      _applyFilters();
-                    }),
-                  ),
-                  DirectoryStatCard(
-                    label: 'Not registered',
-                    value: '$_notRegisteredCount',
-                    description: 'Awaiting app signup',
-                    icon: Icons.person_add_disabled_outlined,
-                    accent: AdminDirectoryTheme.warning,
-                    onTap: () => setState(() {
-                      _registrationFilter =
-                          AlumniRegistrationFilter.notRegistered;
-                      _page = 0;
-                      _applyFilters();
-                    }),
-                  ),
-                  DirectoryStatCard(
-                    label: 'Active (30d)',
-                    value: '$_activeAlumniCount',
-                    description: 'Recently active users',
-                    icon: Icons.online_prediction_outlined,
-                    accent: AdminDirectoryTheme.success,
-                    onTap: () => setState(() {
-                      _activeFilter = AlumniActiveFilter.active30;
-                      _page = 0;
-                      _applyFilters();
-                    }),
-                  ),
-                  if (_profileUpdatesCount > 0)
-                    DirectoryStatCard(
-                      label: 'Profile updates',
-                      value: '$_profileUpdatesCount',
-                      description: 'Pending admin review',
-                      icon: Icons.notifications_active_outlined,
-                      accent: AdminDirectoryTheme.warning,
-                    ),
-                ],
+              AdminKpiCard(
+                dense: true,
+                label: 'Registered alumni',
+                value: '$_registeredCount',
+                caption: 'Signed in to the app',
+                icon: Icons.verified_outlined,
+                palette: AdminAccents.sky,
+                onTap: () => setState(() {
+                  _registrationFilter = AlumniRegistrationFilter.registered;
+                  _page = 0;
+                  _applyFilters();
+                }),
               ),
-              const SizedBox(height: AdminDirectoryTheme.space2),
-              DirectoryToolbarCard(
-                searchController: _searchController,
-                onSearchChanged: _onSearchChanged,
-                onClearSearch: () {
-                  _searchDebounce?.cancel();
-                  _searchController.clear();
-                  setState(() {
-                    _page = 0;
-                    _applyFilters();
-                  });
-                },
-                isLoading: _isLoading,
-                onRefresh: _loadMembers,
-                hasActiveFilters: _hasActiveFilters,
-                onResetFilters: _clearFilters,
-                filters: _buildFilterControls(),
-                activeFilterChips: _buildActiveFilterChips(),
+              AdminKpiCard(
+                dense: true,
+                label: 'Not registered',
+                value: '$_notRegisteredCount',
+                caption: 'Awaiting app signup',
+                icon: Icons.person_add_disabled_outlined,
+                palette: AdminAccents.gold,
+                onTap: () => setState(() {
+                  _registrationFilter = AlumniRegistrationFilter.notRegistered;
+                  _page = 0;
+                  _applyFilters();
+                }),
               ),
-              const SizedBox(height: 8),
-              DirectoryResultsBar(
-                message: _resultsMessage(),
-                pendingReviewCount: _profileUpdatesCount,
+              AdminKpiCard(
+                dense: true,
+                label: 'Active (30d)',
+                value: '$_activeAlumniCount',
+                caption: 'Recently active users',
+                icon: Icons.online_prediction_outlined,
+                palette: AdminAccents.midBlue,
+                onTap: () => setState(() {
+                  _activeFilter = AlumniActiveFilter.active30;
+                  _page = 0;
+                  _applyFilters();
+                }),
               ),
-              const SizedBox(height: 8),
             ],
-            Expanded(child: _buildDirectoryBody()),
-          ],
+          ),
+          const SizedBox(height: AdminDirectoryTheme.space2),
+          DirectoryToolbarCard(
+            searchHint: 'Search name, ID, course, email…',
+            searchController: _searchController,
+            onSearchChanged: _onSearchChanged,
+            onClearSearch: () {
+              _searchDebounce?.cancel();
+              _searchController.clear();
+              setState(() {
+                _page = 0;
+                _applyFilters();
+              });
+            },
+            isLoading: _isLoading || _isRefreshing,
+            onRefresh: _loadMembers,
+            hasActiveFilters: _hasActiveFilters,
+            onResetFilters: _clearFilters,
+            filters: _buildFilterControls(),
+            activeFilterChips: _buildActiveFilterChips(),
+            singleRowMinWidth: 1000,
+          ),
+          const SizedBox(height: 8),
+          AdminTabBar(
+            selectedIndex: _viewIndex,
+            onSelected: (index) => setState(() {
+              _viewIndex = index;
+              _page = 0;
+              _applyFilters();
+            }),
+            tabs: [
+              const AdminTabSpec(
+                label: 'All alumni',
+                icon: Icons.groups_outlined,
+              ),
+              AdminTabSpec(
+                label: 'Updates',
+                icon: Icons.notifications_active_outlined,
+                count: _profileUpdatesCount > 0 ? _profileUpdatesCount : null,
+              ),
+              AdminTabSpec(
+                label: 'Deactivated',
+                icon: Icons.person_off_outlined,
+                count: _deactivatedCount > 0 ? _deactivatedCount : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          DirectoryResultsBar(message: _resultsMessage()),
+          const SizedBox(height: 8),
+        ],
+        Expanded(child: _buildDirectoryBody()),
+      ],
     );
   }
 
@@ -848,15 +765,23 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
 
   String _resultsMessage() {
     if (_isLoading) return 'Loading roster…';
-    return 'Showing ${_displayed.length} of ${_allMembers.where((m) => !m.isDeactivated).length} alumni';
+    final total = switch (_view) {
+      AlumniDirectoryView.updates => _profileUpdatesCount,
+      AlumniDirectoryView.deactivated => _deactivatedCount,
+      AlumniDirectoryView.all => _allMembers.length - _deactivatedCount,
+    };
+    return 'Showing ${_displayed.length} of $total alumni';
   }
 
   Widget _buildFilterControls() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        // Prefer a single compact row of fixed-width fields on desktop.
-        final fieldWidth = width >= 1100
+        // Unbounded width = single-row toolbar; narrower fields leave room
+        // for the search box.
+        final fieldWidth = width.isInfinite
+            ? 136.0
+            : width >= 1100
             ? 148.0
             : width >= 820
             ? 136.0
@@ -1097,21 +1022,41 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     Widget? empty;
     if (!_isLoading && _displayed.isEmpty) {
       if (_allMembers.isEmpty) {
-        empty = DirectoryEmptyState(
+        empty = AdminStateView.empty(
           icon: Icons.groups_outlined,
           title: 'No alumni on the roster yet',
-          subtitle:
+          message:
               'Add members one at a time or import an Excel file with columns: Full Name, Course, ID Number, and optionally Year Graduated.',
-          primaryLabel: 'Add Alumni',
-          primaryAction: _openAddAlumniChooser,
+          primaryAction: AdminStateAction(
+            label: 'Add Alumni',
+            icon: Icons.person_add_alt_1,
+            onPressed: _openAddAlumniChooser,
+          ),
+        );
+      } else if (!_hasActiveFilters && _view == AlumniDirectoryView.updates) {
+        empty = AdminStateView.empty(
+          icon: Icons.done_all_outlined,
+          title: 'All caught up',
+          message: 'No alumni have unreviewed profile updates.',
+        );
+      } else if (!_hasActiveFilters &&
+          _view == AlumniDirectoryView.deactivated) {
+        empty = AdminStateView.empty(
+          icon: Icons.person_off_outlined,
+          title: 'No deactivated alumni',
+          message: 'Deactivated members will appear here.',
         );
       } else {
-        empty = DirectoryEmptyState(
+        empty = AdminStateView.empty(
           icon: Icons.search_off,
           title: 'No matches',
-          subtitle: 'Try adjusting your search or filters.',
-          primaryLabel: 'Clear filters',
-          primaryAction: _hasActiveFilters ? _clearFilters : null,
+          message: 'Try adjusting your search or filters.',
+          primaryAction: _hasActiveFilters
+              ? AdminStateAction(
+                  label: 'Clear filters',
+                  onPressed: _clearFilters,
+                )
+              : null,
         );
       }
     }
@@ -1141,15 +1086,12 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                       member: member,
                       isSelected: _selectedMember?.id == member.id,
                       showActiveBadge: _showActiveBadge(member),
+                      chedProgress: _chedFor(member),
                       onTap: () => _selectMember(member),
                       onEdit: () => _showAddOrEditDialog(existing: member),
                       onDelete: () => _confirmDelete(member),
                       onReactivate: member.isDeactivated
-                          ? () async {
-                              await _memberService.reactivateMember(member.id);
-                              _showSnack('${member.fullName} reactivated');
-                              await _loadMembers();
-                            }
+                          ? () => _reactivate(member)
                           : null,
                     );
                   },
@@ -1163,15 +1105,12 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                       member: member,
                       isSelected: _selectedMember?.id == member.id,
                       showActiveBadge: _showActiveBadge(member),
+                      chedProgress: _chedFor(member),
                       onTap: () => _selectMember(member),
                       onEdit: () => _showAddOrEditDialog(existing: member),
                       onDelete: () => _confirmDelete(member),
                       onReactivate: member.isDeactivated
-                          ? () async {
-                              await _memberService.reactivateMember(member.id);
-                              _showSnack('${member.fullName} reactivated');
-                              await _loadMembers();
-                            }
+                          ? () => _reactivate(member)
                           : null,
                     );
                   },

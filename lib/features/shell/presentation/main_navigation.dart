@@ -51,8 +51,13 @@ class MainNavigationState extends State<MainNavigation> {
   final GlobalKey<ProfileScreenState> _profileKey =
       GlobalKey<ProfileScreenState>();
   final Set<int> _visitedTabs = {PortalTabs.home};
+  String? _requestedTracerSurveyId;
 
   bool get isHomeTabActive => _currentIndex == PortalTabs.home;
+
+  bool get isProfileTabActive => _currentIndex == PortalTabs.profile;
+
+  int get currentTabIndex => _currentIndex;
 
   @override
   void initState() {
@@ -107,9 +112,19 @@ class MainNavigationState extends State<MainNavigation> {
       setState(() => _visitedTabs.add(index));
     }
     if (!mounted) return;
-    await Future<void>.delayed(Duration.zero);
-    if (!mounted) return;
     await WidgetsBinding.instance.endOfFrame;
+  }
+
+  /// Waits for a tab's [GlobalKey] state after IndexedStack mounts it.
+  /// Uses frame callbacks instead of arbitrary timers.
+  Future<T?> _waitForTabState<T extends State>(GlobalKey<T> key) async {
+    for (var i = 0; i < 12; i++) {
+      if (!mounted) return null;
+      final state = key.currentState;
+      if (state != null) return state;
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    return key.currentState;
   }
 
   /// Home deep-link: Events tab, then open the tapped event.
@@ -118,12 +133,7 @@ class MainNavigationState extends State<MainNavigation> {
     if (id.isEmpty) return;
     await _ensureTabReady(PortalTabs.events);
     if (!mounted) return;
-    var state = _eventsKey.currentState;
-    if (state == null) {
-      await Future<void>.delayed(const Duration(milliseconds: 32));
-      if (!mounted) return;
-      state = _eventsKey.currentState;
-    }
+    final state = await _waitForTabState(_eventsKey);
     await state?.openEventById(id, openComments: openComments);
   }
 
@@ -133,13 +143,18 @@ class MainNavigationState extends State<MainNavigation> {
     if (id.isEmpty) return;
     await _ensureTabReady(PortalTabs.jobs);
     if (!mounted) return;
-    var state = _jobsKey.currentState;
-    if (state == null) {
-      await Future<void>.delayed(const Duration(milliseconds: 32));
-      if (!mounted) return;
-      state = _jobsKey.currentState;
-    }
+    final state = await _waitForTabState(_jobsKey);
     await state?.openJobById(id);
+  }
+
+  /// Share/notification deep-link: Tracer tab for a specific GTS survey.
+  Future<void> openTracerSurvey(String surveyId) async {
+    final id = surveyId.trim();
+    if (id.isEmpty) return;
+    if (_requestedTracerSurveyId != id) {
+      setState(() => _requestedTracerSurveyId = id);
+    }
+    await _ensureTabReady(PortalTabs.tracer);
   }
 
   /// Home deep-link: Community tab, then open the tapped topic.
@@ -171,7 +186,10 @@ class MainNavigationState extends State<MainNavigation> {
       case PortalTabs.events:
         return EventsScreen(key: _eventsKey);
       case PortalTabs.tracer:
-        return const TracerScreen(embeddedInNav: true);
+        return TracerScreen(
+          embeddedInNav: true,
+          requestedSurveyId: _requestedTracerSurveyId,
+        );
       case PortalTabs.jobs:
         return JobPostingScreen(key: _jobsKey);
       case PortalTabs.community:

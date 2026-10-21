@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/skeleton.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 export 'package:alumni_system/shared/widgets/user/portal_skeletons.dart'
     show CommentListSkeleton, JobListSkeleton, MessageListSkeleton, PortalCardListSkeleton, SurveyFormSkeleton;
 
-/// Admin dashboard home — KPI row + panels.
+/// Admin dashboard home — title row, KPI row, chart/activity row, card row.
 class AdminDashboardHomeSkeleton extends StatelessWidget {
   const AdminDashboardHomeSkeleton({super.key});
 
-  static const _navy = Color(0xFF090A4F);
+  static const _chip = BorderRadius.all(Radius.circular(8));
 
   @override
   Widget build(BuildContext context) {
@@ -17,34 +18,23 @@ class AdminDashboardHomeSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            height: 88,
-            decoration: BoxDecoration(
-              color: _navy.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Skeleton(width: 100, height: 12),
-                        SizedBox(height: 8),
-                        Skeleton(width: 180, height: 20),
-                      ],
-                    ),
+          const SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Skeleton(width: 200, height: 20),
+                      SizedBox(height: 6),
+                      Skeleton(width: 90, height: 12),
+                    ],
                   ),
-                  Skeleton(width: 90, height: 48, borderRadius: BorderRadius.all(Radius.circular(8))),
-                  SizedBox(width: 8),
-                  Skeleton(width: 90, height: 48, borderRadius: BorderRadius.all(Radius.circular(8))),
-                  SizedBox(width: 8),
-                  Skeleton(width: 90, height: 48, borderRadius: BorderRadius.all(Radius.circular(8))),
-                ],
-              ),
+                ),
+                Skeleton(width: 96, height: 36, borderRadius: _chip),
+              ],
             ),
           ),
           const SizedBox(height: 12),
@@ -54,7 +44,7 @@ class AdminDashboardHomeSkeleton extends StatelessWidget {
               (i) => Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(left: i == 0 ? 0 : 6, right: i == 3 ? 0 : 6),
-                  child: _panelBox(height: 88),
+                  child: _panelBox(height: 96),
                 ),
               ),
             ),
@@ -63,18 +53,20 @@ class AdminDashboardHomeSkeleton extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _panelBox(height: 200)),
-              const SizedBox(width: 10),
-              Expanded(child: _panelBox(height: 200)),
+              Expanded(flex: 2, child: _panelBox(height: 240)),
+              const SizedBox(width: 12),
+              Expanded(child: _panelBox(height: 240)),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _panelBox(height: 160)),
-              const SizedBox(width: 10),
-              Expanded(child: _panelBox(height: 160)),
+              Expanded(child: _panelBox(height: 200)),
+              const SizedBox(width: 12),
+              Expanded(child: _panelBox(height: 200)),
+              const SizedBox(width: 12),
+              Expanded(child: _panelBox(height: 200)),
             ],
           ),
         ],
@@ -86,12 +78,8 @@ class AdminDashboardHomeSkeleton extends StatelessWidget {
     final compact = height < 100;
     return Container(
       height: height,
-      padding: EdgeInsets.all(compact ? 10 : 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
+      padding: EdgeInsets.all(compact ? 12 : 16),
+      decoration: AdminSurfaces.card(),
       child: compact
           ? const Column(
               mainAxisAlignment: MainAxisAlignment.center,

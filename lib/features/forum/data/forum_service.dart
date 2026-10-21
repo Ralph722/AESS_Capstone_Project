@@ -10,13 +10,13 @@ import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/forum/data/forum_bookmark_service.dart';
 import 'package:alumni_system/features/forum/data/forum_refresh_bus.dart';
+import 'package:alumni_system/features/share/share_destination.dart';
+
 /// Forum data access — Supabase only.
 class ForumService {
-  ForumService({
-    SupabaseClient? supabase,
-    ForumBookmarkService? bookmarks,
-  })  : _supabase = supabase ?? Supabase.instance.client,
-        _bookmarks = bookmarks ?? ForumBookmarkService(supabase: supabase);
+  ForumService({SupabaseClient? supabase, ForumBookmarkService? bookmarks})
+    : _supabase = supabase ?? Supabase.instance.client,
+      _bookmarks = bookmarks ?? ForumBookmarkService(supabase: supabase);
 
   final SupabaseClient _supabase;
   final ForumBookmarkService _bookmarks;
@@ -28,7 +28,12 @@ class ForumService {
   static const int titleMaxLength = 120;
   static const int bodyMaxLength = 8000;
 
-  static String topicDeepLink(String topicId) => 'aess://forum/topic/$topicId';
+  /// Canonical shareable URL (was the unhandled `aess://` scheme, whose
+  /// copied links opened nothing).
+  static String topicDeepLink(String topicId) => ShareDestination(
+    type: ShareResourceType.forumTopic,
+    surveyId: topicId,
+  ).canonicalUri.toString();
 
   Future<({String name, String program, String batch})> _authorInfo(
     String userId,
@@ -38,8 +43,7 @@ class ForumService {
         .select()
         .eq('id', userId)
         .maybeSingle();
-    final profile =
-        row != null ? TracerProfile.fromSupabaseRow(row) : null;
+    final profile = row != null ? TracerProfile.fromSupabaseRow(row) : null;
     final name = profile?.displayName.isNotEmpty == true
         ? profile!.displayName
         : (AppSession.email ?? 'Alumni');
@@ -64,10 +68,10 @@ class ForumService {
   Future<void> _setTopicTags(String topicId, List<String> tagIds) async {
     await _supabase.from('forum_topic_tags').delete().eq('topic_id', topicId);
     if (tagIds.isEmpty) return;
-    await _supabase.from('forum_topic_tags').insert(
-          tagIds
-              .map((id) => {'topic_id': topicId, 'tag_id': id})
-              .toList(),
+    await _supabase
+        .from('forum_topic_tags')
+        .insert(
+          tagIds.map((id) => {'topic_id': topicId, 'tag_id': id}).toList(),
         );
   }
 
@@ -159,10 +163,7 @@ class ForumService {
         .maybeSingle();
     if (row == null) return null;
     final bookmarked = await _bookmarks.isBookmarked(topicId);
-    final topic = ForumTopic.fromSupabaseRow(
-      row,
-      isBookmarked: bookmarked,
-    );
+    final topic = ForumTopic.fromSupabaseRow(row, isBookmarked: bookmarked);
     final avatars = await _authorAvatars([topic.authorUid]);
     final url = avatars[topic.authorUid];
     return url == null ? topic : topic.copyWith(authorAvatarUrl: url);
@@ -196,10 +197,7 @@ class ForumService {
             .from('forum_topics')
             .stream(primaryKey: ['id'])
             .eq('id', topicId)
-            .listen(
-              (_) => emit(),
-              onError: (_) => startPolling(),
-            );
+            .listen((_) => emit(), onError: (_) => startPolling());
       } catch (_) {
         await startPolling();
       }
@@ -242,10 +240,7 @@ class ForumService {
             .from('forum_posts')
             .stream(primaryKey: ['id'])
             .eq('topic_id', topicId)
-            .listen(
-              (_) => emit(),
-              onError: (_) => startPolling(),
-            );
+            .listen((_) => emit(), onError: (_) => startPolling());
       } catch (_) {
         await startPolling();
       }
@@ -265,8 +260,8 @@ class ForumService {
   // ---------------------------------------------------------------------------
 
   Future<ForumTopicPage> fetchTopics(ForumTopicQuery query) async {
-    final bookmarks = query.bookmarkTopicIds ??
-        await _bookmarks.getBookmarkedTopicIds();
+    final bookmarks =
+        query.bookmarkTopicIds ?? await _bookmarks.getBookmarkedTopicIds();
     final uid = query.authorUid ?? AppSession.userId;
 
     // Wider slice for client-side filters/tags, capped for alumni volumes.
@@ -336,12 +331,9 @@ class ForumService {
       }).toList();
     }
 
-    if (query.programEquals != null &&
-        query.programEquals!.trim().isNotEmpty) {
+    if (query.programEquals != null && query.programEquals!.trim().isNotEmpty) {
       final p = query.programEquals!.trim().toLowerCase();
-      topics = topics
-          .where((t) => t.authorProgram.toLowerCase() == p)
-          .toList();
+      topics = topics.where((t) => t.authorProgram.toLowerCase() == p).toList();
     }
 
     if (query.createdFrom != null) {
@@ -390,7 +382,11 @@ class ForumService {
     final total = topics.length;
     final start = query.page * query.pageSize;
     if (start >= total) {
-      return ForumTopicPage(topics: const [], totalCount: total, hasMore: false);
+      return ForumTopicPage(
+        topics: const [],
+        totalCount: total,
+        hasMore: false,
+      );
     }
     final end = (start + query.pageSize).clamp(0, total);
     final slice = topics.sublist(start, end);
@@ -476,17 +472,15 @@ class ForumService {
     );
 
     try {
-      await _supabase.from('forum_topics').upsert(
+      await _supabase
+          .from('forum_topics')
+          .upsert(
             topic.toSupabaseRow(authorSupabaseId: userId),
             onConflict: 'id',
           );
       await _setTopicTags(id, tagIds);
       if (asAnnouncement) {
-        await _logModeration(
-          topicId: id,
-          action: 'announcement',
-          reason: null,
-        );
+        await _logModeration(topicId: id, action: 'announcement', reason: null);
       }
       await clearDraft();
       notifyTopicsChanged();
@@ -508,11 +502,14 @@ class ForumService {
     if (trimmedBody.isEmpty) throw Exception('Message is required');
 
     try {
-      await _supabase.rpc('edit_forum_topic', params: {
-        'p_topic_id': topicId,
-        'p_title': trimmedTitle,
-        'p_body': trimmedBody,
-      });
+      await _supabase.rpc(
+        'edit_forum_topic',
+        params: {
+          'p_topic_id': topicId,
+          'p_title': trimmedTitle,
+          'p_body': trimmedBody,
+        },
+      );
       if (tagIds != null) {
         await _setTopicTags(topicId, tagIds);
       }
@@ -522,17 +519,14 @@ class ForumService {
     }
   }
 
-  Future<void> editPost({
-    required String postId,
-    required String body,
-  }) async {
+  Future<void> editPost({required String postId, required String body}) async {
     final trimmed = body.trim();
     if (trimmed.isEmpty) throw Exception('Reply cannot be empty');
     try {
-      await _supabase.rpc('edit_forum_post', params: {
-        'p_post_id': postId,
-        'p_body': trimmed,
-      });
+      await _supabase.rpc(
+        'edit_forum_post',
+        params: {'p_post_id': postId, 'p_body': trimmed},
+      );
       notifyTopicsChanged();
     } catch (e) {
       throw Exception('Error editing reply: $e');
@@ -568,7 +562,9 @@ class ForumService {
     );
 
     try {
-      await _supabase.from('forum_posts').upsert(
+      await _supabase
+          .from('forum_posts')
+          .upsert(
             post.toSupabaseRow(
               topicSupabaseId: topicId,
               authorSupabaseId: userId,
@@ -577,10 +573,13 @@ class ForumService {
           );
       if (mentionedUserIds.isNotEmpty) {
         try {
-          await _supabase.rpc('notify_forum_mentions', params: {
-            'p_post_id': post.id,
-            'p_mentioned_uids': mentionedUserIds,
-          });
+          await _supabase.rpc(
+            'notify_forum_mentions',
+            params: {
+              'p_post_id': post.id,
+              'p_mentioned_uids': mentionedUserIds,
+            },
+          );
         } catch (_) {
           // The reply is saved; a mention notice failure must not undo that.
         }
@@ -671,10 +670,13 @@ class ForumService {
   }
 
   Future<void> updateReportStatus(String reportId, String status) async {
-    await _supabase.from('forum_reports').update({
-      'status': status,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', reportId);
+    await _supabase
+        .from('forum_reports')
+        .update({
+          'status': status,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', reportId);
   }
 
   Future<Map<String, int>> _helpfulCounts(List<String> postIds) async {
@@ -750,11 +752,7 @@ class ForumService {
 
   Future<void> deleteTopic(String topicId, {String? reason}) async {
     try {
-      await _logModeration(
-        topicId: topicId,
-        action: 'delete',
-        reason: reason,
-      );
+      await _logModeration(topicId: topicId, action: 'delete', reason: reason);
       await _supabase.from('forum_topics').delete().eq('id', topicId);
       notifyTopicsChanged();
     } catch (e) {
@@ -787,8 +785,9 @@ class ForumService {
       if (isPinned != null) payload['is_pinned'] = isPinned;
       if (isSolved != null) payload['is_solved'] = isSolved;
       if (moderationReason != null) {
-        payload['moderation_reason'] =
-            moderationReason.trim().isEmpty ? null : moderationReason.trim();
+        payload['moderation_reason'] = moderationReason.trim().isEmpty
+            ? null
+            : moderationReason.trim();
       }
       await _supabase.from('forum_topics').update(payload).eq('id', topicId);
       notifyTopicsChanged();
@@ -838,12 +837,8 @@ class ForumService {
     }
   }
 
-  Future<({
-    int total,
-    int unanswered,
-    int locked,
-    int announcements,
-  })> getModerationStats() async {
+  Future<({int total, int unanswered, int locked, int announcements})>
+  getModerationStats() async {
     final topics = await getAllTopics();
     return (
       total: topics.length,
@@ -873,28 +868,23 @@ class ForumService {
     final counts = await _helpfulCounts(ids);
     final mine = await _myHelpfulPostIds(ids);
     final avatars = await _authorAvatars(authorIds);
-    return rows
-        .map(
-          (r) {
-            final authorUid = r['author_uid']?.toString() ?? '';
-            return ForumPost.fromSupabaseRow(
-              r,
-              helpfulCount: counts[r['id']?.toString()] ?? 0,
-              helpfulByMe: mine.contains(r['id']?.toString()),
-              authorAvatarUrl: avatars[authorUid],
-            );
-          },
-        )
-        .toList();
+    return rows.map((r) {
+      final authorUid = r['author_uid']?.toString() ?? '';
+      return ForumPost.fromSupabaseRow(
+        r,
+        helpfulCount: counts[r['id']?.toString()] ?? 0,
+        helpfulByMe: mine.contains(r['id']?.toString()),
+        authorAvatarUrl: avatars[authorUid],
+      );
+    }).toList();
   }
 
   Future<Map<String, String>> _authorAvatars(List<String> userIds) async {
     if (userIds.isEmpty) return {};
     try {
-      final rows = await _supabase.rpc(
-        'get_public_profiles',
-        params: {'p_ids': userIds},
-      ) as List<dynamic>;
+      final rows =
+          await _supabase.rpc('get_public_profiles', params: {'p_ids': userIds})
+              as List<dynamic>;
       final out = <String, String>{};
       for (final row in rows.cast<Map<String, dynamic>>()) {
         final id = row['id']?.toString() ?? '';

@@ -31,7 +31,9 @@ Future<void> downloadMessageImage({
         bytes = base64Decode(imageUrl.substring(comma + 1));
       } else {
         final url = await ImageStorageService.resolveMessageImageUrl(imageUrl);
-        final response = await http.get(Uri.parse(url));
+        final response = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 30));
         if (response.statusCode < 200 || response.statusCode >= 300) {
           throw StateError('HTTP ${response.statusCode}');
         }

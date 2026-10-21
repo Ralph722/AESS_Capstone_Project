@@ -1,34 +1,27 @@
 #!/bin/bash
 
+set -euo pipefail
+
 echo "========================================"
 echo "Building Flutter Web App for Production"
 echo "========================================"
-flutter build web --release
+echo "Firebase project: aess-alumni"
+echo "Hosting site:     ustp-aess"
+echo ""
 
-if [ $? -ne 0 ]; then
-    echo ""
-    echo "Build failed! Please check the errors above."
-    exit 1
-fi
+flutter build web --release
 
 echo ""
 echo "========================================"
 echo "Deploying to Firebase Hosting"
 echo "========================================"
-firebase deploy --only hosting
-
-if [ $? -ne 0 ]; then
-    echo ""
-    echo "Deployment failed! Please check the errors above."
-    exit 1
-fi
+firebase deploy --only hosting --project aess-alumni
 
 echo ""
 echo "========================================"
 echo "Deployment Complete!"
 echo "========================================"
 echo "Your app is now live at:"
-echo "https://alumni-3fb4d.web.app"
-echo "https://alumni-3fb4d.firebaseapp.com"
+echo "https://ustp-aess.web.app"
+echo "https://ustp-aess.firebaseapp.com"
 echo ""
-

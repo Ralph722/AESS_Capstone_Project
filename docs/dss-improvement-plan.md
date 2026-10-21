@@ -102,6 +102,9 @@ Recommended first: 1, 2 and 4.
 
 - `docs/access-link-plan.md`
 - `docs/demo-data-plan.md`
+- `docs/dss-usability-redesign-plan.md` — admin workflow/UX redesign of
+  this feature (action panel, merged Plan/owner/proof, timeline); UI-only,
+  complements the engine improvements listed above.
 - Registration security fix (server-side email code, roster check, no
   reset/wipe of existing accounts): done in the database audit (Phase 1);
   registration now uses Supabase Auth email OTP and `link_alumni_registration`.

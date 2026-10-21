@@ -6,6 +6,7 @@ import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/home/data/survey_attention_reminder.dart';
+import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 
 enum UserRole { admin, user }
 
@@ -252,10 +253,17 @@ class AuthService {
       throw Exception('Verification failed. Request a new code and try again.');
     }
     // Repeating a sign-up for an unconfirmed email keeps the first password,
-    // so set the one this person just chose.
+    // so set the one this person just chose. Never swallow failures — the UI
+    // must not treat registration as complete if the chosen password was lost.
     try {
       await _supabase.auth.updateUser(UserAttributes(password: password));
-    } on AuthException catch (_) {}
+    } on AuthException catch (e) {
+      throw Exception(
+        'Your email was verified, but we could not save your password. '
+        'Use Forgot password on the sign-in screen to set it, then try again. '
+        '${_handleAuthException(e)}',
+      );
+    }
     return user;
   }
 
@@ -585,6 +593,7 @@ class AuthService {
 
   Future<void> logout() async {
     AppImage.clearDecodedCache();
+    ImageStorageService.clearSignedUrlCache();
     final hook = beforeSignOut;
     if (hook != null) {
       try {

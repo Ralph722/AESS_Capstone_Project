@@ -19,7 +19,7 @@ class UserFeedbackListScreen extends StatelessWidget {
     final service = FeedbackService();
 
     return Scaffold(
-      backgroundColor: PortalTheme.pageBg,
+      backgroundColor: Colors.white,
       appBar: const PortalAppBar(title: 'My Feedback'),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openSubmit(context),
@@ -140,7 +140,7 @@ class _FeedbackCard extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-          side: BorderSide(color: PortalTheme.border.withValues(alpha: 0.75)),
+          side: const BorderSide(color: PortalTheme.borderStrong),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(

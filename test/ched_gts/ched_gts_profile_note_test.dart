@@ -96,6 +96,9 @@ void main() {
       ),
     );
 
+    expect(find.text(_profileNote), findsNothing);
+    await tester.tap(find.text('About this question').at(1));
+    await tester.pumpAndSettle();
     expect(find.text(_profileNote), findsOneWidget);
 
     await tester.enterText(
@@ -104,6 +107,70 @@ void main() {
     );
     await tester.pump();
     expect(find.text(_profileNote), findsNothing);
+  });
+
+  testWidgets('description sits in a closed "About this question" dropdown', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ChedGtsForm(
+              answers: const {},
+              onChanged: (_) {},
+              showIntro: false,
+              onlyItemIds: const {'ched_5', 'ched_6'},
+              sectionFilter: ChedGtsSection.a,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    const description = 'Your active mobile number, e.g. 0917 123 4567.';
+    // Q6 Civil Status has no description or notes, so no dropdown.
+    expect(find.text('About this question'), findsOneWidget);
+    expect(find.text(description), findsNothing);
+
+    await tester.tap(find.text('About this question'));
+    await tester.pumpAndSettle();
+    expect(find.text(description), findsOneWidget);
+
+    await tester.tap(find.text('About this question'));
+    await tester.pumpAndSettle();
+    expect(find.text(description), findsNothing);
+  });
+
+  testWidgets('inline style shows notes in place, with no dropdown', (
+    tester,
+  ) async {
+    const profile = {'ched_2': 'Lapasan, CDO'};
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ChedGtsForm(
+              answers: Map.of(profile),
+              prefilledAnswers: profile,
+              onChanged: (_) {},
+              showIntro: false,
+              onlyItemIds: const {'ched_2', 'ched_5'},
+              sectionFilter: ChedGtsSection.a,
+              notesStyle: ChedGtsNotesStyle.inline,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('About this question'), findsNothing);
+    expect(find.text(_profileNote), findsOneWidget);
+    expect(
+      find.text('Your active mobile number, e.g. 0917 123 4567.'),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.lightbulb_outline_rounded), findsNWidgets(2));
   });
 
   testWidgets('read-only views never show the note', (tester) async {

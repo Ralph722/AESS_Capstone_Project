@@ -15,6 +15,7 @@ import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/widgets/job_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
+import 'package:alumni_system/shared/widgets/user/skeleton.dart';
 
 /// Presentational Home pieces — keep navigation / data in [HomeScreen].
 
@@ -85,7 +86,7 @@ Widget _portalCard({
 // WELCOME / IDENTITY
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Welcome / profile hero — tappable card that opens the Profile tab.
+/// Welcome / profile hero — tappable card that opens the digital alumni card.
 class HomeAlumniIdentityHero extends StatelessWidget {
   const HomeAlumniIdentityHero({
     super.key,
@@ -95,7 +96,8 @@ class HomeAlumniIdentityHero extends StatelessWidget {
     this.batchYear,
     this.profileImageUrl,
     this.onTap,
-    @Deprecated('Use onTap — the whole card opens Profile') this.onAvatarTap,
+    this.hint = 'Tap to show your alumni card',
+    @Deprecated('Use onTap') this.onAvatarTap,
   });
 
   final String firstName;
@@ -104,6 +106,7 @@ class HomeAlumniIdentityHero extends StatelessWidget {
   final String? batchYear;
   final String? profileImageUrl;
   final VoidCallback? onTap;
+  final String? hint;
   final VoidCallback? onAvatarTap;
 
   String? get _courseBatchBadge {
@@ -217,6 +220,17 @@ class HomeAlumniIdentityHero extends StatelessWidget {
                                     fontWeight: FontWeight.w800,
                                     fontSize: 11,
                                   ),
+                                ),
+                              ),
+                            ],
+                            if (hint != null && hint!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                hint!,
+                                style: PortalTheme.meta.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.72),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -490,7 +504,7 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
                             : '$pendingSurveys assigned surveys waiting',
                         subtitle: surveySubtitle?.trim().isNotEmpty == true
                             ? surveySubtitle!
-                            : 'Respond when you can — separate from Tracer',
+                            : 'Pending · respond when ready',
                         onTap: onOpenSurveys,
                       ),
                   ],
@@ -586,7 +600,7 @@ class _YellowMetaPill extends StatelessWidget {
                         color: PortalTheme.navy.withValues(alpha: 0.72),
                         fontWeight: FontWeight.w600,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -706,51 +720,48 @@ class HomeStatCardsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: _hPad),
-        child: HomeStatCardsSkeleton(),
-      );
-    }
-
+    // Same outer padding for skeleton and loaded cards so the row does not
+    // jump when stats finish loading (_sectionTop was missing on skeleton).
     return Padding(
       padding: _sectionPadding(context),
-      child: Row(
-        children: [
-          Expanded(
-            child: HomeStatCard(
-              icon: Icons.campaign_outlined,
-              iconColor: PortalTheme.navy,
-              iconBg: PortalTheme.navy.withValues(alpha: 0.08),
-              count: announcementsCount,
-              label: 'Announcements',
-              onTap: onAnnouncements,
+      child: loading
+          ? const HomeStatCardsSkeleton()
+          : Row(
+              children: [
+                Expanded(
+                  child: HomeStatCard(
+                    icon: Icons.campaign_outlined,
+                    iconColor: PortalTheme.navy,
+                    iconBg: PortalTheme.navy.withValues(alpha: 0.08),
+                    count: announcementsCount,
+                    label: 'Announcements',
+                    onTap: onAnnouncements,
+                  ),
+                ),
+                const SizedBox(width: gap),
+                Expanded(
+                  child: HomeStatCard(
+                    icon: Icons.forum_outlined,
+                    iconColor: PortalTheme.navy,
+                    iconBg: PortalTheme.navy.withValues(alpha: 0.08),
+                    count: communityTodayCount,
+                    label: 'Posts today',
+                    onTap: onCommunity,
+                  ),
+                ),
+                const SizedBox(width: gap),
+                Expanded(
+                  child: HomeStatCard(
+                    icon: Icons.event_outlined,
+                    iconColor: PortalTheme.navy,
+                    iconBg: PortalTheme.navy.withValues(alpha: 0.08),
+                    count: eventsCount,
+                    label: 'Events',
+                    onTap: onEvents,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(width: gap),
-          Expanded(
-            child: HomeStatCard(
-              icon: Icons.forum_outlined,
-              iconColor: PortalTheme.navy,
-              iconBg: PortalTheme.navy.withValues(alpha: 0.08),
-              count: communityTodayCount,
-              label: 'Posts today',
-              onTap: onCommunity,
-            ),
-          ),
-          const SizedBox(width: gap),
-          Expanded(
-            child: HomeStatCard(
-              icon: Icons.event_outlined,
-              iconColor: PortalTheme.navy,
-              iconBg: PortalTheme.navy.withValues(alpha: 0.08),
-              count: eventsCount,
-              label: 'Events',
-              onTap: onEvents,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -824,27 +835,37 @@ class HomeStatCardsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(
-        3,
-        (i) => Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: i == 0 ? 0 : 5,
-              right: i == 2 ? 0 : 5,
-            ),
-            child: Container(
-              height: 96,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
-                border: Border.all(
-                  color: PortalTheme.border.withValues(alpha: 0.5),
-                ),
-              ),
-            ),
+    // Mirror [HomeStatCard] padding, radius, and gaps so layout does not shift.
+    Widget card() => _portalCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+      radius: PortalTheme.radiusXl,
+      elevation: 1,
+      shadowColor: PortalTheme.navy.withValues(alpha: 0.08),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Skeleton(
+            width: 28,
+            height: 28,
+            borderRadius: BorderRadius.all(Radius.circular(10)),
           ),
-        ),
+          SizedBox(height: 10),
+          Skeleton(width: 28, height: 22),
+          SizedBox(height: 2),
+          Skeleton(width: 72, height: 10),
+        ],
+      ),
+    );
+
+    return ShimmerScope(
+      child: Row(
+        children: [
+          Expanded(child: card()),
+          const SizedBox(width: HomeStatCardsRow.gap),
+          Expanded(child: card()),
+          const SizedBox(width: HomeStatCardsRow.gap),
+          Expanded(child: card()),
+        ],
       ),
     );
   }

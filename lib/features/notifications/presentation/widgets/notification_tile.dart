@@ -166,7 +166,7 @@ class NotificationTile extends StatelessWidget {
               : Colors.white,
           borderColor: unread
               ? PortalTheme.navy.withValues(alpha: 0.16)
-              : PortalTheme.border.withValues(alpha: 0.75),
+              : PortalTheme.borderStrong,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

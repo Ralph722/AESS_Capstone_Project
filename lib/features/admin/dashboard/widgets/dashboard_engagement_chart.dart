@@ -2,94 +2,116 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/admin/dashboard/application/dashboard_activity_trend.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_chart_card.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
-/// Area line chart for portal activity over time (admin dashboard).
+/// "Portal activity" card: daily audit-log actions over time (admin dashboard).
 class DashboardEngagementTrendChart extends StatelessWidget {
   const DashboardEngagementTrendChart({
     super.key,
     required this.trend,
     this.isLoading = false,
+    this.failed = false,
+    this.onRetry,
     this.expand = false,
+    this.chartHeight = 200,
     this.onViewReports,
   });
 
   final DashboardActivityTrend trend;
   final bool isLoading;
+
+  /// The last load failed and there is no trend to show.
+  final bool failed;
+  final VoidCallback? onRetry;
+
+  /// Fill the parent's height (parent must be bounded).
   final bool expand;
+  final double chartHeight;
   final VoidCallback? onViewReports;
 
-  static const _chartGreen = Color(0xFF22C55E);
-  static const _navy = Color(0xFF090A4F);
+  static const _line = AdminColors.primary;
 
   @override
   Widget build(BuildContext context) {
     final peak = trend.peakPoint;
     final maxVal = trend.maxCount;
+    final noPoints = trend.points.isEmpty;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Expanded(
-              child: Text(
-                'Portal activity',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: _navy,
-                ),
+    final Widget body;
+    var isEmpty = false;
+    if (isLoading && noPoints) {
+      body = const AdminStateView.loading(
+        label: 'Loading activity trend…',
+        compact: true,
+      );
+    } else if (failed && noPoints) {
+      body = AdminStateView.error(
+        title: "Couldn't load activity trend",
+        onRetry: onRetry,
+        compact: true,
+      );
+    } else if (trend.isEmpty) {
+      isEmpty = true;
+      body = const SizedBox.shrink();
+    } else {
+      body = Semantics(
+        container: true,
+        label: _summary(peak),
+        child: ExcludeSemantics(child: _buildChart(maxVal, peak)),
+      );
+    }
+
+    return AdminChartCard(
+      title: 'Portal activity',
+      caption: 'Daily actions logged in the system (last 90 days)',
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!isLoading && maxVal > 0)
+            Text(
+              'Max: $maxVal',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AdminColors.textSecondary,
               ),
             ),
-            if (!isLoading && maxVal > 0)
-              Text(
-                'Max: $maxVal',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+          if (onViewReports != null) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onViewReports,
+              style: TextButton.styleFrom(
+                foregroundColor: AdminColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                minimumSize: const Size(0, 28),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
                 ),
               ),
-            if (onViewReports != null) ...[
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: onViewReports,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Reports', style: TextStyle(fontSize: 12)),
+              child: const Text(
+                'Reports',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
               ),
-            ],
+            ),
           ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Daily actions logged in the system (last 90 days)',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: isLoading && trend.points.isEmpty
-              ? Center(
-                  child: Text(
-                    'Loading activity trend…',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                )
-              : trend.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No activity recorded yet',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    )
-                  : _buildChart(maxVal, peak),
-        ),
-      ],
+        ],
+      ),
+      isEmpty: isEmpty,
+      emptyMessage: 'No activity recorded yet',
+      expandChart: expand,
+      chartHeight: expand ? null : chartHeight,
+      child: body,
     );
+  }
+
+  String _summary(DashboardTrendPoint? peak) {
+    final base = 'Portal activity, last ${trend.points.length} days';
+    if (peak == null || peak.count == 0) return base;
+    return '$base, peak ${peak.count} actions on '
+        '${DateFormat.yMMMd().format(peak.date)}';
   }
 
   Widget _buildChart(int maxVal, DashboardTrendPoint? peak) {
@@ -103,11 +125,12 @@ class DashboardEngagementTrendChart extends StatelessWidget {
     final chartMaxY = maxY + yPad;
 
     final labelStep = _xLabelStep(trend.points.length);
+    final lastIndex = trend.points.length - 1;
 
     return LineChart(
       LineChartData(
         minX: 0,
-        maxX: (trend.points.length - 1).toDouble().clamp(0, double.infinity),
+        maxX: lastIndex.toDouble().clamp(0, double.infinity),
         minY: 0,
         maxY: chartMaxY,
         gridData: FlGridData(
@@ -115,18 +138,18 @@ class DashboardEngagementTrendChart extends StatelessWidget {
           drawVerticalLine: true,
           horizontalInterval: chartMaxY / 4,
           verticalInterval: labelStep.toDouble(),
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.shade200,
-            strokeWidth: 1,
-          ),
-          getDrawingVerticalLine: (value) => FlLine(
-            color: Colors.grey.shade100,
-            strokeWidth: 1,
-          ),
+          getDrawingHorizontalLine: (value) =>
+              const FlLine(color: AdminColors.border, strokeWidth: 1),
+          getDrawingVerticalLine: (value) =>
+              const FlLine(color: AdminColors.surface, strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -138,9 +161,9 @@ class DashboardEngagementTrendChart extends StatelessWidget {
                 }
                 return Text(
                   _formatYAxis(value),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey.shade600,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AdminColors.textSecondary,
                   ),
                 );
               },
@@ -153,19 +176,16 @@ class DashboardEngagementTrendChart extends StatelessWidget {
               interval: labelStep.toDouble(),
               getTitlesWidget: (value, meta) {
                 final i = value.round();
-                if (i < 0 || i >= trend.points.length) {
-                  return const SizedBox.shrink();
-                }
-                if (i % labelStep != 0 && i != trend.points.length - 1) {
+                if (!showXLabel(i, lastIndex, labelStep)) {
                   return const SizedBox.shrink();
                 }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     DateFormat('MM/dd').format(trend.points[i].date),
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: Colors.grey.shade600,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AdminColors.textSecondary,
                     ),
                   ),
                 );
@@ -198,17 +218,17 @@ class DashboardEngagementTrendChart extends StatelessWidget {
                 horizontalLines: [
                   HorizontalLine(
                     y: peak.count.toDouble(),
-                    color: _chartGreen.withValues(alpha: 0.85),
-                    strokeWidth: 1,
+                    color: AdminAccents.gold.color,
+                    strokeWidth: 1.5,
                     dashArray: [6, 4],
                     label: HorizontalLineLabel(
                       show: true,
                       alignment: Alignment.topRight,
                       padding: const EdgeInsets.only(right: 4, bottom: 4),
-                      style: TextStyle(
-                        fontSize: 10,
+                      style: const TextStyle(
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF15803D),
+                        color: AdminColors.textSecondary,
                       ),
                       labelResolver: (_) => 'Peak: ${peak.count}',
                     ),
@@ -221,7 +241,8 @@ class DashboardEngagementTrendChart extends StatelessWidget {
             spots: spots,
             isCurved: true,
             curveSmoothness: 0.22,
-            color: _chartGreen,
+            preventCurveOverShooting: true,
+            color: _line,
             barWidth: 2.5,
             isStrokeCapRound: true,
             dotData: FlDotData(
@@ -230,7 +251,7 @@ class DashboardEngagementTrendChart extends StatelessWidget {
                 radius: 3,
                 color: Colors.white,
                 strokeWidth: 2,
-                strokeColor: _chartGreen,
+                strokeColor: _line,
               ),
             ),
             belowBarData: BarAreaData(
@@ -239,8 +260,8 @@ class DashboardEngagementTrendChart extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  _chartGreen.withValues(alpha: 0.28),
-                  _chartGreen.withValues(alpha: 0.04),
+                  AdminAccents.sky.color.withValues(alpha: 0.28),
+                  AdminAccents.sky.color.withValues(alpha: 0.02),
                 ],
               ),
             ),
@@ -249,6 +270,16 @@ class DashboardEngagementTrendChart extends StatelessWidget {
       ),
       duration: const Duration(milliseconds: 250),
     );
+  }
+
+  /// Ticks every [step] points plus the last point (today). The regular tick
+  /// just before the last one is skipped when the two labels would collide.
+  @visibleForTesting
+  static bool showXLabel(int i, int lastIndex, int step) {
+    if (i < 0 || i > lastIndex) return false;
+    if (i == lastIndex) return true;
+    if (i % step != 0) return false;
+    return lastIndex - i >= step * 0.6;
   }
 
   static int _xLabelStep(int pointCount) {

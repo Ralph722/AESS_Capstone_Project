@@ -114,9 +114,7 @@ void main() {
     );
   });
 
-  testWidgets('frosted pill shadow sits below it, never inside it', (
-    tester,
-  ) async {
+  testWidgets('nav pill is opaque white with shadow below it', (tester) async {
     final boundary = GlobalKey();
     await tester.pumpWidget(
       MaterialApp(
@@ -135,7 +133,7 @@ void main() {
         ),
       ),
     );
-    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
 
     final pill = tester.getRect(find.byType(PortalFrostedPill));
     final (bytes, width) = (await tester.runAsync(() async {
@@ -147,7 +145,6 @@ void main() {
     int red(Offset p) =>
         bytes!.getUint8((p.dy.round() * width + p.dx.round()) * 4);
 
-    // The backdrop blur may pick up a trace of the shadow at the very edge.
     for (final dy in [pill.top + 4, pill.center.dy, pill.bottom - 8]) {
       expect(red(Offset(pill.center.dx, dy)), greaterThanOrEqualTo(252));
     }

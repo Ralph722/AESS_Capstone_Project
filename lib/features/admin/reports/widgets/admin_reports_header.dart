@@ -20,8 +20,6 @@ class ReportsPageHeader extends StatelessWidget {
   /// Fixed so tabs can size themselves to the remaining viewport.
   static const double height = 72;
 
-  static const _accentHeight = 3.0;
-
   final String subtitle;
 
   /// When the dashboard data last finished loading.
@@ -31,75 +29,43 @@ class ReportsPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const radius = Radius.circular(AdminReportsTheme.radiusLg);
     return Container(
       width: double.infinity,
       height: height,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: radius),
-        border: const Border(
-          top: BorderSide(color: AdminReportsTheme.border),
-          left: BorderSide(color: AdminReportsTheme.border),
-          right: BorderSide(color: AdminReportsTheme.border),
-        ),
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            AdminReportsTheme.card,
-            AdminReportsTheme.card,
-            AdminReportsTheme.primary.withValues(alpha: 0.05),
-          ],
-          stops: const [0, 0.55, 1],
-        ),
+        color: AdminReportsTheme.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AdminReportsTheme.border),
+        boxShadow: AdminReportsTheme.cardShadow,
       ),
-      child: Column(
-        children: [
-          Container(
-            height: _accentHeight,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AdminReportsTheme.primary,
-                  Color(0xFF4F46E5),
-                  AdminReportsTheme.gold,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AdminReportsTheme.space3,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final showStatus = constraints.maxWidth >= 620;
+            return Row(
+              children: [
+                const _HeaderEmblem(),
+                const SizedBox(width: AdminReportsTheme.space2),
+                Expanded(child: _titleBlock()),
+                if (showStatus && updatedAt != null) ...[
+                  const SizedBox(width: AdminReportsTheme.space2),
+                  _LiveStatus(updatedAt: updatedAt!),
                 ],
-                stops: [0, 0.6, 1],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AdminReportsTheme.space3,
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final showStatus = constraints.maxWidth >= 620;
-                  return Row(
-                    children: [
-                      const _HeaderEmblem(),
-                      const SizedBox(width: AdminReportsTheme.space2),
-                      Expanded(child: _titleBlock()),
-                      if (showStatus && updatedAt != null) ...[
-                        const SizedBox(width: AdminReportsTheme.space2),
-                        _LiveStatus(updatedAt: updatedAt!),
-                      ],
-                      if (onRefresh != null) ...[
-                        const SizedBox(width: 6),
-                        _RefreshButton(
-                          onPressed: refreshing ? null : onRefresh,
-                          refreshing: refreshing,
-                        ),
-                      ],
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
+                if (onRefresh != null) ...[
+                  const SizedBox(width: 8),
+                  _RefreshButton(
+                    onPressed: refreshing ? null : onRefresh,
+                    refreshing: refreshing,
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -150,11 +116,7 @@ class _HeaderEmblem extends StatelessWidget {
       height: 38,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AdminReportsTheme.primary, Color(0xFF4F46E5)],
-        ),
+        color: AdminReportsTheme.primary,
         boxShadow: [
           BoxShadow(
             color: AdminReportsTheme.primary.withValues(alpha: 0.25),

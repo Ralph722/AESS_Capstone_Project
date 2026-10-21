@@ -134,15 +134,23 @@ class MessageRealtime {
     String channelName = 'messages-unread',
   }) {
     final controller = StreamController<int>();
+    MessageChangeSubscription? changeSub;
+    var cancelled = false;
+
+    // Register cancel immediately so a quick unsubscribe cannot race setup().
+    controller.onCancel = () async {
+      cancelled = true;
+      await changeSub?.cancel();
+      changeSub = null;
+    };
 
     Future<void> setup() async {
-      MessageChangeSubscription? changeSub;
       var lastEmitted = -1;
 
       Future<void> emit() async {
-        if (controller.isClosed) return;
+        if (cancelled || controller.isClosed) return;
         final count = await fetchCount();
-        if (controller.isClosed) return;
+        if (cancelled || controller.isClosed) return;
         if (count == lastEmitted) return;
         lastEmitted = count;
         controller.add(count);
@@ -150,6 +158,7 @@ class MessageRealtime {
 
       try {
         final recipientId = await resolveRecipientId();
+        if (cancelled || controller.isClosed) return;
         if (recipientId == null || recipientId.isEmpty) {
           controller.add(0);
           await controller.close();
@@ -157,6 +166,7 @@ class MessageRealtime {
         }
 
         await emit();
+        if (cancelled || controller.isClosed) return;
 
         changeSub = subscribeMessageChanges(
           channelName: '$channelName-$recipientId',
@@ -166,13 +176,14 @@ class MessageRealtime {
             unawaited(emit());
           },
         );
-
-        controller.onCancel = () async {
+        if (cancelled) {
           await changeSub?.cancel();
-        };
+          changeSub = null;
+        }
       } catch (_) {
         await changeSub?.cancel();
-        if (!controller.isClosed) controller.add(0);
+        changeSub = null;
+        if (!cancelled && !controller.isClosed) controller.add(0);
       }
     }
 

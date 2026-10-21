@@ -588,6 +588,9 @@ class SurveyReminderResult {
   final int emailSent;
   final int emailSkippedNoAddress;
   final int emailSkippedNotConfigured;
+
+  /// Recipients who turned off survey emails in Notification settings.
+  final int emailSkippedOptedOut;
   final List<String> failures;
 
   const SurveyReminderResult({
@@ -595,6 +598,7 @@ class SurveyReminderResult {
     this.emailSent = 0,
     this.emailSkippedNoAddress = 0,
     this.emailSkippedNotConfigured = 0,
+    this.emailSkippedOptedOut = 0,
     this.failures = const [],
   });
 

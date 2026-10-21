@@ -157,13 +157,6 @@ class _UserAnnouncementsScreenState extends State<UserAnnouncementsScreen> {
                 MediaQuery.sizeOf(context).width,
               ),
               children: [
-                if (!widget.embeddedInHub)
-                  const PortalPageIntro(
-                    headline: 'Stay informed',
-                    body:
-                        'Official notices and updates from the alumni office.',
-                    padding: EdgeInsets.fromLTRB(0, 4, 0, 16),
-                  ),
                 _AnnouncementFilterBar(
                   controller: _search,
                   dateRange: _dateRange,

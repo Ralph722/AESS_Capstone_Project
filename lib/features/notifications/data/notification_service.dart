@@ -54,7 +54,10 @@ class NotificationService {
 
     var query = _supabase
         .from('user_notifications')
-        .select()
+        .select(
+          'id, user_id, type, title, body, is_read, created_at, data, '
+          'priority, route, dedupe_key, read_at, expires_at',
+        )
         .eq('user_id', userId);
     if (unreadOnly) query = query.eq('is_read', false);
     if (type != null) query = query.eq('type', type.name);
@@ -119,14 +122,16 @@ class NotificationService {
   }
 
   Future<void> markAsRead(String notificationId) async {
-    if (AppSession.userId == null) return;
+    final userId = AppSession.userId;
+    if (userId == null) return;
     await _supabase
         .from('user_notifications')
         .update({
           'is_read': true,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .eq('id', notificationId);
+        .eq('id', notificationId)
+        .eq('user_id', userId);
   }
 
   Future<void> markAllAsRead() async {
@@ -144,8 +149,13 @@ class NotificationService {
   }
 
   Future<void> deleteNotification(String notificationId) async {
-    if (AppSession.userId == null) return;
-    await _supabase.from('user_notifications').delete().eq('id', notificationId);
+    final userId = AppSession.userId;
+    if (userId == null) return;
+    await _supabase
+        .from('user_notifications')
+        .delete()
+        .eq('id', notificationId)
+        .eq('user_id', userId);
   }
 
   Future<void> deleteAllRead() async {

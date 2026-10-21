@@ -213,20 +213,31 @@ class _HomeJobCardSkeleton extends StatelessWidget {
 
 /// Events tab list/grid loading placeholder.
 class EventListSkeleton extends StatelessWidget {
-  const EventListSkeleton({super.key, this.grid = false, this.count = 4});
+  const EventListSkeleton({
+    super.key,
+    this.grid = false,
+    this.count = 4,
+    this.shrinkWrap = true,
+  });
 
   final bool grid;
   final int count;
 
+  /// False when the skeleton fills a [SliverFillRemaining] / expanded body.
+  final bool shrinkWrap;
+
   @override
   Widget build(BuildContext context) {
+    final physics = shrinkWrap
+        ? const NeverScrollableScrollPhysics()
+        : const AlwaysScrollableScrollPhysics();
     if (grid) {
       return ShimmerScope(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: shrinkWrap,
+            physics: physics,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 16,
@@ -242,8 +253,8 @@ class EventListSkeleton extends StatelessWidget {
 
     return ShimmerScope(
       child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: shrinkWrap,
+        physics: physics,
         padding: const EdgeInsets.all(16),
         itemCount: count,
         itemBuilder: (_, __) => const Padding(
@@ -849,9 +860,204 @@ class _SettingRowSkeleton extends StatelessWidget {
           Expanded(child: Skeleton(width: double.infinity, height: 14)),
           SizedBox(width: 12),
           Skeleton(
-            width: 16,
-            height: 16,
-            borderRadius: BorderRadius.all(Radius.circular(4)),
+            width: 40,
+            height: 22,
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Notification settings — toggle rows matching the prefs screen cards.
+class NotificationSettingsSkeleton extends StatelessWidget {
+  const NotificationSettingsSkeleton({super.key, this.rows = 8});
+
+  final int rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerScope(
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: [
+          const Skeleton(width: 120, height: 14),
+          const SizedBox(height: 8),
+          const Skeleton(width: 220, height: 11),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < rows; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  const _SettingRowSkeleton(),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Home important-dates calendar placeholder (month grid + list strip).
+class HomeCalendarSkeleton extends StatelessWidget {
+  const HomeCalendarSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerScope(
+      child: Container(
+        height: 320,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Skeleton(width: 28, height: 28),
+                Spacer(),
+                Skeleton(width: 120, height: 16),
+                Spacer(),
+                Skeleton(width: 28, height: 28),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 7,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                children: List.generate(
+                  28,
+                  (_) => const Skeleton(
+                    width: double.infinity,
+                    height: double.infinity,
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Alumni digital card footprint on Profile.
+class AlumniCardSkeleton extends StatelessWidget {
+  const AlumniCardSkeleton({
+    super.key,
+    this.maxWidth = 380,
+    this.aspectRatio = 1.586,
+  });
+
+  final double maxWidth;
+  final double aspectRatio;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerScope(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: AspectRatio(
+            aspectRatio: aspectRatio,
+            child: const Skeleton(
+              width: double.infinity,
+              height: double.infinity,
+              borderRadius: BorderRadius.all(Radius.circular(14)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// My Surveys list — mirrors survey row chips + title + CTA layout.
+class SurveyListSkeleton extends StatelessWidget {
+  const SurveyListSkeleton({super.key, this.count = 4});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerScope(
+      child: SizedBox.expand(
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+          itemCount: count,
+          itemBuilder: (_, i) => Padding(
+            padding: EdgeInsets.only(bottom: i < count - 1 ? 12 : 0),
+            child: const _SurveyRowCardSkeleton(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SurveyRowCardSkeleton extends StatelessWidget {
+  const _SurveyRowCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Skeleton(
+                width: 96,
+                height: 24,
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+              Spacer(),
+              Skeleton(
+                width: 88,
+                height: 24,
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Skeleton(width: double.infinity, height: 16),
+          SizedBox(height: 6),
+          Skeleton(width: 200, height: 12),
+          SizedBox(height: 6),
+          Skeleton(width: 120, height: 11),
+          SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Skeleton(
+              width: 96,
+              height: 36,
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
           ),
         ],
       ),
@@ -1122,12 +1328,14 @@ class TracerFormSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sectionFields = (fieldCount / 2).ceil().clamp(2, 6);
+    // SizedBox.expand keeps page-level placeholders full-height under
+    // PortalContentFrame's Align (avoids a visible shrink before content).
     return ShimmerScope(
-      child: ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-        children: [
+      child: SizedBox.expand(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+          children: [
           // Navy intro hero
           Container(
             padding: const EdgeInsets.all(16),
@@ -1169,6 +1377,7 @@ class TracerFormSkeleton extends StatelessWidget {
             borderRadius: BorderRadius.all(Radius.circular(12)),
           ),
         ],
+        ),
       ),
     );
   }

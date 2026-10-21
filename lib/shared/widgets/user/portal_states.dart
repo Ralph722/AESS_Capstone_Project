@@ -5,6 +5,20 @@ import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 /// User-facing empty / error / network helpers for the alumni portal.
 
 String portalFriendlyError(Object? error) {
+  // Prefer explicit, already-safe messages from our own ArgumentError/StateError.
+  if (error is ArgumentError) {
+    final msg = error.message?.toString().trim() ?? '';
+    if (msg.isNotEmpty && msg.length <= 160 && !_looksTechnical(msg)) {
+      return msg;
+    }
+  }
+  if (error is StateError) {
+    final msg = error.message.trim();
+    if (msg.isNotEmpty && msg.length <= 160 && !_looksTechnical(msg)) {
+      return msg;
+    }
+  }
+
   final raw = error?.toString() ?? '';
   final s = raw.toLowerCase();
   if (s.contains('socket') ||
@@ -19,12 +33,22 @@ String portalFriendlyError(Object? error) {
   if (s.contains('permission') || s.contains('row-level') || s.contains('42501')) {
     return 'You do not have permission to do that.';
   }
-  if (s.contains('jwt') || s.contains('auth') || s.contains('session')) {
+  if (s.contains('jwt') ||
+      s.contains('not signed in') ||
+      (s.contains('auth') && s.contains('session')) ||
+      s.contains('session expired')) {
     return 'Your session expired. Please sign in again.';
+  }
+  if (s.contains('storageexception') ||
+      s.contains('payload too large') ||
+      s.contains('entity too large') ||
+      s.contains('exceeds maximum upload')) {
+    return 'Could not upload that image. Try a smaller photo.';
   }
   // Avoid dumping PostgREST / stack traces to alumni.
   if (raw.contains('Postgrest') ||
       raw.contains('Exception:') ||
+      _looksTechnical(raw) ||
       RegExp(r'\b\d{5}\b').hasMatch(raw)) {
     return 'Something went wrong. Please try again.';
   }
@@ -35,6 +59,29 @@ String portalFriendlyError(Object? error) {
     return 'Something went wrong. Please try again.';
   }
   return raw.replaceFirst(RegExp(r'^Exception:\s*'), '');
+}
+
+bool _looksTechnical(String raw) {
+  final s = raw.toLowerCase();
+  return s.contains('postgrest') ||
+      s.contains('supabase') ||
+      s.contains('stack trace') ||
+      s.contains('dart:') ||
+      s.contains('package:') ||
+      RegExp(r'\bPGRST\d+\b', caseSensitive: false).hasMatch(raw);
+}
+
+/// Shows a floating danger SnackBar with a [portalFriendlyError] message.
+void showPortalErrorSnack(BuildContext context, Object? error) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(portalFriendlyError(error)),
+        backgroundColor: PortalTheme.danger,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
 }
 
 Future<bool> confirmDiscardChanges(BuildContext context) async {

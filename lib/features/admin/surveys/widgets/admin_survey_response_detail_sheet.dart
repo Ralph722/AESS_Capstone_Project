@@ -3,9 +3,11 @@ import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dar
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
+import 'package:alumni_system/features/surveys/data/classic_survey_visibility.dart';
 import 'package:alumni_system/features/surveys/data/survey_answer_display.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Sectioned response detail view — UI only; does not alter CHED schema.
 ///
@@ -17,13 +19,17 @@ Future<void> showAdminSurveyResponseDetailSheet({
   required SurveyResponse response,
   required bool isChedBuiltin,
   required List<SurveyQuestion> questions,
+  String? subtitle,
+  Map<String, SurveyVisibilityRule> visibilityRules = const {},
   VoidCallback? onViewTimeline,
 }) {
   Widget workspace(BuildContext ctx) => _ResponseDetailWorkspace(
         alumniName: alumniName,
+        subtitle: subtitle,
         response: response,
         isChedBuiltin: isChedBuiltin,
         questions: questions,
+        visibilityRules: visibilityRules,
         onClose: () => Navigator.pop(ctx),
         onViewTimeline: onViewTimeline,
       );
@@ -55,17 +61,21 @@ Future<void> showAdminSurveyResponseDetailSheet({
 class _ResponseDetailWorkspace extends StatefulWidget {
   const _ResponseDetailWorkspace({
     required this.alumniName,
+    required this.subtitle,
     required this.response,
     required this.isChedBuiltin,
     required this.questions,
+    required this.visibilityRules,
     required this.onClose,
     this.onViewTimeline,
   });
 
   final String alumniName;
+  final String? subtitle;
   final SurveyResponse response;
   final bool isChedBuiltin;
   final List<SurveyQuestion> questions;
+  final Map<String, SurveyVisibilityRule> visibilityRules;
   final VoidCallback onClose;
   final VoidCallback? onViewTimeline;
 
@@ -76,6 +86,25 @@ class _ResponseDetailWorkspace extends StatefulWidget {
 
 class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
   late String _activeSectionId;
+  bool _showOfficialForm = false;
+
+  /// Questions this alumnus actually saw (show-when rules applied).
+  List<SurveyQuestion> get _visibleQuestions =>
+      ClassicSurveyVisibility.visibleQuestions(
+        questions: widget.questions,
+        answers: widget.response.answers,
+        rules: widget.visibilityRules,
+      );
+
+  List<SurveyQuestion> _questionsInActiveSection(List<SurveyQuestion> source) {
+    return source.where((q) {
+      if (_activeSectionId == '__general__') {
+        return q.section == null || q.section!.trim().isEmpty;
+      }
+      return (q.section ?? '').trim() == _activeSectionId;
+    }).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+  }
 
   @override
   void initState() {
@@ -163,16 +192,8 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
       return missing;
     }
 
-    final qs = widget.questions.where((q) {
-      if (_activeSectionId == '__general__') {
-        return q.section == null || q.section!.trim().isEmpty;
-      }
-      return (q.section ?? '').trim() == _activeSectionId;
-    }).toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
-
     return [
-      for (final q in qs)
+      for (final q in _questionsInActiveSection(_visibleQuestions))
         if (_isAnswerEmpty(answers[q.id])) q.prompt,
     ];
   }
@@ -201,19 +222,18 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
                       widget.alumniName.trim().isEmpty
                           ? 'Alumni response'
                           : widget.alumniName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AdminSurveyTheme.textPrimary,
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AdminText.sectionTitle.copyWith(fontSize: 16),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'Response details',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AdminSurveyTheme.textMuted,
-                      ),
+                    Text(
+                      (widget.subtitle?.trim().isNotEmpty ?? false)
+                          ? widget.subtitle!.trim()
+                          : 'Response details',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AdminText.caption.copyWith(height: 1.35),
                     ),
                   ],
                 ),
@@ -276,30 +296,22 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
                       orElse: () => sections.first,
                     )
                     .title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AdminSurveyTheme.textPrimary,
-                ),
+                style: AdminText.sectionTitle,
               ),
               const SizedBox(height: 8),
               if (unanswered.isNotEmpty) ...[
-                SurveyCallout(
-                  tone: SurveyCalloutTone.warning,
-                  icon: Icons.warning_amber_outlined,
-                  title:
-                      '${unanswered.length} unanswered in this section',
-                  body: unanswered.take(6).join('\n'),
+                _UnansweredStrip(
+                  key: ValueKey('unanswered-$_activeSectionId'),
+                  prompts: unanswered,
                 ),
                 const SizedBox(height: 12),
               ] else
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
                     'All visible items in this section have answers.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AdminSurveyTheme.success,
+                    style: AdminText.caption.copyWith(
+                      color: AdminColors.success,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -338,25 +350,33 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
           ),
           const SizedBox(height: 10),
         ],
-        // Full official form for this section (read-only) for fidelity.
-        const SizedBox(height: 8),
-        const Text(
-          'Official form view',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AdminSurveyTheme.textMuted,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () =>
+                setState(() => _showOfficialForm = !_showOfficialForm),
+            icon: Icon(
+              _showOfficialForm
+                  ? Icons.expand_less
+                  : Icons.description_outlined,
+              size: 18,
+            ),
+            label: Text(
+              _showOfficialForm ? 'Hide official form' : 'Show official form',
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        ChedGtsForm(
-          answers: answers,
-          onChanged: (_) {},
-          readOnly: true,
-          showIntro: false,
-          showSectionHeaders: false,
-          sectionFilter: section,
-        ),
+        if (_showOfficialForm) ...[
+          const SizedBox(height: 4),
+          ChedGtsForm(
+            answers: answers,
+            onChanged: (_) {},
+            readOnly: true,
+            showIntro: false,
+            showSectionHeaders: false,
+            sectionFilter: section,
+          ),
+        ],
       ],
     );
   }
@@ -378,18 +398,16 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
       );
     }
 
-    final qs = widget.questions.where((q) {
-      if (_activeSectionId == '__general__') {
-        return q.section == null || q.section!.trim().isEmpty;
-      }
-      return (q.section ?? '').trim() == _activeSectionId;
-    }).toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+    final qs = _questionsInActiveSection(_visibleQuestions);
 
     if (qs.isEmpty) {
-      return const Text(
-        'No questions in this section.',
-        style: TextStyle(color: AdminSurveyTheme.textMuted),
+      final hadQuestions =
+          _questionsInActiveSection(widget.questions).isNotEmpty;
+      return Text(
+        hadQuestions
+            ? 'No questions in this section were shown to this alumnus.'
+            : 'No questions in this section.',
+        style: AdminText.caption,
       );
     }
 
@@ -411,6 +429,97 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
   String _formatValue(dynamic value) {
     final text = formatSurveyAnswerValue(value);
     return text.isEmpty ? 'No answer' : text;
+  }
+}
+
+/// Compact warning strip; [SurveyCallout] is left to the Editor.
+class _UnansweredStrip extends StatefulWidget {
+  const _UnansweredStrip({super.key, required this.prompts});
+
+  final List<String> prompts;
+
+  @override
+  State<_UnansweredStrip> createState() => _UnansweredStripState();
+}
+
+class _UnansweredStripState extends State<_UnansweredStrip> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = widget.prompts.length;
+    return Container(
+      decoration: BoxDecoration(
+        color: AdminColors.warningBg,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(
+          color: AdminColors.warning.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_outlined,
+                    size: 16,
+                    color: AdminColors.warning,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$count unanswered in this section',
+                      style: AdminText.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AdminColors.warning,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _expanded ? 'Hide' : 'Show',
+                    style: AdminText.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AdminColors.warning,
+                    ),
+                  ),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: AdminColors.warning,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(34, 0, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final prompt in widget.prompts)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• $prompt',
+                        style: AdminText.caption.copyWith(
+                          color: AdminColors.textPrimary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

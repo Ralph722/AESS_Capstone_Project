@@ -83,11 +83,11 @@ class _WarningBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFED7AA)),
+        color: AdminReportsTheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AdminReportsTheme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,11 +101,18 @@ class _WarningBox extends StatelessWidget {
                   const Icon(
                     Icons.warning_amber_rounded,
                     size: 16,
-                    color: Color(0xFFEA580C),
+                    color: AdminReportsTheme.gold,
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(m, style: const TextStyle(fontSize: 12)),
+                    child: Text(
+                      m,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AdminReportsTheme.textPrimary,
+                        height: 1.35,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -180,34 +187,43 @@ class _ResultTableState extends State<_ResultTable> {
     List<List<Object?>> rows,
     List<bool> numeric,
   ) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowHeight: 36,
-        dataRowMinHeight: 30,
-        dataRowMaxHeight: 40,
-        columnSpacing: 20,
-        headingTextStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: AdminReportsTheme.primary,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AdminReportsTheme.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: const WidgetStatePropertyAll(AdminReportsTheme.surface),
+          headingRowHeight: 38,
+          dataRowMinHeight: 32,
+          dataRowMaxHeight: 44,
+          columnSpacing: 20,
+          headingTextStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AdminReportsTheme.primary,
+          ),
+          dataTextStyle: const TextStyle(fontSize: 12, color: Colors.black87),
+          columns: [
+            for (var i = 0; i < table.headers.length; i++)
+              DataColumn(label: Text(table.headers[i]), numeric: numeric[i]),
+          ],
+          rows: [
+            for (final row in rows)
+              DataRow(
+                color: row.first == GtsReportTables.allGraduates
+                    ? const WidgetStatePropertyAll(AdminReportsTheme.surface)
+                    : null,
+                cells: [
+                  for (final c in row) DataCell(Text(GtsReportTables.display(c))),
+                ],
+              ),
+          ],
         ),
-        dataTextStyle: const TextStyle(fontSize: 12, color: Colors.black87),
-        columns: [
-          for (var i = 0; i < table.headers.length; i++)
-            DataColumn(label: Text(table.headers[i]), numeric: numeric[i]),
-        ],
-        rows: [
-          for (final row in rows)
-            DataRow(
-              color: row.first == GtsReportTables.allGraduates
-                  ? const WidgetStatePropertyAll(AdminReportsTheme.surface)
-                  : null,
-              cells: [
-                for (final c in row) DataCell(Text(GtsReportTables.display(c))),
-              ],
-            ),
-        ],
       ),
     );
   }

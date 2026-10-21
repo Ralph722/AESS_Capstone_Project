@@ -20,6 +20,9 @@ import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layou
 import 'package:alumni_system/features/admin/reports/widgets/gts_report_preview.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_saved_reports_bar.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 typedef GtsRespondentLoader =
     Future<List<GtsRespondent>> Function(List<String> surveyIds);
@@ -488,11 +491,12 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
   }
 
   Widget _card(Widget child) => Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
       color: AdminReportsTheme.card,
-      borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
+      borderRadius: BorderRadius.circular(14),
       border: Border.all(color: AdminReportsTheme.border),
+      boxShadow: AdminReportsTheme.cardShadow,
     ),
     child: child,
   );
@@ -523,8 +527,23 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
 
   InputDecoration _input(String label) => InputDecoration(
     labelText: label,
+    labelStyle: const TextStyle(fontSize: 13, color: AdminReportsTheme.textSecondary),
     isDense: true,
-    border: const OutlineInputBorder(),
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AdminReportsTheme.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AdminReportsTheme.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AdminReportsTheme.primary, width: 1.5),
+    ),
   );
 
   /// An older saved setting that is kept so the numbers do not change.
@@ -678,34 +697,58 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
       selected: selected,
       child: InkWell(
         key: ValueKey('template-card-${t.key}'),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         onTap: () => _applyTemplate(t),
         child: Container(
           width: 176,
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: selected
-                ? AdminReportsTheme.primary.withValues(alpha: 0.06)
-                : AdminReportsTheme.surface,
-            borderRadius: BorderRadius.circular(8),
+                ? AdminReportsTheme.primary.withValues(alpha: 0.05)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: selected
                   ? AdminReportsTheme.primary
                   : AdminReportsTheme.border,
-              width: selected ? 2 : 1,
+              width: selected ? 1.5 : 1,
             ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AdminReportsTheme.primary.withValues(alpha: 0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                t.name,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      t.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: selected
+                            ? AdminReportsTheme.primary
+                            : AdminReportsTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (selected)
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: AdminReportsTheme.primary,
+                    ),
+                ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 5),
               Text(
                 t.summary,
                 maxLines: 3,
@@ -713,6 +756,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
                 style: const TextStyle(
                   fontSize: 11,
                   color: AdminReportsTheme.textMuted,
+                  height: 1.3,
                 ),
               ),
             ],
@@ -1334,6 +1378,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
                   onPressed: result == null || _exporting != null
                       ? null
                       : () => unawaited(_download(f)),
+                  style: AdminButtonStyles.outlined(),
                   icon: _exporting == f
                       ? const SizedBox(
                           width: 14,
@@ -1414,21 +1459,51 @@ class _QuestionPickerDialogState extends State<_QuestionPickerDialog> {
       (bySection[f.section ?? _rosterSection] ??= []).add(f);
     }
     return AlertDialog(
-      title: const Text('What do you want to know?'),
+      shape: AdminDialogStandards.shape,
+      backgroundColor: AdminDialogStandards.backgroundColor,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: AdminDialogStandards.defaultInsetPadding,
+      contentPadding: AdminDialogStandards.defaultContentPadding,
+      titlePadding: EdgeInsets.zero,
+      actionsPadding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
+      title: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+        child: AdminModalHeader(
+          title: 'Select Question',
+          subtitle: 'Choose a question or data field from the CHED GTS.',
+          icon: Icons.help_outline_rounded,
+          onClose: () => Navigator.of(context).pop(),
+        ),
+      ),
       content: SizedBox(
         width: 560,
         height: 520,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const Divider(height: 1, color: AdminColors.border),
+            const SizedBox(height: 12),
             TextField(
               controller: _search,
               autofocus: true,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 isDense: true,
-                prefixIcon: Icon(Icons.search, size: 18),
+                prefixIcon: const Icon(Icons.search, size: 18),
                 hintText: 'Search, e.g. employed or 16',
-                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: AdminColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -1473,8 +1548,9 @@ class _QuestionPickerDialogState extends State<_QuestionPickerDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        OutlinedButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: AdminButtonStyles.outlined(),
           child: const Text('Cancel'),
         ),
       ],

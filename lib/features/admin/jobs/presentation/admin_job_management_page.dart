@@ -8,6 +8,8 @@ import 'package:alumni_system/features/jobs/data/job_service.dart';
 import 'package:alumni_system/features/jobs/models/job_category_constants.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/presentation/add_job_dialog.dart';
+import 'package:alumni_system/features/share/share_link_sheet.dart';
+import 'package:alumni_system/features/share/shareable_content.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
@@ -44,8 +46,7 @@ class _AdminJobManagementState extends State<AdminJobManagement>
   int _page = 0;
   static const _pageSize = 20;
 
-  int get _totalInterest =>
-      _jobs.fold<int>(0, (s, j) => s + j.interestedCount);
+  int get _totalInterest => _jobs.fold<int>(0, (s, j) => s + j.interestedCount);
 
   double get _avgInterest {
     if (_jobs.isEmpty) return 0;
@@ -326,10 +327,7 @@ class _AdminJobManagementState extends State<AdminJobManagement>
 
   Future<void> _toggleArchive(JobPosting job) async {
     final next = job.status == 'archived' ? 'active' : 'archived';
-    final updated = job.copyWith(
-      status: next,
-      isActive: next == 'active',
-    );
+    final updated = job.copyWith(status: next, isActive: next == 'active');
     await _jobService.updateJobPosting(updated);
     await _load();
   }
@@ -365,11 +363,8 @@ class _AdminJobManagementState extends State<AdminJobManagement>
       context: context,
       job: job,
       alumni: alumni,
-      onExportCsv: () => exportInterestedAlumniCsv(
-        context: context,
-        job: job,
-        alumni: alumni,
-      ),
+      onExportCsv: () =>
+          exportInterestedAlumniCsv(context: context, job: job, alumni: alumni),
       onOpenMessages: () => widget.onOpenAdminMenu?.call(6),
     );
   }
@@ -417,10 +412,7 @@ class _AdminJobManagementState extends State<AdminJobManagement>
     );
   }
 
-  Widget _statusChip({
-    required String value,
-    required String label,
-  }) {
+  Widget _statusChip({required String value, required String label}) {
     final selected = _status == value;
     return DirectoryToolbarFilterChip(
       label: label,
@@ -536,10 +528,7 @@ class _AdminJobManagementState extends State<AdminJobManagement>
           _statusChip(value: 'all', label: 'All'),
           _statusChip(value: 'active', label: 'Active'),
           _statusChip(value: 'expired', label: 'Expired'),
-          _statusChip(
-            value: 'archived',
-            label: 'Archived ($_archivedCount)',
-          ),
+          _statusChip(value: 'archived', label: 'Archived ($_archivedCount)'),
         ],
       ),
     );
@@ -554,107 +543,111 @@ class _AdminJobManagementState extends State<AdminJobManagement>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-            AdminPageHeader(
-              title: 'Job Postings',
-              subtitle: 'University career board for alumni opportunities',
-              actions: [
-                OutlinedButton.icon(
-                  onPressed: _loading
-                      ? null
-                      : () => showAdminJobInsightsDialog(
-                            context: context,
-                            jobs: _jobs,
-                          ),
-                  icon: const Icon(Icons.insights_outlined, size: 17),
-                  label: const Text('Insights'),
-                  style: jobOutlinedButtonStyle(),
-                ),
-                FilledButton.icon(
-                  onPressed: _loading ? null : () => _openEditor(),
-                  icon: const Icon(Icons.add, size: 17),
-                  label: const Text('Post new job'),
-                  style: jobFilledButtonStyle(),
-                ),
-              ],
+        AdminPageHeader(
+          title: 'Job Postings',
+          subtitle: 'University career board for alumni opportunities',
+          actions: [
+            OutlinedButton.icon(
+              onPressed: _loading
+                  ? null
+                  : () => showAdminJobInsightsDialog(
+                      context: context,
+                      jobs: _jobs,
+                    ),
+              icon: const Icon(Icons.insights_outlined, size: 17),
+              label: const Text('Insights'),
+              style: jobOutlinedButtonStyle(),
             ),
-            const SizedBox(height: AdminJobTheme.space2),
-            _buildMetrics(),
-            const SizedBox(height: AdminJobTheme.space2),
-            _buildToolbar(),
-            const SizedBox(height: AdminJobTheme.space1),
-            Expanded(
-              child: AdminInstantContent(
-                loading: _loading,
-                loadingSkeleton: const PortalCardListSkeleton(),
-                isEmpty: filtered.isEmpty,
-                empty: DirectoryEmptyState(
-                  title: _hasFilters ? 'No matching jobs' : 'No jobs yet',
-                  subtitle: _hasFilters
-                      ? 'Try clearing filters or search.'
-                      : 'Post a career opportunity for alumni.',
-                  icon: Icons.work_off_outlined,
-                  primaryAction: _hasFilters ? null : () => _openEditor(),
-                  primaryLabel: _hasFilters ? null : 'Post new job',
-                ),
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: AdminDensity.space3),
-                  children: [
-                    DirectoryResultsBar(
-                      message:
-                          '${filtered.length} job${filtered.length == 1 ? '' : 's'}',
-                    ),
-                    const SizedBox(height: AdminDensity.space1),
-                    ..._pageItems.map(
-                      (job) => AdminJobCard(
-                        job: job,
-                        onEdit: () => _openEditor(job: job),
-                        onDetails: () => showAdminJobDetailsDrawer(
-                          context: context,
-                          job: job,
-                          onOpenInterested: () => _openInterested(job),
-                        ),
-                        onInterested: () => _openInterested(job),
-                        onToggleArchive: () => _toggleArchive(job),
-                        onDelete: () => _delete(job),
-                      ),
-                    ),
-                    if (pageCount > 1)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AdminDensity.space1,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              onPressed: _page > 0
-                                  ? () => setState(() => _page--)
-                                  : null,
-                              style: AdminDensity.iconButtonStyle(),
-                              icon: const Icon(Icons.chevron_left),
-                            ),
-                            Text(
-                              'Page ${_page + 1} of $pageCount',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: AdminJobTheme.textSecondary,
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: _page < pageCount - 1
-                                  ? () => setState(() => _page++)
-                                  : null,
-                              style: AdminDensity.iconButtonStyle(),
-                              icon: const Icon(Icons.chevron_right),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            FilledButton.icon(
+              onPressed: _loading ? null : () => _openEditor(),
+              icon: const Icon(Icons.add, size: 17),
+              label: const Text('Post new job'),
+              style: jobFilledButtonStyle(),
             ),
           ],
+        ),
+        const SizedBox(height: AdminJobTheme.space2),
+        _buildMetrics(),
+        const SizedBox(height: AdminJobTheme.space2),
+        _buildToolbar(),
+        const SizedBox(height: AdminJobTheme.space1),
+        Expanded(
+          child: AdminInstantContent(
+            loading: _loading,
+            loadingSkeleton: const PortalCardListSkeleton(),
+            isEmpty: filtered.isEmpty,
+            empty: DirectoryEmptyState(
+              title: _hasFilters ? 'No matching jobs' : 'No jobs yet',
+              subtitle: _hasFilters
+                  ? 'Try clearing filters or search.'
+                  : 'Post a career opportunity for alumni.',
+              icon: Icons.work_off_outlined,
+              primaryAction: _hasFilters ? null : () => _openEditor(),
+              primaryLabel: _hasFilters ? null : 'Post new job',
+            ),
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: AdminDensity.space3),
+              children: [
+                DirectoryResultsBar(
+                  message:
+                      '${filtered.length} job${filtered.length == 1 ? '' : 's'}',
+                ),
+                const SizedBox(height: AdminDensity.space1),
+                ..._pageItems.map(
+                  (job) => AdminJobCard(
+                    job: job,
+                    onEdit: () => _openEditor(job: job),
+                    onDetails: () => showAdminJobDetailsDrawer(
+                      context: context,
+                      job: job,
+                      onOpenInterested: () => _openInterested(job),
+                    ),
+                    onShare: () => showShareLinkSheet(
+                      context,
+                      ShareableContent.fromJob(job),
+                    ),
+                    onInterested: () => _openInterested(job),
+                    onToggleArchive: () => _toggleArchive(job),
+                    onDelete: () => _delete(job),
+                  ),
+                ),
+                if (pageCount > 1)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AdminDensity.space1,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          onPressed: _page > 0
+                              ? () => setState(() => _page--)
+                              : null,
+                          style: AdminDensity.iconButtonStyle(),
+                          icon: const Icon(Icons.chevron_left),
+                        ),
+                        Text(
+                          'Page ${_page + 1} of $pageCount',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: AdminJobTheme.textSecondary,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _page < pageCount - 1
+                              ? () => setState(() => _page++)
+                              : null,
+                          style: AdminDensity.iconButtonStyle(),
+                          icon: const Icon(Icons.chevron_right),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

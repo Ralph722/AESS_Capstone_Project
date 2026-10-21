@@ -402,12 +402,17 @@ void main() {
       );
       expect(find.text('Unsuccessful'), findsOneWidget);
       expect(find.textContaining('not proof'), findsOneWidget);
-      for (final label in ['Resolve', 'Continue', 'Modify', 'Escalate']) {
+      for (final label in [
+        'Decide: Resolve',
+        'Decide: Continue',
+        'Decide: Modify',
+        'Decide: Escalate',
+      ]) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.text('Edit plan'), findsNothing);
-      await tester.tap(find.text('Continue'));
-      await tester.tap(find.text('Escalate'));
+      await tester.tap(find.text('Decide: Continue'));
+      await tester.tap(find.text('Decide: Escalate'));
       expect(calls, [
         DssOutcomeDecision.continueWork,
         DssOutcomeDecision.escalate,
@@ -430,7 +435,7 @@ void main() {
         onDecide: (_, d) => calls.add(d),
       );
       expect(find.text('Successful'), findsOneWidget);
-      await tester.tap(find.text('Resolve'));
+      await tester.tap(find.text('Decide: Resolve'));
       expect(calls, [DssOutcomeDecision.resolve]);
     });
 
@@ -450,7 +455,7 @@ void main() {
       );
       expect(find.text('No comparable data'), findsOneWidget);
       expect(find.textContaining('not proof'), findsNothing);
-      expect(find.text('Continue'), findsOneWidget);
+      expect(find.text('Decide: Continue'), findsOneWidget);
     });
 
     testWidgets('decided: decision shown, earlier interventions listed', (

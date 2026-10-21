@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
 
 const _titleStyle = TextStyle(
   fontWeight: FontWeight.w700,
@@ -284,6 +285,11 @@ class DssOutcomeCard extends StatelessWidget {
               color: AdminDssTheme.textSecondary,
             ),
           ),
+          const SizedBox(height: 4),
+          const Text(
+            'Outcome decision — separate from Resolve finding above.',
+            style: _hintStyle,
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -294,7 +300,7 @@ class DssOutcomeCard extends StatelessWidget {
                     ? null
                     : () => onDecide(i, DssOutcomeDecision.resolve),
                 style: dssFilledButtonStyle(background: AdminDssTheme.success),
-                child: const Text('Resolve'),
+                child: const Text('Decide: Resolve'),
               ),
               for (final d in const [
                 DssOutcomeDecision.continueWork,
@@ -304,7 +310,7 @@ class DssOutcomeCard extends StatelessWidget {
                 OutlinedButton(
                   onPressed: busy ? null : () => onDecide(i, d),
                   style: dssOutlinedButtonStyle(),
-                  child: Text(d.label),
+                  child: Text('Decide: ${d.label}'),
                 ),
             ],
           ),
@@ -407,7 +413,7 @@ InputDecoration _decoration(String label, {String? helper, String? error}) {
       color: AdminDssTheme.textSecondary,
     ),
     filled: true,
-    fillColor: AdminDssTheme.background,
+    fillColor: Colors.white,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     border: OutlineInputBorder(
       borderRadius: radius,
@@ -525,6 +531,10 @@ class _InterventionDialogState extends State<_InterventionDialog> {
     final canSave = type != null && !needsDetail && _targetError == null;
     final today = _today();
     return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: AdminDialogStandards.shape,
+      elevation: AdminDialogStandards.elevation,
       title: Text(
         widget.existing == null ? 'Record intervention' : 'Edit plan',
       ),
@@ -537,6 +547,7 @@ class _InterventionDialogState extends State<_InterventionDialog> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: _options.contains(type) ? type : null,
+                dropdownColor: Colors.white,
                 isExpanded: true,
                 decoration: _decoration('Intervention'),
                 items: [
@@ -749,6 +760,10 @@ class _DecisionDialogState extends State<_DecisionDialog> {
     final canSave =
         _noteCtrl.text.trim().isNotEmpty && (!_modify || target != null);
     return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: AdminDialogStandards.shape,
+      elevation: AdminDialogStandards.elevation,
       title: Text(
         '${widget.decision.label}: ${widget.intervention.outcomeStatus.label}',
       ),
@@ -775,6 +790,8 @@ class _DecisionDialogState extends State<_DecisionDialog> {
                         suffixIcon: PopupMenuButton<String>(
                           tooltip: 'Suggested offices',
                           icon: const Icon(Icons.arrow_drop_down),
+                          color: Colors.white,
+                          surfaceTintColor: Colors.transparent,
                           onSelected: (v) =>
                               setState(() => _officeCtrl.text = v),
                           itemBuilder: (_) => [
@@ -789,6 +806,7 @@ class _DecisionDialogState extends State<_DecisionDialog> {
               if (_modify) ...[
                 DropdownButtonFormField<String>(
                   initialValue: _type,
+                  dropdownColor: Colors.white,
                   isExpanded: true,
                   decoration: _decoration('New intervention'),
                   items: [

@@ -11,6 +11,7 @@ import 'package:alumni_system/features/jobs/models/job_interest_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/widgets/job_ui.dart';
 import 'package:alumni_system/features/messages/data/message_open_bus.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
@@ -44,26 +45,10 @@ abstract final class AdminJobTheme {
       AdminDirectoryTheme.surfaceCard(hovered: hovered);
 }
 
-ButtonStyle jobFilledButtonStyle({Color? background}) => FilledButton.styleFrom(
-  backgroundColor: background ?? AdminJobTheme.primary,
-  foregroundColor: Colors.white,
-  minimumSize: const Size(0, AdminJobTheme.buttonHeight),
-  padding: const EdgeInsets.symmetric(horizontal: 16),
-  elevation: 0,
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
-  ),
-);
+ButtonStyle jobFilledButtonStyle({Color? background}) =>
+    AdminButtonStyles.filled(background: background);
 
-ButtonStyle jobOutlinedButtonStyle() => OutlinedButton.styleFrom(
-  foregroundColor: AdminJobTheme.textPrimary,
-  side: const BorderSide(color: AdminJobTheme.border),
-  minimumSize: const Size(0, AdminJobTheme.buttonHeight),
-  padding: const EdgeInsets.symmetric(horizontal: 14),
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
-  ),
-);
+ButtonStyle jobOutlinedButtonStyle() => AdminButtonStyles.outlined();
 
 /// Compact survey-style row card for Job Postings list.
 class AdminJobCard extends StatefulWidget {
@@ -75,6 +60,7 @@ class AdminJobCard extends StatefulWidget {
     required this.onInterested,
     required this.onToggleArchive,
     required this.onDelete,
+    this.onShare,
   });
 
   final JobPosting job;
@@ -83,6 +69,7 @@ class AdminJobCard extends StatefulWidget {
   final VoidCallback onInterested;
   final VoidCallback onToggleArchive;
   final VoidCallback onDelete;
+  final VoidCallback? onShare;
 
   @override
   State<AdminJobCard> createState() => _AdminJobCardState();
@@ -168,6 +155,8 @@ class _AdminJobCardState extends State<AdminJobCard> {
                           widget.onDetails();
                         case 'interested':
                           widget.onInterested();
+                        case 'share':
+                          widget.onShare?.call();
                         case 'edit':
                           widget.onEdit();
                         case 'archive':
@@ -185,6 +174,11 @@ class _AdminJobCardState extends State<AdminJobCard> {
                         value: 'interested',
                         child: Text('Interested (${job.interestedCount})'),
                       ),
+                      if (widget.onShare != null && job.isActiveForAlumni)
+                        const PopupMenuItem(
+                          value: 'share',
+                          child: Text('Share link…'),
+                        ),
                       const PopupMenuItem(value: 'edit', child: Text('Edit')),
                       PopupMenuItem(
                         value: 'archive',

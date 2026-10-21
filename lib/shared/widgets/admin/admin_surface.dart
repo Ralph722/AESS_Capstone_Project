@@ -24,6 +24,11 @@ const Color _adminScrim = Color(0x730F172A);
 bool adminIsWideSurface(BuildContext context) =>
     MediaQuery.sizeOf(context).width >= kAdminSurfaceBreakpoint;
 
+/// Whether the current window should use phone-oriented admin chrome
+/// (drawer nav, full-width panels, bottom-sheet pickers).
+bool adminIsPhoneSurface(BuildContext context) =>
+    AdminDensity.isPhoneWidth(MediaQuery.sizeOf(context).width);
+
 /// Opens [child] as a centered desktop modal dialog.
 ///
 /// - Fixed [maxWidth] with a sensible [maxHeight] cap.
@@ -88,7 +93,9 @@ Future<T?> showAdminSidePanel<T>({
     transitionDuration: const Duration(milliseconds: 220),
     pageBuilder: (ctx, animation, secondaryAnimation) {
       final size = MediaQuery.sizeOf(ctx);
-      final resolvedWidth = math.min(width, size.width - 48);
+      // Phone: nearly full-bleed. Wider: keep a gutter so the list stays visible.
+      final gutter = AdminDensity.isPhoneWidth(size.width) ? 0.0 : 48.0;
+      final resolvedWidth = math.min(width, size.width - gutter);
       return Align(
         alignment: Alignment.centerRight,
         child: _AdminEscDismiss(
@@ -96,7 +103,7 @@ Future<T?> showAdminSidePanel<T>({
             elevation: 16,
             color: backgroundColor,
             child: SizedBox(
-              width: resolvedWidth,
+              width: resolvedWidth <= 0 ? size.width : resolvedWidth,
               height: double.infinity,
               child: child,
             ),

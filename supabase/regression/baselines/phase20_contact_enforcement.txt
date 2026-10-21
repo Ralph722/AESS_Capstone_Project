@@ -1,0 +1,10 @@
+﻿n,test,expected,actual
+1,mirror copies users contacts to the roster,09171234567|mock|09171234567|p20-start@example.com|p20-start@example.com,09171234567|mock|09171234567|p20-start@example.com|p20-start@example.com
+2,alumni cannot change a mobile number on file directly,09171234567|mock|09171234567,09171234567|mock|09171234567|p20-start@example.com|p20-start@example.com
+3,alumni cannot clear it either,09171234567|mock,09171234567|mock|09171234567|p20-start@example.com|p20-start@example.com
+4,"roster contact columns are kept, other fields still save",ok|09171234567|p20-start@example.com|P20 Street,ok|09171234567|p20-start@example.com|P20 Street
+5,first number on file can be typed directly (not verified),09175550000|null|09175550000,09175550000|null|09175550000|p20-start@example.com|p20-start@example.com
+6,verified mobile saves and mirrors,true,true
+7,... on users and the roster,09176660000|mock|09176660000,09176660000|mock|09176660000|p20-start@example.com|p20-start@example.com
+8,admin can still edit a mobile number,ok,ok
+9,... and the roster follows,09177770000|null|09177770000,09177770000|null|09177770000|p20-start@example.com|p20-start@example.com

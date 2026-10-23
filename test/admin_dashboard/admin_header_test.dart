@@ -55,12 +55,11 @@ void main() {
     );
   });
 
-  testWidgets('header shows section / page path context', (tester) async {
+  testWidgets('header does not show screen title or path in top bar', (tester) async {
     await _pumpHeader(tester);
 
-    expect(find.text('Overview'), findsOneWidget);
-    expect(find.text('Dashboard'), findsOneWidget);
-    expect(find.textContaining('/'), findsOneWidget);
+    expect(find.text('Overview'), findsNothing);
+    expect(find.text('Dashboard'), findsNothing);
   });
 
   testWidgets('search sits in the right-hand control group', (tester) async {

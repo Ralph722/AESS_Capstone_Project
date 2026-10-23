@@ -677,6 +677,7 @@ class DirectoryFilterField<T> extends StatelessWidget {
     this.width,
     this.minWidth = 128,
     this.enabled = true,
+    this.dense = false,
   });
 
   final String label;
@@ -686,6 +687,7 @@ class DirectoryFilterField<T> extends StatelessWidget {
   final double? width;
   final double minWidth;
   final bool enabled;
+  final bool dense;
 
   /// Outer height shared by filter dropdowns and date chips.
   static const double controlHeight =
@@ -696,25 +698,29 @@ class DirectoryFilterField<T> extends StatelessWidget {
     FloatingLabelBehavior floatingLabelBehavior = FloatingLabelBehavior.auto,
     Color borderColor = AdminDirectoryTheme.border,
     Color fillColor = Colors.white,
+    bool dense = false,
   }) {
     final radius = BorderRadius.circular(AdminDirectoryTheme.radiusSm);
     return InputDecoration(
       isDense: true,
       labelText: label,
-      labelStyle: const TextStyle(
-        fontSize: 11,
+      labelStyle: TextStyle(
+        fontSize: dense ? 10.5 : 11,
         color: AdminDirectoryTheme.textSecondary,
       ),
       // Flutter scales a floated label to 75%; 14.5 renders at ~11px.
-      floatingLabelStyle: const TextStyle(
-        fontSize: 14.5,
+      floatingLabelStyle: TextStyle(
+        fontSize: dense ? 12.5 : 14.5,
         fontWeight: FontWeight.w600,
         color: AdminDirectoryTheme.textSecondary,
       ),
       floatingLabelBehavior: floatingLabelBehavior,
       filled: true,
       fillColor: fillColor,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: dense ? 8 : 10,
+        vertical: dense ? 3 : 8,
+      ),
       border: OutlineInputBorder(
         borderRadius: radius,
         borderSide: BorderSide(color: borderColor),
@@ -739,18 +745,22 @@ class DirectoryFilterField<T> extends StatelessWidget {
       isExpanded: true,
       isDense: true,
       dropdownColor: Colors.white,
-      iconSize: 18,
+      iconSize: dense ? 16 : 18,
       borderRadius: radius,
-      icon: const Icon(
+      icon: Icon(
         Icons.keyboard_arrow_down_rounded,
-        size: 18,
+        size: dense ? 16 : 18,
         color: AdminDirectoryTheme.textMuted,
       ),
-      style: const TextStyle(
-        fontSize: 12.5,
+      style: TextStyle(
+        fontSize: dense ? 12 : 12.5,
         color: AdminDirectoryTheme.textPrimary,
       ),
-      decoration: decoration(label: label),
+      decoration: decoration(
+        label: label,
+        fillColor: dense ? AdminDirectoryTheme.background : Colors.white,
+        dense: dense,
+      ),
       items: items,
       onChanged: enabled ? onChanged : null,
     );

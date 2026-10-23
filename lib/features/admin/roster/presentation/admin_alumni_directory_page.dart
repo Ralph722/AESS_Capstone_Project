@@ -11,12 +11,16 @@ import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/admin_alumni_directory_dialogs.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_instant_content.dart';
+import 'package:alumni_system/core/constants/ustp_colors.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/web_file_upload.dart';
@@ -634,70 +638,157 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!showingDetail) ...[
-          DirectoryPageHeader(
-            onAdd: _openAddAlumniChooser,
-            onExport: _exportChedGtsPdfBatch,
-            isLoading: _isLoading,
-            canExport: _allMembers.isNotEmpty,
-            isExporting: _exportingChedBatch,
+          AdminCompactHeader(
+            title: 'Alumni Directory',
+            actions: [
+              OutlinedButton.icon(
+                onPressed: _isLoading || _isRefreshing ? null : _loadMembers,
+                icon: _isRefreshing
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 15),
+                label: Text(_isRefreshing ? 'Refreshing…' : 'Refresh'),
+                style: AdminButtonStyles.outlined(),
+              ),
+              Tooltip(
+                message: 'Download CHED GTS PDFs as a ZIP',
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading || _exportingChedBatch || _allMembers.isEmpty
+                      ? null
+                      : _exportChedGtsPdfBatch,
+                  icon: _exportingChedBatch
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.picture_as_pdf_outlined, size: 15),
+                  label: Text(_exportingChedBatch ? 'Exporting…' : 'Export CHED GTS'),
+                  style: AdminButtonStyles.outlined(),
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: _isLoading ? null : _openAddAlumniChooser,
+                icon: const Icon(Icons.person_add_alt_1_outlined, size: 15),
+                label: const Text('Add Alumni'),
+                style: AdminButtonStyles.filled(),
+              ),
+            ],
           ),
-          const SizedBox(height: AdminDirectoryTheme.space2),
-          DirectoryKpiRow(
-            children: [
-              AdminKpiCard(
-                dense: true,
+          const SizedBox(height: 8),
+          AdminMetricRibbon(
+            items: [
+              AdminMetricRibbonItem(
                 label: 'On roster',
                 value: '${_allMembers.length}',
-                caption: _deactivatedCount > 0
+                icon: Icons.groups_outlined,
+                color: AdminColors.primary,
+                tooltip: _deactivatedCount > 0
                     ? 'Total alumni records, incl. $_deactivatedCount deactivated'
                     : 'Total alumni records',
-                icon: Icons.groups_outlined,
-                palette: AdminAccents.blue,
-              ),
-              AdminKpiCard(
-                dense: true,
-                label: 'Registered alumni',
-                value: '$_registeredCount',
-                caption: 'Signed in to the app',
-                icon: Icons.verified_outlined,
-                palette: AdminAccents.sky,
+                isSelected: _registrationFilter == AlumniRegistrationFilter.all &&
+                    _activeFilter == AlumniActiveFilter.all &&
+                    _viewIndex == 0,
                 onTap: () => setState(() {
-                  _registrationFilter = AlumniRegistrationFilter.registered;
+                  _registrationFilter = AlumniRegistrationFilter.all;
+                  _activeFilter = AlumniActiveFilter.all;
+                  _viewIndex = 0;
                   _page = 0;
                   _applyFilters();
                 }),
               ),
-              AdminKpiCard(
-                dense: true,
+              AdminMetricRibbonItem(
+                label: 'Registered',
+                value: '$_registeredCount',
+                icon: Icons.verified_outlined,
+                color: AdminColors.secondary,
+                tooltip: 'Signed in to the portal app',
+                isSelected: _registrationFilter == AlumniRegistrationFilter.registered,
+                onTap: () => setState(() {
+                  _registrationFilter =
+                      _registrationFilter == AlumniRegistrationFilter.registered
+                          ? AlumniRegistrationFilter.all
+                          : AlumniRegistrationFilter.registered;
+                  _page = 0;
+                  _applyFilters();
+                }),
+              ),
+              AdminMetricRibbonItem(
                 label: 'Not registered',
                 value: '$_notRegisteredCount',
-                caption: 'Awaiting app signup',
                 icon: Icons.person_add_disabled_outlined,
-                palette: AdminAccents.gold,
+                color: UstpColors.orange,
+                tooltip: 'Awaiting app signup',
+                isSelected: _registrationFilter ==
+                    AlumniRegistrationFilter.notRegistered,
                 onTap: () => setState(() {
-                  _registrationFilter = AlumniRegistrationFilter.notRegistered;
+                  _registrationFilter =
+                      _registrationFilter == AlumniRegistrationFilter.notRegistered
+                          ? AlumniRegistrationFilter.all
+                          : AlumniRegistrationFilter.notRegistered;
                   _page = 0;
                   _applyFilters();
                 }),
               ),
-              AdminKpiCard(
-                dense: true,
+              AdminMetricRibbonItem(
                 label: 'Active (30d)',
                 value: '$_activeAlumniCount',
-                caption: 'Recently active users',
                 icon: Icons.online_prediction_outlined,
-                palette: AdminAccents.midBlue,
+                color: AdminColors.success,
+                tooltip: 'Recently active users in past 30 days',
+                isSelected: _activeFilter == AlumniActiveFilter.active30,
                 onTap: () => setState(() {
-                  _activeFilter = AlumniActiveFilter.active30;
+                  _activeFilter = _activeFilter == AlumniActiveFilter.active30
+                      ? AlumniActiveFilter.all
+                      : AlumniActiveFilter.active30;
                   _page = 0;
                   _applyFilters();
                 }),
               ),
             ],
           ),
-          const SizedBox(height: AdminDirectoryTheme.space2),
-          DirectoryToolbarCard(
-            searchHint: 'Search name, ID, course, email…',
+          const SizedBox(height: 10),
+          AdminSaaSTabs(
+            tabs: [
+              AdminSaaSTabSpec(
+                label: 'All alumni',
+                icon: Icons.groups_outlined,
+                isSelected: _viewIndex == 0,
+                onTap: () => setState(() {
+                  _viewIndex = 0;
+                  _page = 0;
+                  _applyFilters();
+                }),
+              ),
+              AdminSaaSTabSpec(
+                label: 'Updates',
+                icon: Icons.notifications_active_outlined,
+                count: _profileUpdatesCount > 0 ? _profileUpdatesCount : null,
+                isSelected: _viewIndex == 1,
+                onTap: () => setState(() {
+                  _viewIndex = 1;
+                  _page = 0;
+                  _applyFilters();
+                }),
+              ),
+              AdminSaaSTabSpec(
+                label: 'Deactivated',
+                icon: Icons.person_off_outlined,
+                count: _deactivatedCount > 0 ? _deactivatedCount : null,
+                isSelected: _viewIndex == 2,
+                onTap: () => setState(() {
+                  _viewIndex = 2;
+                  _page = 0;
+                  _applyFilters();
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AdminSaaSToolbar(
             searchController: _searchController,
             onSearchChanged: _onSearchChanged,
             onClearSearch: () {
@@ -708,41 +799,16 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 _applyFilters();
               });
             },
-            isLoading: _isLoading || _isRefreshing,
-            onRefresh: _loadMembers,
+            searchHint: 'Search name, ID, course, email…',
+            searchWidth: 270,
+            filters: [
+              ..._buildFilterControlsList(dense: true),
+              _buildSortControl(dense: true),
+            ],
+            activeFilterChips: _buildActiveFilterChips(),
             hasActiveFilters: _hasActiveFilters,
             onResetFilters: _clearFilters,
-            filters: _buildFilterControls(),
-            activeFilterChips: _buildActiveFilterChips(),
-            singleRowMinWidth: 1000,
           ),
-          const SizedBox(height: 8),
-          AdminTabBar(
-            selectedIndex: _viewIndex,
-            onSelected: (index) => setState(() {
-              _viewIndex = index;
-              _page = 0;
-              _applyFilters();
-            }),
-            tabs: [
-              const AdminTabSpec(
-                label: 'All alumni',
-                icon: Icons.groups_outlined,
-              ),
-              AdminTabSpec(
-                label: 'Updates',
-                icon: Icons.notifications_active_outlined,
-                count: _profileUpdatesCount > 0 ? _profileUpdatesCount : null,
-              ),
-              AdminTabSpec(
-                label: 'Deactivated',
-                icon: Icons.person_off_outlined,
-                count: _deactivatedCount > 0 ? _deactivatedCount : null,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          DirectoryResultsBar(message: _resultsMessage()),
           const SizedBox(height: 8),
         ],
         Expanded(child: _buildDirectoryBody()),
@@ -763,176 +829,153 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     return _buildMemberList();
   }
 
-  String _resultsMessage() {
-    if (_isLoading) return 'Loading roster…';
-    final total = switch (_view) {
-      AlumniDirectoryView.updates => _profileUpdatesCount,
-      AlumniDirectoryView.deactivated => _deactivatedCount,
-      AlumniDirectoryView.all => _allMembers.length - _deactivatedCount,
-    };
-    return 'Showing ${_displayed.length} of $total alumni';
+  List<Widget> _buildFilterControlsList({bool dense = true}) {
+    const fieldWidth = 124.0;
+    return [
+      DirectoryFilterField<String?>(
+        label: 'Course',
+        value: _courseFilter,
+        dense: dense,
+        width: fieldWidth,
+        items: [
+          const DropdownMenuItem(value: null, child: Text('All courses')),
+          ...CourseConstants.courses.map(
+            (c) => DropdownMenuItem(value: c, child: Text(c)),
+          ),
+        ],
+        onChanged: (v) {
+          setState(() {
+            _courseFilter = v;
+            _page = 0;
+            _applyFilters();
+          });
+        },
+      ),
+      DirectoryFilterField<String?>(
+        label: 'Batch',
+        value: _batchFilter,
+        dense: dense,
+        width: fieldWidth,
+        items: [
+          const DropdownMenuItem(value: null, child: Text('All batches')),
+          ..._batchOptions.map(
+            (b) => DropdownMenuItem(value: b, child: Text(b)),
+          ),
+        ],
+        onChanged: (v) {
+          setState(() {
+            _batchFilter = v;
+            _page = 0;
+            _applyFilters();
+          });
+        },
+      ),
+      DirectoryFilterField<AlumniRegistrationFilter>(
+        label: 'Registration',
+        value: _registrationFilter,
+        dense: dense,
+        width: fieldWidth,
+        items: const [
+          DropdownMenuItem(
+            value: AlumniRegistrationFilter.all,
+            child: Text('All'),
+          ),
+          DropdownMenuItem(
+            value: AlumniRegistrationFilter.registered,
+            child: Text('Registered'),
+          ),
+          DropdownMenuItem(
+            value: AlumniRegistrationFilter.notRegistered,
+            child: Text('Not registered'),
+          ),
+        ],
+        onChanged: (v) {
+          if (v == null) return;
+          setState(() {
+            _registrationFilter = v;
+            _page = 0;
+            _applyFilters();
+          });
+        },
+      ),
+      DirectoryFilterField<AlumniActiveFilter>(
+        label: 'Activity',
+        value: _activeFilter,
+        dense: dense,
+        width: fieldWidth,
+        items: const [
+          DropdownMenuItem(
+            value: AlumniActiveFilter.all,
+            child: Text('All activity'),
+          ),
+          DropdownMenuItem(
+            value: AlumniActiveFilter.active7,
+            child: Text('Active ≤7d'),
+          ),
+          DropdownMenuItem(
+            value: AlumniActiveFilter.active30,
+            child: Text('Active ≤30d'),
+          ),
+          DropdownMenuItem(
+            value: AlumniActiveFilter.active90,
+            child: Text('Active ≤90d'),
+          ),
+          DropdownMenuItem(
+            value: AlumniActiveFilter.inactive,
+            child: Text('Inactive (90d+)'),
+          ),
+        ],
+        onChanged: (v) {
+          if (v == null) return;
+          setState(() {
+            _activeFilter = v;
+            _page = 0;
+            _applyFilters();
+          });
+        },
+      ),
+    ];
   }
 
-  Widget _buildFilterControls() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        // Unbounded width = single-row toolbar; narrower fields leave room
-        // for the search box.
-        final fieldWidth = width.isInfinite
-            ? 136.0
-            : width >= 1100
-            ? 148.0
-            : width >= 820
-            ? 136.0
-            : width >= 560
-            ? (width - AdminDirectoryTheme.space1) / 2
-            : double.infinity;
-
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            DirectoryFilterField<String?>(
-              label: 'Course',
-              value: _courseFilter,
-              width: fieldWidth == double.infinity ? null : fieldWidth,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('All courses')),
-                ...CourseConstants.courses.map(
-                  (c) => DropdownMenuItem(value: c, child: Text(c)),
-                ),
-              ],
-              onChanged: (v) {
-                setState(() {
-                  _courseFilter = v;
-                  _page = 0;
-                  _applyFilters();
-                });
-              },
-            ),
-            DirectoryFilterField<String?>(
-              label: 'Batch',
-              value: _batchFilter,
-              width: fieldWidth == double.infinity ? null : fieldWidth,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('All batches')),
-                ..._batchOptions.map(
-                  (b) => DropdownMenuItem(value: b, child: Text(b)),
-                ),
-              ],
-              onChanged: (v) {
-                setState(() {
-                  _batchFilter = v;
-                  _page = 0;
-                  _applyFilters();
-                });
-              },
-            ),
-            DirectoryFilterField<AlumniRegistrationFilter>(
-              label: 'Registration',
-              value: _registrationFilter,
-              width: fieldWidth == double.infinity ? null : fieldWidth,
-              items: const [
-                DropdownMenuItem(
-                  value: AlumniRegistrationFilter.all,
-                  child: Text('All'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniRegistrationFilter.registered,
-                  child: Text('Registered'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniRegistrationFilter.notRegistered,
-                  child: Text('Not registered'),
-                ),
-              ],
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _registrationFilter = v;
-                  _page = 0;
-                  _applyFilters();
-                });
-              },
-            ),
-            DirectoryFilterField<AlumniActiveFilter>(
-              label: 'Activity',
-              value: _activeFilter,
-              width: fieldWidth == double.infinity ? null : fieldWidth,
-              items: const [
-                DropdownMenuItem(
-                  value: AlumniActiveFilter.all,
-                  child: Text('All activity'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniActiveFilter.active7,
-                  child: Text('Active ≤7 days'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniActiveFilter.active30,
-                  child: Text('Active ≤30 days'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniActiveFilter.active90,
-                  child: Text('Active ≤90 days'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniActiveFilter.inactive,
-                  child: Text('Inactive (90d+)'),
-                ),
-              ],
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _activeFilter = v;
-                  _page = 0;
-                  _applyFilters();
-                });
-              },
-            ),
-            DirectoryFilterField<AlumniDirectorySort>(
-              label: 'Sort',
-              value: _sort,
-              width: fieldWidth == double.infinity ? null : fieldWidth,
-              items: const [
-                DropdownMenuItem(
-                  value: AlumniDirectorySort.nameAsc,
-                  child: Text('Name A–Z'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniDirectorySort.nameDesc,
-                  child: Text('Name Z–A'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniDirectorySort.studentIdAsc,
-                  child: Text('ID number'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniDirectorySort.courseAsc,
-                  child: Text('Course'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniDirectorySort.createdNewest,
-                  child: Text('Newest added'),
-                ),
-                DropdownMenuItem(
-                  value: AlumniDirectorySort.lastActiveNewest,
-                  child: Text('Last active'),
-                ),
-              ],
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _sort = v;
-                  _page = 0;
-                  _applyFilters();
-                });
-              },
-            ),
-          ],
-        );
+  Widget _buildSortControl({bool dense = true}) {
+    return DirectoryFilterField<AlumniDirectorySort>(
+      label: 'Sort',
+      value: _sort,
+      dense: dense,
+      width: 128.0,
+      items: const [
+        DropdownMenuItem(
+          value: AlumniDirectorySort.nameAsc,
+          child: Text('Name A–Z'),
+        ),
+        DropdownMenuItem(
+          value: AlumniDirectorySort.nameDesc,
+          child: Text('Name Z–A'),
+        ),
+        DropdownMenuItem(
+          value: AlumniDirectorySort.studentIdAsc,
+          child: Text('ID number'),
+        ),
+        DropdownMenuItem(
+          value: AlumniDirectorySort.courseAsc,
+          child: Text('Course'),
+        ),
+        DropdownMenuItem(
+          value: AlumniDirectorySort.createdNewest,
+          child: Text('Newest added'),
+        ),
+        DropdownMenuItem(
+          value: AlumniDirectorySort.lastActiveNewest,
+          child: Text('Last active'),
+        ),
+      ],
+      onChanged: (v) {
+        if (v == null) return;
+        setState(() {
+          _sort = v;
+          _page = 0;
+          _applyFilters();
+        });
       },
     );
   }

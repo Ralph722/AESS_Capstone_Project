@@ -2706,12 +2706,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                   ),
                   SizedBox(width: _AdminChrome.controlGap),
                 ],
-                Expanded(
-                  child: _buildLocationTitle(
-                    widget.selectedMenuItem,
-                    compact: compact,
-                  ),
-                ),
+                const Spacer(),
                 const SizedBox(width: 12),
                 _buildSearchField(width: searchWidth, compact: compact),
                 SizedBox(width: _AdminChrome.controlGap),
@@ -2724,69 +2719,6 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildLocationTitle(int selectedIndex, {required bool compact}) {
-    String sectionTitle = 'Overview';
-    String pageTitle = 'Dashboard';
-    IconData pageIcon = Icons.dashboard_outlined;
-
-    for (final section in kAdminNavSections) {
-      for (final item in section.items) {
-        if (item.index == selectedIndex) {
-          sectionTitle = section.title;
-          pageTitle = item.label;
-          pageIcon = item.icon;
-          break;
-        }
-      }
-    }
-
-    return Semantics(
-      header: true,
-      label: 'Current page: $sectionTitle, $pageTitle',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(pageIcon, size: 18, color: AdminColors.primary),
-          const SizedBox(width: 8),
-          if (!compact) ...[
-            Text(
-              sectionTitle,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AdminColors.textSecondary,
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                '/',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  color: AdminColors.border,
-                ),
-              ),
-            ),
-          ],
-          Flexible(
-            child: Text(
-              pageTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AdminColors.textPrimary,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

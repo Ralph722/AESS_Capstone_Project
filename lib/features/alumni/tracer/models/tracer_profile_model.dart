@@ -22,6 +22,25 @@ class TracerProfile {
   final String collegeUniversity;
   final String honorsAwards;
   final String employmentStatus;
+
+  /// CHED GTS Q18: e.g. 'Regular or Permanent', 'Temporary', 'Casual', 'Contractual', 'Self-employed'.
+  final String employmentType;
+
+  /// CHED GTS Q19: e.g. 'Web Developer'.
+  final String employmentOccupation;
+
+  /// CHED GTS Q17: Reasons why not yet employed.
+  final List<String> notEmployedReasons;
+
+  /// CHED GTS Q17 Other: Specified reason when 'Other reason(s), please specify' is chosen.
+  final String notEmployedReasonOther;
+
+  /// When this employment snapshot was last updated (from onboarding or CHED GTS).
+  final DateTime? employmentUpdatedAt;
+
+  /// Origin of the current employment snapshot: 'onboarding' or 'ched_gts'.
+  final String employmentSource;
+
   final double completionPercent;
   final bool isComplete;
   final DateTime? completedAt;
@@ -58,6 +77,12 @@ class TracerProfile {
     this.collegeUniversity = '',
     this.honorsAwards = '',
     this.employmentStatus = '',
+    this.employmentType = '',
+    this.employmentOccupation = '',
+    this.notEmployedReasons = const [],
+    this.notEmployedReasonOther = '',
+    this.employmentUpdatedAt,
+    this.employmentSource = '',
     this.completionPercent = 0,
     this.isComplete = false,
     this.completedAt,
@@ -219,6 +244,27 @@ class TracerProfile {
     final isComplete =
         row['tracer_profile_complete'] == true || resolvedCompletion >= 100;
 
+    final reasonsRaw = row['not_employed_reasons'];
+    final List<String> notEmployedReasons;
+    if (reasonsRaw is List) {
+      notEmployedReasons = reasonsRaw
+          .map((e) => e?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } else {
+      notEmployedReasons = const [];
+    }
+
+    final employmentUpdatedAt = row['employment_updated_at'] != null
+        ? DateTime.tryParse(row['employment_updated_at'].toString())
+        : null;
+    final employmentSource = (row['employment_source'] as String? ?? '').trim();
+    final employmentType = (row['employment_type'] as String? ?? '').trim();
+    final employmentOccupation =
+        (row['employment_occupation'] as String? ?? '').trim();
+    final notEmployedReasonOther =
+        (row['not_employed_reason_other'] as String? ?? '').trim();
+
     return TracerProfile(
       uid: row['id'] as String? ?? '',
       email: row['email'] as String? ?? '',
@@ -241,6 +287,12 @@ class TracerProfile {
       collegeUniversity: row['college_university'] as String? ?? '',
       honorsAwards: row['honors_awards'] as String? ?? '',
       employmentStatus: row['employment_status'] as String? ?? '',
+      employmentType: employmentType,
+      employmentOccupation: employmentOccupation,
+      notEmployedReasons: notEmployedReasons,
+      notEmployedReasonOther: notEmployedReasonOther,
+      employmentUpdatedAt: employmentUpdatedAt,
+      employmentSource: employmentSource,
       completionPercent: resolvedCompletion,
       isComplete: isComplete,
       completedAt: null,
@@ -301,10 +353,36 @@ class TracerProfile {
           : GtsConstants.defaultCollegeUniversity,
       'honors_awards': honorsAwards.trim(),
       'employment_status': employmentStatus.trim(),
+      'employment_type': employmentType.trim(),
+      'employment_occupation': employmentOccupation.trim(),
+      'not_employed_reasons': notEmployedReasons,
+      'not_employed_reason_other': notEmployedReasonOther.trim(),
+      if (employmentUpdatedAt != null)
+        'employment_updated_at': employmentUpdatedAt!.toUtc().toIso8601String(),
+      if (employmentSource.isNotEmpty)
+        'employment_source': employmentSource.trim(),
       'tracer_profile_completion': completion.round(),
       'tracer_profile_complete': complete,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
+  }
+
+  /// Clears whichever branch does not apply to [employmentStatus].
+  TracerProfile normalizedEmployment() {
+    final status = employmentStatus.trim().toLowerCase();
+    if (status == GtsConstants.employed.toLowerCase()) {
+      return copyWith(
+        notEmployedReasons: const [],
+        notEmployedReasonOther: '',
+      );
+    } else if (status == GtsConstants.unemployed.toLowerCase() ||
+        status == GtsConstants.neverEmployed.toLowerCase()) {
+      return copyWith(
+        employmentType: '',
+        employmentOccupation: '',
+      );
+    }
+    return this;
   }
 
   TracerProfile copyWith({
@@ -326,6 +404,12 @@ class TracerProfile {
     String? collegeUniversity,
     String? honorsAwards,
     String? employmentStatus,
+    String? employmentType,
+    String? employmentOccupation,
+    List<String>? notEmployedReasons,
+    String? notEmployedReasonOther,
+    DateTime? employmentUpdatedAt,
+    String? employmentSource,
   }) {
     return TracerProfile(
       uid: uid,
@@ -347,6 +431,13 @@ class TracerProfile {
       collegeUniversity: collegeUniversity ?? this.collegeUniversity,
       honorsAwards: honorsAwards ?? this.honorsAwards,
       employmentStatus: employmentStatus ?? this.employmentStatus,
+      employmentType: employmentType ?? this.employmentType,
+      employmentOccupation: employmentOccupation ?? this.employmentOccupation,
+      notEmployedReasons: notEmployedReasons ?? this.notEmployedReasons,
+      notEmployedReasonOther:
+          notEmployedReasonOther ?? this.notEmployedReasonOther,
+      employmentUpdatedAt: employmentUpdatedAt ?? this.employmentUpdatedAt,
+      employmentSource: employmentSource ?? this.employmentSource,
       contactEmail: contactEmail,
       contactEmailVerifiedAt: contactEmailVerifiedAt,
       mobileVerifiedAt: mobileVerifiedAt,

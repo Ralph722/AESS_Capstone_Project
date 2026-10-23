@@ -231,8 +231,8 @@ class _TracerScreenState extends State<TracerScreen> {
       );
       final profile = await _profileService.getTracerProfile(uid);
 
-      // Only profile details are carried over; the job questions describe
-      // the alumni's situation now, so each tracer starts them blank.
+      // Profile details and initial employment snapshot (Q16-Q19) are
+      // carried over and flagged with a prompt to confirm or update them.
       final prefill = profile != null
           ? ChedGtsPrefill.fromProfile(profile)
           : <String, dynamic>{};

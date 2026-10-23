@@ -182,7 +182,7 @@ Admin creates survey (Official CHED GTS or Blank)
 | **Home gate** | `features/onboarding/presentation/alumni_home_gate.dart` | After register: waits for `onboarding_complete`, then onboarding or main shell. |
 | **Onboarding** | `features/onboarding/presentation/alumni_onboarding_page.dart` | 4 steps: Welcome → Profile (GTS form, must be 100%) → optional Photo → Done. Sets `onboarding_complete`. |
 
-**Onboarding profile save:** writes CHED-style demographic + employment-status fields on `users` via `UserProfileService`, then can mirror key fields to `alumni_members`. Photo uploads to Storage `images/avatars/{uid}.jpg`.
+**Onboarding profile save:** writes CHED-style demographic fields + an initial employment snapshot (employment status with conditional follow-ups: Q18 type & Q19 occupation if employed; Q17 reasons if not employed) on `users` via `UserProfileService`, which prefills future CHED GTS surveys with a confirmation prompt. Also mirrors key fields to `alumni_members`. Photo uploads to Storage `images/avatars/{uid}.jpg`.
 
 ### 5.2 Main shell (`MainNavigation`)
 

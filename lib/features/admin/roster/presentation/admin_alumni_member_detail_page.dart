@@ -726,9 +726,61 @@ class _AdminAlumniMemberDetailPanelState
       ],
     );
 
+    final status = tracer.employmentStatus.trim().toLowerCase();
+    final isEmployed = status == GtsConstants.employed.toLowerCase();
+    final isNotEmployed = status == GtsConstants.unemployed.toLowerCase() ||
+        status == GtsConstants.neverEmployed.toLowerCase();
+
+    String reasonsText = '';
+    if (isNotEmployed && tracer.notEmployedReasons.isNotEmpty) {
+      final list = List<String>.from(tracer.notEmployedReasons);
+      final hasOther = list.contains(GtsConstants.otherReasonSpecify);
+      if (hasOther && tracer.notEmployedReasonOther.isNotEmpty) {
+        final idx = list.indexOf(GtsConstants.otherReasonSpecify);
+        list[idx] = 'Other: ${tracer.notEmployedReasonOther}';
+      }
+      reasonsText = list.join(', ');
+    }
+
+    String? snapshotCaption;
+    if (tracer.employmentUpdatedAt != null || tracer.employmentSource.isNotEmpty) {
+      final dateStr = tracer.employmentUpdatedAt != null
+          ? DateFormat('MMM yyyy').format(tracer.employmentUpdatedAt!.toLocal())
+          : null;
+      final sourceStr = tracer.employmentSource == 'ched_gts'
+          ? 'CHED GTS'
+          : (tracer.employmentSource == 'onboarding'
+              ? 'onboarding'
+              : tracer.employmentSource);
+      final parts = <String>[
+        'Self-reported',
+        if (dateStr != null) 'as of $dateStr',
+        if (sourceStr.isNotEmpty) 'from $sourceStr',
+      ];
+      snapshotCaption = parts.join(' · ');
+    }
+
     final employment = MemberDetailSection(
       title: GtsConstants.labelEmploymentStatus,
       icon: Icons.work_outline,
+      trailing: snapshotCaption != null
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AdminColors.surface,
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                border: Border.all(color: AdminColors.border),
+              ),
+              child: Text(
+                snapshotCaption,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AdminColors.textMuted,
+                ),
+              ),
+            )
+          : null,
       children: [
         MemberDetailInfoRow(
           label: GtsConstants.labelEmploymentStatus,
@@ -737,6 +789,29 @@ class _AdminAlumniMemberDetailPanelState
           emptyText: notProvided,
           changed: changed.contains('employmentStatus'),
         ),
+        if (isEmployed) ...[
+          if (tracer.employmentOccupation.isNotEmpty)
+            MemberDetailInfoRow(
+              label: GtsConstants.labelOccupation,
+              value: tracer.employmentOccupation,
+              icon: Icons.badge_outlined,
+              changed: changed.contains('employmentOccupation'),
+            ),
+          if (tracer.employmentType.isNotEmpty)
+            MemberDetailInfoRow(
+              label: GtsConstants.labelEmploymentType,
+              value: tracer.employmentType,
+              icon: Icons.assignment_ind_outlined,
+              changed: changed.contains('employmentType'),
+            ),
+        ],
+        if (isNotEmployed && reasonsText.isNotEmpty)
+          MemberDetailInfoRow(
+            label: GtsConstants.labelNotEmployedReasons,
+            value: reasonsText,
+            icon: Icons.rule_outlined,
+            changed: changed.contains('notEmployedReasons'),
+          ),
       ],
     );
 

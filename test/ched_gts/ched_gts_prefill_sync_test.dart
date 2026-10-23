@@ -96,4 +96,99 @@ void main() {
       'ana@gmail.com',
     );
   });
+
+  test('mergeIntoProfile writes back Q18 and Q19 when employed and clears Q17', () {
+    const current = TracerProfile(
+      uid: 'u1',
+      email: 'alumni@ustp.edu.ph',
+      displayName: 'Carlos',
+      studentId: '2020101',
+      program: 'BSIT',
+      batchYear: '2020',
+      yearGraduated: '2020',
+      employmentStatus: GtsConstants.unemployed,
+      notEmployedReasons: ['Lack of work experience'],
+    );
+
+    final synced = ChedGtsPrefill.mergeIntoProfile(
+      current: current,
+      answers: {
+        'ched_16': ChedGtsBuiltin.yes,
+        'ched_18': 'Contractual',
+        'ched_19': 'Frontend Engineer',
+      },
+    );
+
+    expect(synced.employmentStatus, GtsConstants.employed);
+    expect(synced.employmentType, 'Contractual');
+    expect(synced.employmentOccupation, 'Frontend Engineer');
+    expect(synced.notEmployedReasons, isEmpty);
+    expect(synced.employmentSource, 'ched_gts');
+    expect(synced.employmentUpdatedAt, isNotNull);
+  });
+
+  test('mergeIntoProfile writes back Q17 when unemployed and clears Q18/Q19', () {
+    const current = TracerProfile(
+      uid: 'u1',
+      email: 'alumni@ustp.edu.ph',
+      displayName: 'Diana',
+      studentId: '2020102',
+      program: 'BSIT',
+      batchYear: '2020',
+      yearGraduated: '2020',
+      employmentStatus: GtsConstants.employed,
+      employmentType: 'Regular or Permanent',
+      employmentOccupation: 'QA Specialist',
+    );
+
+    final synced = ChedGtsPrefill.mergeIntoProfile(
+      current: current,
+      answers: {
+        'ched_16': ChedGtsBuiltin.no,
+        'ched_17': ['Advance or further study', 'Other reason(s), please specify'],
+        'ched_17_other': 'Reviewing for master degree entrance',
+      },
+    );
+
+    expect(synced.employmentStatus, GtsConstants.unemployed);
+    expect(synced.employmentType, isEmpty);
+    expect(synced.employmentOccupation, isEmpty);
+    expect(synced.notEmployedReasons, [
+      'Advance or further study',
+      'Other reason(s), please specify',
+    ]);
+    expect(synced.notEmployedReasonOther, 'Reviewing for master degree entrance');
+    expect(synced.employmentSource, 'ched_gts');
+  });
+
+  test('TracerProfile fromSupabaseRow and toSupabaseRow preserve employment follow-ups', () {
+    final now = DateTime.now().toUtc();
+    final profile = TracerProfile.fromSupabaseRow({
+      'id': 'u1',
+      'email': 'test@ustp.edu.ph',
+      'display_name': 'Test User',
+      'student_id': '2020999',
+      'program': 'BSIT',
+      'year_graduated': '2020',
+      'employment_status': 'Employed',
+      'employment_type': 'Regular or Permanent',
+      'employment_occupation': 'Systems Analyst',
+      'not_employed_reasons': <dynamic>[],
+      'not_employed_reason_other': '',
+      'employment_source': 'onboarding',
+      'employment_updated_at': now.toIso8601String(),
+    });
+
+    expect(profile.employmentStatus, 'Employed');
+    expect(profile.employmentType, 'Regular or Permanent');
+    expect(profile.employmentOccupation, 'Systems Analyst');
+    expect(profile.employmentSource, 'onboarding');
+    expect(profile.employmentUpdatedAt?.year, now.year);
+
+    final row = profile.toSupabaseRow();
+    expect(row['employment_type'], 'Regular or Permanent');
+    expect(row['employment_occupation'], 'Systems Analyst');
+    expect(row['employment_source'], 'onboarding');
+    expect(row['employment_updated_at'], isNotNull);
+  });
 }

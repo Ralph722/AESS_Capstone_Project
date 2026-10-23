@@ -20,6 +20,10 @@ abstract final class ChedGtsPrefill {
     'ched_10',
     'ched_11',
     'ched_16',
+    'ched_17',
+    'ched_17_other',
+    'ched_18',
+    'ched_19',
   };
 
   /// Whether [itemId] still shows its pre-filled profile value and is one
@@ -32,6 +36,12 @@ abstract final class ChedGtsPrefill {
     if (!mayChangeIds.contains(itemId)) return false;
     final original = prefilled[itemId];
     if (!_hasValue(original) || !_hasValue(answer)) return false;
+    if (original is List && answer is List) {
+      if (original.length != answer.length) return false;
+      final setA = original.map((e) => e.toString().trim()).toSet();
+      final setB = answer.map((e) => e.toString().trim()).toSet();
+      return setA.length == setB.length && setA.containsAll(setB);
+    }
     return original.toString().trim() == answer.toString().trim();
   }
 
@@ -89,6 +99,20 @@ abstract final class ChedGtsPrefill {
     );
     put('ched_16', employed);
 
+    final status = profile.employmentStatus.trim().toLowerCase();
+    if (status == GtsConstants.employed.toLowerCase()) {
+      final q18Options =
+          ChedGtsBuiltin.byId('ched_18')?.options ?? GtsConstants.employmentTypes;
+      put('ched_18', _match(profile.employmentType, q18Options));
+      put('ched_19', profile.employmentOccupation);
+    } else if (status == GtsConstants.unemployed.toLowerCase() ||
+        status == GtsConstants.neverEmployed.toLowerCase()) {
+      if (profile.notEmployedReasons.isNotEmpty) {
+        out['ched_17'] = List<String>.from(profile.notEmployedReasons);
+      }
+      put('ched_17_other', profile.notEmployedReasonOther);
+    }
+
     if (employment != null) {
       final empValues = SurveyPrefillHelper.valuesFromEmployment(employment);
       put('ched_16', empValues['employment.presentlyEmployed']);
@@ -119,7 +143,7 @@ abstract final class ChedGtsPrefill {
     return out;
   }
 
-  /// Merge submitted CHED answers into the live profile (Section A + B.12 + item 16).
+  /// Merge submitted CHED answers into the live profile (Section A + B.12 + item 16-19).
   /// Program stays as the roster has it; the year only fills a blank profile.
   /// Q3 email and Q5 mobile are left out: a changed contact is saved only
   /// after verification (`ContactVerificationService.saveVerified`).
@@ -173,6 +197,46 @@ abstract final class ChedGtsPrefill {
     }
 
     final employment = GtsConstants.fromChedPresentlyEmployed(text('ched_16'));
+    final newStatus = employment ?? current.employmentStatus;
+    final isEmployed =
+        newStatus.trim().toLowerCase() == GtsConstants.employed.toLowerCase();
+    final isNotEmployed =
+        newStatus.trim().toLowerCase() == GtsConstants.unemployed.toLowerCase() ||
+        newStatus.trim().toLowerCase() == GtsConstants.neverEmployed.toLowerCase();
+
+    final q18Answer = text('ched_18');
+    final q19Answer = text('ched_19');
+
+    final q17Raw = answers['ched_17'];
+    final List<String> q17Reasons;
+    if (q17Raw is List) {
+      q17Reasons = q17Raw
+          .map((e) => e?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } else if (q17Raw is String && q17Raw.trim().isNotEmpty) {
+      q17Reasons = [q17Raw.trim()];
+    } else {
+      q17Reasons = const [];
+    }
+    final q17Other = text('ched_17_other');
+
+    final nextEmploymentType = isEmployed
+        ? (q18Answer ?? current.employmentType)
+        : '';
+    final nextOccupation = isEmployed
+        ? (q19Answer ?? current.employmentOccupation)
+        : '';
+    final nextReasons = isNotEmployed
+        ? (answers.containsKey('ched_17')
+            ? q17Reasons
+            : current.notEmployedReasons)
+        : const <String>[];
+    final nextReasonOther = isNotEmployed
+        ? (answers.containsKey('ched_17_other')
+            ? (q17Other ?? '')
+            : current.notEmployedReasonOther)
+        : '';
 
     return current.copyWith(
       // Name only follows ched_1 after the marriage opt-in; otherwise the
@@ -192,8 +256,14 @@ abstract final class ChedGtsPrefill {
       yearGraduated: yearGraduated,
       batchYear: yearGraduated,
       honorsAwards: honors,
-      employmentStatus: employment ?? current.employmentStatus,
-    );
+      employmentStatus: newStatus,
+      employmentType: nextEmploymentType,
+      employmentOccupation: nextOccupation,
+      notEmployedReasons: nextReasons,
+      notEmployedReasonOther: nextReasonOther,
+      employmentSource: 'ched_gts',
+      employmentUpdatedAt: DateTime.now().toUtc(),
+    ).normalizedEmployment();
   }
 
   /// Merge prefill under existing draft answers (draft wins).

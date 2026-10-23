@@ -41,19 +41,28 @@ void main() {
       expect(_note('ched_3', 'a@x.com', profile), isFalse);
     });
 
-    test('job answers never get the note', () {
+    test('initial employment follow-ups get the note, but deep tracer questions do not', () {
       const prefilled = {
+        'ched_17': ['Advance or further study'],
         'ched_18': 'Regular or Permanent',
         'ched_19': 'Engineer',
+        'ched_20': 'Manufacturing',
+        'ched_21': 'Local',
         'ched_31': 'P25,000.00 and above',
       };
-      for (final id in prefilled.keys) {
+      // Q17, Q18, Q19 are prefilled from the initial snapshot and prompt confirmation
+      expect(_note('ched_17', ['Advance or further study'], prefilled), isTrue);
+      expect(_note('ched_18', 'Regular or Permanent', prefilled), isTrue);
+      expect(_note('ched_19', 'Engineer', prefilled), isTrue);
+
+      // Deep tracer fields (Q20, Q21, Q31) never get the note
+      for (final id in ['ched_20', 'ched_21', 'ched_31']) {
         expect(_note(id, prefilled[id], prefilled), isFalse, reason: id);
       }
     });
   });
 
-  test('profile prefill leaves the job questions blank', () {
+  test('profile prefill includes Q18/Q19 when employed, but leaves deep job questions blank', () {
     final prefill = ChedGtsPrefill.fromProfile(
       const TracerProfile(
         uid: 'u1',
@@ -65,11 +74,39 @@ void main() {
         yearGraduated: '2020',
         civilStatus: 'Single',
         employmentStatus: GtsConstants.employed,
+        employmentType: 'Regular or Permanent',
+        employmentOccupation: 'Software Developer',
       ),
     );
 
     expect(prefill['ched_1'], 'Ana Reyes');
-    expect(prefill['ched_16'], isNotNull);
+    expect(prefill['ched_16'], 'Yes');
+    expect(prefill['ched_18'], 'Regular or Permanent');
+    expect(prefill['ched_19'], 'Software Developer');
+    for (final id in ['ched_17', 'ched_20', 'ched_21', 'ched_31']) {
+      expect(prefill.containsKey(id), isFalse, reason: id);
+    }
+  });
+
+  test('profile prefill includes Q17 reasons when not employed', () {
+    final prefill = ChedGtsPrefill.fromProfile(
+      const TracerProfile(
+        uid: 'u2',
+        email: 'ben@example.com',
+        displayName: 'Ben Santos',
+        studentId: '2027001',
+        program: 'BSIT',
+        batchYear: '2027',
+        yearGraduated: '2027',
+        civilStatus: 'Single',
+        employmentStatus: GtsConstants.neverEmployed,
+        notEmployedReasons: ['Advance or further study'],
+        notEmployedReasonOther: '',
+      ),
+    );
+
+    expect(prefill['ched_16'], 'Never Employed');
+    expect(prefill['ched_17'], ['Advance or further study']);
     for (final id in ['ched_18', 'ched_19', 'ched_20', 'ched_21', 'ched_31']) {
       expect(prefill.containsKey(id), isFalse, reason: id);
     }

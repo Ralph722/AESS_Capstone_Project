@@ -26,6 +26,10 @@ class GtsConstants {
 
   // —— Employment status (onboarding / profile) ——
   static const labelEmploymentStatus = 'Employment Status';
+  static const labelEmploymentType = 'Type of Employment';
+  static const labelOccupation = 'Present Occupation';
+  static const labelNotEmployedReasons = 'Reason(s) Not Yet Employed';
+
   static const employed = 'Employed';
   static const unemployed = 'Unemployed';
   static const neverEmployed = 'Never employed';
@@ -34,6 +38,28 @@ class GtsConstants {
     employed,
     unemployed,
     neverEmployed,
+  ];
+
+  /// CHED GTS Q18 options
+  static const List<String> employmentTypes = [
+    'Regular or Permanent',
+    'Temporary',
+    'Casual',
+    'Contractual',
+    'Self-employed',
+  ];
+
+  static const String otherReasonSpecify = 'Other reason(s), please specify';
+
+  /// CHED GTS Q17 options
+  static const List<String> notEmployedReasonOptions = [
+    'Advance or further study',
+    'Family concern and decided not to find a job',
+    'Health-related reason(s)',
+    'Lack of work experience',
+    'No job opportunity',
+    'Did not look for a job',
+    otherReasonSpecify,
   ];
 
   static const List<String> civilStatuses = [

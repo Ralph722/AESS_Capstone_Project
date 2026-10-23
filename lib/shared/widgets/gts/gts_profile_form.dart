@@ -24,6 +24,8 @@ class GtsProfileFormState {
     );
     yearGraduatedController = TextEditingController();
     honorsController = TextEditingController();
+    occupationController = TextEditingController();
+    reasonOtherController = TextEditingController();
   }
 
   late final TextEditingController displayNameController;
@@ -40,6 +42,12 @@ class GtsProfileFormState {
   late final TextEditingController yearGraduatedController;
   late final TextEditingController honorsController;
 
+  /// CHED GTS Q19 Present occupation
+  late final TextEditingController occupationController;
+
+  /// CHED GTS Q17 "Other reason(s)" detail
+  late final TextEditingController reasonOtherController;
+
   String civilStatus = '';
   String gender = '';
   DateTime? birthDate;
@@ -47,6 +55,13 @@ class GtsProfileFormState {
   String locationOfResidence = '';
   String program = '';
   String employmentStatus = '';
+
+  /// CHED GTS Q18 Type of employment
+  String employmentType = '';
+
+  /// CHED GTS Q17 Reasons not yet employed
+  List<String> notEmployedReasons = [];
+
   String studentId = '';
 
   /// Once a graduation year is on file only the alumni office can change it.
@@ -89,6 +104,8 @@ class GtsProfileFormState {
     collegeController.dispose();
     yearGraduatedController.dispose();
     honorsController.dispose();
+    occupationController.dispose();
+    reasonOtherController.dispose();
   }
 
   void applyFromProfile(TracerProfile profile) {
@@ -114,6 +131,10 @@ class GtsProfileFormState {
     locationOfResidence = profile.locationOfResidence;
     program = CourseConstants.normalize(profile.program) ?? profile.program;
     employmentStatus = profile.employmentStatus;
+    employmentType = profile.employmentType;
+    occupationController.text = profile.employmentOccupation;
+    notEmployedReasons = List<String>.from(profile.notEmployedReasons);
+    reasonOtherController.text = profile.notEmployedReasonOther;
     studentId = profile.studentId;
     yearLocked = profile.yearGraduated.trim().isNotEmpty;
 
@@ -173,7 +194,11 @@ class GtsProfileFormState {
       collegeUniversity: collegeController.text.trim(),
       honorsAwards: honorsController.text.trim(),
       employmentStatus: employmentStatus,
-    );
+      employmentType: employmentType.trim(),
+      employmentOccupation: occupationController.text.trim(),
+      notEmployedReasons: List<String>.from(notEmployedReasons),
+      notEmployedReasonOther: reasonOtherController.text.trim(),
+    ).normalizedEmployment();
   }
 
   Map<String, dynamic> completionPayload({bool includeEmployment = true}) {
@@ -587,13 +612,28 @@ class GtsProfileFormFields extends StatelessWidget {
     required: false,
   );
 
-  Widget _employmentField() => OnboardingGtsEmploymentStatus(
-    value: state.employmentStatus,
-    enabled: enabled,
-    onChanged: (v) {
-      state.employmentStatus = v;
-      onChanged();
-    },
+  Widget _employmentField() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      OnboardingGtsEmploymentStatus(
+        value: state.employmentStatus,
+        enabled: enabled,
+        onChanged: (v) {
+          if (state.employmentStatus != v) {
+            if (v == GtsConstants.employed) {
+              state.notEmployedReasons = [];
+              state.reasonOtherController.clear();
+            } else {
+              state.employmentType = '';
+              state.occupationController.clear();
+            }
+          }
+          state.employmentStatus = v;
+          onChanged();
+        },
+      ),
+      _employmentFollowupFields(required: false),
+    ],
   );
 
   Widget _requiredBirthdayField(BuildContext context) {
@@ -628,6 +668,7 @@ class GtsProfileFormFields extends StatelessWidget {
 
   Widget _requiredEmploymentField() {
     return FormField<String>(
+      key: ValueKey<String>('status_${state.employmentStatus}'),
       initialValue: state.employmentStatus,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       validator: (_) =>
@@ -639,14 +680,236 @@ class GtsProfileFormFields extends StatelessWidget {
             value: state.employmentStatus,
             enabled: enabled,
             onChanged: (v) {
+              if (state.employmentStatus != v) {
+                if (v == GtsConstants.employed) {
+                  state.notEmployedReasons = [];
+                  state.reasonOtherController.clear();
+                } else {
+                  state.employmentType = '';
+                  state.occupationController.clear();
+                }
+              }
               state.employmentStatus = v;
               field.didChange(v);
               onChanged();
             },
           ),
           if (field.hasError) _fieldError(field.errorText!),
+          _employmentFollowupFields(required: true),
         ],
       ),
+    );
+  }
+
+  Widget _employmentFollowupFields({required bool required}) {
+    final status = state.employmentStatus.trim().toLowerCase();
+    final isEmployed = status == GtsConstants.employed.toLowerCase();
+    final isNotEmployed = status == GtsConstants.unemployed.toLowerCase() ||
+        status == GtsConstants.neverEmployed.toLowerCase();
+
+    if (!isEmployed && !isNotEmployed) {
+      return const SizedBox.shrink();
+    }
+
+    Widget content;
+    if (isEmployed) {
+      content = Column(
+        key: const ValueKey('followup_employed'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FormField<String>(
+            key: ValueKey('type_${state.employmentType}'),
+            initialValue: state.employmentType,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            validator: required
+                ? (_) => state.employmentType.trim().isEmpty
+                    ? 'Choose your employment type'
+                    : null
+                : null,
+            builder: (field) => Padding(
+              padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _req(GtsConstants.labelEmploymentType),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: OnboardingTheme.navy,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: GtsConstants.employmentTypes.map((type) {
+                      final selected = state.employmentType == type;
+                      return ChoiceChip(
+                        label: Text(type),
+                        selected: selected,
+                        selectedColor: PortalTheme.navy,
+                        labelStyle: TextStyle(
+                          color: selected ? Colors.white : PortalTheme.textPrimary,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                        backgroundColor: PortalTheme.card,
+                        side: BorderSide(
+                          color: selected ? PortalTheme.navy : PortalTheme.border,
+                        ),
+                        onSelected: enabled
+                            ? (bool sel) {
+                                state.employmentType = sel ? type : '';
+                                field.didChange(state.employmentType);
+                                onChanged();
+                              }
+                            : null,
+                      );
+                    }).toList(),
+                  ),
+                  if (field.hasError) _fieldError(field.errorText!),
+                ],
+              ),
+            ),
+          ),
+          _text(
+            controller: state.occupationController,
+            label: _req(GtsConstants.labelOccupation),
+            icon: Icons.badge_outlined,
+            hint: 'e.g. Web Developer, Sales Associate, Teacher',
+            required: required,
+          ),
+        ],
+      );
+    } else {
+      content = Column(
+        key: const ValueKey('followup_not_employed'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FormField<List<String>>(
+            key: ValueKey('reasons_${state.notEmployedReasons.length}'),
+            initialValue: state.notEmployedReasons,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            validator: required
+                ? (_) => state.notEmployedReasons.isEmpty
+                    ? 'Select at least one reason'
+                    : null
+                : null,
+            builder: (field) => Padding(
+              padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _req(GtsConstants.labelNotEmployedReasons),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: OnboardingTheme.navy,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select all that apply.',
+                    style: PortalTheme.caption.copyWith(color: PortalTheme.textMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  ...GtsConstants.notEmployedReasonOptions.map((reason) {
+                    final checked = state.notEmployedReasons.contains(reason);
+                    final isOther = reason == GtsConstants.otherReasonSpecify;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CheckboxListTile(
+                          value: checked,
+                          title: Text(
+                            reason,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          activeColor: PortalTheme.navy,
+                          onChanged: enabled
+                              ? (bool? v) {
+                                  if (v == true) {
+                                    if (!state.notEmployedReasons.contains(reason)) {
+                                      state.notEmployedReasons.add(reason);
+                                    }
+                                  } else {
+                                    state.notEmployedReasons.remove(reason);
+                                    if (isOther) {
+                                      state.reasonOtherController.clear();
+                                    }
+                                  }
+                                  field.didChange(state.notEmployedReasons);
+                                  onChanged();
+                                }
+                              : null,
+                        ),
+                        if (isOther && checked)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 32,
+                              bottom: 8,
+                              top: 4,
+                            ),
+                            child: _text(
+                              controller: state.reasonOtherController,
+                              label: _req('Please specify other reason'),
+                              icon: Icons.edit_note_outlined,
+                              required: required,
+                              hint: 'Specify your reason',
+                            ),
+                          ),
+                      ],
+                    );
+                  }),
+                  if (field.hasError) _fieldError(field.errorText!),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnimatedSize(
+          duration: PortalTheme.fast,
+          alignment: Alignment.topCenter,
+          child: content,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: OnboardingSpacing.fieldGap),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.info_outline,
+                size: 16,
+                color: PortalTheme.textMuted,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'A quick snapshot for the alumni office. You will confirm this when a CHED tracer survey opens.',
+                  style: PortalTheme.caption.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: PortalTheme.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

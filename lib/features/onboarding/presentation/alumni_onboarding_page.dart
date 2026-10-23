@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:alumni_system/core/constants/gts_constants.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
@@ -326,8 +327,9 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     );
   }
 
-  TracerProfile _currentProfile(String userId) =>
-      _formState.toTracerProfile(uid: userId, email: AppSession.email ?? '');
+  TracerProfile _currentProfile(String userId) => _formState
+      .toTracerProfile(uid: userId, email: AppSession.email ?? '')
+      .copyWith(employmentSource: 'onboarding');
 
   Future<void> _pickImage() async {
     if (!mounted || _finishing) return;
@@ -823,11 +825,33 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       OnboardingSummaryRow(
         icon: Icons.school_outlined,
         title: 'Education & work',
-        summary: join([
-          _formState.program,
-          _formState.yearGraduatedController.text,
-          _formState.employmentStatus,
-        ]),
+        summary: () {
+          final parts = <String>[
+            _formState.program,
+            _formState.yearGraduatedController.text,
+            _formState.employmentStatus,
+          ];
+          if (_formState.employmentStatus == GtsConstants.employed) {
+            if (_formState.occupationController.text.trim().isNotEmpty) {
+              parts.add(_formState.occupationController.text.trim());
+            }
+            if (_formState.employmentType.trim().isNotEmpty) {
+              parts.add('(${_formState.employmentType.trim()})');
+            }
+          } else if (_formState.employmentStatus == GtsConstants.unemployed ||
+              _formState.employmentStatus == GtsConstants.neverEmployed) {
+            if (_formState.notEmployedReasons.isNotEmpty) {
+              final first = _formState.notEmployedReasons.first;
+              if (first == GtsConstants.otherReasonSpecify &&
+                  _formState.reasonOtherController.text.trim().isNotEmpty) {
+                parts.add(_formState.reasonOtherController.text.trim());
+              } else {
+                parts.add(first);
+              }
+            }
+          }
+          return join(parts);
+        }(),
         onEdit: _finishing
             ? null
             : () => _editFromReview(_stepFor(GtsFormSection.education)),

@@ -290,9 +290,14 @@ void main() {
             flag: _flag(office: 'Curriculum Committee'),
             repository: _repo(),
             onSaved: () async {},
+            admins: const [
+              DssAdminChoice(id: 'a1', label: 'Admin One'),
+            ],
           ),
         ),
       );
+      expect(find.text('Owner & schedule'), findsOneWidget);
+      expect(find.text('Admin owner'), findsOneWidget);
       expect(find.text('Curriculum Committee'), findsOneWidget);
       final save = find.widgetWithText(FilledButton, 'Save');
       expect(tester.widget<FilledButton>(save).onPressed, isNull);
@@ -363,7 +368,7 @@ void main() {
       );
       Future<void> pump(bool canEdit) => tester.pumpWidget(
         _host(
-          DssEvidenceCard(
+          DssProofCard(
             entries: [entry],
             canEdit: canEdit,
             busy: false,
@@ -373,6 +378,7 @@ void main() {
         ),
       );
       await pump(true);
+      expect(find.text('Proof'), findsOneWidget);
       expect(find.text('Memo to the dean'), findsOneWidget);
       expect(find.textContaining('Document / memo'), findsOneWidget);
       expect(find.text('Add'), findsOneWidget);
@@ -380,6 +386,32 @@ void main() {
       await pump(false);
       expect(find.text('Add'), findsNothing);
       expect(find.byTooltip('Remove'), findsNothing);
+    });
+
+    testWidgets('proof list shows reminder draft and Other offline rows', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          DssProofCard(
+            entries: const [],
+            canEdit: true,
+            busy: false,
+            onAdd: () {},
+            onRemove: (_) {},
+            linkedAnnouncementId: 'ann-1',
+            linkedAnnouncementAt: DateTime(2026, 10, 12),
+            offlineOtherDetail: 'Called the program chair offline',
+          ),
+        ),
+      );
+      expect(
+        find.text('Reminder announcement drafted — counts as proof'),
+        findsOneWidget,
+      );
+      expect(find.text('Offline action (Other)'), findsOneWidget);
+      expect(find.text('Called the program chair offline'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget); // chip count
     });
 
     testWidgets('due chip: overdue, due soon, closed', (tester) async {

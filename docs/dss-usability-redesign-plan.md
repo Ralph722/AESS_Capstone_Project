@@ -56,6 +56,8 @@ panel**. Narrow: action panel sits directly under the stage strip.
 
 ## Phase 0 — Words, timing, signposts (quick wins)
 
+**Done 2026-10-23.**
+
 *Fixes pain point 5 (partially) and 7. Low risk, mostly strings.*
 
 - Rename **Refresh insights → Re-run analysis** on the list, the empty
@@ -77,6 +79,8 @@ Files: `admin_dss_page.dart`, `admin_dss_detail_page.dart`,
 Tests: update any string assertions; add chip-tooltip widget test.
 
 ## Phase 1 — List becomes a work queue + refresh summary
+
+**Done 2026-10-23.**
 
 *Fixes pain points 5 and 6.*
 

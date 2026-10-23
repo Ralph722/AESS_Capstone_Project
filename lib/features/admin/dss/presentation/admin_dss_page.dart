@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
@@ -10,6 +11,7 @@ import 'package:alumni_system/features/admin/dss/application/dss_history.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_report_card.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_report_card_service.dart';
+import 'package:alumni_system/features/admin/dss/application/dss_rerun_diff.dart';
 import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/presentation/admin_dss_detail_page.dart';
@@ -27,6 +29,8 @@ import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 enum _DssPanel { list, detail, history, settings }
 
 enum _DssStatusFilter {
+  /// Open + In progress — the default work queue.
+  queue,
   all,
   open,
   inProgress,
@@ -35,8 +39,6 @@ enum _DssStatusFilter {
   dismissed,
   superseded,
 }
-
-enum _DssEvidenceFilter { all, findings, watch }
 
 enum _DssSort { priority, newest, oldest, severity, sampleDesc }
 
@@ -74,12 +76,13 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   String? _error;
   String? _evalMessage;
   bool _showRulesRefreshHint = false;
+  String? _rerunSummary;
+  bool _showHowThisWorks = false;
 
   _DssPanel _panel = _DssPanel.list;
   String? _activeFlagId;
 
-  _DssStatusFilter _statusFilter = _DssStatusFilter.all;
-  _DssEvidenceFilter _evidenceFilter = _DssEvidenceFilter.all;
+  _DssStatusFilter _statusFilter = _DssStatusFilter.queue;
   String _ruleFilter = '';
   DssPriority? _priorityFilter;
   String _officeFilter = '';
@@ -92,8 +95,26 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _load();
+      if (mounted) {
+        _loadHowThisWorksPref();
+        _load();
+      }
     });
+  }
+
+  Future<void> _loadHowThisWorksPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _showHowThisWorks =
+          !(prefs.getBool(kDssHowThisWorksDismissedKey) ?? false);
+    });
+  }
+
+  Future<void> _dismissHowThisWorks() async {
+    setState(() => _showHowThisWorks = false);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kDssHowThisWorksDismissedKey, true);
   }
 
   @override
@@ -133,9 +154,11 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   }
 
   Future<void> _refreshInsights() async {
+    final before = {for (final f in _flags) f.id: f.status};
     setState(() {
       _evaluating = true;
       _evalMessage = null;
+      _rerunSummary = null;
     });
     try {
       final result = await _eval.evaluateAll(
@@ -151,6 +174,8 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       });
       await _load();
       if (!mounted) return;
+      final diff = dssRerunDiff(before: before, after: _flags);
+      setState(() => _rerunSummary = diff.bannerText);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result.message),
@@ -266,15 +291,14 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
   String get _lastEvaluatedLabel {
     final at = _lastEvaluatedAt;
-    if (at == null) return 'Not evaluated yet — click Refresh insights.';
+    if (at == null) return 'Not evaluated yet — click Re-run analysis.';
     final when = DateFormat.yMMMd().add_jm().format(at.toLocal());
     final how = _lastEvaluatedScheduled ? 'Nightly' : 'Manual';
     return 'Last evaluated: $when ($how)';
   }
 
   bool get _hasActiveFilters =>
-      _statusFilter != _DssStatusFilter.all ||
-      _evidenceFilter != _DssEvidenceFilter.all ||
+      _statusFilter != _DssStatusFilter.queue ||
       _ruleFilter.isNotEmpty ||
       _priorityFilter != null ||
       _officeFilter.isNotEmpty ||
@@ -285,6 +309,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
   int get _moreFiltersCount {
     var count = 0;
+    if (_ruleFilter.isNotEmpty) count++;
+    if (_priorityFilter != null) count++;
+    if (_sort != _DssSort.priority) count++;
     if (_dueFilter != _DssDueFilter.all) count++;
     if (_officeFilter.isNotEmpty) count++;
     if (_mineOnly) count++;
@@ -293,20 +320,30 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
   Future<void> _openMoreFiltersDialog() async {
     final result = await showDialog<({
+      String rule,
+      DssPriority? priority,
+      _DssSort sort,
       _DssDueFilter due,
       String office,
       bool mineOnly,
     })>(
       context: context,
       builder: (_) => _MoreFiltersDialog(
+        initialRule: _ruleFilter,
+        initialPriority: _priorityFilter,
+        initialSort: _sort,
         initialDue: _dueFilter,
         initialOffice: _officeFilter,
         initialMineOnly: _mineOnly,
+        rules: _rules,
         offices: _offices,
       ),
     );
     if (result != null && mounted) {
       setState(() {
+        _ruleFilter = result.rule;
+        _priorityFilter = result.priority;
+        _sort = result.sort;
         _dueFilter = result.due;
         _officeFilter = result.office;
         _mineOnly = result.mineOnly;
@@ -317,8 +354,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   void _resetFilters() {
     _searchController.clear();
     setState(() {
-      _statusFilter = _DssStatusFilter.all;
-      _evidenceFilter = _DssEvidenceFilter.all;
+      _statusFilter = _DssStatusFilter.queue;
       _ruleFilter = '';
       _priorityFilter = null;
       _officeFilter = '';
@@ -341,29 +377,21 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   List<DssFlag> get _filtered {
     final now = DateTime.now();
     var list = _flags.where((f) {
-      switch (_evidenceFilter) {
-        case _DssEvidenceFilter.all:
-          break;
-        case _DssEvidenceFilter.findings:
-          if (!f.isFinding) return false;
-        case _DssEvidenceFilter.watch:
-          if (f.isFinding) return false;
-      }
-      final wanted = switch (_statusFilter) {
-        _DssStatusFilter.all => null,
-        _DssStatusFilter.open => DssFlagStatus.open,
-        _DssStatusFilter.inProgress => DssFlagStatus.inProgress,
-        _DssStatusFilter.watch => DssFlagStatus.watch,
-        _DssStatusFilter.resolved => DssFlagStatus.resolved,
-        _DssStatusFilter.dismissed => DssFlagStatus.dismissed,
-        _DssStatusFilter.superseded => DssFlagStatus.superseded,
+      final matchesStatus = switch (_statusFilter) {
+        _DssStatusFilter.queue =>
+          f.isFinding &&
+              (f.status == DssFlagStatus.open ||
+                  f.status == DssFlagStatus.inProgress),
+        _DssStatusFilter.all => f.status != DssFlagStatus.superseded,
+        _DssStatusFilter.open => f.status == DssFlagStatus.open && f.isFinding,
+        _DssStatusFilter.inProgress =>
+          f.status == DssFlagStatus.inProgress && f.isFinding,
+        _DssStatusFilter.watch => f.status == DssFlagStatus.watch,
+        _DssStatusFilter.resolved => f.status == DssFlagStatus.resolved,
+        _DssStatusFilter.dismissed => f.status == DssFlagStatus.dismissed,
+        _DssStatusFilter.superseded => f.status == DssFlagStatus.superseded,
       };
-      // Superseded flags are history; they show only under their filter.
-      if (wanted == null
-          ? f.status == DssFlagStatus.superseded
-          : f.status != wanted) {
-        return false;
-      }
+      if (!matchesStatus) return false;
       if (_ruleFilter.isNotEmpty && f.ruleId != _ruleFilter) {
         return false;
       }
@@ -439,20 +467,12 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
   List<Widget> _activeFilterChips() {
     final chips = <Widget>[];
-    if (_statusFilter != _DssStatusFilter.all) {
+    if (_statusFilter != _DssStatusFilter.queue) {
       chips.add(
         DirectoryActiveFilterChip(
           label: 'Status: ${_statusFilterLabel(_statusFilter)}',
-          onRemoved: () => setState(() => _statusFilter = _DssStatusFilter.all),
-        ),
-      );
-    }
-    if (_evidenceFilter != _DssEvidenceFilter.all) {
-      chips.add(
-        DirectoryActiveFilterChip(
-          label: 'Sample: ${_evidenceFilterLabel(_evidenceFilter)}',
           onRemoved: () =>
-              setState(() => _evidenceFilter = _DssEvidenceFilter.all),
+              setState(() => _statusFilter = _DssStatusFilter.queue),
         ),
       );
     }
@@ -473,6 +493,14 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         DirectoryActiveFilterChip(
           label: 'Priority: ${_priorityFilter!.label}',
           onRemoved: () => setState(() => _priorityFilter = null),
+        ),
+      );
+    }
+    if (_sort != _DssSort.priority) {
+      chips.add(
+        DirectoryActiveFilterChip(
+          label: 'Sort: ${_sortLabel(_sort)}',
+          onRemoved: () => setState(() => _sort = _DssSort.priority),
         ),
       );
     }
@@ -515,6 +543,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   }
 
   String _statusFilterLabel(_DssStatusFilter f) => switch (f) {
+    _DssStatusFilter.queue => 'Queue',
     _DssStatusFilter.all => 'All',
     _DssStatusFilter.open => 'Open',
     _DssStatusFilter.inProgress => 'In Progress',
@@ -522,6 +551,14 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     _DssStatusFilter.resolved => 'Resolved',
     _DssStatusFilter.dismissed => 'Dismissed',
     _DssStatusFilter.superseded => 'Superseded',
+  };
+
+  String _sortLabel(_DssSort s) => switch (s) {
+    _DssSort.priority => 'Priority',
+    _DssSort.newest => 'Newest first',
+    _DssSort.oldest => 'Oldest first',
+    _DssSort.severity => 'Severity',
+    _DssSort.sampleDesc => 'Largest n',
   };
 
   String _dueFilterLabel(_DssDueFilter f) => switch (f) {
@@ -539,12 +576,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     return set.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
-
-  String _evidenceFilterLabel(_DssEvidenceFilter f) => switch (f) {
-    _DssEvidenceFilter.all => 'All sizes',
-    _DssEvidenceFilter.findings => 'Findings (n≥10)',
-    _DssEvidenceFilter.watch => 'Watch (n<10)',
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -672,7 +703,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
                       ),
                     )
                   : const Icon(Icons.analytics_outlined, size: 17),
-              label: Text(_evaluating ? 'Evaluating…' : 'Refresh insights'),
+              label: Text(_evaluating ? 'Evaluating…' : 'Re-run analysis'),
               style: dssFilledButtonStyle(),
             ),
           ],
@@ -681,15 +712,30 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           const SizedBox(height: AdminDssTheme.space1),
           DssInsightBanner(
             text:
-                'If you changed Rules, click Refresh insights so Findings use the new thresholds.',
+                'If you changed Rules, click Re-run analysis so Findings use the new thresholds.',
             icon: Icons.tune,
             onDismiss: () => setState(() => _showRulesRefreshHint = false),
+          ),
+        ],
+        if (_showHowThisWorks) ...[
+          const SizedBox(height: AdminDssTheme.space1),
+          DssHowThisWorksStrip(
+            onDismiss: _dismissHowThisWorks,
+            onSeeExample: () => showDssExampleFindingPreview(context),
           ),
         ],
         const SizedBox(height: AdminDssTheme.space2),
         _buildMetrics(),
         const SizedBox(height: AdminDssTheme.space2),
         _buildToolbar(),
+        if (_rerunSummary != null) ...[
+          const SizedBox(height: AdminDssTheme.space1),
+          DssInsightBanner(
+            text: _rerunSummary!,
+            icon: Icons.analytics_outlined,
+            onDismiss: () => setState(() => _rerunSummary = null),
+          ),
+        ],
         if (_evalMessage != null) ...[
           const SizedBox(height: AdminDssTheme.space1),
           DssInsightBanner(
@@ -720,15 +766,17 @@ class _AdminDssScreenState extends State<AdminDssScreen>
                     ? 'No findings yet'
                     : 'No matches',
                 subtitle: _flags.isEmpty
-                    ? 'Need a published CHED GTS with responses — then Refresh insights.'
+                    ? 'Need a published CHED GTS with responses — then Re-run analysis.'
                     : 'Try a different search or clear filters.',
                 icon: Icons.lightbulb_outline,
                 primaryAction: _flags.isEmpty
                     ? _refreshInsights
                     : _resetFilters,
                 primaryLabel: _flags.isEmpty
-                    ? 'Refresh insights'
+                    ? 'Re-run analysis'
                     : 'Reset filters',
+                secondaryAction: () => showDssExampleFindingPreview(context),
+                secondaryLabel: 'See example',
               ),
               child: ListView.builder(
                 padding: const EdgeInsets.only(bottom: AdminDensity.space3),
@@ -758,10 +806,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           caption: 'Not started',
           icon: Icons.flag_outlined,
           accent: AdminColors.primary,
-          onTap: () => setState(() {
-            _statusFilter = _DssStatusFilter.open;
-            _evidenceFilter = _DssEvidenceFilter.findings;
-          }),
+          palette: AdminAccents.blue,
+          selected: _statusFilter == _DssStatusFilter.open,
+          onTap: () => setState(() => _statusFilter = _DssStatusFilter.open),
         ),
         AdminKpiCard(
           dense: true,
@@ -770,10 +817,10 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           caption: 'Being handled',
           icon: Icons.pending_actions_outlined,
           accent: AdminColors.accent,
-          onTap: () => setState(() {
-            _statusFilter = _DssStatusFilter.inProgress;
-            _evidenceFilter = _DssEvidenceFilter.findings;
-          }),
+          palette: AdminAccents.gold,
+          selected: _statusFilter == _DssStatusFilter.inProgress,
+          onTap: () =>
+              setState(() => _statusFilter = _DssStatusFilter.inProgress),
         ),
         AdminKpiCard(
           dense: true,
@@ -782,6 +829,8 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           caption: 'Closed with action',
           icon: Icons.check_circle_outline,
           accent: AdminColors.primary,
+          palette: AdminAccents.midBlue,
+          selected: _statusFilter == _DssStatusFilter.resolved,
           onTap: () =>
               setState(() => _statusFilter = _DssStatusFilter.resolved),
         ),
@@ -792,10 +841,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           caption: 'Too few answers',
           icon: Icons.visibility_outlined,
           accent: AdminColors.accent,
-          onTap: () => setState(() {
-            _statusFilter = _DssStatusFilter.all;
-            _evidenceFilter = _DssEvidenceFilter.watch;
-          }),
+          palette: AdminAccents.orange,
+          selected: _statusFilter == _DssStatusFilter.watch,
+          onTap: () => setState(() => _statusFilter = _DssStatusFilter.watch),
         ),
       ],
     );
@@ -816,188 +864,97 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       onResetFilters: _resetFilters,
       activeFilterChips: _activeFilterChips(),
       searchHint: 'Search by rule, course, batch, or finding…',
-      singleRowMinWidth: 960,
-      filters: LayoutBuilder(
-        builder: (context, constraints) {
-          final isSingleRow = constraints.maxWidth.isInfinite;
-          final controls = <Widget>[
-            DirectoryFilterField<String>(
-              label: 'Rule',
-              value: _ruleFilter,
-              width: isSingleRow ? 135 : 160,
-              items: [
-                const DropdownMenuItem<String>(
-                  value: '',
-                  child: Text('All rules', maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                ..._rules.map(
-                  (r) => DropdownMenuItem<String>(
-                    value: r.ruleId,
-                    child: Text(r.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
+      singleRowMinWidth: 720,
+      filters: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          DirectoryFilterField<_DssStatusFilter>(
+            label: 'Status',
+            value: _statusFilter,
+            width: 135,
+            items: [
+              for (final f in _DssStatusFilter.values)
+                DropdownMenuItem(
+                  value: f,
+                  child: Text(
+                    _statusFilterLabel(f),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ],
-              onChanged: (v) => setState(() => _ruleFilter = v ?? ''),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => _statusFilter = v);
+            },
+          ),
+          OutlinedButton.icon(
+            onPressed: _openMoreFiltersDialog,
+            icon: Icon(
+              Icons.tune_rounded,
+              size: 15,
+              color: _moreFiltersCount > 0
+                  ? AdminColors.primary
+                  : AdminDirectoryTheme.textSecondary,
             ),
-            DirectoryFilterField<_DssStatusFilter>(
-              label: 'Status',
-              value: _statusFilter,
-              width: isSingleRow ? 115 : 135,
-              items: [
-                for (final f in _DssStatusFilter.values)
-                  DropdownMenuItem(
-                    value: f,
-                    child: Text(_statusFilterLabel(f), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: (v) {
-                if (v != null) setState(() => _statusFilter = v);
-              },
-            ),
-            DirectoryFilterField<DssPriority?>(
-              label: 'Priority',
-              value: _priorityFilter,
-              width: isSingleRow ? 115 : 130,
-              items: [
-                const DropdownMenuItem<DssPriority?>(
-                  value: null,
-                  child: Text('All priorities', maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                for (final p in DssPriority.values)
-                  DropdownMenuItem<DssPriority?>(
-                    value: p,
-                    child: Text(p.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: (v) => setState(() => _priorityFilter = v),
-            ),
-            DirectoryFilterField<_DssEvidenceFilter>(
-              label: 'Sample size',
-              value: _evidenceFilter,
-              width: isSingleRow ? 135 : 150,
-              items: [
-                for (final f in _DssEvidenceFilter.values)
-                  DropdownMenuItem(
-                    value: f,
-                    child: Text(
-                      _evidenceFilterLabel(f),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-              onChanged: (v) {
-                if (v != null) setState(() => _evidenceFilter = v);
-              },
-            ),
-            DirectoryFilterField<_DssSort>(
-              label: 'Sort',
-              value: _sort,
-              width: isSingleRow ? 110 : 125,
-              items: const [
-                DropdownMenuItem(
-                  value: _DssSort.priority,
-                  child: Text('Priority', maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                DropdownMenuItem(
-                  value: _DssSort.newest,
-                  child: Text('Newest first', maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                DropdownMenuItem(
-                  value: _DssSort.oldest,
-                  child: Text('Oldest first', maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                DropdownMenuItem(
-                  value: _DssSort.severity,
-                  child: Text('Severity', maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                DropdownMenuItem(
-                  value: _DssSort.sampleDesc,
-                  child: Text('Largest n', maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-              ],
-              onChanged: (v) {
-                if (v != null) setState(() => _sort = v);
-              },
-            ),
-            OutlinedButton.icon(
-              onPressed: _openMoreFiltersDialog,
-              icon: Icon(
-                Icons.tune_rounded,
-                size: 15,
+            label: Text(
+              _moreFiltersCount > 0 ? 'More ($_moreFiltersCount)' : 'More',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight:
+                    _moreFiltersCount > 0 ? FontWeight.w700 : FontWeight.w600,
                 color: _moreFiltersCount > 0
                     ? AdminColors.primary
-                    : AdminDirectoryTheme.textSecondary,
-              ),
-              label: Text(
-                _moreFiltersCount > 0 ? 'More ($_moreFiltersCount)' : 'More',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight:
-                      _moreFiltersCount > 0 ? FontWeight.w700 : FontWeight.w600,
-                  color: _moreFiltersCount > 0
-                      ? AdminColors.primary
-                      : AdminDirectoryTheme.textPrimary,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: _moreFiltersCount > 0
-                    ? AdminColors.primary.withValues(alpha: 0.08)
-                    : Colors.white,
-                foregroundColor: _moreFiltersCount > 0
-                    ? AdminColors.primary
                     : AdminDirectoryTheme.textPrimary,
-                side: BorderSide(
-                  color: _moreFiltersCount > 0
-                      ? AdminColors.primary
-                      : AdminDirectoryTheme.border,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 11),
-                minimumSize: const Size(0, DirectoryFilterField.controlHeight),
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-                ),
               ),
             ),
-          ];
-
-          if (isSingleRow) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < controls.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
-                  controls[i],
-                ],
-              ],
-            );
-          }
-
-          return Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: controls,
-          );
-        },
+            style: OutlinedButton.styleFrom(
+              backgroundColor: _moreFiltersCount > 0
+                  ? AdminColors.primary.withValues(alpha: 0.08)
+                  : Colors.white,
+              foregroundColor: _moreFiltersCount > 0
+                  ? AdminColors.primary
+                  : AdminDirectoryTheme.textPrimary,
+              side: BorderSide(
+                color: _moreFiltersCount > 0
+                    ? AdminColors.primary
+                    : AdminDirectoryTheme.border,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 11),
+              minimumSize: const Size(0, DirectoryFilterField.controlHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(AdminDirectoryTheme.radiusSm),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Modal dialog for secondary findings filters: due timeline, office, and ownership.
+/// Secondary findings filters: rule, priority, sort, due, office, ownership.
 class _MoreFiltersDialog extends StatefulWidget {
   const _MoreFiltersDialog({
+    required this.initialRule,
+    required this.initialPriority,
+    required this.initialSort,
     required this.initialDue,
     required this.initialOffice,
     required this.initialMineOnly,
+    required this.rules,
     required this.offices,
   });
 
+  final String initialRule;
+  final DssPriority? initialPriority;
+  final _DssSort initialSort;
   final _DssDueFilter initialDue;
   final String initialOffice;
   final bool initialMineOnly;
+  final List<DssRule> rules;
   final List<String> offices;
 
   @override
@@ -1005,6 +962,9 @@ class _MoreFiltersDialog extends StatefulWidget {
 }
 
 class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
+  late String _rule = widget.initialRule;
+  late DssPriority? _priority = widget.initialPriority;
+  late _DssSort _sort = widget.initialSort;
   late _DssDueFilter _due = widget.initialDue;
   late String _office = widget.initialOffice;
   late bool _mineOnly = widget.initialMineOnly;
@@ -1013,6 +973,14 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
     _DssDueFilter.all => 'All due dates',
     _DssDueFilter.overdue => 'Overdue',
     _DssDueFilter.dueSoon => 'Due within 7 days',
+  };
+
+  String _sortLabel(_DssSort s) => switch (s) {
+    _DssSort.priority => 'Priority',
+    _DssSort.newest => 'Newest first',
+    _DssSort.oldest => 'Oldest first',
+    _DssSort.severity => 'Severity',
+    _DssSort.sampleDesc => 'Largest n',
   };
 
   @override
@@ -1024,7 +992,7 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
       shape: AdminDialogStandards.shape,
       insetPadding: AdminDialogStandards.defaultInsetPadding,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
+        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 640),
         child: Padding(
           padding: AdminDialogStandards.defaultContentPadding,
           child: Column(
@@ -1034,107 +1002,180 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
               AdminModalHeader(
                 title: 'More Filters',
                 subtitle:
-                    'Filter findings by due date, assigned office, or ownership.',
+                    'Rule, priority, sort, due date, office, and ownership.',
                 icon: Icons.tune_rounded,
                 onClose: () => Navigator.of(context).pop(),
               ),
-              const SizedBox(height: 20),
-              DirectoryFilterField<_DssDueFilter>(
-                label: 'Due timeline',
-                value: _due,
-                width: double.infinity,
-                items: [
-                  for (final f in _DssDueFilter.values)
-                    DropdownMenuItem(
-                      value: f,
-                      child: Text(_dueLabel(f)),
-                    ),
-                ],
-                onChanged: (v) {
-                  if (v != null) setState(() => _due = v);
-                },
-              ),
-              const SizedBox(height: 14),
-              DirectoryFilterField<String>(
-                label: 'Assigned office',
-                value: _office,
-                width: double.infinity,
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: '',
-                    child: Text('All offices'),
-                  ),
-                  for (final o in widget.offices)
-                    DropdownMenuItem<String>(
-                      value: o,
-                      child: Text(o, overflow: TextOverflow.ellipsis),
-                    ),
-                ],
-                onChanged: (v) => setState(() => _office = v ?? ''),
-              ),
-              const SizedBox(height: 14),
-              InkWell(
-                onTap: () => setState(() => _mineOnly = !_mineOnly),
-                borderRadius:
-                    BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _mineOnly
-                        ? AdminColors.primary.withValues(alpha: 0.05)
-                        : Colors.white,
-                    borderRadius:
-                        BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-                    border: Border.all(
-                      color:
-                          _mineOnly ? AdminColors.primary : AdminColors.border,
-                    ),
-                  ),
-                  child: Row(
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Checkbox(
-                        value: _mineOnly,
-                        activeColor: AdminColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        onChanged: (v) => setState(() => _mineOnly = v ?? false),
+                      DirectoryFilterField<String>(
+                        label: 'Rule',
+                        value: _rule,
+                        width: double.infinity,
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: '',
+                            child: Text('All rules'),
+                          ),
+                          for (final r in widget.rules)
+                            DropdownMenuItem<String>(
+                              value: r.ruleId,
+                              child: Text(
+                                r.displayName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (v) => setState(() => _rule = v ?? ''),
                       ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'My findings only',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AdminColors.textPrimary,
-                              ),
+                      const SizedBox(height: 12),
+                      DirectoryFilterField<DssPriority?>(
+                        label: 'Priority',
+                        value: _priority,
+                        width: double.infinity,
+                        items: [
+                          const DropdownMenuItem<DssPriority?>(
+                            value: null,
+                            child: Text('All priorities'),
+                          ),
+                          for (final p in DssPriority.values)
+                            DropdownMenuItem<DssPriority?>(
+                              value: p,
+                              child: Text(p.label),
                             ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Show only findings assigned to my admin account.',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: AdminColors.textSecondary,
-                              ),
+                        ],
+                        onChanged: (v) => setState(() => _priority = v),
+                      ),
+                      const SizedBox(height: 12),
+                      DirectoryFilterField<_DssSort>(
+                        label: 'Sort',
+                        value: _sort,
+                        width: double.infinity,
+                        items: [
+                          for (final s in _DssSort.values)
+                            DropdownMenuItem(
+                              value: s,
+                              child: Text(_sortLabel(s)),
                             ),
-                          ],
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setState(() => _sort = v);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DirectoryFilterField<_DssDueFilter>(
+                        label: 'Due timeline',
+                        value: _due,
+                        width: double.infinity,
+                        items: [
+                          for (final f in _DssDueFilter.values)
+                            DropdownMenuItem(
+                              value: f,
+                              child: Text(_dueLabel(f)),
+                            ),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setState(() => _due = v);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DirectoryFilterField<String>(
+                        label: 'Assigned office',
+                        value: _office,
+                        width: double.infinity,
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: '',
+                            child: Text('All offices'),
+                          ),
+                          for (final o in widget.offices)
+                            DropdownMenuItem<String>(
+                              value: o,
+                              child: Text(o, overflow: TextOverflow.ellipsis),
+                            ),
+                        ],
+                        onChanged: (v) => setState(() => _office = v ?? ''),
+                      ),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: () => setState(() => _mineOnly = !_mineOnly),
+                        borderRadius: BorderRadius.circular(
+                          AdminDirectoryTheme.radiusSm,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _mineOnly
+                                ? AdminColors.primary.withValues(alpha: 0.05)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(
+                              AdminDirectoryTheme.radiusSm,
+                            ),
+                            border: Border.all(
+                              color: _mineOnly
+                                  ? AdminColors.primary
+                                  : AdminColors.border,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: _mineOnly,
+                                activeColor: AdminColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                onChanged: (v) =>
+                                    setState(() => _mineOnly = v ?? false),
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'My findings only',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AdminColors.textPrimary,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Show only findings assigned to my admin account.',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: AdminColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 18),
               Row(
                 children: [
                   TextButton(
                     onPressed: () {
                       setState(() {
+                        _rule = '';
+                        _priority = null;
+                        _sort = _DssSort.priority;
                         _due = _DssDueFilter.all;
                         _office = '';
                         _mineOnly = false;
@@ -1151,6 +1192,9 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop((
+                      rule: _rule,
+                      priority: _priority,
+                      sort: _sort,
                       due: _due,
                       office: _office,
                       mineOnly: _mineOnly,

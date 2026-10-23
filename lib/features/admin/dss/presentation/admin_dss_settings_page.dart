@@ -6,6 +6,7 @@ import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 
 class AdminDssSettingsPanel extends StatefulWidget {
@@ -107,13 +108,23 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
       );
       return;
     }
+    final confirmed = await showAdminConfirmDialog(
+      context,
+      title: 'Save rule changes?',
+      message:
+          'Save ${rule.displayName} with the new threshold and minimum? '
+          'Findings use the new values only after you return to Findings and '
+          'click Re-run analysis.',
+      confirmLabel: 'Save',
+    );
+    if (!confirmed || !mounted) return;
     try {
       await _repo.updateRule(rule.copyWith(threshold: threshold, minN: minN));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Saved ${rule.displayName}. Return to Findings and Refresh insights.',
+            'Saved ${rule.displayName}. Return to Findings and Re-run analysis.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -222,7 +233,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
               children: [
                 DssInsightBanner(
                   text:
-                      'Save each rule, then Refresh insights on Findings so new thresholds apply.',
+                      'Save each rule, then Re-run analysis on Findings so new thresholds apply.',
                   icon: Icons.info_outline,
                   trailing: TextButton.icon(
                     onPressed: widget.onSubnavSelected == null

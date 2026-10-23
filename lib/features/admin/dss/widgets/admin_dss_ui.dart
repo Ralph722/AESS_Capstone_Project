@@ -244,10 +244,28 @@ class DssStatusChip extends StatelessWidget {
 
   final DssFlagStatus status;
 
+  static String? glossary(DssFlagStatus status) => switch (status) {
+    DssFlagStatus.watch =>
+      'Watch — too few answers for a finding yet. Re-run analysis '
+      'promotes it once enough alumni answer; until then you can dismiss '
+      'it or add notes.',
+    DssFlagStatus.superseded =>
+      'Superseded — a newer CHED GTS wave checked the same finding. '
+      'This row is history and can no longer change.',
+    DssFlagStatus.open => 'Open — not started. Next step is Start.',
+    DssFlagStatus.inProgress =>
+      'In progress — work under way. Act, add proof, then Resolve.',
+    DssFlagStatus.resolved =>
+      'Resolved — closed with an intervention. Outcome is judged from '
+      'the next CHED GTS wave.',
+    DssFlagStatus.dismissed =>
+      'Dismissed — closed without action. Reopen if the issue returns.',
+  };
+
   @override
   Widget build(BuildContext context) {
     final color = dssStatusColor(status);
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
@@ -262,6 +280,9 @@ class DssStatusChip extends StatelessWidget {
         ),
       ),
     );
+    final tip = glossary(status);
+    if (tip == null) return chip;
+    return Tooltip(message: tip, child: chip);
   }
 }
 
@@ -310,8 +331,12 @@ class DssEvidenceChip extends StatelessWidget {
       ),
       _ => (Icons.info_outline, AdminDssTheme.textSecondary),
     };
+    final tip = [
+      DssCopy.evidenceLabel(flag) ?? strength.label,
+      if (DssCopy.evidenceHint(flag) case final hint?) hint,
+    ].join('\n\n');
     return Tooltip(
-      message: DssCopy.evidenceLabel(flag) ?? strength.label,
+      message: tip,
       child: DssMetaChip(label: strength.label, icon: icon, color: color),
     );
   }
@@ -626,6 +651,98 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
   }
 }
 
+String _resolvedAwaitingHint(DssFlag flag) {
+  final due = flag.verifyDueAt;
+  final duePart = due == null
+      ? ''
+      : ' · verify due ${DateFormat.yMMMd().format(due.toLocal())}';
+  return 'Outcome is judged when the next CHED GTS wave closes$duePart';
+}
+
+/// Primary next step for a finding (shared by stage strip and action panel).
+enum DssNextActionKind {
+  start,
+  resolve,
+  checkOutcome,
+  decide,
+  reopen,
+  wait,
+  dismissOnly,
+  none,
+}
+
+class DssNextAction {
+  const DssNextAction({
+    required this.kind,
+    required this.label,
+    required this.hint,
+  });
+
+  final DssNextActionKind kind;
+  final String label;
+  final String hint;
+}
+
+/// Single source of truth for "what should the admin do next?".
+DssNextAction dssNextAction(
+  DssFlag flag, {
+  required bool hasUndecidedIntervention,
+  required bool outcomeReady,
+}) {
+  switch (flag.status) {
+    case DssFlagStatus.watch:
+      return const DssNextAction(
+        kind: DssNextActionKind.dismissOnly,
+        label: 'Dismiss',
+        hint: 'Watch — wait for more answers, or dismiss.',
+      );
+    case DssFlagStatus.superseded:
+      return const DssNextAction(
+        kind: DssNextActionKind.none,
+        label: '',
+        hint: 'Superseded — read-only.',
+      );
+    case DssFlagStatus.open:
+      return const DssNextAction(
+        kind: DssNextActionKind.start,
+        label: 'Start',
+        hint: 'Next: Start',
+      );
+    case DssFlagStatus.inProgress:
+      return const DssNextAction(
+        kind: DssNextActionKind.resolve,
+        label: 'Resolve finding',
+        hint: 'Next: act, add Proof, Resolve finding',
+      );
+    case DssFlagStatus.dismissed:
+      return const DssNextAction(
+        kind: DssNextActionKind.reopen,
+        label: 'Reopen',
+        hint: 'Dismissed — Reopen if needed',
+      );
+    case DssFlagStatus.resolved:
+      if (outcomeReady && hasUndecidedIntervention) {
+        return const DssNextAction(
+          kind: DssNextActionKind.decide,
+          label: 'Decide',
+          hint: 'Next: check outcome and decide',
+        );
+      }
+      if (hasUndecidedIntervention) {
+        return const DssNextAction(
+          kind: DssNextActionKind.checkOutcome,
+          label: 'Check outcome',
+          hint: 'Next: check outcome and decide',
+        );
+      }
+      return DssNextAction(
+        kind: DssNextActionKind.wait,
+        label: 'Reopen',
+        hint: _resolvedAwaitingHint(flag),
+      );
+  }
+}
+
 /// Derived workflow stage for a finding (display only).
 enum DssWorkflowStage { detected, inProgress, resolved, outcome }
 
@@ -693,17 +810,11 @@ class DssStageStrip extends StatelessWidget {
     );
     final stages = DssWorkflowStage.values;
     final currentIndex = stages.indexOf(current);
-    String hint = switch (flag.status) {
-      DssFlagStatus.watch => 'Watch — wait for more answers, or dismiss.',
-      DssFlagStatus.superseded => 'Superseded — read-only.',
-      DssFlagStatus.open => 'Next: Start',
-      DssFlagStatus.inProgress => 'Next: act, add Proof, Resolve finding',
-      DssFlagStatus.resolved =>
-        hasUndecidedIntervention || outcomeReady
-            ? 'Next: check outcome and decide'
-            : 'Closed — awaiting next wave',
-      DssFlagStatus.dismissed => 'Dismissed — Reopen if needed',
-    };
+    final hint = dssNextAction(
+      flag,
+      hasUndecidedIntervention: hasUndecidedIntervention,
+      outcomeReady: outcomeReady,
+    ).hint;
 
     return DssSurfaceCard(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -876,4 +987,251 @@ class DssInsightBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// SharedPreferences key for the dismissible How-this-works strip (Phase 6).
+const kDssHowThisWorksDismissedKey = 'dss_how_this_works_dismissed_v1';
+
+/// Four-step primer shown on first visit to Findings.
+class DssHowThisWorksStrip extends StatelessWidget {
+  const DssHowThisWorksStrip({
+    super.key,
+    required this.onDismiss,
+    this.onSeeExample,
+  });
+
+  final VoidCallback onDismiss;
+  final VoidCallback? onSeeExample;
+
+  static const steps = <(String, String)>[
+    ('1', 'Start the finding'),
+    ('2', 'Plan, act in AESS, add Proof'),
+    ('3', 'Resolve finding'),
+    ('4', 'Next wave → Check outcome → Decide'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return DssSurfaceCard(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.school_outlined, size: 18, color: AdminDssTheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'How this works',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AdminDssTheme.textPrimary,
+                  ),
+                ),
+              ),
+              if (onSeeExample != null)
+                TextButton(
+                  onPressed: onSeeExample,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('See example'),
+                ),
+              IconButton(
+                tooltip: 'Dismiss',
+                onPressed: onDismiss,
+                style: AdminDensity.iconButtonStyle(
+                  foregroundColor: AdminDssTheme.textMuted,
+                ),
+                icon: const Icon(Icons.close, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (n, label) in steps)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+                  decoration: BoxDecoration(
+                    color: AdminDssTheme.surface,
+                    borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+                    border: Border.all(color: AdminDssTheme.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AdminDssTheme.primary.withValues(alpha: 0.12),
+                        ),
+                        child: Text(
+                          n,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AdminDssTheme.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AdminDssTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Read-only sample finding for the learnability preview — never persisted.
+DssFlag dssExampleFinding() {
+  final now = DateTime.now();
+  return DssFlag(
+    id: 'example-preview-not-saved',
+    ruleId: 'UNEMPLOYMENT_HIGH',
+    course: 'BSIT',
+    batchYear: '2024',
+    surveyId: 'example-survey',
+    surveyTitle: 'Example CHED GTS wave',
+    metricValue: 0.42,
+    thresholdSnapshot: 0.25,
+    sampleN: 24,
+    confidence: DssConfidence.ok,
+    status: DssFlagStatus.open,
+    title: 'EXAMPLE — High not-employed rate (BSIT 2024)',
+    body:
+        'This is a labelled example only. It is not a real finding and is '
+        'never saved to the database.',
+    recommendedAction: 'Start → choose a Plan → act → add Proof → Resolve.',
+    evidence: const {
+      'valid_answers': 24,
+      'evidence_strength': 'limited',
+    },
+    ruleName: 'High not-employed rate',
+    severity: DssSeverity.warning,
+    ruleCategory: DssRuleCategory.outcome,
+    ruleOperator: 'gte',
+    ruleMinN: 10,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+/// Dialog showing the read-only example finding preview (Phase 6).
+Future<void> showDssExampleFindingPreview(BuildContext context) {
+  final flag = dssExampleFinding();
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      title: const Row(
+        children: [
+          DssMetaChip(
+            label: 'EXAMPLE',
+            color: AdminDssTheme.warning,
+            icon: Icons.info_outline,
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Sample finding (read-only)',
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Not a real finding — nothing here is saved. Use it to see '
+                'how a row looks and what you would do next.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: AdminDssTheme.textMuted,
+                ),
+              ),
+              const SizedBox(height: 12),
+              IgnorePointer(
+                child: DssFlagListCard(flag: flag, onOpen: () {}),
+              ),
+              const SizedBox(height: 12),
+              DssStageStrip(flag: flag),
+              const SizedBox(height: 10),
+              DssSurfaceCard(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Next on a real finding',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: AdminDssTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      dssNextAction(
+                        flag,
+                        hasUndecidedIntervention: false,
+                        outcomeReady: false,
+                      ).hint,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AdminDssTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      flag.recommendedAction,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: AdminDssTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx),
+          style: dssFilledButtonStyle(),
+          child: const Text('Got it'),
+        ),
+      ],
+    ),
+  );
 }

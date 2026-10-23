@@ -55,9 +55,9 @@ abstract final class DssCopy {
         'sparse' =>
           'Collect more tracer responses from this course/batch before acting on employment or curriculum findings.',
         'low_rate' =>
-          'Send reminders to alumni who have not submitted the tracer survey, then refresh insights.',
+          'Send reminders to alumni who have not submitted the tracer survey, then Re-run analysis.',
         'both' =>
-          'Improve survey participation for this cohort (reminders + follow-up), then refresh insights before using outcome flags.',
+          'Improve survey participation for this cohort (reminders + follow-up), then Re-run analysis before using outcome flags.',
         _ => flag.recommendedAction,
       };
     }
@@ -161,7 +161,7 @@ abstract final class DssCopy {
           ),
           DssPlaybookStep(
             step:
-                'Wait until more responses arrive, then click Refresh insights.',
+                'Wait until more responses arrive, then click Re-run analysis.',
           ),
         ],
         'low_rate' || 'both' => const [

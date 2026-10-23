@@ -50,7 +50,14 @@ DateTime _today() {
   return DateTime(now.year, now.month, now.day);
 }
 
-/// Owner office, responsible person and start / due / review dates.
+/// Admin account choice for the Owner & schedule dropdown.
+class DssAdminChoice {
+  const DssAdminChoice({required this.id, required this.label});
+  final String id;
+  final String label;
+}
+
+/// Admin owner, office, responsible person and start / due / review dates.
 /// Editable while the flag is open or in progress.
 class DssAccountabilityCard extends StatefulWidget {
   const DssAccountabilityCard({
@@ -58,11 +65,15 @@ class DssAccountabilityCard extends StatefulWidget {
     required this.flag,
     required this.repository,
     required this.onSaved,
+    this.admins = const [],
+    this.assignedTo,
   });
 
   final DssFlag flag;
   final DssRepository repository;
   final Future<void> Function() onSaved;
+  final List<DssAdminChoice> admins;
+  final String? assignedTo;
 
   @override
   State<DssAccountabilityCard> createState() => _DssAccountabilityCardState();
@@ -78,11 +89,22 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
   late DateTime? _start = widget.flag.startDate;
   late DateTime? _due = widget.flag.dueDate;
   late DateTime? _review = widget.flag.reviewDate;
+  late String? _assignedTo = widget.assignedTo;
   bool _saving = false;
+  bool _assigning = false;
 
   bool get _editable =>
       widget.flag.status == DssFlagStatus.open ||
       widget.flag.status == DssFlagStatus.inProgress;
+
+  String? get _assignedLabel {
+    final id = _assignedTo;
+    if (id == null || id.isEmpty) return null;
+    for (final a in widget.admins) {
+      if (a.id == id) return a.label;
+    }
+    return 'Assigned admin';
+  }
 
   @override
   void dispose() {
@@ -158,8 +180,9 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
     required ValueChanged<DateTime?> onChanged,
     DateTime? notBefore,
   }) {
+    final busy = _saving || _assigning;
     return InkWell(
-      onTap: _saving
+      onTap: busy
           ? null
           : () async {
               final picked = await _pick(value, notBefore: notBefore);
@@ -173,7 +196,7 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
               : IconButton(
                   tooltip: 'Clear',
                   icon: const Icon(Icons.close, size: 16),
-                  onPressed: _saving
+                  onPressed: busy
                       ? null
                       : () => setState(() => onChanged(null)),
                 ),
@@ -191,8 +214,41 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
     );
   }
 
+  Future<void> _assignOwner(String? id) async {
+    final label = id == null
+        ? null
+        : widget.admins
+              .where((a) => a.id == id)
+              .map((a) => a.label)
+              .firstOrNull;
+    setState(() {
+      _assignedTo = id;
+      _assigning = true;
+    });
+    try {
+      await widget.repository.assignOwner(
+        flagId: widget.flag.id,
+        userId: id,
+        ownerLabel: label,
+      );
+      await widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _assignedTo = widget.assignedTo);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Assign failed: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _assigning = false);
+    }
+  }
+
   Widget _readOnly(DssFlag f) {
     final rows = <(String, String)>[
+      if (_assignedLabel != null) ('Admin owner', _assignedLabel!),
       if (f.ownerOffice != null) ('Office', f.ownerOffice!),
       if (f.responsibleName != null) ('Responsible', f.responsibleName!),
       if (f.startDate != null) ('Start', _dateFormat.format(f.startDate!)),
@@ -202,7 +258,7 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
     ];
     if (rows.isEmpty) {
       return const Text(
-        'No office, person or dates were recorded.',
+        'No owner, office, person or dates were recorded.',
         style: TextStyle(fontSize: 12.5, color: AdminDssTheme.textMuted),
       );
     }
@@ -236,16 +292,33 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
   }
 
   @override
+  void didUpdateWidget(covariant DssAccountabilityCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.assignedTo != widget.assignedTo) {
+      _assignedTo = widget.assignedTo;
+    }
+    if (oldWidget.flag.id != widget.flag.id ||
+        oldWidget.flag.updatedAt != widget.flag.updatedAt) {
+      _officeCtrl.text = widget.flag.ownerOffice ?? '';
+      _personCtrl.text = widget.flag.responsibleName ?? '';
+      _start = widget.flag.startDate;
+      _due = widget.flag.dueDate;
+      _review = widget.flag.reviewDate;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final flag = widget.flag;
     final error = _dateError;
+    final busy = _saving || _assigning;
     return DssSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text('Accountability', style: _titleStyle),
+              const Text('Owner & schedule', style: _titleStyle),
               const SizedBox(width: 8),
               DssDueChip(flag: flag),
             ],
@@ -253,8 +326,8 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
           const SizedBox(height: 4),
           Text(
             _editable
-                ? 'Which office acts on this finding, who is responsible and '
-                      'by when. The admin owner is set under Update status.'
+                ? 'Admin owner, office, responsible person and dates for '
+                      'this finding.'
                 : 'Recorded while the work was under way.',
             style: _hintStyle,
           ),
@@ -262,9 +335,27 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
           if (!_editable)
             _readOnly(flag)
           else ...[
+            DropdownButtonFormField<String>(
+              key: ValueKey(_assignedTo ?? ''),
+              initialValue: _assignedTo ?? '',
+              dropdownColor: Colors.white,
+              decoration: _decoration('Admin owner'),
+              items: [
+                const DropdownMenuItem(value: '', child: Text('Unassigned')),
+                ...widget.admins.map(
+                  (a) => DropdownMenuItem(value: a.id, child: Text(a.label)),
+                ),
+              ],
+              onChanged: busy
+                  ? null
+                  : (v) => _assignOwner(
+                      (v == null || v.isEmpty) ? null : v,
+                    ),
+            ),
+            const SizedBox(height: 10),
             TextField(
               controller: _officeCtrl,
-              enabled: !_saving,
+              enabled: !busy,
               maxLength: 120,
               style: const TextStyle(fontSize: 13),
               onChanged: (_) => setState(() {}),
@@ -275,7 +366,7 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
                   icon: const Icon(Icons.arrow_drop_down),
                   color: Colors.white,
                   surfaceTintColor: Colors.transparent,
-                  enabled: !_saving,
+                  enabled: !busy,
                   onSelected: (v) => setState(() => _officeCtrl.text = v),
                   itemBuilder: (_) => [
                     for (final o in DssCopy.officeSuggestions)
@@ -287,7 +378,7 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
             const SizedBox(height: 10),
             TextField(
               controller: _personCtrl,
-              enabled: !_saving,
+              enabled: !busy,
               maxLength: 120,
               style: const TextStyle(fontSize: 13),
               onChanged: (_) => setState(() {}),
@@ -329,7 +420,7 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
             ],
             const SizedBox(height: 12),
             FilledButton(
-              onPressed: _saving || !_dirty || error != null ? null : _save,
+              onPressed: busy || !_dirty || error != null ? null : _save,
               style: dssFilledButtonStyle(),
               child: Text(_saving ? 'Saving…' : 'Save'),
             ),
@@ -340,15 +431,19 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
   }
 }
 
-/// Offline evidence for a flag. Any entry counts as proof for Resolve.
-class DssEvidenceCard extends StatelessWidget {
-  const DssEvidenceCard({
+/// Proof for a flag: evidence entries plus linked draft / offline Other.
+/// Any kind unlocks Resolve finding.
+class DssProofCard extends StatelessWidget {
+  const DssProofCard({
     super.key,
     required this.entries,
     required this.canEdit,
     required this.busy,
     required this.onAdd,
     required this.onRemove,
+    this.linkedAnnouncementId,
+    this.linkedAnnouncementAt,
+    this.offlineOtherDetail,
   });
 
   final List<DssFlagEvidence> entries;
@@ -356,6 +451,13 @@ class DssEvidenceCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onAdd;
   final ValueChanged<DssFlagEvidence> onRemove;
+
+  /// Reminder/announcement draft linked on the flag (counts as proof).
+  final String? linkedAnnouncementId;
+  final DateTime? linkedAnnouncementAt;
+
+  /// Plan type "Other" offline action text (counts as proof).
+  final String? offlineOtherDetail;
 
   static IconData _icon(DssEvidenceType t) => switch (t) {
     DssEvidenceType.meeting => Icons.groups_outlined,
@@ -366,8 +468,76 @@ class DssEvidenceCard extends StatelessWidget {
     DssEvidenceType.other => Icons.attach_file,
   };
 
+  int get _syntheticCount {
+    var n = 0;
+    if ((linkedAnnouncementId ?? '').trim().isNotEmpty) n++;
+    if ((offlineOtherDetail ?? '').trim().isNotEmpty) n++;
+    return n;
+  }
+
+  Widget _syntheticRow({
+    required IconData icon,
+    required String title,
+    required String meta,
+    String? body,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: AdminDssTheme.surface,
+        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+        border: Border.all(color: AdminDssTheme.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AdminDssTheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AdminDssTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  meta,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AdminDssTheme.textMuted,
+                  ),
+                ),
+                if (body != null && body.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    body,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AdminDssTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasDraft = (linkedAnnouncementId ?? '').trim().isNotEmpty;
+    final other = (offlineOtherDetail ?? '').trim();
+    final total = entries.length + _syntheticCount;
     return DssSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +546,7 @@ class DssEvidenceCard extends StatelessWidget {
             children: [
               const Text('Proof', style: _titleStyle),
               const SizedBox(width: 8),
-              DssMetaChip(label: '${entries.length}'),
+              DssMetaChip(label: '$total'),
               const Spacer(),
               if (canEdit)
                 OutlinedButton.icon(
@@ -389,15 +559,30 @@ class DssEvidenceCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Offline proof of what was done: meetings, events, memos, '
-            'reports. Any entry unlocks Resolve finding.',
+            'Reminder draft, offline “Other” action, or evidence entries. '
+            'Any one unlocks Resolve finding.',
             style: _hintStyle,
           ),
           const SizedBox(height: 8),
-          if (entries.isEmpty)
+          if (total == 0)
             const Text(
               'No proof entries yet.',
               style: TextStyle(color: AdminDssTheme.textMuted, fontSize: 12.5),
+            ),
+          if (hasDraft)
+            _syntheticRow(
+              icon: Icons.campaign_outlined,
+              title: 'Reminder announcement drafted — counts as proof',
+              meta: linkedAnnouncementAt == null
+                  ? 'Linked draft'
+                  : 'Linked draft · ${_dateFormat.format(linkedAnnouncementAt!.toLocal())}',
+            ),
+          if (other.isNotEmpty)
+            _syntheticRow(
+              icon: Icons.edit_note_outlined,
+              title: 'Offline action (Other)',
+              meta: 'Counts as proof',
+              body: other,
             ),
           for (final e in entries)
             Container(
@@ -491,6 +676,9 @@ class DssEvidenceCard extends StatelessWidget {
     );
   }
 }
+
+/// Backward-compatible name for [DssProofCard].
+typedef DssEvidenceCard = DssProofCard;
 
 /// What the admin entered in the Add evidence dialog.
 typedef DssEvidenceDraft = ({

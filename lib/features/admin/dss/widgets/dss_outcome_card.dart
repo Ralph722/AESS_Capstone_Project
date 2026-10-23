@@ -79,10 +79,8 @@ class DssOutcomeCard extends StatelessWidget {
     required this.interventions,
     this.check,
     required this.busy,
-    required this.canRecord,
-    required this.onRecord,
     required this.onCheck,
-    required this.onEditPlan,
+    this.onEditPlan,
     required this.onDecide,
   });
 
@@ -96,11 +94,10 @@ class DssOutcomeCard extends StatelessWidget {
   final DssOutcomeCheck? check;
   final bool busy;
 
-  /// The flag accepts a new intervention (open, in progress or resolved).
-  final bool canRecord;
-  final VoidCallback onRecord;
   final ValueChanged<DssIntervention> onCheck;
-  final ValueChanged<DssIntervention> onEditPlan;
+
+  /// Scrolls to the Plan card (Phase 3); plan is edited inline there.
+  final VoidCallback? onEditPlan;
   final void Function(DssIntervention, DssOutcomeDecision) onDecide;
 
   DssIntervention? get current {
@@ -121,7 +118,6 @@ class DssOutcomeCard extends StatelessWidget {
         interventions.isEmpty &&
         flag.status != DssFlagStatus.open &&
         flag.status != DssFlagStatus.inProgress;
-    final canStartNew = canRecord && (now == null || now.isDecided);
 
     return DssSurfaceCard(
       child: Column(
@@ -151,20 +147,11 @@ class DssOutcomeCard extends StatelessWidget {
           const SizedBox(height: 10),
           if (now == null && !legacy)
             const Text(
-              'No intervention recorded yet. Record what is being done and '
-              'the result you expect.',
+              'No intervention recorded yet. Set the Plan above, then Resolve '
+              'finding — or Save plan when details are ready.',
               style: _bodyStyle,
             ),
           if (now != null) _currentBlock(now),
-          if (canStartNew) ...[
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: busy ? null : onRecord,
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Record intervention'),
-              style: dssOutlinedButtonStyle(),
-            ),
-          ],
           if (earlier.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Text(
@@ -265,9 +252,9 @@ class DssOutcomeCard extends StatelessWidget {
                 label: const Text('Check outcome'),
                 style: dssOutlinedButtonStyle(),
               ),
-              if (i.canEditPlan && canRecord)
+              if (i.canEditPlan && onEditPlan != null)
                 OutlinedButton.icon(
-                  onPressed: busy ? null : () => onEditPlan(i),
+                  onPressed: busy ? null : onEditPlan,
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: const Text('Edit plan'),
                   style: dssOutlinedButtonStyle(),
@@ -440,7 +427,7 @@ double? dssParseOutcomeTarget(String metric, String text) {
   return v / 100;
 }
 
-String _targetText(String metric, double? target) {
+String dssFormatOutcomeTarget(String metric, double? target) {
   if (target == null) return '';
   if (metric == 'salary_peer_gap') return target.toStringAsFixed(1);
   final pct = target * 100;
@@ -448,6 +435,9 @@ String _targetText(String metric, double? target) {
       ? pct.toStringAsFixed(0)
       : pct.toStringAsFixed(1);
 }
+
+String _targetText(String metric, double? target) =>
+    dssFormatOutcomeTarget(metric, target);
 
 /// What the admin entered for a new or edited intervention. [target] is
 /// null when the rule's default was kept.

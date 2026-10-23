@@ -92,7 +92,7 @@ Future<void> _pumpCard(
   required DssFlag flag,
   List<DssIntervention> interventions = const [],
   DssOutcomeCheck? check,
-  bool canRecord = true,
+  VoidCallback? onEditPlan,
   void Function(DssIntervention, DssOutcomeDecision)? onDecide,
 }) async {
   tester.view.physicalSize = const Size(1000, 2400);
@@ -107,10 +107,8 @@ Future<void> _pumpCard(
             interventions: interventions,
             check: check,
             busy: false,
-            canRecord: canRecord,
-            onRecord: () {},
             onCheck: (_) {},
-            onEditPlan: (_) {},
+            onEditPlan: onEditPlan ?? () {},
             onDecide: onDecide ?? (_, _) {},
           ),
         ),
@@ -332,6 +330,8 @@ void main() {
       expect(dssParseOutcomeTarget('unemployment_rate', 'abc'), isNull);
       expect(dssParseOutcomeTarget('salary_peer_gap', '-0.5'), -0.5);
       expect(dssParseOutcomeTarget('salary_peer_gap', '11'), isNull);
+      expect(dssFormatOutcomeTarget('unemployment_rate', 0.25), '25');
+      expect(dssFormatOutcomeTarget('salary_peer_gap', -0.5), '-0.5');
     });
   });
 
@@ -339,7 +339,7 @@ void main() {
     testWidgets('closed flag without interventions: legacy', (tester) async {
       await _pumpCard(tester, flag: _flag(status: 'resolved'));
       expect(find.text('Not evaluated (legacy)'), findsOneWidget);
-      expect(find.text('Record intervention'), findsOneWidget);
+      expect(find.text('Record intervention'), findsNothing);
     });
 
     testWidgets('open flag without interventions', (tester) async {
@@ -348,7 +348,8 @@ void main() {
         find.textContaining('No intervention recorded yet'),
         findsOneWidget,
       );
-      expect(find.text('Record intervention'), findsOneWidget);
+      expect(find.textContaining('Set the Plan above'), findsOneWidget);
+      expect(find.text('Record intervention'), findsNothing);
       expect(find.text('Not evaluated (legacy)'), findsNothing);
     });
 
@@ -498,7 +499,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('· Continue'), findsOneWidget);
-      expect(find.text('Record intervention'), findsOneWidget);
+      expect(find.text('Record intervention'), findsNothing);
     });
   });
 
@@ -546,5 +547,52 @@ void main() {
     expect(result?.office, 'Office of the VP');
     expect(result?.type, isNull);
     expect(result?.target, isNull);
+  });
+
+  testWidgets('decision dialog Modify pre-fills plan fields', (tester) async {
+    DssDecisionDraft? result;
+    final iv = _intervention(
+      status: 'unsuccessful',
+      type: 'Job fair / hiring event',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                result = await showDssDecisionDialog(
+                  context,
+                  flag: _flag(),
+                  intervention: iv,
+                  decision: DssOutcomeDecision.modify,
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Job fair / hiring event'), findsWidgets);
+    expect(find.text(iv.description), findsOneWidget);
+    expect(find.text(iv.expectedOutcome), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Note (required)'),
+      'Adjusting the plan.',
+    );
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Modify'));
+    await tester.pumpAndSettle();
+
+    expect(result?.note, 'Adjusting the plan.');
+    expect(result?.type, iv.interventionType);
+    expect(result?.description, iv.description);
+    expect(result?.expectedOutcome, iv.expectedOutcome);
+    expect(result?.target, iv.successTarget);
   });
 }

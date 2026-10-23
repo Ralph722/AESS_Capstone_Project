@@ -170,12 +170,8 @@ unchanged — it still lives in the member detail banner and in Reports.
 
 ## 13. Program Insights (DSS) usability redesign (saved 2026-10-22)
 
-**Plan only — not yet implemented.** A DSS usability audit found the
-admin workflow is hard to learn: the resolve checklist's items are
-completed in three other cards, intervention/proof/ownership concepts each
-exist two to three times, cards reorder by stage, and key terms are never
-defined in place. The plan (Phases 0–6: wording/timing, list as work
-queue, one sticky action panel + frozen layout, merged Plan card, merged
-owner & proof, one "What happened" timeline, learnability) is UI-only —
-no evaluator, rules, or schema changes. Full plan:
+**Phases 0–6 implemented 2026-10-23.** Wording, Queue list, sticky action
+panel, Plan / Owner & schedule / Proof merges, What happened timeline, and
+learnability (How this works strip, example finding preview, Rules-save
+confirm). Full plan:
 [`dss-usability-redesign-plan.md`](dss-usability-redesign-plan.md).

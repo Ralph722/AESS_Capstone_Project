@@ -69,6 +69,7 @@ class AdminKpiCard extends StatefulWidget {
     this.chart,
     this.onTap,
     this.dense = false,
+    this.selected = false,
   });
 
   final String label;
@@ -76,7 +77,7 @@ class AdminKpiCard extends StatefulWidget {
   final IconData icon;
   final Color accent;
 
-  /// Adds a top colour strip and tints the icon chip; overrides [accent].
+  /// Tints the icon chip; overrides [accent].
   final AdminAccent? palette;
 
   /// Denominator or context, e.g. "3 of 8 programs".
@@ -89,6 +90,9 @@ class AdminKpiCard extends StatefulWidget {
 
   /// Uses the 22px value size for dense KPI strips.
   final bool dense;
+
+  /// Highlights the card as the active quick filter (accent border).
+  final bool selected;
 
   @override
   State<AdminKpiCard> createState() => _AdminKpiCardState();
@@ -178,9 +182,17 @@ class _AdminKpiCardState extends State<AdminKpiCard> {
         ),
     );
 
+    final base = AdminSurfaces.card(hovered: interactive && _hovered);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 160),
-      decoration: AdminSurfaces.card(hovered: interactive && _hovered),
+      decoration: widget.selected
+          ? base.copyWith(
+              border: Border.all(
+                color: widget.palette?.color ?? widget.accent,
+                width: 1.5,
+              ),
+            )
+          : base,
       child: body,
     );
 

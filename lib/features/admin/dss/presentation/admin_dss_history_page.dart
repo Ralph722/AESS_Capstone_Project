@@ -598,7 +598,7 @@ class _RunsCard extends StatelessWidget {
           const Text('Evaluation runs', style: _cardTitle),
           const SizedBox(height: 4),
           const Text(
-            'Latest Refresh insights and nightly runs (up to 20).',
+            'Latest Re-run analysis and nightly runs (up to 20).',
             style: TextStyle(fontSize: 12, color: AdminDssTheme.textSecondary),
           ),
           const SizedBox(height: 10),

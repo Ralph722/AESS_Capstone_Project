@@ -89,7 +89,7 @@ void main() {
     );
   });
 
-  testWidgets('KPI card palette adds a top strip and tinted icon', (
+  testWidgets('KPI card palette tints the icon, with no top strip', (
     tester,
   ) async {
     await pumpAdmin(
@@ -102,11 +102,12 @@ void main() {
       ),
     );
 
-    final strip = find.byWidgetPredicate(
-      (w) => w is ColoredBox && w.color == UstpColors.skyBlue,
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ColoredBox && w.color == UstpColors.skyBlue,
+      ),
+      findsNothing,
     );
-    expect(strip, findsOneWidget);
-    expect(tester.getSize(strip).height, 3);
     expect(
       tester.widget<Icon>(find.byIcon(Icons.school_outlined)).color,
       UstpColors.midBlue,

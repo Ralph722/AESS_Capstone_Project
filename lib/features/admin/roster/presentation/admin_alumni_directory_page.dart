@@ -11,11 +11,11 @@ import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/admin_alumni_directory_dialogs.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_instant_content.dart';
-import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
@@ -689,9 +689,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 tooltip: _deactivatedCount > 0
                     ? 'Total alumni records, incl. $_deactivatedCount deactivated'
                     : 'Total alumni records',
-                isSelected: _registrationFilter == AlumniRegistrationFilter.all &&
-                    _activeFilter == AlumniActiveFilter.all &&
-                    _viewIndex == 0,
                 onTap: () => setState(() {
                   _registrationFilter = AlumniRegistrationFilter.all;
                   _activeFilter = AlumniActiveFilter.all;
@@ -706,7 +703,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 icon: Icons.verified_outlined,
                 color: AdminColors.secondary,
                 tooltip: 'Signed in to the portal app',
-                isSelected: _registrationFilter == AlumniRegistrationFilter.registered,
                 onTap: () => setState(() {
                   _registrationFilter =
                       _registrationFilter == AlumniRegistrationFilter.registered
@@ -722,8 +718,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 icon: Icons.person_add_disabled_outlined,
                 color: UstpColors.orange,
                 tooltip: 'Awaiting app signup',
-                isSelected: _registrationFilter ==
-                    AlumniRegistrationFilter.notRegistered,
                 onTap: () => setState(() {
                   _registrationFilter =
                       _registrationFilter == AlumniRegistrationFilter.notRegistered
@@ -739,7 +733,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 icon: Icons.online_prediction_outlined,
                 color: AdminColors.success,
                 tooltip: 'Recently active users in past 30 days',
-                isSelected: _activeFilter == AlumniActiveFilter.active30,
                 onTap: () => setState(() {
                   _activeFilter = _activeFilter == AlumniActiveFilter.active30
                       ? AlumniActiveFilter.all

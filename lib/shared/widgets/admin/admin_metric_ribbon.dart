@@ -165,89 +165,111 @@ class _AdminMetricRibbonState extends State<AdminMetricRibbon> {
   }
 
   Widget _buildMetricCard(AdminMetricRibbonItem item) {
-    final isSelected = item.isSelected;
-    final isClickable = item.onTap != null;
+    return _MetricRibbonCard(
+      item: item,
+      height: widget.cardHeight,
+    );
+  }
+}
 
-    final card = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: item.onTap,
-        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: widget.cardHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? item.color.withValues(alpha: 0.05)
-                : AdminColors.card,
-            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-            border: Border.all(
-              color: isSelected ? item.color : AdminColors.border,
-              width: isSelected ? 1.5 : 1.0,
+class _MetricRibbonCard extends StatefulWidget {
+  const _MetricRibbonCard({
+    required this.item,
+    required this.height,
+  });
+
+  final AdminMetricRibbonItem item;
+  final double height;
+
+  @override
+  State<_MetricRibbonCard> createState() => _MetricRibbonCardState();
+}
+
+class _MetricRibbonCardState extends State<_MetricRibbonCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final isClickable = item.onTap != null;
+    final isSelected = item.isSelected;
+
+    final card = MouseRegion(
+      onEnter: (_) {
+        if (isClickable && mounted) setState(() => _hovered = true);
+      },
+      onExit: (_) {
+        if (isClickable && mounted) setState(() => _hovered = false);
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: item.onTap,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            height: widget.height,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AdminColors.card,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(
+                color: isSelected ? item.color : AdminColors.border,
+                width: isSelected ? 1.5 : 1.0,
+              ),
+              boxShadow: isClickable && _hovered
+                  ? AdminSurfaces.cardShadowHover
+                  : AdminSurfaces.cardShadow,
             ),
-            boxShadow: isSelected ? null : AdminSurfaces.cardShadow,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (item.icon != null)
-                    Container(
-                      width: 28,
-                      height: 28,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: item.color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (item.icon != null)
+                      Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: item.color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          item.icon,
+                          size: 15,
+                          color: item.color,
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 28),
+                    Text(
+                      item.value,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AdminColors.textPrimary,
+                        height: 1.1,
+                        letterSpacing: -0.3,
                       ),
-                      child: Icon(
-                        item.icon,
-                        size: 15,
-                        color: item.color,
-                      ),
-                    )
-                  else
-                    const SizedBox(height: 28),
-                  Text(
-                    item.value,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? item.color : AdminColors.textPrimary,
-                      height: 1.1,
-                      letterSpacing: -0.3,
                     ),
+                  ],
+                ),
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AdminColors.textSecondary,
                   ),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                        color: isSelected ? item.color : AdminColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  if (isClickable)
-                    Icon(
-                      isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
-                      size: 14,
-                      color: isSelected ? item.color : AdminColors.textMuted.withValues(alpha: 0.6),
-                    ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

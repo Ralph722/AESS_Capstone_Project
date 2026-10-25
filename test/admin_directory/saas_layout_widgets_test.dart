@@ -62,6 +62,9 @@ void main() {
       expect(find.text('10'), findsOneWidget);
       expect(find.text('Registered'), findsOneWidget);
       expect(find.text('6'), findsOneWidget);
+      // Clean KPI behavior matching reference screens: no checkmark, no chevron
+      expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
 
       await tester.tap(find.text('Registered'));
       expect(tappedRegistered, isTrue);

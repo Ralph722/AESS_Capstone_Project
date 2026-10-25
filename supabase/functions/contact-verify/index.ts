@@ -11,10 +11,12 @@
 // from the app.
 //
 // SMS_MODE:
-//   - unset / anything other than "mock" → mobile send returns sms_unavailable
-//   - "mock" → code is created for local/demo and returned as demoCode only then
+//   - unset / disabled / anything else → mobile send returns sms_unavailable
+//   - "mock" → local/demo only; OTP returned as demoCode; method = mock
+//   - "live" or "semaphore" → Semaphore SMS; method = sms; never echo OTP
 // Never default production to mock.
 //
+// Secrets for live SMS: SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME.
 // Codes are stored only as an HMAC. Limits live in
 // contact_verification_start/check.
 
@@ -25,6 +27,10 @@ import {
   type User,
 } from "https://esm.sh/@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.15";
+import {
+  sendSemaphoreSms,
+  toSemaphoreNumber,
+} from "../_shared/semaphore_sms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,6 +130,14 @@ serve(async (req) => {
   return await verifyCode(admin, secret, user.id, channel, target, code);
 });
 
+function smsModeEnabled(mode: string) {
+  return mode === "mock" || mode === "live" || mode === "semaphore";
+}
+
+function smsMethod(mode: string): "mock" | "sms" {
+  return mode === "mock" ? "mock" : "sms";
+}
+
 async function sendCode(
   admin: SupabaseClient,
   secret: string,
@@ -131,12 +145,12 @@ async function sendCode(
   channel: Channel,
   target: string,
 ) {
-  // Fail closed: only explicit SMS_MODE=mock enables mobile codes in-dev.
+  // Fail closed unless SMS_MODE is explicitly mock or live/semaphore.
   const smsMode = (Deno.env.get("SMS_MODE") ?? "disabled").toLowerCase();
-  if (channel === "mobile" && smsMode !== "mock") {
+  if (channel === "mobile" && !smsModeEnabled(smsMode)) {
     return json({ error: "sms_unavailable" }, 503);
   }
-  const method = channel === "email" ? "email" : "mock";
+  const method = channel === "email" ? "email" : smsMethod(smsMode);
 
   if (channel === "email") {
     const { data: taken, error: takenError } = await admin.rpc(
@@ -215,6 +229,30 @@ async function sendCode(
   } else if (smsMode === "mock") {
     // Local/demo only — never attach the OTP when SMS is live or unset.
     result.demoCode = code;
+  } else {
+    const semaphoreNumber = toSemaphoreNumber(normalized);
+    if (!semaphoreNumber) {
+      await admin.rpc("contact_verification_cancel", {
+        p_user_id: userId,
+        p_id: started.id,
+      });
+      return json({ error: "sms_ph_only" }, 400);
+    }
+    try {
+      // Do not start the body with "TEST" — Semaphore silently drops those.
+      await sendSemaphoreSms(
+        semaphoreNumber,
+        `Your AESS-USTP verification code is ${code}. ` +
+          `Valid for 10 minutes. Do not share this code.`,
+      );
+    } catch (error) {
+      console.error("contact-verify: SMS failed", errorMessage(error));
+      await admin.rpc("contact_verification_cancel", {
+        p_user_id: userId,
+        p_id: started.id,
+      });
+      return json({ error: "sms_failed" }, 502);
+    }
   }
   return json(result);
 }

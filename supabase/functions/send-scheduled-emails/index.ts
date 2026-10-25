@@ -26,7 +26,9 @@ const corsHeaders = {
 
 const DISPATCH_SECRET = Deno.env.get("PUSH_DISPATCH_SECRET") ?? "";
 const ORIGIN = "https://ustp-aess.web.app";
-const BATCH = 40;
+// Keep small enough that SMTP send + complete finishes inside the
+// scheduled_email_dispatch pg_net timeout (55s).
+const BATCH = 12;
 
 type ClaimedEmail = {
   delivery_id: string;

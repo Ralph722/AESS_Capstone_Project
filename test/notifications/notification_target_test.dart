@@ -240,6 +240,7 @@ void main() {
           .withInApp(NotificationType.forum, false)
           .withInApp(NotificationType.survey, false)
           .withPush(NotificationType.job, false)
+          .withSms(NotificationType.survey, false)
           .copyWith(
             quietHoursEnabled: true,
             quietStartMinutes: 21 * 60 + 30,
@@ -248,6 +249,7 @@ void main() {
       final row = p.toSupabaseRow(userId: 'u');
       expect(row['in_app'], {'forum': false});
       expect(row['push'], {'job': false});
+      expect(row['sms'], {'survey': false});
       expect(row['quiet_start'], '21:30');
       expect(row['quiet_end'], '06:00');
 
@@ -257,6 +259,8 @@ void main() {
       });
       expect(back.inAppEnabled(NotificationType.forum), isFalse);
       expect(back.pushEnabled(NotificationType.job), isFalse);
+      expect(back.smsEnabled(NotificationType.survey), isFalse);
+      expect(back.smsEnabled(NotificationType.job), isTrue);
       expect(back.quietHoursEnabled, isTrue);
       expect(back.quietStartMinutes, 21 * 60 + 30);
       expect(back.quietEndMinutes, 6 * 60);

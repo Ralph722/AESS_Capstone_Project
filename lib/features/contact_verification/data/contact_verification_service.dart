@@ -72,7 +72,7 @@ class ContactCodeSent {
   final String target;
   final int resendAfterSeconds;
 
-  /// Only while SMS is not integrated: the code to show in the app.
+  /// Present only when the server is in SMS mock mode (local/demo).
   final String? demoCode;
 
   bool get isDemo => demoCode != null;
@@ -330,6 +330,11 @@ class ContactVerificationService {
         'That email is already used by another account. '
             'Try a different address.',
       'sms_unavailable' => 'Text message codes are not available yet.',
+      'sms_failed' =>
+        "We couldn't send the text message. Check the number and try again.",
+      'sms_ph_only' =>
+        'Text codes work with Philippine mobile numbers '
+            '(like 09171234567).',
       'wrong_code' =>
         attemptsLeft == null
             ? "That code isn't right."

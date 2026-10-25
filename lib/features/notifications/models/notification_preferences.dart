@@ -10,6 +10,7 @@ class NotificationPreferences {
     this.inApp = const {},
     this.push = const {},
     this.email = const {},
+    this.sms = const {},
     this.quietHoursEnabled = false,
     this.quietStartMinutes = 22 * 60,
     this.quietEndMinutes = 7 * 60,
@@ -22,6 +23,10 @@ class NotificationPreferences {
   /// Email copies per type. Transactional mail (sign-in codes, password
   /// resets) is not governed by this map and always arrives.
   final Map<NotificationType, bool> email;
+
+  /// SMS copies per type. Verification OTPs ignore this map. Only survey
+  /// reminders are sent today (verified PH mobiles).
+  final Map<NotificationType, bool> sms;
   final bool quietHoursEnabled;
   final int quietStartMinutes;
   final int quietEndMinutes;
@@ -36,6 +41,10 @@ class NotificationPreferences {
   static bool isEmailLocked(NotificationType type) =>
       type == NotificationType.system;
 
+  /// Account SMS is not used; survey reminders can be turned off.
+  static bool isSmsLocked(NotificationType type) =>
+      type == NotificationType.system;
+
   bool inAppEnabled(NotificationType type) =>
       isInAppLocked(type) || (inApp[type] ?? true);
 
@@ -45,10 +54,14 @@ class NotificationPreferences {
   bool emailEnabled(NotificationType type) =>
       isEmailLocked(type) || (email[type] ?? true);
 
+  bool smsEnabled(NotificationType type) =>
+      isSmsLocked(type) || (sms[type] ?? true);
+
   NotificationPreferences copyWith({
     Map<NotificationType, bool>? inApp,
     Map<NotificationType, bool>? push,
     Map<NotificationType, bool>? email,
+    Map<NotificationType, bool>? sms,
     bool? quietHoursEnabled,
     int? quietStartMinutes,
     int? quietEndMinutes,
@@ -58,6 +71,7 @@ class NotificationPreferences {
       inApp: inApp ?? this.inApp,
       push: push ?? this.push,
       email: email ?? this.email,
+      sms: sms ?? this.sms,
       quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
       quietStartMinutes: quietStartMinutes ?? this.quietStartMinutes,
       quietEndMinutes: quietEndMinutes ?? this.quietEndMinutes,
@@ -74,11 +88,15 @@ class NotificationPreferences {
   NotificationPreferences withEmail(NotificationType type, bool enabled) =>
       copyWith(email: {...email, type: enabled});
 
+  NotificationPreferences withSms(NotificationType type, bool enabled) =>
+      copyWith(sms: {...sms, type: enabled});
+
   factory NotificationPreferences.fromSupabaseRow(Map<String, dynamic> row) {
     return NotificationPreferences(
       inApp: _parseChannel(row['in_app']),
       push: _parseChannel(row['push']),
       email: _parseChannel(row['email']),
+      sms: _parseChannel(row['sms']),
       quietHoursEnabled: row['quiet_hours_enabled'] == true,
       quietStartMinutes: parseTimeMinutes(row['quiet_start']) ?? 22 * 60,
       quietEndMinutes: parseTimeMinutes(row['quiet_end']) ?? 7 * 60,
@@ -102,6 +120,10 @@ class NotificationPreferences {
       'email': {
         for (final e in email.entries)
           if (!isEmailLocked(e.key)) e.key.name: e.value,
+      },
+      'sms': {
+        for (final e in sms.entries)
+          if (!isSmsLocked(e.key)) e.key.name: e.value,
       },
       'quiet_hours_enabled': quietHoursEnabled,
       'quiet_start': formatTimeMinutes(quietStartMinutes),

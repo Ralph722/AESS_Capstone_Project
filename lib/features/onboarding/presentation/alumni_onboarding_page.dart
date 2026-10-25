@@ -14,6 +14,8 @@ import 'package:alumni_system/core/utils/avatar_image_prepare.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
+import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
+import 'package:alumni_system/features/contact_verification/presentation/contact_verify_card.dart';
 import 'package:alumni_system/features/onboarding/data/onboarding_service.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
@@ -30,7 +32,10 @@ import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Mandatory onboarding: GTS profile + optional photo.
 class AlumniOnboardingScreen extends StatefulWidget {
-  const AlumniOnboardingScreen({super.key});
+  const AlumniOnboardingScreen({super.key, this.contactService});
+
+  /// Optional override for tests.
+  final ContactVerificationService? contactService;
 
   @override
   State<AlumniOnboardingScreen> createState() => _AlumniOnboardingScreenState();
@@ -55,6 +60,12 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       icon: Icons.home_outlined,
     ),
     OnboardingStepInfo(
+      label: 'Confirm mobile',
+      title: 'Confirm your mobile',
+      icon: Icons.sms_outlined,
+      optional: true,
+    ),
+    OnboardingStepInfo(
       label: 'Education & work',
       title: 'Set up your profile',
       icon: Icons.school_outlined,
@@ -73,10 +84,12 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     ),
   ];
 
-  /// Profile steps follow Welcome, in [GtsFormSection] order.
   static const _firstProfileStep = 1;
-  static const _photoStepIndex = 4;
-  static const _finalStepIndex = 5;
+  static const _contactStepIndex = 2;
+  static const _mobileVerifyStepIndex = 3;
+  static const _educationStepIndex = 4;
+  static const _photoStepIndex = 5;
+  static const _finalStepIndex = 6;
 
   final _sectionFormKeys = {
     for (final s in GtsFormSection.values) s: GlobalKey<FormState>(),
@@ -87,6 +100,8 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   final _imageStorage = ImageStorageService();
   final _imagePicker = ImagePicker();
   final _formState = GtsProfileFormState();
+  late final ContactVerificationService _contactService =
+      widget.contactService ?? ContactVerificationService();
 
   int _step = 0;
   bool _forward = true;
@@ -97,6 +112,17 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   String? _profileImageUrl;
   File? _selectedImage;
   Uint8List? _selectedImageBytes;
+
+  /// Mobile shown on the confirm step (may differ briefly while editing).
+  String _mobileDraft = '';
+
+  /// Value queued/saved when entering the confirm step (restored on Skip).
+  String _mobileAtVerifyEntry = '';
+
+  bool _mobileVerified = false;
+  String? _verifiedMobile;
+  bool _mobileSaving = false;
+  String? _mobileSaveError;
 
   /// The form is hidden until the saved record loads: saving over a record we
   /// never read would blank office-managed fields such as the program.
@@ -141,6 +167,15 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
 
       if (boot.profile != null) {
         _formState.applyFromProfile(boot.profile!);
+        final profile = boot.profile!;
+        if (profile.mobileVerified) {
+          final normalized = ContactNormalizer.normalize(
+            ContactChannel.mobile,
+            profile.mobileNumber,
+          );
+          _mobileVerified = normalized != null;
+          _verifiedMobile = normalized;
+        }
       }
       if (_formState.emailController.text.trim().isEmpty) {
         _formState.emailController.text = AppSession.email ?? '';
@@ -171,12 +206,39 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   void _goBack() {
     if (_finishing || _step == 0) return;
     _returnToReview = false;
+    // Skip the confirm-mobile step when going back if it was not offered.
+    if (_step == _educationStepIndex && !_needsMobileVerifyStep) {
+      _goToStep(_contactStepIndex);
+      return;
+    }
+    if (_step == _mobileVerifyStepIndex) {
+      _goToStep(_contactStepIndex);
+      return;
+    }
     _goToStep(_step - 1);
   }
 
   void _editFromReview(int step) {
     _returnToReview = true;
     _goToStep(step);
+  }
+
+  /// True when there is a PH/intl mobile that still needs an SMS check.
+  bool get _needsMobileVerifyStep {
+    final normalized = ContactNormalizer.normalize(
+      ContactChannel.mobile,
+      _formState.mobileController.text,
+    );
+    if (normalized == null) return false;
+    if (_mobileVerified &&
+        ContactNormalizer.same(
+          ContactChannel.mobile,
+          _verifiedMobile,
+          normalized,
+        )) {
+      return false;
+    }
+    return true;
   }
 
   Future<void> _confirmSignOut() async {
@@ -236,7 +298,11 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     }();
   }
 
-  int _stepFor(GtsFormSection section) => _firstProfileStep + section.index;
+  int _stepFor(GtsFormSection section) => switch (section) {
+    GtsFormSection.personal => _firstProfileStep,
+    GtsFormSection.contact => _contactStepIndex,
+    GtsFormSection.education => _educationStepIndex,
+  };
 
   void _continueFromSection(GtsFormSection section) {
     if (!_validateSection(section)) return;
@@ -248,13 +314,18 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     // keeps what they entered. Navigation never waits on it.
     _queueProfileSave(userId);
 
-    if (section != GtsFormSection.education && !_returnToReview) {
-      _goToStep(_stepFor(section) + 1);
+    if (section == GtsFormSection.contact) {
+      _openMobileVerifyOrContinue();
       return;
     }
 
-    // Each step validated its own fields; this catches anything that became
-    // empty elsewhere so the 100% rule still holds.
+    if (section == GtsFormSection.personal && !_returnToReview) {
+      _goToStep(_contactStepIndex);
+      return;
+    }
+
+    // Education: each step validated its own fields; catch anything that
+    // became empty elsewhere so the 100% rule still holds.
     final missing = _formState.missingRequiredKeys();
     if (missing.isNotEmpty) {
       final target = GtsFormSection.values.firstWhere(
@@ -273,6 +344,67 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       return;
     }
     _goToStep(_photoStepIndex);
+  }
+
+  void _openMobileVerifyOrContinue() {
+    if (!_needsMobileVerifyStep) {
+      _continueAfterMobileVerify();
+      return;
+    }
+    setState(() {
+      _mobileAtVerifyEntry = _formState.mobileController.text.trim();
+      _mobileDraft = _mobileAtVerifyEntry;
+      _mobileSaveError = null;
+    });
+    _goToStep(_mobileVerifyStepIndex);
+  }
+
+  void _continueAfterMobileVerify() {
+    if (_returnToReview) {
+      _returnToReview = false;
+      _goToStep(_finalStepIndex);
+      return;
+    }
+    _goToStep(_educationStepIndex);
+  }
+
+  void _skipMobileVerify() {
+    if (_finishing || _mobileSaving) return;
+    _formState.mobileController.text = _mobileAtVerifyEntry;
+    _mobileDraft = _mobileAtVerifyEntry;
+    _continueAfterMobileVerify();
+  }
+
+  Future<void> _onMobileCodeVerified(String target) async {
+    setState(() {
+      _mobileSaving = true;
+      _mobileSaveError = null;
+    });
+    try {
+      await _contactService.saveVerified(ContactChannel.mobile, target);
+      if (!mounted) return;
+      setState(() {
+        _mobileVerified = true;
+        _verifiedMobile = target;
+        _formState.mobileController.text = target;
+        _mobileDraft = target;
+        _mobileAtVerifyEntry = target;
+        _mobileSaving = false;
+      });
+    } on ContactVerificationException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _mobileSaveError = e.message;
+        _mobileSaving = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _mobileSaveError =
+            "Couldn't save your mobile number. Please try again.";
+        _mobileSaving = false;
+      });
+    }
   }
 
   /// Validates one step's fields, scrolling to the topmost problem.
@@ -476,7 +608,9 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   }
 
   bool get _isProfileStep =>
-      _step >= _firstProfileStep && _step < _photoStepIndex;
+      _step == _firstProfileStep ||
+      _step == _contactStepIndex ||
+      _step == _educationStepIndex;
 
   String get _overallFieldCount {
     final total = TracerProfile.fullProfileFieldCount;
@@ -501,7 +635,10 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     final views = ready
         ? [
             _introStep(),
-            for (final section in GtsFormSection.values) _sectionStep(section),
+            _sectionStep(GtsFormSection.personal),
+            _sectionStep(GtsFormSection.contact),
+            _mobileVerifyStep(),
+            _sectionStep(GtsFormSection.education),
             _photoStep(),
             _reviewStep(),
           ]
@@ -739,6 +876,94 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     );
   }
 
+  OnboardingStepView _mobileVerifyStep() {
+    final draftVerified =
+        _mobileVerified &&
+        ContactNormalizer.same(
+          ContactChannel.mobile,
+          _verifiedMobile,
+          _mobileDraft,
+        );
+
+    return OnboardingStepView(
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const OnboardingSectionHeading(
+            title: 'Confirm your mobile number',
+            subtitle:
+                'We’ll text a 6-digit code so the alumni office knows this '
+                'number reaches you. You can skip and verify later in Profile.',
+          ),
+          const SizedBox(height: PortalTheme.space3),
+          ContactVerifyCard(
+            channel: ContactChannel.mobile,
+            original: _mobileAtVerifyEntry,
+            value: _mobileDraft,
+            verified: draftVerified,
+            enabled: !_finishing && !_mobileSaving,
+            service: _contactService,
+            verifiedText: 'Number confirmed. You can continue.',
+            onValueChanged: (value) {
+              setState(() {
+                _mobileDraft = value;
+                _formState.mobileController.text = value;
+                if (!ContactNormalizer.same(
+                  ContactChannel.mobile,
+                  _verifiedMobile,
+                  value,
+                )) {
+                  _mobileVerified = false;
+                }
+                _mobileSaveError = null;
+              });
+            },
+            onVerified: _onMobileCodeVerified,
+          ),
+          if (_mobileSaving) ...[
+            const SizedBox(height: PortalTheme.space3),
+            const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: PortalTheme.navy,
+                ),
+              ),
+            ),
+          ],
+          if (_mobileSaveError != null) ...[
+            const SizedBox(height: PortalTheme.space2),
+            Text(
+              _mobileSaveError!,
+              style: PortalTheme.meta.copyWith(
+                color: PortalTheme.danger,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: PortalTheme.space3),
+          const OnboardingTip(
+            icon: Icons.info_outline_rounded,
+            message:
+                'Philippine mobile numbers only. If the text doesn’t arrive, '
+                'wait a minute and resend, or skip and verify from Profile.',
+          ),
+        ],
+      ),
+      actions: OnboardingActions(
+        primaryLabel: _returnToReview ? 'Save & review' : 'Continue',
+        onPrimary: _finishing || _mobileSaving || !draftVerified
+            ? null
+            : _continueAfterMobileVerify,
+        onBack: _goBack,
+        tertiaryLabel: 'Skip for now',
+        onTertiary: _finishing || _mobileSaving ? null : _skipMobileVerify,
+      ),
+    );
+  }
+
   OnboardingStepView _photoStep() {
     final hasLocalPreview =
         _selectedImageBytes != null || _selectedImage != null;
@@ -817,6 +1042,7 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
         summary: join([
           _formState.provinceController.text,
           _formState.mobileController.text,
+          if (_mobileVerified) 'Verified by text',
         ]),
         onEdit: _finishing
             ? null

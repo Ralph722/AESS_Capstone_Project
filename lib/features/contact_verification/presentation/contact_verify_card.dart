@@ -193,9 +193,8 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
             const _Note(
               icon: Icons.sms_outlined,
               text:
-                  "Text message codes aren't available yet, so we'll show "
-                  "your code here for now. Once SMS is ready we'll ask you "
-                  'to confirm your number by text.',
+                  "We'll text a 6-digit code to this Philippine mobile "
+                  'number. Standard SMS rates may apply.',
             ),
           ],
           if (!_editing) ...[
@@ -360,7 +359,7 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
                   ? 'Send code in ${_clock(_cooldown)}'
                   : _isEmail
                   ? 'Send code to this email'
-                  : 'Get code',
+                  : 'Send code by text',
             ),
           )
         else ...[
@@ -369,9 +368,12 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
             child: Text(
               sent.isDemo
                   ? 'Enter the 6-digit code below to confirm this number.'
-                  : 'We sent a 6-digit code to ${sent.target}. It expires in '
+                  : _isEmail
+                  ? 'We sent a 6-digit code to ${sent.target}. It expires in '
                         '10 minutes. Check your spam folder if you '
-                        "don't see it.",
+                        "don't see it."
+                  : 'We texted a 6-digit code to ${sent.target}. It expires '
+                        'in 10 minutes.',
               style: PortalTheme.bodySecondary.copyWith(fontSize: 13),
             ),
           ),

@@ -16,10 +16,11 @@ email.
 - **Email codes** go out through the existing Gmail SMTP account. The code
   email says the address will become how you sign in; the old address gets a
   one-time "sign-in email was changed" notice.
-- **Mobile codes are mock** until SMS is integrated: the code is shown in the
-  app, submitting is allowed, and the number is saved with
-  `mobile_verification_method = 'mock'` and `mobile_verified_at = null`, so it
-  is never reported as verified.
+- **Mobile codes** go out through Semaphore when `SMS_MODE=live` (or
+  `semaphore`): `mobile_verification_method = 'sms'` and
+  `mobile_verified_at` is set. Local/demo may use `SMS_MODE=mock` (on-screen
+  `demoCode`, method `mock`, `mobile_verified_at` stays null). Unset/disabled
+  returns `sms_unavailable`. Philippine mobiles only for live SMS.
 - **Recent sign-in.** If the last sign-in was over 24 hours ago, the app asks
   for the current password before changing the login email. The server also
   refuses `apply_email` without a recent sign-in.
@@ -55,8 +56,9 @@ codes, 5 codes per channel per hour. Codes are stored as an HMAC. An address
 already used by another account returns `email_in_use` (409).
 
 Function settings: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_SENDER_NAME`
-(already set). Optional: `CONTACT_OTP_SECRET` (HMAC key; defaults to the
-service role key), `SMS_MODE` (`mock` until an SMS provider is added).
+(already set). For live SMS: `SEMAPHORE_API_KEY`, `SEMAPHORE_SENDER_NAME`,
+`SMS_MODE=live`. Optional: `CONTACT_OTP_SECRET` (HMAC key; defaults to the
+service role key). Use `SMS_MODE=mock` only for local/demo.
 
 Deploy:
 
@@ -76,6 +78,10 @@ supabase functions deploy contact-verify
    `20261016030000` (phase 19 32/32, phase 20 9/9).
 4. Admin badges, accessibility, docs, QA. **Done (2026-10-16).**
    `ContactVerificationBadge`: Verified / Demo code / Not verified.
+5. Live Semaphore SMS + optional onboarding “Confirm mobile” step (skip allowed).
+   **Done (2026-10-26).**
+6. Automated survey SMS (week-1 + closing-in-3-days) via `send-scheduled-sms`.
+   **Done (2026-10-26).**
 
 ## Part 2: verified email becomes the login email
 
@@ -104,8 +110,8 @@ Alumnus (tracer):
   clear message.
 - If last sign-in was over 24 hours ago: password dialog before the email is
   saved.
-- Change Q5: demo code shows; Submit works; Profile shows "Confirmed with a
-  demo code".
+- Change Q5: SMS arrives; Verify + Submit works; Profile shows verified
+  mobile (not demo).
 - Change a contact, close the tracer: leave dialog warns; old value comes
   back in the draft.
 - Change nothing: no verify step.

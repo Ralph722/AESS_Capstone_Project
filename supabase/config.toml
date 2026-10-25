@@ -417,6 +417,9 @@ verify_jwt = false
 [functions.send-scheduled-emails]
 verify_jwt = false
 
+[functions.send-scheduled-sms]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

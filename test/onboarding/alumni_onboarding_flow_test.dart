@@ -124,6 +124,10 @@ void main() {
     expect(find.text('Where the alumni office can reach you.'), findsOneWidget);
     await tap(tester, button('Continue'));
 
+    // Confirm mobile is optional — skip so the flow test needs no SMS.
+    expect(find.text('Confirm your mobile number'), findsOneWidget);
+    await tap(tester, button('Skip for now'));
+
     // Education & work: employment status is still required.
     expect(
       find.text('Your degree and current employment status.'),
@@ -132,6 +136,10 @@ void main() {
     await tap(tester, button('Save & continue'));
     expect(find.text('Choose one'), findsOneWidget);
     await tap(tester, find.text('Employed'));
+    await tap(tester, find.text('Regular or Permanent'));
+    // Present Occupation appears after Employed is chosen.
+    await tester.enterText(find.byType(TextFormField).last, 'Developer');
+    await tester.pumpAndSettle();
     await tap(tester, button('Save & continue'));
 
     // Photo is optional.

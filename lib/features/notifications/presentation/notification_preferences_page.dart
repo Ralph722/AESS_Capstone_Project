@@ -221,6 +221,23 @@ class _NotificationPreferencesScreenState
               onChanged: (v) => _update(_prefs.withEmail(type, v)),
             ),
         ]),
+        const SizedBox(height: 20),
+        _sectionTitle(
+          'Text messages (SMS)',
+          'Short reminders to your verified Philippine mobile. Only tracer '
+              'and survey follow-ups are sent (about a week after assignment, '
+              'and once when a survey is closing). Verification codes always '
+              'arrive when you request them.',
+        ),
+        _card([
+          _switchRow(
+            type: NotificationType.survey,
+            value: _prefs.smsEnabled(NotificationType.survey),
+            locked: false,
+            onChanged: (v) =>
+                _update(_prefs.withSms(NotificationType.survey, v)),
+          ),
+        ]),
         if (widget.showPushSection) ...[
           const SizedBox(height: 20),
           _sectionTitle(

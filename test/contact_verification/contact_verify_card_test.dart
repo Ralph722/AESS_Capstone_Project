@@ -140,7 +140,7 @@ void main() {
     expect(button.onPressed, isNull);
   });
 
-  testWidgets('mobile (mock SMS) shows the demo code and the SMS note', (
+  testWidgets('mobile shows SMS note; mock mode still shows demo code', (
     tester,
   ) async {
     final service = _FakeService()..demoCode = '654321';
@@ -154,9 +154,10 @@ void main() {
       value: '09998887777',
       onVerified: (t) => verifiedTarget = t,
     );
-    expect(find.textContaining("aren't available yet"), findsOneWidget);
+    expect(find.textContaining('Philippine mobile'), findsOneWidget);
+    expect(find.text('Send code by text'), findsOneWidget);
 
-    await tester.tap(find.text('Get code'));
+    await tester.tap(find.text('Send code by text'));
     await tester.pump();
     expect(find.text('Demo code'), findsOneWidget);
     expect(find.text('654321'), findsOneWidget);
@@ -166,6 +167,23 @@ void main() {
     await tester.tap(find.text('Verify'));
     await tester.pump();
     expect(verifiedTarget, '09998887777');
+  });
+
+  testWidgets('mobile live path: no demo code, texted confirmation', (
+    tester,
+  ) async {
+    final service = _FakeService();
+    await _pump(
+      tester,
+      channel: ContactChannel.mobile,
+      service: service,
+      original: '09171234567',
+      value: '09998887777',
+    );
+    await tester.tap(find.text('Send code by text'));
+    await tester.pump();
+    expect(find.text('Demo code'), findsNothing);
+    expect(find.textContaining('We texted a 6-digit code'), findsOneWidget);
   });
 
   testWidgets('Edit rejects an invalid email and passes a valid one up', (

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_kpi.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Category colours for bento charts: AESS navy ramp with a gold accent.
 abstract final class ReportsBentoPalette {
@@ -421,7 +422,10 @@ class ReportsStatCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: pillTint.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                          border: Border.all(
+                            color: pillTint.withValues(alpha: 0.25),
+                          ),
                         ),
                         child: Text(
                           pill,
@@ -1480,8 +1484,9 @@ class ReportsSegmentedToggle extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: AdminReportsTheme.surface,
-          borderRadius: BorderRadius.circular(999),
+          color: AdminColors.surface,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          border: Border.all(color: AdminColors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1494,28 +1499,37 @@ class ReportsSegmentedToggle extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
+                      horizontal: 12,
+                      vertical: 5,
                     ),
                     decoration: BoxDecoration(
                       color: i == selected
-                          ? AdminReportsTheme.card
+                          ? AdminColors.card
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm - 2),
+                      border: i == selected
+                          ? Border.all(color: AdminColors.border.withValues(alpha: 0.8))
+                          : null,
                       boxShadow: i == selected
-                          ? AdminReportsTheme.cardShadow
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ]
                           : null,
                     ),
                     child: Text(
                       options[i],
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 12,
                         fontWeight: i == selected
                             ? FontWeight.w700
                             : FontWeight.w500,
                         color: i == selected
-                            ? AdminReportsTheme.primary
-                            : AdminReportsTheme.textSecondary,
+                            ? AdminColors.primary
+                            : AdminColors.textSecondary,
                       ),
                     ),
                   ),

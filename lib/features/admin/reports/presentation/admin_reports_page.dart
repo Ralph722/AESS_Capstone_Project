@@ -1453,9 +1453,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _bentoLink(String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AdminColors.surface,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          border: Border.all(color: AdminColors.border),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1467,14 +1472,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AdminReportsTheme.primary,
+                  color: AdminColors.primary,
                 ),
               ),
             ),
+            const SizedBox(width: 2),
             const Icon(
               Icons.chevron_right_rounded,
-              size: 16,
-              color: AdminReportsTheme.primary,
+              size: 15,
+              color: AdminColors.primary,
             ),
           ],
         ),
@@ -1736,8 +1742,20 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         PopupMenuDivider(),
         PopupMenuItem(value: 'downloads', child: Text('Open Downloads tab')),
       ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AdminColors.card,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          border: Border.all(color: AdminColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1745,19 +1763,27 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               Icons.download_outlined,
               size: 15,
               color: _downloadBusy
-                  ? AdminReportsTheme.textMuted
-                  : AdminReportsTheme.primary,
+                  ? AdminColors.textMuted
+                  : AdminColors.primary,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             Text(
-              _downloadBusy ? 'Exporting\u2026' : 'Export view',
+              _downloadBusy ? 'Exporting…' : 'Export view',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: _downloadBusy
-                    ? AdminReportsTheme.textMuted
-                    : AdminReportsTheme.primary,
+                    ? AdminColors.textMuted
+                    : AdminColors.primary,
               ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 16,
+              color: _downloadBusy
+                  ? AdminColors.textMuted
+                  : AdminColors.primary,
             ),
           ],
         ),
@@ -2778,11 +2804,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: AdminReportsTheme.primary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: AdminReportsTheme.primary.withValues(alpha: 0.12),
-            ),
+            color: AdminColors.surface,
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            border: Border.all(color: AdminColors.border),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -2790,7 +2814,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               const Icon(
                 Icons.filter_list_rounded,
                 size: 13,
-                color: AdminReportsTheme.primary,
+                color: AdminColors.primary,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -2801,7 +2825,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: AdminReportsTheme.primary,
+                    color: AdminColors.primary,
                   ),
                 ),
               ),
@@ -3552,12 +3576,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: AdminReportsTheme.surface.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
+            color: AdminColors.surface.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            border: Border.all(color: AdminColors.border.withValues(alpha: 0.8)),
           ),
           child: Row(
             children: [

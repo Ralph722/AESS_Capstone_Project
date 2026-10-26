@@ -5,6 +5,7 @@ import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layou
 import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 typedef ReportsPresetDownload =
     Future<void> Function(
@@ -171,11 +172,9 @@ class ReportsDownloadsPanel extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AdminReportsTheme.primary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: AdminReportsTheme.primary.withValues(alpha: 0.12),
-                  ),
+                  color: AdminColors.surface,
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                  border: Border.all(color: AdminColors.border),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -183,7 +182,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
                     const Icon(
                       Icons.filter_list_rounded,
                       size: 13,
-                      color: AdminReportsTheme.primary,
+                      color: AdminColors.primary,
                     ),
                     const SizedBox(width: 6),
                     Flexible(
@@ -194,7 +193,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
-                          color: AdminReportsTheme.primary,
+                          color: AdminColors.primary,
                         ),
                       ),
                     ),
@@ -211,7 +210,8 @@ class ReportsDownloadsPanel extends StatelessWidget {
               onPressed: clear,
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                foregroundColor: AdminReportsTheme.primary,
+                foregroundColor: AdminColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
               icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
               label: const Text(
@@ -517,19 +517,32 @@ class _Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(Icons.info_outline_rounded, size: 13, color: color),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11.5, color: color),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 13, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

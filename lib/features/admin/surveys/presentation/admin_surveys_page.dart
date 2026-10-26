@@ -15,7 +15,10 @@ import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
+import 'package:alumni_system/core/constants/ustp_colors.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
@@ -728,109 +731,6 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
     return chips;
   }
 
-  Widget _buildMetrics() {
-    return DirectoryKpiRow(
-      children: [
-        AdminKpiCard(
-          dense: true,
-          label: 'Draft',
-          value: '$_draftCount',
-          caption: 'Not yet published',
-          icon: Icons.edit_note_outlined,
-          palette: AdminAccents.orange,
-          onTap: () =>
-              setState(() => _statusFilter = _SurveyStatusFilter.draft),
-        ),
-        AdminKpiCard(
-          dense: true,
-          label: 'Published',
-          value: '$_publishedCount',
-          caption: 'Live, scheduled or window ended',
-          icon: Icons.publish_outlined,
-          palette: AdminAccents.gold,
-          onTap: () =>
-              setState(() => _statusFilter = _SurveyStatusFilter.published),
-        ),
-        AdminKpiCard(
-          dense: true,
-          label: 'Closed',
-          value: '$_closedCount',
-          caption: 'Ended waves',
-          icon: Icons.lock_outline,
-          palette: AdminAccents.midBlue,
-          onTap: () =>
-              setState(() => _statusFilter = _SurveyStatusFilter.closed),
-        ),
-        AdminKpiCard(
-          dense: true,
-          label: 'Responses',
-          value: '$_responseTotal',
-          caption: 'Submitted · all active surveys (CHED + custom)',
-          icon: Icons.insights_outlined,
-          palette: AdminAccents.blue,
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _filterControls() {
-    return [
-      DirectoryFilterField<_SurveyKindFilter>(
-        label: 'Kind',
-        value: _kindFilter,
-        width: 148,
-        items: const [
-          DropdownMenuItem(
-            value: _SurveyKindFilter.all,
-            child: Text('All kinds'),
-          ),
-          DropdownMenuItem(
-            value: _SurveyKindFilter.officialChed,
-            child: Text('Official CHED'),
-          ),
-          DropdownMenuItem(
-            value: _SurveyKindFilter.chedPreset,
-            child: Text('CHED preset'),
-          ),
-          DropdownMenuItem(
-            value: _SurveyKindFilter.custom,
-            child: Text('Custom'),
-          ),
-        ],
-        onChanged: (v) {
-          if (v != null) setState(() => _kindFilter = v);
-        },
-      ),
-      DirectoryFilterField<_SurveySort>(
-        label: 'Sort',
-        value: _sort,
-        width: 148,
-        items: const [
-          DropdownMenuItem(
-            value: _SurveySort.newest,
-            child: Text('Newest first'),
-          ),
-          DropdownMenuItem(
-            value: _SurveySort.oldest,
-            child: Text('Oldest first'),
-          ),
-          DropdownMenuItem(
-            value: _SurveySort.titleAsc,
-            child: Text('Title A–Z'),
-          ),
-          DropdownMenuItem(
-            value: _SurveySort.responsesDesc,
-            child: Text('Most responses'),
-          ),
-        ],
-        onChanged: (v) {
-          if (v != null) setState(() => _sort = v);
-        },
-      ),
-      for (final f in _SurveyStatusFilter.values) _statusChip(f),
-    ];
-  }
-
   Widget _statusChip(_SurveyStatusFilter f) {
     final chip = DirectoryToolbarFilterChip(
       label: switch (f) {
@@ -838,7 +738,8 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
         _SurveyStatusFilter.draft => 'Draft',
         _SurveyStatusFilter.published => 'Published',
         _SurveyStatusFilter.closed => 'Closed',
-        _SurveyStatusFilter.archived => 'Archived ($_archivedCount)',
+        _SurveyStatusFilter.archived =>
+          _archivedCount > 0 ? 'Archived ($_archivedCount)' : 'Archived',
       },
       selected: _statusFilter == f,
       onSelected: (_) => setState(() => _statusFilter = f),
@@ -847,44 +748,117 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
     return Tooltip(message: 'All surveys except archived', child: chip);
   }
 
+  Widget _buildMetrics() {
+    return AdminMetricRibbon(
+      items: [
+        AdminMetricRibbonItem(
+          label: 'Draft',
+          value: '$_draftCount',
+          icon: Icons.edit_note_outlined,
+          color: UstpColors.orange,
+          tooltip: 'Not yet published surveys',
+          onTap: () =>
+              setState(() => _statusFilter = _SurveyStatusFilter.draft),
+        ),
+        AdminMetricRibbonItem(
+          label: 'Published',
+          value: '$_publishedCount',
+          icon: Icons.publish_outlined,
+          color: AdminColors.primary,
+          tooltip: 'Live, scheduled or window ended waves',
+          onTap: () =>
+              setState(() => _statusFilter = _SurveyStatusFilter.published),
+        ),
+        AdminMetricRibbonItem(
+          label: 'Closed',
+          value: '$_closedCount',
+          icon: Icons.lock_outline,
+          color: AdminColors.textSecondary,
+          tooltip: 'Ended survey waves',
+          onTap: () =>
+              setState(() => _statusFilter = _SurveyStatusFilter.closed),
+        ),
+        AdminMetricRibbonItem(
+          label: 'Responses',
+          value: '$_responseTotal',
+          icon: Icons.insights_outlined,
+          color: AdminColors.secondary,
+          tooltip: 'Submitted across all active surveys (CHED + custom)',
+        ),
+      ],
+    );
+  }
+
   Widget _buildToolbar() {
-    return DirectoryToolbarCard(
+    return AdminSaaSToolbar(
       searchController: _searchController,
       onSearchChanged: (v) => setState(() => _query = v.trim()),
       onClearSearch: () {
         _searchController.clear();
         setState(() => _query = '');
       },
-      isLoading: _isLoading,
-      onRefresh: _load,
+      searchHint: 'Search title, description, kind…',
+      searchWidth: 260,
+      filters: [
+        for (final f in _SurveyStatusFilter.values) _statusChip(f),
+        DirectoryFilterField<_SurveyKindFilter>(
+          label: 'Kind',
+          value: _kindFilter,
+          dense: true,
+          width: 140,
+          items: const [
+            DropdownMenuItem(
+              value: _SurveyKindFilter.all,
+              child: Text('All kinds'),
+            ),
+            DropdownMenuItem(
+              value: _SurveyKindFilter.officialChed,
+              child: Text('Official CHED'),
+            ),
+            DropdownMenuItem(
+              value: _SurveyKindFilter.chedPreset,
+              child: Text('CHED preset'),
+            ),
+            DropdownMenuItem(
+              value: _SurveyKindFilter.custom,
+              child: Text('Custom'),
+            ),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => _kindFilter = v);
+          },
+        ),
+        DirectoryFilterField<_SurveySort>(
+          label: 'Sort',
+          value: _sort,
+          dense: true,
+          width: 140,
+          items: const [
+            DropdownMenuItem(
+              value: _SurveySort.newest,
+              child: Text('Newest first'),
+            ),
+            DropdownMenuItem(
+              value: _SurveySort.oldest,
+              child: Text('Oldest first'),
+            ),
+            DropdownMenuItem(
+              value: _SurveySort.titleAsc,
+              child: Text('Title A–Z'),
+            ),
+            DropdownMenuItem(
+              value: _SurveySort.responsesDesc,
+              child: Text('Most responses'),
+            ),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => _sort = v);
+          },
+        ),
+      ],
+      activeFilterChips: _activeFilterChips(),
       hasActiveFilters: _hasActiveFilters,
       onResetFilters: _resetFilters,
-      activeFilterChips: _activeFilterChips(),
-      searchHint: 'Search title, description, kind…',
-      singleRowMinWidth: 1000,
-      // Single-row mode gives the filters an unbounded width.
-      filters: LayoutBuilder(
-        builder: (context, constraints) {
-          final controls = _filterControls();
-          if (constraints.maxWidth.isInfinite) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < controls.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
-                  controls[i],
-                ],
-              ],
-            );
-          }
-          return Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: controls,
-          );
-        },
-      ),
     );
   }
 
@@ -950,27 +924,38 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SurveyPageHeader(
+        AdminCompactHeader(
           title: 'Surveys',
-          subtitle: 'Official CHED GTS tracer waves and custom alumni surveys.',
           actions: [
+            OutlinedButton.icon(
+              onPressed: _isLoading ? null : _load,
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 15),
+              label: Text(_isLoading ? 'Refreshing…' : 'Refresh'),
+              style: AdminButtonStyles.outlined(),
+            ),
             FilledButton.icon(
               onPressed: _isLoading ? null : _createSurvey,
-              icon: const Icon(Icons.add, size: 17),
+              icon: const Icon(Icons.add, size: 15),
               label: const Text('New survey'),
-              style: surveyFilledButtonStyle(),
+              style: AdminButtonStyles.filled(),
             ),
           ],
         ),
-        const SizedBox(height: AdminSurveyTheme.space2),
+        const SizedBox(height: 8),
         _buildMetrics(),
-        const SizedBox(height: AdminSurveyTheme.space2),
+        const SizedBox(height: 8),
         _buildToolbar(),
         if (_hasLoaded && _loadError != null) ...[
           const SizedBox(height: AdminSurveyTheme.space1),
           _buildRefreshErrorNotice(),
         ],
-        const SizedBox(height: AdminSurveyTheme.space1),
+        const SizedBox(height: 8),
         Expanded(child: _buildResults()),
       ],
     );

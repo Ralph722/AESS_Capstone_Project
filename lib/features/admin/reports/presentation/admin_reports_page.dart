@@ -53,6 +53,8 @@ import 'package:alumni_system/features/admin/reports/data/custom_report_export_s
 import 'package:alumni_system/features/admin/reports/data/gts_saved_report_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/application/survey_catalog_refresh.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
@@ -149,7 +151,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   ];
 
   // Task-based tabs: Overview · Tracer · Survey · Downloads.
-  static const double _tabBarHeight = 48;
+  static const double _tabBarHeight = 45;
   late final TabController _tabController;
 
   /// Cohort filters for Tracer / Survey tabs only.
@@ -896,17 +898,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     }
   }
 
-  static const _tabSubtitles = [
-    'System-wide pulse of alumni, tracer, and survey activity.',
-    'Employment outcomes and career paths of graduates.',
-    'Response health across alumni surveys.',
-    'Ready-made report packs for the office.',
-    'Build a CHED GTS report: pick a question, groups, filters and a chart.',
-  ];
-
   Widget _buildDashboardHeader() {
     return ReportsPageHeader(
-      subtitle: _tabSubtitles[_tabController.index],
       updatedAt: _lastLoadedAt,
       refreshing: _manualRefreshing,
       onRefresh: _refreshFromHeader,
@@ -1004,84 +997,37 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     }
   }
 
-  /// Floating rounded tab card (pins cleanly when scrolled).
+  /// Underline section navigation tabs (pins cleanly when scrolled).
   Widget _buildTabBar({required bool pinned}) {
-    final pillRadius = BorderRadius.circular(AdminReportsTheme.radiusMd);
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-      alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
-        color: AdminReportsTheme.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AdminReportsTheme.border),
+        color: AdminColors.card,
+        border: Border(
+          bottom: BorderSide(
+            color: AdminColors.border.withValues(alpha: pinned ? 0.9 : 0.6),
+          ),
+        ),
         boxShadow: pinned
-            ? AdminReportsTheme.cardShadow
-            : [
+            ? [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  spreadRadius: -4,
-                  offset: const Offset(0, 6),
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
-              ],
+              ]
+            : null,
       ),
-      child: TabBar(
+      child: AdminTabBar(
         controller: _tabController,
-        tabAlignment: TabAlignment.fill,
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicatorPadding: const EdgeInsets.symmetric(vertical: 2),
-        indicator: BoxDecoration(
-          borderRadius: pillRadius,
-          color: AdminReportsTheme.primary,
-          boxShadow: [
-            BoxShadow(
-              color: AdminReportsTheme.primary.withValues(alpha: 0.22),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        splashBorderRadius: pillRadius,
-        overlayColor: WidgetStatePropertyAll(
-          AdminReportsTheme.primary.withValues(alpha: 0.05),
-        ),
-        labelColor: Colors.white,
-        unselectedLabelColor: AdminReportsTheme.textSecondary,
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
         tabs: [
           for (var i = 0; i < _tabLabels.length; i++)
-            Tab(
-              height: 40,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _tabIcons[i],
-                      size: 17,
-                      color: _tabController.index == i
-                          ? AdminReportsTheme.gold
-                          : null,
-                    ),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        _tabLabels[i],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            AdminTabSpec(
+              label: _tabLabels[i],
+              icon: _tabIcons[i],
             ),
         ],
+        isScrollable: true,
+        background: AdminColors.card,
       ),
     );
   }

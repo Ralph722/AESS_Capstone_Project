@@ -6,6 +6,7 @@ import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layou
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Cohort filter bar for Tracer / Survey tabs (wave · batch · course).
 ///
@@ -56,49 +57,70 @@ class ReportsCohortFilterBar extends StatelessWidget {
           tooltip: 'Audience details',
         ),
       if (active)
-        TextButton.icon(
+        OutlinedButton.icon(
           onPressed: () => onChanged(ReportsDashboardFilters.empty),
-          style: TextButton.styleFrom(
-            foregroundColor: AdminReportsTheme.primary,
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+          icon: const Icon(Icons.filter_alt_off_outlined, size: 13),
+          label: const Text('Reset'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AdminColors.textSecondary,
+            side: BorderSide(color: AdminColors.border),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             minimumSize: const Size(0, 32),
-          ),
-          icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
-          label: const Text(
-            'Clear all',
-            style: TextStyle(fontWeight: FontWeight.w700),
+            visualDensity: VisualDensity.compact,
+            textStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            ),
           ),
         ),
     ];
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AdminReportsTheme.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AdminReportsTheme.border),
-        boxShadow: AdminReportsTheme.cardShadow,
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxWidth >= 900) {
-            return Row(
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 170),
-                  child: _leading(activeCount),
+                Row(
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 130),
+                      child: _leading(activeCount),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 3, child: fields[0]),
+                    const SizedBox(width: 10),
+                    Expanded(flex: 2, child: fields[1]),
+                    const SizedBox(width: 10),
+                    Expanded(flex: 3, child: fields[2]),
+                    if (actions.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      ...actions,
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 14),
-                Expanded(flex: 3, child: fields[0]),
-                const SizedBox(width: 10),
-                Expanded(flex: 2, child: fields[1]),
-                const SizedBox(width: 10),
-                Expanded(flex: 3, child: fields[2]),
-                if (actions.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  ...actions,
+                if (active) ...[
+                  const SizedBox(height: 8),
+                  _buildActiveChips(),
                 ],
               ],
             );
@@ -127,36 +149,8 @@ class ReportsCohortFilterBar extends StatelessWidget {
                 ],
               ),
               if (active) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (filters.surveyId != null)
-                      DirectoryActiveFilterChip(
-                        icon: Icons.waves_outlined,
-                        label: _selectedSurvey != null
-                            ? reportsSurveyFilterLabel(_selectedSurvey!)
-                            : 'Wave',
-                        onRemoved: () =>
-                            onChanged(ReportsDashboardFilters.empty),
-                      ),
-                    if (filters.batchYear != null)
-                      DirectoryActiveFilterChip(
-                        icon: Icons.calendar_today_outlined,
-                        label: 'Batch ${filters.batchYear}',
-                        onRemoved: () =>
-                            onChanged(filters.copyWith(clearBatch: true)),
-                      ),
-                    if (filters.course != null)
-                      DirectoryActiveFilterChip(
-                        icon: Icons.school_outlined,
-                        label: filters.course!,
-                        onRemoved: () =>
-                            onChanged(filters.copyWith(clearCourse: true)),
-                      ),
-                  ],
-                ),
+                const SizedBox(height: 8),
+                _buildActiveChips(),
               ],
             ],
           );
@@ -165,60 +159,81 @@ class ReportsCohortFilterBar extends StatelessWidget {
     );
   }
 
+  Widget _buildActiveChips() {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          'Active:',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AdminColors.textMuted,
+          ),
+        ),
+        if (filters.surveyId != null)
+          DirectoryActiveFilterChip(
+            icon: Icons.waves_outlined,
+            label: _selectedSurvey != null
+                ? reportsSurveyFilterLabel(_selectedSurvey!)
+                : 'Wave',
+            onRemoved: () => onChanged(ReportsDashboardFilters.empty),
+          ),
+        if (filters.batchYear != null)
+          DirectoryActiveFilterChip(
+            icon: Icons.calendar_today_outlined,
+            label: 'Batch ${filters.batchYear}',
+            onRemoved: () => onChanged(filters.copyWith(clearBatch: true)),
+          ),
+        if (filters.course != null)
+          DirectoryActiveFilterChip(
+            icon: Icons.school_outlined,
+            label: filters.course!,
+            onRemoved: () => onChanged(filters.copyWith(clearCourse: true)),
+          ),
+      ],
+    );
+  }
+
   Widget _leading(int activeCount) {
     final active = activeCount > 0;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: active
-                ? AdminReportsTheme.primary
-                : AdminReportsTheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.tune_rounded,
-            size: 17,
-            color: active ? AdminReportsTheme.gold : AdminReportsTheme.primary,
+        Icon(
+          Icons.tune_rounded,
+          size: 16,
+          color: active ? AdminColors.primary : AdminColors.textSecondary,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Filters',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AdminColors.textPrimary,
           ),
         ),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Cohort filters',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: AdminReportsTheme.textPrimary,
-                ),
+        if (active) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: AdminColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$activeCount',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AdminColors.primary,
               ),
-              const SizedBox(height: 1),
-              Text(
-                active ? '$activeCount active' : 'Showing all data',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  height: 1.3,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                  color: active
-                      ? AdminReportsTheme.primary
-                      : AdminReportsTheme.textMuted,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

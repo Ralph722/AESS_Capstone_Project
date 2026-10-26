@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// The two kinds of custom report in the Builder tab.
 enum GtsBuilderMode {
-  list('Alumni list', 'Who answered and what they said', Icons.list_alt),
+  list('Alumni list', 'Who answered and what they said', Icons.list_alt_rounded),
   summary(
     'Summary & charts',
     'How many and what share',
-    Icons.insert_chart_outlined,
+    Icons.insert_chart_outlined_rounded,
   );
 
   const GtsBuilderMode(this.label, this.purpose, this.icon);
@@ -17,6 +17,7 @@ enum GtsBuilderMode {
   final IconData icon;
 }
 
+/// SaaS segmented mode switch for Report Builder (Alumni List vs. Summary & Charts).
 class GtsBuilderModeSwitch extends StatelessWidget {
   const GtsBuilderModeSwitch({
     super.key,
@@ -31,10 +32,16 @@ class GtsBuilderModeSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AdminReportsTheme.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AdminReportsTheme.border),
-        boxShadow: AdminReportsTheme.cardShadow,
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
@@ -52,22 +59,24 @@ class GtsBuilderModeSwitch extends StatelessWidget {
     required GtsBuilderMode mode,
     required bool isSelected,
   }) {
+    final borderRadius = BorderRadius.circular(AdminSurfaces.radiusSm - 2);
     return Material(
-      color: isSelected ? AdminReportsTheme.primary : Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
+      color: isSelected ? AdminColors.primary : Colors.transparent,
+      borderRadius: borderRadius,
       child: InkWell(
         onTap: () => onChanged(mode),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        borderRadius: borderRadius,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: borderRadius,
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AdminReportsTheme.primary.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                      color: AdminColors.primary.withValues(alpha: 0.22),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
                   ]
                 : null,
@@ -75,24 +84,12 @@ class GtsBuilderModeSwitch extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : AdminReportsTheme.surface,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  mode.icon,
-                  size: 18,
-                  color: isSelected
-                      ? AdminReportsTheme.gold
-                      : AdminReportsTheme.textSecondary,
-                ),
+              Icon(
+                mode.icon,
+                size: 17,
+                color: isSelected ? Colors.white : AdminColors.textSecondary,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -100,22 +97,21 @@ class GtsBuilderModeSwitch extends StatelessWidget {
                   Text(
                     mode.label,
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                       color: isSelected
                           ? Colors.white
-                          : AdminReportsTheme.textPrimary,
+                          : AdminColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 1),
                   Text(
                     mode.purpose,
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w400,
                       color: isSelected
-                          ? Colors.white.withValues(alpha: 0.8)
-                          : AdminReportsTheme.textMuted,
+                          ? Colors.white.withValues(alpha: 0.85)
+                          : AdminColors.textMuted,
                     ),
                   ),
                 ],

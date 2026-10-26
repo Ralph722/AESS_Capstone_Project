@@ -273,58 +273,94 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     unawaited(_refresh());
   }
 
-  // ---- Settings -----------------------------------------------------------
-
-  static const _heading = TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w700,
-    color: AdminReportsTheme.primary,
-    letterSpacing: 0.3,
-  );
-
   static const _muted = TextStyle(
     fontSize: 12,
-    color: AdminReportsTheme.textMuted,
+    color: AdminColors.textMuted,
   );
 
-  InputDecoration _input(String label) => InputDecoration(
-    labelText: label,
-    labelStyle: const TextStyle(fontSize: 13, color: AdminReportsTheme.textSecondary),
-    isDense: true,
-    filled: true,
-    fillColor: Colors.white,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AdminReportsTheme.border),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AdminReportsTheme.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AdminReportsTheme.primary, width: 1.5),
-    ),
-  );
-
-  Widget _section(String title, List<Widget> children) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _stepHeader(String stepNumber, String title, {String? subtitle}) => Padding(
+    padding: const EdgeInsets.only(top: 4, bottom: 8),
+    child: Row(
       children: [
-        Text(title.toUpperCase(), style: _heading),
-        const SizedBox(height: 8),
-        ...children,
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: AdminColors.primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            stepNumber,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AdminColors.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: AdminColors.primary,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AdminColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     ),
   );
 
+  InputDecoration _input(String label) => InputDecoration(
+    labelText: label,
+    labelStyle: const TextStyle(fontSize: 12.5, color: AdminColors.textSecondary),
+    isDense: true,
+    filled: true,
+    fillColor: AdminColors.surface,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      borderSide: const BorderSide(color: AdminColors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      borderSide: const BorderSide(color: AdminColors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
+    ),
+  );
+
   Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(top: 4, bottom: 4),
+    padding: const EdgeInsets.only(top: 8, bottom: 4),
     child: Text(
       text,
-      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AdminColors.textPrimary,
+      ),
     ),
   );
 
@@ -381,16 +417,26 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
       children: [
         Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AdminColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.format_list_bulleted_rounded, size: 18, color: AdminColors.primary),
+            ),
+            const SizedBox(width: 10),
             const Expanded(
               child: Text(
-                'List settings',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                'List Builder',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
               ),
             ),
             IconButton(
               tooltip: 'Reload responses',
               onPressed: _loading ? null : _reloadData,
-              icon: const Icon(Icons.refresh, size: 20),
+              icon: const Icon(Icons.refresh_rounded, size: 18, color: AdminColors.textSecondary),
+              visualDensity: VisualDensity.compact,
             ),
           ],
         ),
@@ -415,13 +461,47 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
             },
             onDeleted: () => _setOpen(null),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
         ],
+        _stepHeader('1', 'Scope & Template', subtitle: 'Choose tracer wave and baseline list'),
+        DropdownButtonFormField<String?>(
+          key: ValueKey('wave-${_config.surveyId}'),
+          initialValue: _config.surveyId,
+          isExpanded: true,
+          dropdownColor: AdminColors.card,
+          decoration: _input('Answers from'),
+          items: [
+            for (final w in widget.waves)
+              DropdownMenuItem(
+                value: w.id,
+                child: Text(w.title, overflow: TextOverflow.ellipsis),
+              ),
+            const DropdownMenuItem(
+              value: null,
+              child: Text(GtsListTables.latestWave),
+            ),
+          ],
+          onChanged: (id) => _update(
+            id == null
+                ? _config.copyWith(latestFromAnyWave: true)
+                : _config.copyWith(surveyId: id),
+          ),
+        ),
+        if (_config.latestFromAnyWave)
+          const Padding(
+            padding: EdgeInsets.only(top: 4, bottom: 6),
+            child: Text(
+              'Each graduate\'s newest answer from any tracer wave. The '
+              '"Wave answered" column shows which one.',
+              style: _muted,
+            ),
+          ),
+        const SizedBox(height: 10),
         DropdownButtonFormField<String>(
           key: ValueKey('list-template-${_config.templateKey}'),
           initialValue: GtsListTemplates.byKey(_config.templateKey)?.key,
           isExpanded: true,
-          dropdownColor: Colors.white,
+          dropdownColor: AdminColors.card,
           hint: const Text('Custom list'),
           decoration: _input('Start from a ready-made list'),
           items: [
@@ -443,152 +523,118 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
               style: _muted,
             ),
           ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         TextField(
           controller: _title,
           decoration: _input('Report name (optional)'),
           onChanged: (v) => _update(_config.copyWith(title: v)),
         ),
         const SizedBox(height: 16),
-        _section('Tracer wave', [
-          DropdownButtonFormField<String?>(
-            key: ValueKey('wave-${_config.surveyId}'),
-            initialValue: _config.surveyId,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            decoration: _input('Answers from'),
-            items: [
-              for (final w in widget.waves)
-                DropdownMenuItem(
-                  value: w.id,
-                  child: Text(w.title, overflow: TextOverflow.ellipsis),
-                ),
-              const DropdownMenuItem(
-                value: null,
-                child: Text(GtsListTables.latestWave),
-              ),
-            ],
-            onChanged: (id) => _update(
-              id == null
-                  ? _config.copyWith(latestFromAnyWave: true)
-                  : _config.copyWith(surveyId: id),
-            ),
+        _stepHeader('2', 'Columns', subtitle: 'Select and reorder columns for alumni data'),
+        _columnList(columns),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => unawaited(_pickColumns(columns)),
+            icon: const Icon(Icons.view_column_outlined, size: 18),
+            label: const Text('Add or remove columns'),
           ),
-          if (_config.latestFromAnyWave)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'Each graduate\'s newest answer from any tracer wave. The '
-                '"Wave answered" column shows which one.',
-                style: _muted,
-              ),
-            ),
-        ]),
-        _section('Columns', [
-          _columnList(columns),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => unawaited(_pickColumns(columns)),
-              icon: const Icon(Icons.view_column_outlined, size: 18),
-              label: const Text('Add or remove columns'),
-            ),
-          ),
-        ]),
-        _section('Only include', [
-          _label('Tracer status'),
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [
-              for (final s in GtsTracerStatus.values)
-                FilterChip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(s.label, style: const TextStyle(fontSize: 12)),
-                  selected: _config.statuses.contains(s),
-                  onSelected: (on) => _update(
-                    _config.copyWith(
-                      statuses: [
-                        for (final x in GtsTracerStatus.values)
-                          if (x == s ? on : _config.statuses.contains(x)) x,
-                      ],
-                    ),
+        ),
+        const SizedBox(height: 16),
+        _stepHeader('3', 'Filters (Only include)', subtitle: 'Filter by tracer status, course, batch, or answers'),
+        _label('Tracer status'),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            for (final s in GtsTracerStatus.values)
+              FilterChip(
+                visualDensity: VisualDensity.compact,
+                label: Text(s.label, style: const TextStyle(fontSize: 12)),
+                selected: _config.statuses.contains(s),
+                onSelected: (on) => _update(
+                  _config.copyWith(
+                    statuses: [
+                      for (final x in GtsTracerStatus.values)
+                        if (x == s ? on : _config.statuses.contains(x)) x,
+                    ],
                   ),
                 ),
-            ],
+              ),
+          ],
+        ),
+        _label('Course'),
+        _chips(
+          _courseChoices,
+          _config.courses,
+          (v, on) => _update(
+            _config.copyWith(courses: _toggled(_config.courses, v, on)),
           ),
-          _label('Course'),
-          _chips(
-            _courseChoices,
-            _config.courses,
-            (v, on) => _update(
-              _config.copyWith(courses: _toggled(_config.courses, v, on)),
-            ),
+        ),
+        _label('Batch'),
+        _chips(
+          _batchChoices,
+          _config.batches,
+          (v, on) => _update(
+            _config.copyWith(batches: _toggled(_config.batches, v, on)),
           ),
-          _label('Batch'),
-          _chips(
-            _batchChoices,
-            _config.batches,
-            (v, on) => _update(
-              _config.copyWith(batches: _toggled(_config.batches, v, on)),
-            ),
+        ),
+        const SizedBox(height: 6),
+        for (var i = 0; i < _config.answerFilters.length; i++)
+          _answerFilterRow(i),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _addAnswerFilter,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Only graduates who answered…'),
           ),
-          const SizedBox(height: 4),
-          for (var i = 0; i < _config.answerFilters.length; i++)
-            _answerFilterRow(i),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _addAnswerFilter,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Only graduates who answered…'),
-            ),
-          ),
-          const Text(
-            'Answer filters leave out untracked alumni, who have no answers.',
-            style: _muted,
-          ),
-        ]),
-        _section('Order', [_sortControls(columns)]),
-        _section('Subtotals', [
-          Wrap(
-            spacing: 6,
-            children: [
-              for (final s in GtsListSubtotal.values)
-                ChoiceChip(
-                  label: Text(switch (s) {
-                    GtsListSubtotal.none => 'Overall only',
-                    GtsListSubtotal.batch => 'By batch',
-                    GtsListSubtotal.course => 'By course',
-                  }),
-                  selected: _config.subtotalBy == s,
-                  onSelected: (_) => _update(_config.copyWith(subtotalBy: s)),
-                ),
-            ],
-          ),
-        ]),
-        _section('Chart', [
-          Wrap(
-            spacing: 6,
-            children: [
-              for (final c in GtsListChart.values)
-                ChoiceChip(
-                  label: Text(switch (c) {
-                    GtsListChart.none => 'No chart',
-                    GtsListChart.bars => 'Bars',
-                    GtsListChart.donut => 'Donut',
-                  }),
-                  selected: _config.chart == c,
-                  onSelected: (_) => _update(_config.copyWith(chart: c)),
-                ),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Text('Tracer status of the alumni listed.', style: _muted),
-          ),
-        ]),
+        ),
+        const Text(
+          'Answer filters leave out untracked alumni, who have no answers.',
+          style: _muted,
+        ),
+        const SizedBox(height: 16),
+        _stepHeader('4', 'Grouping & Sorting', subtitle: 'Order rows, add subtotals, and configure status charts'),
+        _label('Order'),
+        _sortControls(columns),
+        _label('Subtotals'),
+        Wrap(
+          spacing: 6,
+          children: [
+            for (final s in GtsListSubtotal.values)
+              ChoiceChip(
+                label: Text(switch (s) {
+                  GtsListSubtotal.none => 'Overall only',
+                  GtsListSubtotal.batch => 'By batch',
+                  GtsListSubtotal.course => 'By course',
+                }),
+                selected: _config.subtotalBy == s,
+                onSelected: (_) => _update(_config.copyWith(subtotalBy: s)),
+              ),
+          ],
+        ),
+        _label('Chart'),
+        Wrap(
+          spacing: 6,
+          children: [
+            for (final c in GtsListChart.values)
+              ChoiceChip(
+                label: Text(switch (c) {
+                  GtsListChart.none => 'No chart',
+                  GtsListChart.bars => 'Bars',
+                  GtsListChart.donut => 'Donut',
+                }),
+                selected: _config.chart == c,
+                onSelected: (_) => _update(_config.copyWith(chart: c)),
+              ),
+          ],
+        ),
+        const Padding(
+          padding: EdgeInsets.only(top: 4),
+          child: Text('Tracer status of the alumni listed.', style: _muted),
+        ),
       ],
     );
   }
@@ -825,10 +871,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AdminReportsTheme.surface,
-        borderRadius: BorderRadius.circular(8),
+        color: AdminColors.surface,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -906,12 +953,18 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   // ---- Layout -------------------------------------------------------------
 
   Widget _card(Widget child) => Container(
-    padding: const EdgeInsets.all(18),
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: AdminReportsTheme.card,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AdminReportsTheme.border),
-      boxShadow: AdminReportsTheme.cardShadow,
+      color: AdminColors.card,
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      border: Border.all(color: AdminColors.border),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.02),
+          blurRadius: 4,
+          offset: const Offset(0, 1),
+        ),
+      ],
     ),
     child: child,
   );
@@ -991,10 +1044,19 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
       children: [
         Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AdminColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.visibility_outlined, size: 18, color: AdminColors.primary),
+            ),
+            const SizedBox(width: 10),
             const Expanded(
               child: Text(
                 'Preview',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
               ),
             ),
             for (final f in _downloadOrder)
@@ -1011,7 +1073,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.download_outlined, size: 16),
+                      : const Icon(Icons.download_outlined, size: 15),
                   label: Text(f.label),
                 ),
               ),
@@ -1077,7 +1139,7 @@ class GtsAlumniListPreview extends StatelessWidget {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AdminReportsTheme.primary,
+            color: AdminColors.primary,
           ),
         ),
         const SizedBox(height: 2),
@@ -1086,7 +1148,7 @@ class GtsAlumniListPreview extends StatelessWidget {
           'active roster${filtered ? ' (filtered)' : ''}',
           style: const TextStyle(
             fontSize: 12,
-            color: AdminReportsTheme.textMuted,
+            color: AdminColors.textMuted,
           ),
         ),
         if (result.config.description.trim().isNotEmpty)
@@ -1094,7 +1156,7 @@ class GtsAlumniListPreview extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               result.config.description,
-              style: const TextStyle(fontSize: 13),
+              style: const TextStyle(fontSize: 13, color: AdminColors.textPrimary),
             ),
           ),
         const SizedBox(height: 16),
@@ -1124,7 +1186,7 @@ class GtsAlumniListPreview extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: AdminReportsTheme.primary,
+            color: AdminColors.primary,
             letterSpacing: 0.3,
           ),
         ),
@@ -1137,7 +1199,7 @@ class GtsAlumniListPreview extends StatelessWidget {
               GtsListTables.offRosterNote,
               style: TextStyle(
                 fontSize: 11,
-                color: AdminReportsTheme.textMuted,
+                color: AdminColors.textMuted,
               ),
             ),
           ),
@@ -1149,10 +1211,10 @@ class GtsAlumniListPreview extends StatelessWidget {
 const _headingStyle = TextStyle(
   fontSize: 12,
   fontWeight: FontWeight.w700,
-  color: AdminReportsTheme.primary,
+  color: AdminColors.primary,
 );
 
-const _cellStyle = TextStyle(fontSize: 12, color: Colors.black87);
+const _cellStyle = TextStyle(fontSize: 12, color: AdminColors.textPrimary);
 
 class _ListTable extends StatefulWidget {
   const _ListTable({super.key, required this.result, required this.columns});
@@ -1176,7 +1238,7 @@ class _ListTableState extends State<_ListTable> {
         style: TextStyle(
           fontSize: 12,
           fontStyle: FontStyle.italic,
-          color: AdminReportsTheme.textMuted,
+          color: AdminColors.textMuted,
         ),
       );
     }
@@ -1197,15 +1259,15 @@ class _ListTableState extends State<_ListTable> {
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AdminReportsTheme.border),
+            color: AdminColors.card,
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            border: Border.all(color: AdminColors.border),
           ),
           clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              headingRowColor: const WidgetStatePropertyAll(AdminReportsTheme.surface),
+              headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
               headingRowHeight: 38,
               dataRowMinHeight: 32,
               dataRowMaxHeight: 48,
@@ -1224,7 +1286,7 @@ class _ListTableState extends State<_ListTable> {
                     color: r.status.untracked
                         ? const WidgetStatePropertyAll(_untrackedTint)
                         : r.member == null
-                        ? const WidgetStatePropertyAll(AdminReportsTheme.surface)
+                        ? const WidgetStatePropertyAll(AdminColors.surface)
                         : null,
                     cells: [
                       for (final c in widget.columns)
@@ -1247,7 +1309,7 @@ class _ListTableState extends State<_ListTable> {
                 'Showing the first $_limit of ${rows.length} alumni.',
                 style: const TextStyle(
                   fontSize: 12,
-                  color: AdminReportsTheme.textMuted,
+                  color: AdminColors.textMuted,
                 ),
               ),
               TextButton(
@@ -1279,7 +1341,7 @@ class _TallyTable extends StatelessWidget {
       final line = overall[i];
       return DataRow(
         color: line.isTotal
-            ? const WidgetStatePropertyAll(AdminReportsTheme.surface)
+            ? const WidgetStatePropertyAll(AdminColors.surface)
             : null,
         cells: [
           for (final c in cells)
@@ -1301,6 +1363,7 @@ class _TallyTable extends StatelessWidget {
     final DataTable table;
     if (groups.isEmpty) {
       table = DataTable(
+        headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
         headingRowHeight: 34,
         dataRowMinHeight: 28,
         dataRowMaxHeight: 36,
@@ -1322,6 +1385,7 @@ class _TallyTable extends StatelessWidget {
         for (final g in groups) _byLabel(GtsListTables.tally(g.tally)),
       ];
       table = DataTable(
+        headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
         headingRowHeight: 34,
         dataRowMinHeight: 28,
         dataRowMaxHeight: 36,
@@ -1354,9 +1418,9 @@ class _TallyTable extends StatelessWidget {
     }
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AdminReportsTheme.border),
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(

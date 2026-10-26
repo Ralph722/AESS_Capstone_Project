@@ -8,6 +8,7 @@ import 'package:alumni_system/features/admin/reports/application/gts_report_tabl
 import 'package:alumni_system/features/admin/reports/application/gts_report_validator.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// On-screen report: warnings, chart, table and notes from one result, the
 /// same layout the PDF, Excel and CSV exports print.
@@ -35,7 +36,7 @@ class GtsReportPreview extends StatelessWidget {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AdminReportsTheme.primary,
+            color: AdminColors.primary,
           ),
         ),
         const SizedBox(height: 2),
@@ -44,14 +45,14 @@ class GtsReportPreview extends StatelessWidget {
           '${result.total.respondents} graduates',
           style: const TextStyle(
             fontSize: 12,
-            color: AdminReportsTheme.textMuted,
+            color: AdminColors.textMuted,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           GtsReportTables.sentence(result),
           key: const ValueKey('gts-report-sentence'),
-          style: const TextStyle(fontSize: 13),
+          style: const TextStyle(fontSize: 13, color: AdminColors.textPrimary),
         ),
         if (warnings.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -85,9 +86,9 @@ class _WarningBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AdminReportsTheme.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AdminReportsTheme.border),
+        color: AdminColors.surface,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.warning.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,7 +102,7 @@ class _WarningBox extends StatelessWidget {
                   const Icon(
                     Icons.warning_amber_rounded,
                     size: 16,
-                    color: AdminReportsTheme.gold,
+                    color: AdminColors.warning,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -109,7 +110,7 @@ class _WarningBox extends StatelessWidget {
                       m,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: AdminReportsTheme.textPrimary,
+                        color: AdminColors.textPrimary,
                         height: 1.35,
                       ),
                     ),
@@ -189,15 +190,15 @@ class _ResultTableState extends State<_ResultTable> {
   ) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AdminReportsTheme.border),
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: const WidgetStatePropertyAll(AdminReportsTheme.surface),
+          headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
           headingRowHeight: 38,
           dataRowMinHeight: 32,
           dataRowMaxHeight: 44,
@@ -205,9 +206,9 @@ class _ResultTableState extends State<_ResultTable> {
           headingTextStyle: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: AdminReportsTheme.primary,
+            color: AdminColors.primary,
           ),
-          dataTextStyle: const TextStyle(fontSize: 12, color: Colors.black87),
+          dataTextStyle: const TextStyle(fontSize: 12, color: AdminColors.textPrimary),
           columns: [
             for (var i = 0; i < table.headers.length; i++)
               DataColumn(label: Text(table.headers[i]), numeric: numeric[i]),
@@ -216,7 +217,7 @@ class _ResultTableState extends State<_ResultTable> {
             for (final row in rows)
               DataRow(
                 color: row.first == GtsReportTables.allGraduates
-                    ? const WidgetStatePropertyAll(AdminReportsTheme.surface)
+                    ? const WidgetStatePropertyAll(AdminColors.surface)
                     : null,
                 cells: [
                   for (final c in row) DataCell(Text(GtsReportTables.display(c))),

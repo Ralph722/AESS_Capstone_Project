@@ -491,58 +491,105 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
   }
 
   Widget _card(Widget child) => Container(
-    padding: const EdgeInsets.all(18),
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: AdminReportsTheme.card,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AdminReportsTheme.border),
-      boxShadow: AdminReportsTheme.cardShadow,
+      color: AdminColors.card,
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      border: Border.all(color: AdminColors.border),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.02),
+          blurRadius: 4,
+          offset: const Offset(0, 1),
+        ),
+      ],
     ),
     child: child,
   );
 
   static const _heading = TextStyle(
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: FontWeight.w700,
-    color: AdminReportsTheme.primary,
+    color: AdminColors.primary,
     letterSpacing: 0.3,
   );
 
   static const _muted = TextStyle(
     fontSize: 12,
-    color: AdminReportsTheme.textMuted,
+    color: AdminColors.textMuted,
   );
 
-  Widget _section(String title, List<Widget> children) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _stepHeader(String stepNumber, String title, {String? subtitle}) => Padding(
+    padding: const EdgeInsets.only(top: 4, bottom: 8),
+    child: Row(
       children: [
-        Text(title.toUpperCase(), style: _heading),
-        const SizedBox(height: 8),
-        ...children,
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: AdminColors.primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            stepNumber,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AdminColors.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: AdminColors.primary,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AdminColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     ),
   );
 
   InputDecoration _input(String label) => InputDecoration(
     labelText: label,
-    labelStyle: const TextStyle(fontSize: 13, color: AdminReportsTheme.textSecondary),
+    labelStyle: const TextStyle(fontSize: 12.5, color: AdminColors.textSecondary),
     isDense: true,
     filled: true,
-    fillColor: Colors.white,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+    fillColor: AdminColors.surface,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AdminReportsTheme.border),
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      borderSide: const BorderSide(color: AdminColors.border),
     ),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AdminReportsTheme.border),
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      borderSide: const BorderSide(color: AdminColors.border),
     ),
     focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AdminReportsTheme.primary, width: 1.5),
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
     ),
   );
 
@@ -553,7 +600,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
         padding: const EdgeInsets.fromLTRB(10, 8, 6, 4),
         decoration: BoxDecoration(
           color: const Color(0xFFFEF3C7),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,16 +624,26 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
       children: [
         Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AdminColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.tune_rounded, size: 18, color: AdminColors.primary),
+            ),
+            const SizedBox(width: 10),
             const Expanded(
               child: Text(
-                'Report settings',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                'Report Builder',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
               ),
             ),
             IconButton(
               tooltip: 'Reload responses',
               onPressed: _loading ? null : _reloadData,
-              icon: const Icon(Icons.refresh, size: 20),
+              icon: const Icon(Icons.refresh_rounded, size: 18, color: AdminColors.textSecondary),
+              visualDensity: VisualDensity.compact,
             ),
           ],
         ),
@@ -611,30 +668,31 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
             },
             onDeleted: () => _setOpen(null),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
         ],
-        _section('Start from a ready-made report', [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final t in GtsReportTemplates.all) _templateCard(t),
-            ],
+        _stepHeader('1', 'Scope & Template', subtitle: 'Choose tracer wave and baseline template'),
+        ..._waveSettings(),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in GtsReportTemplates.all) _templateCard(t),
+          ],
+        ),
+        if (GtsReportTemplates.byKey(_config.templateKey) != null)
+          const Padding(
+            padding: EdgeInsets.only(top: 6, bottom: 4),
+            child: Text('You can change any setting below.', style: _muted),
           ),
-          if (GtsReportTemplates.byKey(_config.templateKey) != null)
-            const Padding(
-              padding: EdgeInsets.only(top: 6),
-              child: Text('You can change any setting below.', style: _muted),
-            ),
-        ]),
+        const SizedBox(height: 10),
         TextField(
           controller: _title,
           decoration: _input('Report name (optional)'),
           onChanged: (v) => _update(_config.copyWith(title: v)),
         ),
-        const SizedBox(height: 16),
-        _section('Tracer wave', _waveSettings()),
-        if (_config.population == GtsPopulation.allRespondents)
+        if (_config.population == GtsPopulation.allRespondents) ...[
+          const SizedBox(height: 10),
           _olderSetting(
             'This saved report counts every response, including people who '
                 'are not on the active roster. This older setting is kept so '
@@ -644,25 +702,34 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
               _config.copyWith(population: GtsPopulation.rosterLinked),
             ),
           ),
-        _section('1. What do you want to know?', [_questionTile(measure)]),
-        _section('2. Compare by', _compareSettings()),
-        _section('3. Only include', [
-          if (_config.filters.isEmpty)
-            const Text(
+        ],
+        const SizedBox(height: 16),
+        _stepHeader('2', 'Measure', subtitle: 'What do you want to report on?'),
+        _questionTile(measure),
+        const SizedBox(height: 16),
+        _stepHeader('3', 'Grouping & Filters', subtitle: 'Compare by cohorts and specify conditions'),
+        ..._compareSettings(),
+        const SizedBox(height: 10),
+        if (_config.filters.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 6),
+            child: Text(
               'Every graduate in the tracer wave is included.',
               style: _muted,
             ),
-          for (var i = 0; i < _config.filters.length; i++) _filterRow(i),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _addFilter,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add a condition'),
-            ),
           ),
-        ]),
-        _section('4. Show as', _displaySettings(measure)),
+        for (var i = 0; i < _config.filters.length; i++) _filterRow(i),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _addFilter,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add a condition'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _stepHeader('4', 'Visualization & Output', subtitle: 'Choose charts, calculations, and table layout'),
+        ..._displaySettings(measure),
         _moreOptions(measure),
         if (errors.isNotEmpty)
           Container(
@@ -670,7 +737,8 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(color: AdminColors.danger.withValues(alpha: 0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,7 +748,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
                     e.message,
                     style: const TextStyle(
                       fontSize: 12,
-                      color: AdminReportsTheme.danger,
+                      color: AdminColors.danger,
                     ),
                   ),
               ],
@@ -697,28 +765,28 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
       selected: selected,
       child: InkWell(
         key: ValueKey('template-card-${t.key}'),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
         onTap: () => _applyTemplate(t),
         child: Container(
           width: 176,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: selected
-                ? AdminReportsTheme.primary.withValues(alpha: 0.05)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(10),
+                ? AdminColors.primary.withValues(alpha: 0.05)
+                : AdminColors.card,
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
             border: Border.all(
               color: selected
-                  ? AdminReportsTheme.primary
-                  : AdminReportsTheme.border,
+                  ? AdminColors.primary
+                  : AdminColors.border,
               width: selected ? 1.5 : 1,
             ),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: AdminReportsTheme.primary.withValues(alpha: 0.08),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      color: AdminColors.primary.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
                   ]
                 : null,
@@ -732,31 +800,31 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
                     child: Text(
                       t.name,
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
                         color: selected
-                            ? AdminReportsTheme.primary
-                            : AdminReportsTheme.textPrimary,
+                            ? AdminColors.primary
+                            : AdminColors.textPrimary,
                       ),
                     ),
                   ),
                   if (selected)
                     const Icon(
                       Icons.check_circle_rounded,
-                      size: 16,
-                      color: AdminReportsTheme.primary,
+                      size: 15,
+                      color: AdminColors.primary,
                     ),
                 ],
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 4),
               Text(
                 t.summary,
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 11,
-                  color: AdminReportsTheme.textMuted,
-                  height: 1.3,
+                  color: AdminColors.textMuted,
+                  height: 1.25,
                 ),
               ),
             ],
@@ -824,17 +892,30 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
     final prompt = measure?.prompt?.trim();
     return InkWell(
       key: const ValueKey('question-picker'),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
       onTap: () => unawaited(_pickQuestion()),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AdminReportsTheme.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AdminReportsTheme.border),
+          color: AdminColors.surface,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          border: Border.all(color: AdminColors.border),
         ),
         child: Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AdminColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(
+                Icons.help_outline_rounded,
+                size: 18,
+                color: AdminColors.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -842,8 +923,9 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
                   Text(
                     measure?.numberedLabel ?? 'Choose a question',
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w600,
+                      color: AdminColors.textPrimary,
                     ),
                   ),
                   if (prompt != null && prompt.isNotEmpty) ...[
@@ -858,12 +940,20 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
               ),
             ),
             const SizedBox(width: 8),
-            const Text(
-              'Change',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AdminReportsTheme.primary,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AdminColors.card,
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm - 2),
+                border: Border.all(color: AdminColors.border),
+              ),
+              child: const Text(
+                'Change',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AdminColors.primary,
+                ),
               ),
             ),
           ],
@@ -1203,10 +1293,10 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
     final enabled = reason == null;
     final selected = _config.chart == type;
     final color = !enabled
-        ? AdminReportsTheme.textMuted.withValues(alpha: 0.45)
+        ? AdminColors.textMuted.withValues(alpha: 0.45)
         : selected
-        ? AdminReportsTheme.primary
-        : AdminReportsTheme.textMuted;
+        ? AdminColors.primary
+        : AdminColors.textMuted;
     return Tooltip(
       message: reason ?? _chartLabel(type),
       child: Semantics(
@@ -1215,33 +1305,37 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
         selected: selected,
         child: InkWell(
           key: ValueKey('chart-${type.name}'),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
           onTap: enabled ? () => _update(_config.copyWith(chart: type)) : null,
           child: Container(
             width: 84,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             decoration: BoxDecoration(
               color: selected
-                  ? AdminReportsTheme.primary.withValues(alpha: 0.06)
+                  ? AdminColors.primary.withValues(alpha: 0.06)
                   : enabled
-                  ? AdminReportsTheme.card
-                  : AdminReportsTheme.surface,
-              borderRadius: BorderRadius.circular(8),
+                  ? AdminColors.card
+                  : AdminColors.surface,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
               border: Border.all(
                 color: selected
-                    ? AdminReportsTheme.primary
-                    : AdminReportsTheme.border,
-                width: selected ? 2 : 1,
+                    ? AdminColors.primary
+                    : AdminColors.border,
+                width: selected ? 1.5 : 1,
               ),
             ),
             child: Column(
               children: [
-                Icon(_chartIcon(type), size: 26, color: color),
+                Icon(_chartIcon(type), size: 24, color: color),
                 const SizedBox(height: 4),
                 Text(
                   _chartLabel(type),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: color),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
               ],
             ),
@@ -1274,10 +1368,11 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
     );
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AdminReportsTheme.surface,
-        borderRadius: BorderRadius.circular(8),
+        color: AdminColors.surface,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1285,7 +1380,11 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
           if (sentence != null) ...[
             Text(
               sentence,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AdminColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
           ],
@@ -1365,10 +1464,19 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
       children: [
         Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AdminColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.visibility_outlined, size: 18, color: AdminColors.primary),
+            ),
+            const SizedBox(width: 10),
             const Expanded(
               child: Text(
                 'Preview',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
               ),
             ),
             for (final f in CustomReportFormat.values)
@@ -1385,7 +1493,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.download_outlined, size: 16),
+                      : const Icon(Icons.download_outlined, size: 15),
                   label: Text(f.label),
                 ),
               ),
@@ -1412,7 +1520,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
             padding: EdgeInsets.all(24),
             child: Text(
               'Fix the highlighted settings to see the report.',
-              style: TextStyle(color: AdminReportsTheme.textMuted),
+              style: TextStyle(color: AdminColors.textMuted),
             ),
           )
         else

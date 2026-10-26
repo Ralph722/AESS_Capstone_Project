@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/reports/data/gts_saved_report_service.dart';
-import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
@@ -170,7 +169,7 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
   Widget build(BuildContext context) {
     final open = widget.open;
     final visible = _visible;
-    const muted = TextStyle(fontSize: 12, color: AdminReportsTheme.textMuted);
+    const muted = TextStyle(fontSize: 12, color: AdminColors.textMuted);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -178,33 +177,33 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
           key: ValueKey('saved-${open?.id}-${visible.length}'),
           initialValue: visible.any((r) => r.id == open?.id) ? open!.id : null,
           isExpanded: true,
-          dropdownColor: Colors.white,
+          dropdownColor: AdminColors.card,
           hint: Text(
             _loading
                 ? 'Loading saved reports…'
                 : visible.isEmpty
                 ? 'No saved reports yet'
                 : 'Open a saved report',
-            style: const TextStyle(fontSize: 13, color: AdminReportsTheme.textMuted),
+            style: const TextStyle(fontSize: 12.5, color: AdminColors.textMuted),
           ),
           decoration: InputDecoration(
             labelText: 'Saved reports',
-            labelStyle: const TextStyle(fontSize: 13, color: AdminReportsTheme.textSecondary),
+            labelStyle: const TextStyle(fontSize: 12.5, color: AdminColors.textSecondary),
             isDense: true,
             filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            fillColor: AdminColors.surface,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AdminReportsTheme.border),
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              borderSide: const BorderSide(color: AdminColors.border),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AdminReportsTheme.border),
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              borderSide: const BorderSide(color: AdminColors.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AdminReportsTheme.primary, width: 1.5),
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
             ),
           ),
           items: [
@@ -216,14 +215,18 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
                     Tooltip(
                       message: r.isList ? 'Alumni list' : 'Summary & charts',
                       child: Icon(
-                        r.isList ? Icons.list_alt : Icons.insert_chart_outlined,
+                        r.isList ? Icons.list_alt_rounded : Icons.insert_chart_outlined_rounded,
                         size: 16,
-                        color: AdminReportsTheme.textMuted,
+                        color: AdminColors.textMuted,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(r.name, overflow: TextOverflow.ellipsis),
+                      child: Text(
+                        r.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, color: AdminColors.textPrimary),
+                      ),
                     ),
                   ],
                 ),
@@ -246,13 +249,33 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               _error!,
-              style: muted.copyWith(color: AdminReportsTheme.danger),
+              style: muted.copyWith(color: AdminColors.danger),
             ),
           )
         else if (open != null && widget.unsavedChanges)
-          const Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Text('Unsaved changes', style: muted),
+          Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: AdminColors.warning,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'Unsaved changes',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: AdminColors.warning,
+                  ),
+                ),
+              ],
+            ),
           ),
         const SizedBox(height: 10),
         Wrap(

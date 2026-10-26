@@ -134,7 +134,14 @@ class _ResultTable extends StatefulWidget {
 }
 
 class _ResultTableState extends State<_ResultTable> {
+  final ScrollController _hScrollController = ScrollController();
   var _limit = GtsReportPreview.rowStep;
+
+  @override
+  void dispose() {
+    _hScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,7 +158,7 @@ class _ResultTableState extends State<_ResultTable> {
         rows.any((r) => r[i] is num),
     ];
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _table(table, rows, numeric),
         if (capped) ...[
@@ -189,15 +196,25 @@ class _ResultTableState extends State<_ResultTable> {
     List<bool> numeric,
   ) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: AdminColors.card,
         borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
         border: Border.all(color: AdminColors.border),
       ),
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
+      child: Scrollbar(
+        controller: _hScrollController,
+        thumbVisibility: true,
+        trackVisibility: true,
+        child: SingleChildScrollView(
+          controller: _hScrollController,
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: math.max(500, table.headers.length * 120.0),
+            ),
+            child: DataTable(
           headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
           headingRowHeight: 38,
           dataRowMinHeight: 32,
@@ -226,7 +243,9 @@ class _ResultTableState extends State<_ResultTable> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
 

@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:alumni_system/features/admin/reports/application/gts_alumni_list.dart';
+import 'package:alumni_system/features/admin/reports/application/gts_report_engine.dart';
 import 'package:alumni_system/features/admin/reports/data/gts_saved_report_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
+import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
+import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
+import 'package:alumni_system/features/admin/reports/models/gts_respondent.dart';
+import 'package:alumni_system/features/admin/reports/widgets/gts_alumni_list_panel.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_builder_mode_switch.dart';
+import 'package:alumni_system/features/admin/reports/widgets/gts_report_preview.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_saved_reports_bar.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_downloads_panel.dart';
+import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 
 class _FakeStore implements GtsSavedReportStore {
   final reports = <GtsSavedReport>[];
@@ -246,6 +254,69 @@ void main() {
       tester.view.physicalSize = const Size(400, 800);
       await tester.pumpAndSettle();
       expect(find.text('Card A'), findsOneWidget);
+    });
+
+    testWidgets('GtsReportPreview renders horizontal Scrollbar for wide tables', (tester) async {
+      final people = [
+        GtsRespondent(
+          userId: 'u1',
+          surveyId: 'w1',
+          course: 'BSIT',
+          yearGraduated: '2024',
+          onActiveRoster: true,
+          answers: const {'ched_16': 'Yes'},
+        ),
+      ];
+      final res = GtsReportEngine.run(
+        const GtsReportConfig(surveyIds: ['w1'], measure: 'ched_16'),
+        people,
+        now: DateTime(2026, 10, 12),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: GtsReportPreview(result: res),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Scrollbar), findsOneWidget);
+    });
+
+    testWidgets('GtsAlumniListPreview renders horizontal Scrollbar for list and tally', (tester) async {
+      final roster = [
+        AlumniMember(
+          id: 'm1',
+          fullName: 'Juan Dela Cruz',
+          studentId: 'S-2024-001',
+          course: 'BSIT',
+          batchYear: '2024',
+          createdAt: DateTime(2024),
+        ),
+      ];
+      final listRes = GtsAlumniList.build(
+        const GtsListConfig(surveyId: 'w1'),
+        roster: roster,
+        responses: const [],
+        waveIds: const ['w1'],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: GtsAlumniListPreview(result: listRes),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Scrollbar), findsAtLeastNWidgets(2));
     });
   });
 }

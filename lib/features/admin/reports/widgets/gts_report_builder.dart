@@ -519,58 +519,98 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
     color: AdminColors.textMuted,
   );
 
-  Widget _stepHeader(String stepNumber, String title, {String? subtitle}) => Padding(
-    padding: const EdgeInsets.only(top: 4, bottom: 8),
-    child: Row(
-      children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: AdminColors.primary.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
+  Widget _stepCard({
+    required String step,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
-          alignment: Alignment.center,
-          child: Text(
-            stepNumber,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: AdminColors.primary,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: const BoxDecoration(
+              color: AdminColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AdminSurfaces.radiusSm - 1)),
+              border: Border(bottom: BorderSide(color: AdminColors.border)),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                  color: AdminColors.primary,
-                ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 1),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AdminColors.textSecondary,
+            child: Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: AdminColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    step,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AdminColors.primary,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AdminColors.textPrimary,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AdminColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (trailing != null) trailing,
               ],
-            ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   InputDecoration _input(String label) => InputDecoration(
     labelText: label,
@@ -670,67 +710,88 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
           ),
           const SizedBox(height: 14),
         ],
-        _stepHeader('1', 'Scope & Template', subtitle: 'Choose tracer wave and baseline template'),
-        ..._waveSettings(),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        _stepCard(
+          step: '1',
+          title: 'Scope & Template',
+          subtitle: 'Choose tracer wave and baseline template',
           children: [
-            for (final t in GtsReportTemplates.all) _templateCard(t),
+            ..._waveSettings(),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final t in GtsReportTemplates.all) _templateCard(t),
+              ],
+            ),
+            if (GtsReportTemplates.byKey(_config.templateKey) != null)
+              const Padding(
+                padding: EdgeInsets.only(top: 6, bottom: 4),
+                child: Text('You can change any setting below.', style: _muted),
+              ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _title,
+              decoration: _input('Report name (optional)'),
+              onChanged: (v) => _update(_config.copyWith(title: v)),
+            ),
+            if (_config.population == GtsPopulation.allRespondents) ...[
+              const SizedBox(height: 10),
+              _olderSetting(
+                'This saved report counts every response, including people who '
+                    'are not on the active roster. This older setting is kept so '
+                    'its numbers do not change.',
+                'Count roster graduates only',
+                () => _update(
+                  _config.copyWith(population: GtsPopulation.rosterLinked),
+                ),
+              ),
+            ],
           ],
         ),
-        if (GtsReportTemplates.byKey(_config.templateKey) != null)
-          const Padding(
-            padding: EdgeInsets.only(top: 6, bottom: 4),
-            child: Text('You can change any setting below.', style: _muted),
-          ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _title,
-          decoration: _input('Report name (optional)'),
-          onChanged: (v) => _update(_config.copyWith(title: v)),
+        _stepCard(
+          step: '2',
+          title: 'Measure',
+          subtitle: 'What do you want to report on?',
+          children: [
+            _questionTile(measure),
+          ],
         ),
-        if (_config.population == GtsPopulation.allRespondents) ...[
-          const SizedBox(height: 10),
-          _olderSetting(
-            'This saved report counts every response, including people who '
-                'are not on the active roster. This older setting is kept so '
-                'its numbers do not change.',
-            'Count roster graduates only',
-            () => _update(
-              _config.copyWith(population: GtsPopulation.rosterLinked),
+        _stepCard(
+          step: '3',
+          title: 'Grouping & Filters',
+          subtitle: 'Compare by cohorts and specify conditions',
+          children: [
+            ..._compareSettings(),
+            const SizedBox(height: 10),
+            if (_config.filters.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Every graduate in the tracer wave is included.',
+                  style: _muted,
+                ),
+              ),
+            for (var i = 0; i < _config.filters.length; i++) _filterRow(i),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _addFilter,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add a condition'),
+              ),
             ),
-          ),
-        ],
-        const SizedBox(height: 16),
-        _stepHeader('2', 'Measure', subtitle: 'What do you want to report on?'),
-        _questionTile(measure),
-        const SizedBox(height: 16),
-        _stepHeader('3', 'Grouping & Filters', subtitle: 'Compare by cohorts and specify conditions'),
-        ..._compareSettings(),
-        const SizedBox(height: 10),
-        if (_config.filters.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 6),
-            child: Text(
-              'Every graduate in the tracer wave is included.',
-              style: _muted,
-            ),
-          ),
-        for (var i = 0; i < _config.filters.length; i++) _filterRow(i),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _addFilter,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Add a condition'),
-          ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _stepHeader('4', 'Visualization & Output', subtitle: 'Choose charts, calculations, and table layout'),
-        ..._displaySettings(measure),
-        _moreOptions(measure),
+        _stepCard(
+          step: '4',
+          title: 'Visualization & Output',
+          subtitle: 'Choose charts, calculations, and table layout',
+          children: [
+            ..._displaySettings(measure),
+            _moreOptions(measure),
+          ],
+        ),
         if (errors.isNotEmpty)
           Container(
             margin: const EdgeInsets.only(top: 12),
@@ -1431,14 +1492,31 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
             ),
             const SizedBox(height: 4),
             Wrap(
-              spacing: 4,
-              runSpacing: 4,
+              spacing: 6,
+              runSpacing: 6,
               children: [
                 for (final (value, label) in _filterChoices(field))
                   FilterChip(
                     visualDensity: VisualDensity.compact,
-                    label: Text(label, style: const TextStyle(fontSize: 12)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    label: Text(label),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: filter.values.contains(value) ? FontWeight.w700 : FontWeight.w500,
+                      color: filter.values.contains(value) ? AdminColors.primary : AdminColors.textPrimary,
+                    ),
                     selected: filter.values.contains(value),
+                    selectedColor: AdminColors.primary.withValues(alpha: 0.1),
+                    backgroundColor: AdminColors.surface,
+                    checkmarkColor: AdminColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                      side: BorderSide(
+                        color: filter.values.contains(value) ? AdminColors.primary : AdminColors.border,
+                        width: filter.values.contains(value) ? 1.4 : 1.0,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     onSelected: (on) => replace(
                       GtsReportFilter(
                         field: filter.field,
@@ -1497,6 +1575,16 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
                   label: Text(f.label),
                 ),
               ),
+            if (result != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: OutlinedButton.icon(
+                  onPressed: () => _showFullPreviewModal(context, result),
+                  style: AdminButtonStyles.outlined(),
+                  icon: const Icon(Icons.open_in_full_rounded, size: 15),
+                  label: const Text('Expand view'),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 16),
@@ -1526,6 +1614,86 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
         else
           GtsReportPreview(result: result),
       ],
+    );
+  }
+
+  void _showFullPreviewModal(BuildContext context, GtsReportResult result) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: AdminColors.card,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+          side: const BorderSide(color: AdminColors.border),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200, maxHeight: 850),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AdminColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.fullscreen_rounded, size: 20, color: AdminColors.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            GtsReportTables.title(result),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
+                          ),
+                          Text(
+                            'Full-screen preview · ${result.total.respondents} graduates',
+                            style: const TextStyle(fontSize: 12, color: AdminColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    for (final f in CustomReportFormat.values)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            unawaited(_download(f));
+                          },
+                          style: AdminButtonStyles.outlined(),
+                          icon: const Icon(Icons.download_outlined, size: 15),
+                          label: Text(f.label),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Close full view',
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close_rounded, size: 20, color: AdminColors.textSecondary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1, color: AdminColors.border),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: GtsReportPreview(result: result),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

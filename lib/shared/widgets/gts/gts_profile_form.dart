@@ -262,6 +262,7 @@ class GtsProfileFormFields extends StatelessWidget {
     required this.state,
     required this.onChanged,
     this.emailReadOnly = false,
+    this.demographicReadOnly = false,
     this.showEmploymentStatus = false,
     this.enabled = true,
     this.chedStyleLabels = true,
@@ -273,6 +274,10 @@ class GtsProfileFormFields extends StatelessWidget {
   final GtsProfileFormState state;
   final VoidCallback onChanged;
   final bool emailReadOnly;
+
+  /// Locks demographic records (sex, birthday, region of origin, year graduated)
+  /// to read-only mode with verified indicators.
+  final bool demographicReadOnly;
 
   /// Full-form mode: the email field becomes "Login email" and an editable
   /// contact email follows it. A changed contact email or mobile number must
@@ -379,12 +384,14 @@ class GtsProfileFormFields extends StatelessWidget {
             _addressField(),
             if (showContactEmail) ...[
               _contactEmailField(),
-              ?contactFooter?.call(ContactChannel.email),
+              if (contactFooter?.call(ContactChannel.email) != null)
+                contactFooter!(ContactChannel.email)!,
             ] else
               _emailField(),
             _telephoneField(),
             _mobileField(),
-            ?contactFooter?.call(ContactChannel.mobile),
+            if (contactFooter?.call(ContactChannel.mobile) != null)
+              contactFooter!(ContactChannel.mobile)!,
             _civilStatusField(),
             _sexField(),
             _birthdayField(context),
@@ -503,56 +510,123 @@ class GtsProfileFormFields extends StatelessWidget {
     },
   );
 
-  Widget _sexField() => _dropdown(
-    label: _req(GtsConstants.labelSex),
-    value: state.gender,
-    items: GtsConstants.sexOptions,
-    icon: Icons.wc_outlined,
-    helperText: _recordHint('gender'),
-    onChanged: (v) {
-      state.gender = v ?? '';
-      onChanged();
-    },
-  );
-
-  Widget _birthdayField(BuildContext context) => OnboardingDateTile(
-    label: _req(GtsConstants.labelBirthday),
-    valueText: state.birthDate != null
-        ? DateFormat.yMMMd().format(state.birthDate!)
-        : 'Tap to choose date',
-    hasValue: state.birthDate != null,
-    enabled: enabled,
-    onTap: () async {
-      final picked = await showDatePicker(
-        context: context,
-        initialDate: state.birthDate ?? DateTime(2000),
-        firstDate: DateTime(1950),
-        lastDate: DateTime.now(),
+  Widget _sexField() {
+    if (demographicReadOnly) {
+      final text = state.gender.trim().isEmpty ? 'Not specified' : state.gender;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
+        child: TextFormField(
+          key: ValueKey<String>('sex|$text'),
+          initialValue: text,
+          readOnly: true,
+          enabled: enabled,
+          style: _fieldStyle,
+          decoration: onboardingFieldDecoration(
+            label: _req(GtsConstants.labelSex),
+            icon: Icons.wc_outlined,
+            readOnly: true,
+            helperText: 'Verified demographic record · Read only',
+          ),
+        ),
       );
-      if (picked != null) {
-        state.birthDate = picked;
+    }
+    return _dropdown(
+      label: _req(GtsConstants.labelSex),
+      value: state.gender,
+      items: GtsConstants.sexOptions,
+      icon: Icons.wc_outlined,
+      helperText: _recordHint('gender'),
+      onChanged: (v) {
+        state.gender = v ?? '';
         onChanged();
-      }
-    },
-  );
+      },
+    );
+  }
 
-  Widget _regionField() => _dropdown(
-    label: _req(GtsConstants.labelRegionOfOrigin),
-    value: state.regionOfOrigin,
-    items: PhilippineLocationConstants.regions,
-    icon: Icons.map_outlined,
-    helperText: _recordHint('regionOfOrigin'),
-    onChanged: (v) {
-      final region = v ?? '';
-      state.regionOfOrigin = region;
-      final allowed = PhilippineLocationConstants.provincesForRegion(region);
-      if (state.provinceController.text.isNotEmpty &&
-          !allowed.contains(state.provinceController.text)) {
-        state.provinceController.clear();
-      }
-      onChanged();
-    },
-  );
+  Widget _birthdayField(BuildContext context) {
+    if (demographicReadOnly) {
+      final bdayStr = state.birthDate != null
+          ? DateFormat.yMMMd().format(state.birthDate!)
+          : 'Not specified';
+      return Padding(
+        padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
+        child: TextFormField(
+          key: ValueKey<String>('bday|$bdayStr'),
+          initialValue: bdayStr,
+          readOnly: true,
+          enabled: enabled,
+          style: _fieldStyle,
+          decoration: onboardingFieldDecoration(
+            label: _req(GtsConstants.labelBirthday),
+            icon: Icons.cake_outlined,
+            readOnly: true,
+            helperText: 'Verified demographic record · Read only',
+          ),
+        ),
+      );
+    }
+    return OnboardingDateTile(
+      label: _req(GtsConstants.labelBirthday),
+      valueText: state.birthDate != null
+          ? DateFormat.yMMMd().format(state.birthDate!)
+          : 'Tap to choose date',
+      hasValue: state.birthDate != null,
+      enabled: enabled,
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: state.birthDate ?? DateTime(2000),
+          firstDate: DateTime(1950),
+          lastDate: DateTime.now(),
+        );
+        if (picked != null) {
+          state.birthDate = picked;
+          onChanged();
+        }
+      },
+    );
+  }
+
+  Widget _regionField() {
+    if (demographicReadOnly) {
+      final text = state.regionOfOrigin.trim().isEmpty
+          ? 'Not specified'
+          : state.regionOfOrigin;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
+        child: TextFormField(
+          key: ValueKey<String>('region|$text'),
+          initialValue: text,
+          readOnly: true,
+          enabled: enabled,
+          style: _fieldStyle,
+          decoration: onboardingFieldDecoration(
+            label: _req(GtsConstants.labelRegionOfOrigin),
+            icon: Icons.map_outlined,
+            readOnly: true,
+            helperText: 'Verified demographic record · Read only',
+          ),
+        ),
+      );
+    }
+    return _dropdown(
+      label: _req(GtsConstants.labelRegionOfOrigin),
+      value: state.regionOfOrigin,
+      items: PhilippineLocationConstants.regions,
+      icon: Icons.map_outlined,
+      helperText: _recordHint('regionOfOrigin'),
+      onChanged: (v) {
+        final region = v ?? '';
+        state.regionOfOrigin = region;
+        final allowed = PhilippineLocationConstants.provincesForRegion(region);
+        if (state.provinceController.text.isNotEmpty &&
+            !allowed.contains(state.provinceController.text)) {
+          state.provinceController.clear();
+        }
+        onChanged();
+      },
+    );
+  }
 
   Widget _residenceField() => _dropdown(
     label: _req(GtsConstants.labelLocationOfResidence),
@@ -599,8 +673,8 @@ class GtsProfileFormFields extends StatelessWidget {
     icon: Icons.calendar_today_outlined,
     hint: 'e.g. 2024',
     keyboard: TextInputType.number,
-    readOnly: state.yearLocked,
-    helperText: state.yearLocked
+    readOnly: demographicReadOnly || state.yearLocked,
+    helperText: (demographicReadOnly || state.yearLocked)
         ? 'Contact the alumni office to change this'
         : null,
   );

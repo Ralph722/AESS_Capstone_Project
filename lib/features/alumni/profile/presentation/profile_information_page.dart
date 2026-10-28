@@ -12,6 +12,7 @@ import 'package:alumni_system/features/admin/roster/data/alumni_member_service.d
 import 'package:alumni_system/features/alumni/profile/data/profile_change_diff.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
+import 'package:alumni_system/features/alumni/profile/presentation/avatar_crop_dialog.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
 import 'package:alumni_system/features/contact_verification/presentation/contact_verify_sheet.dart';
@@ -77,9 +78,43 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
 
   Future<bool> _confirmLeave() async {
     if (!_dirty) return true;
-    final discard = await confirmDiscardChanges(context);
-    if (discard && mounted) setState(() => _dirty = false);
-    return discard;
+    final choice = await showDialog<_LeaveChoice>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text(
+          'You have unsaved changes to your profile. Would you like to save them before leaving?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _LeaveChoice.discard),
+            style: TextButton.styleFrom(
+              foregroundColor: PortalTheme.danger,
+            ),
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _LeaveChoice.keepEditing),
+            style: PortalTheme.ghostButton(dense: true),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, _LeaveChoice.saveAndLeave),
+            style: PortalTheme.primaryButton(dense: true),
+            child: const Text('Save & leave'),
+          ),
+        ],
+      ),
+    );
+
+    if (choice == _LeaveChoice.discard) {
+      if (mounted) setState(() => _dirty = false);
+      return true;
+    } else if (choice == _LeaveChoice.saveAndLeave) {
+      final saved = await _save();
+      return saved;
+    }
+    return false;
   }
 
   Future<void> _load() async {
@@ -136,7 +171,9 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
         return;
       }
       if (!mounted) return;
-      await _uploadProfileImage(rawBytes);
+      final croppedBytes = await AvatarCropDialog.show(context, rawBytes);
+      if (croppedBytes == null || !mounted) return;
+      await _uploadProfileImage(croppedBytes);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -209,10 +246,10 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
     }
   }
 
-  Future<void> _save() async {
-    if (!_profileFormKey.currentState!.validate()) return;
+  Future<bool> _save() async {
+    if (!_profileFormKey.currentState!.validate()) return false;
     final userId = AppSession.userId;
-    if (userId == null) return;
+    if (userId == null) return false;
 
     final changes = [
       for (final c in ContactChannel.values)
@@ -231,11 +268,11 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
           .toTracerProfile(uid: userId, email: AppSession.email ?? '')
           .copyWith(mobileNumber: _formState.savedMobile);
       await _userProfileService.saveTracerProfile(profile);
-      if (!mounted) return;
+      if (!mounted) return true;
       if (changes.isEmpty) {
         setState(() => _dirty = false);
         _snack('Profile updated successfully!');
-        return;
+        return true;
       }
       setState(() => _isSaving = false);
       final saved = await showContactVerifySheet(
@@ -246,7 +283,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
             'are yours with a one-time code so the alumni office can reach '
             'you.',
       );
-      if (!mounted) return;
+      if (!mounted) return true;
       await _load();
       final unsaved = [
         for (final c in changes)
@@ -261,14 +298,16 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
             : 'Your other changes were saved. ${_unsavedSentence(unsaved)}',
         error: unsaved.isNotEmpty,
       );
+      return unsaved.isEmpty;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving profile: ${portalFriendlyError(e)}'),
           backgroundColor: PortalTheme.danger,
         ),
       );
+      return false;
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -384,6 +423,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
           title: 'Profile information',
           automaticallyImplyLeading: true,
         ),
+        bottomNavigationBar: _buildDirtyBar(),
         body: PortalContentFrame(
           child: _isLoading
               ? const ProfileSkeleton()
@@ -392,7 +432,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildPhotoCard(),
+                      _buildPhotoHeader(),
                       if (_dirty) ...[
                         const SizedBox(height: PortalTheme.space3),
                         const PortalChip(
@@ -407,9 +447,10 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                         child: GtsProfileFormFields(
                           state: _formState,
                           emailReadOnly: true,
+                          demographicReadOnly: true,
                           showContactEmail: true,
                           contactFooter: _contactFooter,
-                          showEmploymentStatus: true,
+                          showEmploymentStatus: false,
                           chedStyleLabels: false,
                           enabled: !_isSaving,
                           onChanged: () {
@@ -441,19 +482,95 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
     );
   }
 
-  Widget _buildPhotoCard() {
+  Widget? _buildDirtyBar() {
+    if (!_dirty) return null;
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-      decoration: BoxDecoration(
-        color: PortalTheme.card,
-        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(color: PortalTheme.borderStrong),
-        boxShadow: PortalTheme.softShadow,
+      padding: EdgeInsets.fromLTRB(
+        16,
+        10,
+        16,
+        10 + MediaQuery.of(context).padding.bottom,
       ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, -3),
+          ),
+        ],
+        border: const Border(
+          top: BorderSide(color: PortalTheme.border),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(
+                        Icons.edit_note_rounded,
+                        size: 20,
+                        color: PortalTheme.navy,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Unsaved changes',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: PortalTheme.navy,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Remember to save your profile edits',
+                    style: PortalTheme.caption.copyWith(
+                      color: PortalTheme.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: _isSaving ? null : () => _save(),
+              style: PortalTheme.primaryButton(dense: true),
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: PortalTheme.space3),
       child: Column(
         children: [
           _buildAvatarRing(),
-          const SizedBox(height: PortalTheme.space3),
+          const SizedBox(height: PortalTheme.space2),
           Text(
             'Tap photo to update',
             style: PortalTheme.caption.copyWith(
@@ -570,3 +687,5 @@ class _ContactStatusLine extends StatelessWidget {
     );
   }
 }
+
+enum _LeaveChoice { discard, keepEditing, saveAndLeave }

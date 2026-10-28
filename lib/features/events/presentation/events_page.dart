@@ -372,9 +372,12 @@ class EventsScreenState extends State<EventsScreen>
                   );
                 },
               ),
-              meta: Text(
-                '${filteredEvents.length} ${filteredEvents.length == 1 ? 'event' : 'events'}',
-                style: PortalTheme.meta,
+              meta: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  '${filteredEvents.length} ${filteredEvents.length == 1 ? 'event' : 'events'}',
+                  style: PortalTheme.meta,
+                ),
               ),
             ),
 

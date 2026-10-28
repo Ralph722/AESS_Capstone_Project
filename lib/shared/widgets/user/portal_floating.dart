@@ -119,33 +119,9 @@ class PortalFloatingFilterHeader extends StatelessWidget {
         );
 
     return PinnedHeaderSliver(
-      child: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: padding.top + 28,
-            child: const IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      PortalTheme.pageBg,
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: padding,
-            child: PortalFloatingCard(lifted: true, child: content),
-          ),
-        ],
+      child: Padding(
+        padding: padding,
+        child: PortalFloatingCard(lifted: true, child: content),
       ),
     );
   }
@@ -193,88 +169,61 @@ class _CollapsibleFilterHeaderDelegate
       progress,
     )!;
 
-    return Stack(
-      children: [
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: padding.top + 28,
-          child: IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: lifted ? 1.0 : 0.0,
-              duration: PortalTheme.fast,
-              child: const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      PortalTheme.pageBg,
-                      Colors.transparent,
-                    ],
+    return Padding(
+      padding: currentPad,
+      child: PortalFloatingCard(
+        lifted: lifted,
+        padding: currentCardPad,
+        child: OverflowBox(
+          alignment: Alignment.topCenter,
+          minHeight: 0,
+          maxHeight: maxExtent,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (progress < 0.98)
+                ClipRect(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    heightFactor: (1.0 - progress).clamp(0.0, 1.0),
+                    child: Opacity(
+                      opacity: (1.0 - progress * 2.2).clamp(0.0, 1.0),
+                      child: IgnorePointer(
+                        ignoring: progress > 0.3,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: search,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
-        ),
-        Positioned.fill(
-          child: Padding(
-            padding: currentPad,
-            child: PortalFloatingCard(
-              lifted: lifted,
-              padding: currentCardPad,
-              child: OverflowBox(
-                alignment: Alignment.center,
-                minHeight: 0,
-                maxHeight: maxExtent,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (progress < 0.98)
-                      ClipRect(
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          heightFactor: (1.0 - progress).clamp(0.0, 1.0),
-                          child: Opacity(
-                            opacity: (1.0 - progress * 2.2).clamp(0.0, 1.0),
-                            child: IgnorePointer(
-                              ignoring: progress > 0.3,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: search,
-                              ),
-                            ),
+              filters,
+              if (meta != null && progress < 0.98)
+                ClipRect(
+                  child: Align(
+                    alignment: AlignmentDirectional.topStart,
+                    heightFactor: (1.0 - progress).clamp(0.0, 1.0),
+                    child: Opacity(
+                      opacity: (1.0 - progress * 2.5).clamp(0.0, 1.0),
+                      child: IgnorePointer(
+                        ignoring: progress > 0.3,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: meta!,
                           ),
                         ),
                       ),
-                    filters,
-                    if (meta != null && progress < 0.98)
-                      ClipRect(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          heightFactor: (1.0 - progress).clamp(0.0, 1.0),
-                          child: Opacity(
-                            opacity: (1.0 - progress * 2.5).clamp(0.0, 1.0),
-                            child: IgnorePointer(
-                              ignoring: progress > 0.3,
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: meta!,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 

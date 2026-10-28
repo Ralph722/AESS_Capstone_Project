@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_overlay_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
@@ -39,6 +38,14 @@ Future<TracerReminderChoice?> showTracerReminderSheet(
     context: context,
     isScrollControlled: true,
     useRootNavigator: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(PortalTheme.radius2xl),
+      ),
+    ),
+    clipBehavior: Clip.antiAlias,
+    constraints: const BoxConstraints(maxWidth: 560),
     builder: (_) => _ReminderSheet(
       closeAt: closeAt?.toLocal(),
       initialRepeatHourly: initialRepeatHourly,
@@ -158,101 +165,218 @@ class _ReminderSheetState extends State<_ReminderSheet> {
             const SizedBox(height: 10),
             Center(
               child: Container(
-                width: 40,
-                height: 4,
+                width: 44,
+                height: 4.5,
                 decoration: BoxDecoration(
-                  color: PortalTheme.borderStrong,
+                  color: PortalTheme.borderStrong.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-              child: Text(widget.title, style: PortalTheme.pageTitle),
-            ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                "We'll send you a notification so you can pick up where "
-                'you left off.',
-                style: PortalTheme.bodySecondary,
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: PortalTheme.navy.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_active_outlined,
+                      color: PortalTheme.navy,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: PortalTheme.pageTitle.copyWith(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          "We'll send you a notification so you can pick up where "
+                          'you left off.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.35,
+                            color: PortalTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: PortalTheme.pageBg,
+                          border: Border.all(color: PortalTheme.border),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: PortalTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             for (final (label, icon, at) in options)
-              _ReminderOption(
+              _ReminderOptionCard(
                 label: label,
                 icon: icon,
                 meta: _afterClose(at)
-                    ? 'After the tracer closes'
+                    ? 'After close'
                     : formatReminderTime(at),
                 onTap: _afterClose(at) ? null : () => _choose(at),
               ),
-            _ReminderOption(
+            _ReminderOptionCard(
               label: 'Pick a date & time',
               icon: Icons.edit_calendar_outlined,
               onTap: _pickCustom,
             ),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.error_outline_rounded,
-                      size: 16,
-                      color: PortalTheme.danger,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: PortalTheme.danger.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
+                    border: Border.all(
+                      color: PortalTheme.danger.withValues(alpha: 0.3),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: PortalTheme.meta.copyWith(
-                          color: PortalTheme.danger,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        size: 16,
+                        color: PortalTheme.danger,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: PortalTheme.meta.copyWith(
+                            color: PortalTheme.danger,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Divider(height: 20, color: PortalTheme.border),
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 12, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Material(
+                color: PortalTheme.pageBg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                  side: BorderSide(
+                    color: _repeatHourly
+                        ? PortalTheme.navy.withValues(alpha: 0.3)
+                        : PortalTheme.border,
+                  ),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+                  onTap: () => setState(() => _repeatHourly = !_repeatHourly),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
                       children: [
-                        Text(
-                          // Shorter + NBSP before "it" so small phones don't
-                          // orphan that word on its own line.
-                          "Remind me hourly if I don't open\u00A0it",
-                          style: PortalMenu.itemText,
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: _repeatHourly
+                                ? PortalTheme.navy.withValues(alpha: 0.12)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _repeatHourly
+                                  ? PortalTheme.navy.withValues(alpha: 0.2)
+                                  : PortalTheme.border,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.update_rounded,
+                            size: 20,
+                            color: _repeatHourly
+                                ? PortalTheme.navy
+                                : PortalTheme.textSecondary,
+                          ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Only on that day, until 9 PM (up to 3 times)',
-                          style: PortalTheme.meta,
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Remind me hourly if I don't open\u00A0it",
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: PortalTheme.textPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Only on that day, until 9 PM (up to 3 times)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: PortalTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: _repeatHourly,
+                          activeThumbColor: Colors.white,
+                          activeTrackColor: PortalTheme.navy,
+                          inactiveThumbColor: Colors.white,
+                          inactiveTrackColor: PortalTheme.borderStrong,
+                          onChanged: (v) => setState(() => _repeatHourly = v),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Switch(
-                    value: _repeatHourly,
-                    activeTrackColor: PortalTheme.navy,
-                    onChanged: (v) => setState(() => _repeatHourly = v),
-                  ),
-                ],
+                ),
               ),
             ),
             if (widget.dismissLabel != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: PortalTheme.secondaryButton(),
@@ -260,7 +384,7 @@ class _ReminderSheetState extends State<_ReminderSheet> {
                 ),
               )
             else
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
           ],
         ),
       ),
@@ -268,8 +392,8 @@ class _ReminderSheetState extends State<_ReminderSheet> {
   }
 }
 
-class _ReminderOption extends StatelessWidget {
-  const _ReminderOption({
+class _ReminderOptionCard extends StatelessWidget {
+  const _ReminderOptionCard({
     required this.label,
     required this.icon,
     required this.onTap,
@@ -284,41 +408,115 @@ class _ReminderOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return InkWell(
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 52),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: PortalMenu.iconSize,
-                color: enabled ? PortalTheme.navy : PortalTheme.textMuted,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  label,
-                  style: PortalMenu.itemText.copyWith(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4.5),
+      child: Material(
+        color: enabled ? Colors.white : PortalTheme.pageBg.withValues(alpha: 0.6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+          side: BorderSide(
+            color: enabled
+                ? PortalTheme.border
+                : PortalTheme.border.withValues(alpha: 0.5),
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
                     color: enabled
-                        ? PortalTheme.textPrimary
-                        : PortalTheme.textMuted,
+                        ? PortalTheme.navy.withValues(alpha: 0.06)
+                        : PortalTheme.surfaceMuted,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-              ),
-              if (meta != null) ...[
-                const SizedBox(width: 12),
-                Text(
-                  meta!,
-                  style: PortalTheme.meta.copyWith(
+                  child: Icon(
+                    icon,
+                    size: 20,
                     color: enabled ? PortalTheme.navy : PortalTheme.textMuted,
-                    fontWeight: enabled ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: enabled
+                          ? PortalTheme.textPrimary
+                          : PortalTheme.textMuted,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                if (meta != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: enabled
+                          ? PortalTheme.pageBg
+                          : PortalTheme.surfaceMuted,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: enabled
+                            ? PortalTheme.border
+                            : Colors.transparent,
+                      ),
+                    ),
+                    child: Text(
+                      meta!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: enabled
+                            ? PortalTheme.navy
+                            : PortalTheme.textMuted,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: PortalTheme.pageBg,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: PortalTheme.border),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Custom',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: PortalTheme.textSecondary,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: PortalTheme.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
               ],
-            ],
+            ),
           ),
         ),
       ),

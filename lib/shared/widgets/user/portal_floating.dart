@@ -38,6 +38,7 @@ class PortalFloatingCard extends StatelessWidget {
     super.key,
     required this.child,
     this.lifted = false,
+    this.padding = const EdgeInsets.fromLTRB(14, 14, 14, 12),
   });
 
   final Widget child;
@@ -45,12 +46,14 @@ class PortalFloatingCard extends StatelessWidget {
   /// Content is scrolling underneath, so the shadow deepens.
   final bool lifted;
 
+  final EdgeInsets padding;
+
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: PortalTheme.fast,
       curve: PortalTheme.ease,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: padding,
       decoration: BoxDecoration(
         color: PortalTheme.card,
         borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
@@ -62,72 +65,59 @@ class PortalFloatingCard extends StatelessWidget {
   }
 }
 
-/// Search/filter card pinned at the top of a [CustomScrollView]. The list
-/// scrolls behind it and fades out in the gap under the app bar.
-class PortalFloatingFilterHeader extends StatefulWidget {
+/// Search/filter card pinned at the top of a [CustomScrollView].
+///
+/// When both [search] and [filters] are provided, the card collapses smoothly
+/// on scroll: the search input (and optional [meta]) tucks away, leaving only
+/// the [filters] row pinned at the top.
+/// When scrolling back to the top, the search input smoothly re-expands.
+class PortalFloatingFilterHeader extends StatelessWidget {
   const PortalFloatingFilterHeader({
     super.key,
-    required this.child,
-    this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 8),
+    this.search,
+    this.filters,
+    this.meta,
+    this.child,
+    this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 8),
+    this.floating = false,
   });
 
-  /// Contents of the card.
-  final Widget child;
+  final Widget? search;
+  final Widget? filters;
+  final Widget? meta;
+  final Widget? child;
   final EdgeInsets padding;
-
-  @override
-  State<PortalFloatingFilterHeader> createState() =>
-      _PortalFloatingFilterHeaderState();
-}
-
-class _PortalFloatingFilterHeaderState
-    extends State<PortalFloatingFilterHeader> {
-  ScrollPosition? _position;
-  bool _lifted = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final position = Scrollable.maybeOf(context)?.position;
-    if (position == _position) return;
-    _position?.removeListener(_onScroll);
-    _position = position?..addListener(_onScroll);
-    _lifted = _isLifted();
-  }
-
-  @override
-  void dispose() {
-    _position?.removeListener(_onScroll);
-    super.dispose();
-  }
-
-  bool _isLifted() {
-    final p = _position;
-    return p != null &&
-        p.hasPixels &&
-        p.hasContentDimensions &&
-        p.pixels > p.minScrollExtent + 0.5;
-  }
-
-  void _onScroll() {
-    if (_isLifted() == _lifted) return;
-    // Positions can notify mid-layout, when a rebuild is not allowed.
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) => _sync());
-    } else {
-      _sync();
-    }
-  }
-
-  void _sync() {
-    final lifted = _isLifted();
-    if (mounted && lifted != _lifted) setState(() => _lifted = lifted);
-  }
+  final bool floating;
 
   @override
   Widget build(BuildContext context) {
-    final pad = widget.padding;
+    if (search != null && filters != null) {
+      return SliverPersistentHeader(
+        pinned: true,
+        floating: floating,
+        delegate: _CollapsibleFilterHeaderDelegate(
+          search: search!,
+          filters: filters!,
+          meta: meta,
+          padding: padding,
+        ),
+      );
+    }
+
+    final content = child ??
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (search != null) search!,
+            if (filters != null) filters!,
+            if (meta != null) ...[
+              const SizedBox(height: 8),
+              meta!,
+            ],
+          ],
+        );
+
     return PinnedHeaderSliver(
       child: Stack(
         children: [
@@ -135,33 +125,164 @@ class _PortalFloatingFilterHeaderState
             top: 0,
             left: 0,
             right: 0,
-            height: pad.top + 28,
-            child: IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: _lifted ? 1 : 0,
-                duration: PortalTheme.fast,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        PortalTheme.pageBg,
-                        PortalTheme.pageBg.withValues(alpha: 0),
-                      ],
-                    ),
+            height: padding.top + 28,
+            child: const IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      PortalTheme.pageBg,
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),
             ),
           ),
           Padding(
-            padding: pad,
-            child: PortalFloatingCard(lifted: _lifted, child: widget.child),
+            padding: padding,
+            child: PortalFloatingCard(lifted: true, child: content),
           ),
         ],
       ),
     );
+  }
+}
+
+class _CollapsibleFilterHeaderDelegate
+    extends SliverPersistentHeaderDelegate {
+  _CollapsibleFilterHeaderDelegate({
+    required this.search,
+    required this.filters,
+    this.meta,
+    required this.padding,
+  });
+
+  final Widget search;
+  final Widget filters;
+  final Widget? meta;
+  final EdgeInsets padding;
+
+  @override
+  double get minExtent => 66.0;
+
+  @override
+  double get maxExtent => meta != null ? 156.0 : 132.0;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final range = maxExtent - minExtent;
+    final progress = range > 0 ? (shrinkOffset / range).clamp(0.0, 1.0) : 0.0;
+    final lifted = progress > 0.02 || overlapsContent;
+
+    final currentPad = EdgeInsets.lerp(
+      padding,
+      EdgeInsets.fromLTRB(padding.left, 6, padding.right, 6),
+      progress,
+    )!;
+
+    final currentCardPad = EdgeInsets.lerp(
+      const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      progress,
+    )!;
+
+    return Stack(
+      children: [
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: padding.top + 28,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: lifted ? 1.0 : 0.0,
+              duration: PortalTheme.fast,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      PortalTheme.pageBg,
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: Padding(
+            padding: currentPad,
+            child: PortalFloatingCard(
+              lifted: lifted,
+              padding: currentCardPad,
+              child: OverflowBox(
+                alignment: Alignment.center,
+                minHeight: 0,
+                maxHeight: maxExtent,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (progress < 0.98)
+                      ClipRect(
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          heightFactor: (1.0 - progress).clamp(0.0, 1.0),
+                          child: Opacity(
+                            opacity: (1.0 - progress * 2.2).clamp(0.0, 1.0),
+                            child: IgnorePointer(
+                              ignoring: progress > 0.3,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: search,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    filters,
+                    if (meta != null && progress < 0.98)
+                      ClipRect(
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          heightFactor: (1.0 - progress).clamp(0.0, 1.0),
+                          child: Opacity(
+                            opacity: (1.0 - progress * 2.5).clamp(0.0, 1.0),
+                            child: IgnorePointer(
+                              ignoring: progress > 0.3,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: meta!,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  bool shouldRebuild(
+    covariant _CollapsibleFilterHeaderDelegate oldDelegate,
+  ) {
+    return true;
   }
 }
 

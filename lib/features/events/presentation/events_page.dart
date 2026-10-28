@@ -353,7 +353,29 @@ class EventsScreenState extends State<EventsScreen>
         child: CustomScrollView(
           slivers: [
             PortalFloatingFilterHeader(
-              child: _buildFilterCardContent(filteredEvents.length),
+              search: PortalSearchField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                hintText: 'Search by title, venue, or category',
+              ),
+              filters: PortalScrollableFilterRow.builder(
+                height: PortalFilterChip.height,
+                itemCount: _filters.length,
+                itemBuilder: (context, index) {
+                  final selected = _selectedFilter == index;
+                  return PortalFilterChip(
+                    label: _filters[index],
+                    selected: selected,
+                    onTap: () {
+                      if (!selected) _filterEvents(index);
+                    },
+                  );
+                },
+              ),
+              meta: Text(
+                '${filteredEvents.length} ${filteredEvents.length == 1 ? 'event' : 'events'}',
+                style: PortalTheme.meta,
+              ),
             ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -541,39 +563,6 @@ class EventsScreenState extends State<EventsScreen>
       constraintLabels: _constraintLabels(event),
       onTap: () => _showEventDetails(event),
       onRsvpChanged: (s) => _onRsvpChanged(event, s),
-    );
-  }
-
-  Widget _buildFilterCardContent(int count) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        PortalSearchField(
-          controller: _searchController,
-          onChanged: _onSearchChanged,
-          hintText: 'Search by title, venue, or category',
-        ),
-        const SizedBox(height: 12),
-        PortalScrollableFilterRow.builder(
-          height: PortalFilterChip.height,
-          itemCount: _filters.length,
-          itemBuilder: (context, index) {
-            final selected = _selectedFilter == index;
-            return PortalFilterChip(
-              label: _filters[index],
-              selected: selected,
-              onTap: () {
-                if (!selected) _filterEvents(index);
-              },
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        Text(
-          '$count ${count == 1 ? 'event' : 'events'}',
-          style: PortalTheme.meta,
-        ),
-      ],
     );
   }
 

@@ -300,7 +300,28 @@ class _ForumScreenState extends State<ForumScreen> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         PortalFloatingFilterHeader(
-                          child: _buildFilterCardContent(wide),
+                          search: PortalSearchField(
+                            controller: _searchController,
+                            onChanged: _onSearchChanged,
+                            textInputAction: TextInputAction.search,
+                            hintText:
+                                'Search title, content, author, program, tags…',
+                          ),
+                          filters: wide ? null : _buildFilterChips(),
+                          meta: Row(
+                            children: [
+                              Text(
+                                _totalCount == 1
+                                    ? '1 discussion'
+                                    : '$_totalCount discussions',
+                                style: PortalTheme.meta,
+                              ),
+                              if (wide) ...[
+                                const Spacer(),
+                                _buildSortChip(),
+                              ],
+                            ],
+                          ),
                         ),
                         if (_loading)
                           const SliverFillRemaining(
@@ -332,32 +353,6 @@ class _ForumScreenState extends State<ForumScreen> {
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildFilterCardContent(bool wide) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        PortalSearchField(
-          controller: _searchController,
-          onChanged: _onSearchChanged,
-          textInputAction: TextInputAction.search,
-          hintText: 'Search title, content, author, program, tags…',
-        ),
-        const SizedBox(height: PortalTheme.space2),
-        if (!wide) _buildFilterChips(),
-        if (!wide) const SizedBox(height: PortalTheme.space2),
-        Row(
-          children: [
-            Text(
-              _totalCount == 1 ? '1 discussion' : '$_totalCount discussions',
-              style: PortalTheme.meta,
-            ),
-            if (wide) ...[const Spacer(), _buildSortChip()],
-          ],
-        ),
-      ],
     );
   }
 

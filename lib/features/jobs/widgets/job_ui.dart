@@ -122,7 +122,7 @@ String? jobDeadlineHint(DateTime deadline, {DateTime? now}) {
   return null;
 }
 
-/// Compact badge for job deadline hint (top-right corner of job cards).
+/// Compact badge for job deadline hint (matching JobTagPill sizing).
 class JobDeadlineBadge extends StatelessWidget {
   const JobDeadlineBadge({super.key, required this.hint});
 
@@ -140,28 +140,27 @@ class JobDeadlineBadge extends StatelessWidget {
         : PortalTheme.ember.withValues(alpha: 0.35);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
-        border: Border.all(color: border, width: 0.8),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             isClosed ? Icons.event_busy_outlined : Icons.schedule_rounded,
-            size: 11,
+            size: 13,
             color: fg,
           ),
-          const SizedBox(width: 3.5),
+          const SizedBox(width: 5),
           Text(
             hint,
             style: TextStyle(
               color: fg,
-              fontWeight: FontWeight.w800,
-              fontSize: 10.5,
-              height: 1.1,
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
             ),
           ),
         ],
@@ -337,7 +336,7 @@ class JobTagPill extends StatelessWidget {
   }
 }
 
-/// Inline meta chips for job cards (type / location / remote).
+/// Inline meta chips for job cards (type / location / remote / deadline).
 class JobMetaRow extends StatelessWidget {
   const JobMetaRow({
     super.key,
@@ -346,6 +345,7 @@ class JobMetaRow extends StatelessWidget {
     required this.posted,
     this.isRemote = false,
     this.experienceLevel = '',
+    this.deadlineHint,
   });
 
   final String location;
@@ -353,6 +353,7 @@ class JobMetaRow extends StatelessWidget {
   final String posted;
   final bool isRemote;
   final String experienceLevel;
+  final String? deadlineHint;
 
   @override
   Widget build(BuildContext context) {
@@ -371,6 +372,8 @@ class JobMetaRow extends StatelessWidget {
             icon: Icons.home_work_outlined,
             emphasized: true,
           ),
+        if (deadlineHint != null)
+          JobDeadlineBadge(hint: deadlineHint!),
       ],
     );
   }

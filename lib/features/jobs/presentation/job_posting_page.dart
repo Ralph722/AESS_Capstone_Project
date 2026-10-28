@@ -1052,30 +1052,18 @@ class _AlumniJobCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (deadlineHint != null) ...[
-                    JobDeadlineBadge(hint: deadlineHint),
-                    const SizedBox(width: 4),
-                  ],
-                  IconButton(
-                    tooltip: isFavorite ? 'Remove saved' : 'Save job',
-                    onPressed: onFavorite,
-                    visualDensity: VisualDensity.compact,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                    padding: EdgeInsets.zero,
-                    icon: Icon(
-                      isFavorite
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_border_rounded,
-                      color: isFavorite ? JobUiTheme.navy : JobUiTheme.textMuted,
-                      size: 24,
-                    ),
-                  ),
-                ],
+              IconButton(
+                tooltip: isFavorite ? 'Remove saved' : 'Save job',
+                onPressed: onFavorite,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                icon: Icon(
+                  isFavorite
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  color: isFavorite ? JobUiTheme.navy : JobUiTheme.textMuted,
+                  size: 24,
+                ),
               ),
             ],
           ),
@@ -1085,6 +1073,7 @@ class _AlumniJobCard extends StatelessWidget {
             jobType: job.jobType,
             posted: '',
             isRemote: job.isRemote,
+            deadlineHint: deadlineHint,
           ),
           if (salary.isNotEmpty || experience.isNotEmpty) ...[
             const SizedBox(height: 14),

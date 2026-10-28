@@ -226,7 +226,7 @@ abstract final class ChedGtsBuiltin {
           'Your bachelor\'s degree (e.g. BS Information Technology), '
           'school, year graduated, and honors such as Cum Laude. Add a '
           'row for each degree.',
-      required: true,
+      required: false,
       prefillKey: 'profile.educationRow',
     ),
     ChedGtsItem(

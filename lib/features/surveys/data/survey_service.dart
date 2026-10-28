@@ -352,6 +352,28 @@ class SurveyService {
     }
   }
 
+  /// Fetches the most recent submitted CHED GTS survey answers for [userId],
+  /// optionally excluding [excludeSurveyId] (e.g. the survey currently being taken).
+  Future<Map<String, dynamic>?> getLatestSubmittedChedAnswers(
+    String userId, {
+    String? excludeSurveyId,
+  }) async {
+    try {
+      final list = await getUserSubmittedResponses(userId);
+      for (final item in list) {
+        if (excludeSurveyId != null &&
+            item.response.surveyId == excludeSurveyId) {
+          continue;
+        }
+        final answers = item.response.answers;
+        if (answers.keys.any((k) => k.startsWith('ched_'))) {
+          return Map<String, dynamic>.from(answers);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<List<SurveyQuestion>> getQuestions(String surveyId) async {
     final merged = <String, SurveyQuestion>{};
 

@@ -229,12 +229,19 @@ class _TracerScreenState extends State<TracerScreen> {
         assignment.surveyId,
         uid,
       );
+      final pastAnswers = await _surveyService.getLatestSubmittedChedAnswers(
+        uid,
+        excludeSurveyId: assignment.surveyId,
+      );
       final profile = await _profileService.getTracerProfile(uid);
 
-      // Profile details and initial employment snapshot (Q16-Q19) are
+      // Profile details and historical answers (Sections A, B, C) are
       // carried over and flagged with a prompt to confirm or update them.
       final prefill = profile != null
-          ? ChedGtsPrefill.fromProfile(profile)
+          ? ChedGtsPrefill.fromProfile(
+              profile,
+              historicalAnswers: pastAnswers,
+            )
           : <String, dynamic>{};
       final merged = ChedGtsPrefill.merge(
         existing: existing?.answers ?? const {},

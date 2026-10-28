@@ -231,21 +231,35 @@ class _ChedGtsFormState extends State<ChedGtsForm> {
         children.add(_SectionHeader(title: item.sectionTitle));
         children.add(const SizedBox(height: 12));
       }
+      final isPermanentDemographic =
+          item.id == 'ched_7' || item.id == 'ched_8' || item.id == 'ched_9';
+      final isHistoricalSingleOrMatrix =
+          (item.id == 'ched_15b' || item.id == 'ched_15b_other') &&
+          widget.prefilledAnswers[item.id] != null;
+      final effectiveReadOnly = widget.readOnly ||
+          isPermanentDemographic ||
+          isHistoricalSingleOrMatrix;
+
       children.add(
         _ItemCard(
           item: item,
           value: _answers[item.id],
           textController: _textControllers[item.id],
-          readOnly: widget.readOnly,
+          readOnly: effectiveReadOnly,
           notesStyle: widget.notesStyle,
           missing: missing.contains(item.id),
           fromProfile:
-              !widget.readOnly &&
+              !effectiveReadOnly &&
               ChedGtsPrefill.showsProfileNote(
                 item.id,
                 _answers[item.id],
                 widget.prefilledAnswers,
               ),
+          demographicLocked: isPermanentDemographic,
+          historicalLocked: isHistoricalSingleOrMatrix,
+          prefilledRows: widget.prefilledAnswers[item.id] is List
+              ? widget.prefilledAnswers[item.id] as List
+              : null,
           onChanged: (v) => _set(item.id, v),
           nameLocked: item.id == 'ched_1' && widget.nameLocked,
           onHelp: _helpFor(item),
@@ -316,6 +330,42 @@ class _RequiredBadge extends StatelessWidget {
       child: Text(
         required ? 'Required' : 'Optional',
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label, this.icon});
+
+  final String label;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: PortalTheme.navy.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: PortalTheme.navy.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: PortalTheme.navy),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: PortalTheme.navy,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -712,6 +762,9 @@ class _ItemCard extends StatelessWidget {
     this.textController,
     this.missing = false,
     this.fromProfile = false,
+    this.demographicLocked = false,
+    this.historicalLocked = false,
+    this.prefilledRows,
     this.nameLocked = false,
     this.onHelp,
     this.helpUsed = false,
@@ -738,6 +791,15 @@ class _ItemCard extends StatelessWidget {
   /// Still shows a pre-filled profile value that may be out of date.
   final bool fromProfile;
 
+  /// Permanent demographic item (Q7 Sex, Q8 Birthday, Q9 Region of origin).
+  final bool demographicLocked;
+
+  /// Single choice or matrix prefilled from a previous survey.
+  final bool historicalLocked;
+
+  /// Prefilled rows for table items (Q12 degrees, Q13 exams, Q15a studies).
+  final List<dynamic>? prefilledRows;
+
   /// Q1 only: verified name, locked unless marriage opt-in.
   final bool nameLocked;
   final VoidCallback? onHelp;
@@ -756,9 +818,33 @@ class _ItemCard extends StatelessWidget {
 
   List<Widget> _notes() {
     final helpText = item.helpText;
+    final isQ1 = item.id == 'ched_1';
+    final isDemographic =
+        item.id == 'ched_7' || item.id == 'ched_8' || item.id == 'ched_9';
+
+    // Q1 when locked, and Q7-Q9: no dropdown notes at all
+    if (isDemographic || (isQ1 && nameLocked)) {
+      return const [];
+    }
+
+    // Q1 when unlocked via married civil status:
+    if (isQ1 && !nameLocked) {
+      return [
+        Text(
+          'Change your maiden name to your married legal name (e.g. updating your surname or family name).',
+          style: _noteStyle,
+        ),
+      ];
+    }
+
     return [
       if (recommendation == null && helpText != null)
         Text(helpText, style: _noteStyle),
+      if (historicalLocked)
+        Text(
+          'Prefilled from your previous tracer survey response · Read only.',
+          style: _noteStyle,
+        ),
       if (fromProfile) Text(profileNote, style: _noteStyle),
       if (helpPointer)
         Text.rich(
@@ -797,6 +883,24 @@ class _ItemCard extends StatelessWidget {
   }
 
   List<Widget> _inlineNotes() {
+    final isQ1 = item.id == 'ched_1';
+    final isDemographic =
+        item.id == 'ched_7' || item.id == 'ched_8' || item.id == 'ched_9';
+
+    if (isDemographic || (isQ1 && nameLocked)) {
+      return const [];
+    }
+
+    if (isQ1 && !nameLocked) {
+      return [
+        const SizedBox(height: 8),
+        Text(
+          'Change your maiden name to your married legal name (e.g. updating your surname or family name).',
+          style: _noteStyle,
+        ),
+      ];
+    }
+
     return [
       if (recommendation != null) ...[
         const SizedBox(height: 10),
@@ -804,6 +908,13 @@ class _ItemCard extends StatelessWidget {
       ] else if (item.helpText != null) ...[
         const SizedBox(height: 8),
         _HelpNote(text: item.helpText!),
+      ],
+      if (historicalLocked) ...[
+        const SizedBox(height: 8),
+        Text(
+          'Prefilled from your previous tracer survey · Read only.',
+          style: _noteStyle.copyWith(fontStyle: FontStyle.italic),
+        ),
       ],
       if (fromProfile) ...[
         const SizedBox(height: 8),
@@ -855,6 +966,9 @@ class _ItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLockedDemographic =
+        demographicLocked || (nameLocked && item.id == 'ched_1');
+
     return AnimatedContainer(
       duration: PortalTheme.fast,
       decoration: BoxDecoration(
@@ -884,10 +998,83 @@ class _ItemCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              _RequiredBadge(required: item.required),
+              if (historicalLocked) ...[
+                const SizedBox(width: 8),
+                const _StatusBadge(
+                  label: 'From Previous Survey',
+                  icon: Icons.history_rounded,
+                ),
+              ] else if (!isLockedDemographic) ...[
+                const SizedBox(width: 8),
+                _RequiredBadge(required: item.required),
+              ],
             ],
           ),
+          if (isLockedDemographic) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: PortalTheme.surfaceMuted,
+                borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                border: Border.all(
+                  color: PortalTheme.border.withValues(alpha: 0.8),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 14,
+                    color: PortalTheme.navy,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Verified institutional demographic record · Read only',
+                      style: PortalTheme.meta.copyWith(
+                        fontSize: 12,
+                        color: PortalTheme.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (historicalLocked) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: PortalTheme.surfaceMuted,
+                borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                border: Border.all(
+                  color: PortalTheme.border.withValues(alpha: 0.8),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.history_rounded,
+                    size: 14,
+                    color: PortalTheme.navy,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Prefilled from your previous survey response · Read only',
+                      style: PortalTheme.meta.copyWith(
+                        fontSize: 12,
+                        color: PortalTheme.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (missing) ...[
             const SizedBox(height: 6),
             const Row(
@@ -964,14 +1151,21 @@ class _ItemCard extends StatelessWidget {
               onSelected: readOnly ? null : (_) => onChanged(opt),
               selectedColor: PortalTheme.navy.withValues(alpha: 0.12),
               backgroundColor: PortalTheme.surfaceMuted,
+              disabledColor: selected
+                  ? PortalTheme.navy.withValues(alpha: 0.12)
+                  : PortalTheme.surfaceMuted.withValues(alpha: 0.4),
               side: BorderSide(
                 color: selected
                     ? PortalTheme.navy.withValues(alpha: 0.35)
-                    : PortalTheme.border,
+                    : PortalTheme.border.withValues(alpha: readOnly ? 0.4 : 1.0),
               ),
               labelStyle: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: selected ? PortalTheme.navy : PortalTheme.textSecondary,
+                color: selected
+                    ? PortalTheme.navy
+                    : (readOnly
+                        ? PortalTheme.textMuted
+                        : PortalTheme.textSecondary),
                 fontSize: 12,
               ),
             );
@@ -1024,7 +1218,8 @@ class _ItemCard extends StatelessWidget {
                         : <String, dynamic>{},
                   ),
                 )
-              : <Map<String, dynamic>>[{}],
+              : <Map<String, dynamic>>[],
+          prefilledRows: prefilledRows,
           readOnly: readOnly,
           onChanged: onChanged,
         );
@@ -1051,7 +1246,7 @@ class _DateField extends StatelessWidget {
     }
     final label = parsed != null
         ? DateFormat.yMMMd().format(parsed)
-        : 'Tap to select date';
+        : (readOnly ? 'None recorded' : 'Tap to select date');
 
     return InkWell(
       onTap: readOnly
@@ -1074,7 +1269,12 @@ class _DateField extends StatelessWidget {
           icon: Icons.calendar_today_outlined,
           readOnly: readOnly,
         ),
-        child: Text(label, style: PortalTheme.body),
+        child: Text(
+          label,
+          style: PortalTheme.body.copyWith(
+            color: readOnly ? PortalTheme.textPrimary : null,
+          ),
+        ),
       ),
     );
   }
@@ -1399,59 +1599,334 @@ class _TableRowsField extends StatelessWidget {
     required this.value,
     required this.onChanged,
     required this.readOnly,
+    this.prefilledRows,
   });
 
   final ChedGtsItem item;
   final List<Map<String, dynamic>> value;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
   final bool readOnly;
+  final List<dynamic>? prefilledRows;
 
   @override
   Widget build(BuildContext context) {
-    final rows = value.isEmpty ? [<String, dynamic>{}] : value;
+    final List<Map<String, dynamic>> rows;
+    if (value.isNotEmpty) {
+      rows = value;
+    } else if (prefilledRows != null && prefilledRows!.isNotEmpty) {
+      rows = prefilledRows!
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } else {
+      rows = const [];
+    }
+
+    final prefilledCount = prefilledRows?.length ?? 0;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (rows.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: PortalTheme.surfaceMuted,
+              borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+              border: Border.all(
+                color: PortalTheme.border.withValues(alpha: 0.8),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 16,
+                  color: PortalTheme.textMuted,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    switch (item.id) {
+                      'ched_12' =>
+                        'No degrees recorded. Tap below to add your degree.',
+                      'ched_13' =>
+                        'No examinations recorded. If you passed any board or civil service exam, tap below to add.',
+                      'ched_15a' =>
+                        'No advance studies or trainings recorded. If applicable, tap below to add.',
+                      _ => 'No records entered yet.',
+                    },
+                    style: PortalTheme.meta.copyWith(
+                      color: PortalTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) const Divider(height: 20),
+          _buildRowCard(
+            context: context,
+            index: i,
+            rows: rows,
+            prefilledCount: prefilledCount,
+          ),
+        ],
+        if (!readOnly)
+          _buildAddButton(rows: rows),
+      ],
+    );
+  }
+
+  Widget _buildRowCard({
+    required BuildContext context,
+    required int index,
+    required List<Map<String, dynamic>> rows,
+    required int prefilledCount,
+  }) {
+    final isQ12Row0 = item.id == 'ched_12' && index == 0;
+    final isPastSurveyRow = index < prefilledCount && !isQ12Row0;
+    final isRowLocked = readOnly || isQ12Row0 || index < prefilledCount;
+
+    final String title;
+    final String statusLabel;
+    final IconData icon;
+
+    if (isQ12Row0) {
+      title = 'Degree 1';
+      statusLabel = 'Official Degree · Read only';
+      icon = Icons.school_rounded;
+    } else if (isPastSurveyRow) {
+      title = switch (item.id) {
+        'ched_12' => 'Degree ${index + 1}',
+        'ched_13' => 'Examination ${index + 1}',
+        'ched_15a' => 'Training / Study ${index + 1}',
+        _ => 'Record ${index + 1}',
+      };
+      statusLabel = 'Previous survey · Read only';
+      icon = Icons.history_rounded;
+    } else {
+      title = switch (item.id) {
+        'ched_12' => 'Degree ${index + 1}',
+        'ched_13' => 'Examination ${index + 1}',
+        'ched_15a' => 'Training / Study ${index + 1}',
+        _ => 'Record ${index + 1}',
+      };
+      statusLabel = 'New entry';
+      icon = Icons.edit_note_rounded;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isRowLocked
+            ? PortalTheme.surfaceMuted.withValues(alpha: 0.55)
+            : PortalTheme.card,
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        border: Border.all(
+          color: isRowLocked
+              ? PortalTheme.border.withValues(alpha: 0.8)
+              : PortalTheme.navy.withValues(alpha: 0.25),
+          width: isRowLocked ? 1.0 : 1.2,
+        ),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: PortalTheme.navy),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: PortalTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isRowLocked
+                      ? PortalTheme.navy.withValues(alpha: 0.07)
+                      : const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: isRowLocked
+                        ? PortalTheme.navy
+                        : const Color(0xFF047857),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (!isRowLocked && !readOnly)
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: PortalTheme.danger,
+                  ),
+                  tooltip: 'Remove entry',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  onPressed: () {
+                    final next = rows
+                        .map((r) => Map<String, dynamic>.from(r))
+                        .toList();
+                    next.removeAt(index);
+                    onChanged(next);
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           ...item.tableColumns.map((col) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: TextFormField(
-                initialValue: rows[i][col]?.toString() ?? '',
-                readOnly: readOnly,
-                onChanged: (text) {
-                  final next = rows
-                      .map((r) => Map<String, dynamic>.from(r))
-                      .toList();
-                  next[i][col] = text;
-                  onChanged(next);
-                },
+                key: ValueKey('${item.id}_row_${index}_$col'),
+                initialValue: rows[index][col]?.toString() ?? '',
+                readOnly: isRowLocked,
+                onChanged: isRowLocked
+                    ? null
+                    : (text) {
+                        final next = rows
+                            .map((r) => Map<String, dynamic>.from(r))
+                            .toList();
+                        next[index][col] = text;
+                        onChanged(next);
+                      },
                 decoration: _portalFieldDecoration(
-                  label: item.required ? col : '$col (optional)',
-                  hint: item.required ? null : 'Leave blank or None / N/A',
-                  readOnly: readOnly,
+                  label: col,
+                  hint: isRowLocked ? null : 'Enter $col',
+                  readOnly: isRowLocked,
                 ),
               ),
             );
           }),
         ],
-        if (!readOnly)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              style: PortalTheme.ghostButton(dense: true),
-              onPressed: () {
-                onChanged([
-                  ...rows.map((r) => Map<String, dynamic>.from(r)),
-                  <String, dynamic>{},
-                ]);
-              },
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(item.required ? 'Add row' : 'Add row (optional)'),
+      ),
+    );
+  }
+
+  Widget _buildAddButton({required List<Map<String, dynamic>> rows}) {
+    final String title;
+    final String subtitle;
+
+    switch (item.id) {
+      case 'ched_12':
+        title = rows.isEmpty ? 'Add degree' : 'Add another degree';
+        subtitle =
+            'Add a newly earned degree or another applicable educational record.';
+        break;
+      case 'ched_13':
+        title = rows.isEmpty ? 'Add examination' : 'Add another examination';
+        subtitle =
+            'Add a newly passed examination, civil service, or board license.';
+        break;
+      case 'ched_15a':
+        title = rows.isEmpty
+            ? 'Add training or advance study'
+            : 'Add another training or advance study';
+        subtitle =
+            'Add a newly attended training program, seminar, or advance study.';
+        break;
+      default:
+        title = rows.isEmpty ? 'Add row' : 'Add another row';
+        subtitle = 'Add an additional entry to this table.';
+    }
+
+    return _AddRecordCardButton(
+      title: title,
+      subtitle: subtitle,
+      onTap: () {
+        final next = rows
+            .map((r) => Map<String, dynamic>.from(r))
+            .toList();
+        next.add(<String, dynamic>{});
+        onChanged(next);
+      },
+    );
+  }
+}
+
+class _AddRecordCardButton extends StatelessWidget {
+  const _AddRecordCardButton({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: PortalTheme.navy.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
+            border: Border.all(
+              color: PortalTheme.navy.withValues(alpha: 0.3),
+              width: 1.2,
             ),
           ),
-      ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.add_circle_outline_rounded,
+                    size: 19,
+                    color: PortalTheme.navy,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: PortalTheme.navy,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: PortalTheme.meta.copyWith(
+                  fontSize: 12,
+                  color: PortalTheme.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

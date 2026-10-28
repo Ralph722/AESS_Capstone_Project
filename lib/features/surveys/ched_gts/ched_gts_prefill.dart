@@ -48,6 +48,7 @@ abstract final class ChedGtsPrefill {
   static Map<String, dynamic> fromProfile(
     TracerProfile profile, {
     EmploymentRecord? employment,
+    Map<String, dynamic>? historicalAnswers,
   }) {
     final out = <String, dynamic>{};
 
@@ -92,6 +93,61 @@ abstract final class ChedGtsPrefill {
           'Honor(s) or Award(s) Received': profile.honorsAwards,
         },
       ];
+    }
+
+    if (historicalAnswers != null && historicalAnswers.isNotEmpty) {
+      // Historical Section A demographic fallback
+      if (!out.containsKey('ched_7')) put('ched_7', historicalAnswers['ched_7']);
+      if (!out.containsKey('ched_8')) put('ched_8', historicalAnswers['ched_8']);
+      if (!out.containsKey('ched_9')) put('ched_9', historicalAnswers['ched_9']);
+      if (!out.containsKey('ched_10')) put('ched_10', historicalAnswers['ched_10']);
+      if (!out.containsKey('ched_11')) put('ched_11', historicalAnswers['ched_11']);
+
+      // Historical Section B: Degrees (Q12), Exams (Q13), Course reasons (Q14)
+      final histQ12 = historicalAnswers['ched_12'];
+      if (histQ12 is List && histQ12.isNotEmpty) {
+        final rows = histQ12
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((r) => r.values.any((v) => v != null && v.toString().trim().isNotEmpty))
+            .toList();
+        if (rows.isNotEmpty) {
+          out['ched_12'] = rows;
+        }
+      }
+
+      final histQ13 = historicalAnswers['ched_13'];
+      if (histQ13 is List && histQ13.isNotEmpty) {
+        final rows = histQ13
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((r) => r.values.any((v) => v != null && v.toString().trim().isNotEmpty))
+            .toList();
+        if (rows.isNotEmpty) {
+          out['ched_13'] = rows;
+        }
+      }
+
+      final histQ14 = historicalAnswers['ched_14'];
+      if (histQ14 is Map && histQ14.isNotEmpty) {
+        out['ched_14'] = Map<String, dynamic>.from(histQ14);
+      }
+      put('ched_14_other', historicalAnswers['ched_14_other']);
+
+      // Historical Section C: Training / Studies (Q15a), Advance reasons (Q15b)
+      final histQ15a = historicalAnswers['ched_15a'];
+      if (histQ15a is List && histQ15a.isNotEmpty) {
+        final rows = histQ15a
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((r) => r.values.any((v) => v != null && v.toString().trim().isNotEmpty))
+            .toList();
+        if (rows.isNotEmpty) {
+          out['ched_15a'] = rows;
+        }
+      }
+      put('ched_15b', historicalAnswers['ched_15b']);
+      put('ched_15b_other', historicalAnswers['ched_15b_other']);
     }
 
     final employed = GtsConstants.toChedPresentlyEmployed(

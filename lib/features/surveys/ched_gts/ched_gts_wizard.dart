@@ -362,6 +362,19 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
       final optedIn = update == true;
       setState(() => _marriageNameOptedIn = optedIn);
       widget.onMarriageNameOptChanged?.call(optedIn);
+      if (optedIn) {
+        _scrollToTop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Question 1 (Official Name) is now unlocked. You can update your married name above.',
+            ),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: PortalTheme.navy,
+          ),
+        );
+      }
     } finally {
       _marriedPromptOpen = false;
     }

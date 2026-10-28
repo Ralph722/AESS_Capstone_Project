@@ -615,77 +615,69 @@ class JobPostingScreenState extends State<JobPostingScreen> {
           hintText: 'Search title, company, or location…',
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: PortalFilterChip.height,
-          width: double.infinity,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.hardEdge,
-            child: Row(
-              children: [
-                PortalFilterChip(
-                  label: 'Recommended',
-                  icon: Icons.auto_awesome_rounded,
-                  selected: _showRecommendedOnly,
-                  onTap: () => setState(() {
-                    _showRecommendedOnly = !_showRecommendedOnly;
-                    _showSavedOnly = false;
-                    _page = 0;
-                  }),
-                ),
-                const SizedBox(width: 8),
-                _dropdownChip(
-                  value: _category,
-                  items: [
-                    ('all', 'Category'),
-                    ...JobCategoryConstants.all.map((c) => (c, c)),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _category = v;
-                    _page = 0;
-                  }),
-                ),
-                const SizedBox(width: 8),
-                _dropdownChip(
-                  value: _type,
-                  items: [
-                    ('all', 'Type'),
-                    ...JobCategoryConstants.jobTypes.map((c) => (c, c)),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _type = v;
-                    _page = 0;
-                  }),
-                ),
-                const SizedBox(width: 8),
-                PortalFilterChip(
-                  label: 'Remote',
-                  icon: Icons.home_work_outlined,
-                  selected: _remoteOnly == true,
-                  onTap: () => setState(() {
-                    _remoteOnly = _remoteOnly == true ? null : true;
-                    _page = 0;
-                  }),
-                ),
-                const SizedBox(width: 8),
-                _dropdownChip(
-                  value: _sort,
-                  icon: Icons.swap_vert_rounded,
-                  items: const [
-                    ('newest', 'Newest'),
-                    ('oldest', 'Oldest'),
-                    ('deadline', 'Deadline'),
-                    ('salary_high', 'Salary ↓'),
-                    ('salary_low', 'Salary ↑'),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _sort = v;
-                    _page = 0;
-                  }),
-                ),
-              ],
+        PortalScrollableFilterRow(
+          children: [
+            PortalFilterChip(
+              label: 'Recommended',
+              icon: Icons.auto_awesome_rounded,
+              selected: _showRecommendedOnly,
+              onTap: () => setState(() {
+                _showRecommendedOnly = !_showRecommendedOnly;
+                _showSavedOnly = false;
+                _page = 0;
+              }),
             ),
-          ),
+            const SizedBox(width: 8),
+            _dropdownChip(
+              value: _category,
+              items: [
+                ('all', 'Category'),
+                ...JobCategoryConstants.all.map((c) => (c, c)),
+              ],
+              onChanged: (v) => setState(() {
+                _category = v;
+                _page = 0;
+              }),
+            ),
+            const SizedBox(width: 8),
+            _dropdownChip(
+              value: _type,
+              items: [
+                ('all', 'Type'),
+                ...JobCategoryConstants.jobTypes.map((c) => (c, c)),
+              ],
+              onChanged: (v) => setState(() {
+                _type = v;
+                _page = 0;
+              }),
+            ),
+            const SizedBox(width: 8),
+            PortalFilterChip(
+              label: 'Remote',
+              icon: Icons.home_work_outlined,
+              selected: _remoteOnly == true,
+              onTap: () => setState(() {
+                _remoteOnly = _remoteOnly == true ? null : true;
+                _page = 0;
+              }),
+            ),
+            const SizedBox(width: 8),
+            _dropdownChip(
+              value: _sort,
+              icon: Icons.swap_vert_rounded,
+              items: const [
+                ('newest', 'Newest'),
+                ('oldest', 'Oldest'),
+                ('deadline', 'Deadline'),
+                ('salary_high', 'Salary ↓'),
+                ('salary_low', 'Salary ↑'),
+              ],
+              onChanged: (v) => setState(() {
+                _sort = v;
+                _page = 0;
+              }),
+            ),
+          ],
         ),
       ],
     );

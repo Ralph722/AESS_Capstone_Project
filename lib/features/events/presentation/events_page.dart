@@ -554,7 +554,7 @@ class EventsScreenState extends State<EventsScreen>
           hintText: 'Search by title, venue, or category',
         ),
         const SizedBox(height: 12),
-        _ScrollableChipRow(
+        PortalScrollableFilterRow.builder(
           height: PortalFilterChip.height,
           itemCount: _filters.length,
           itemBuilder: (context, index) {
@@ -1091,121 +1091,6 @@ class EventsScreenState extends State<EventsScreen>
           onCommentsChanged?.call(count);
           _loadEvents();
         },
-      ),
-    );
-  }
-}
-
-/// Horizontal chip list with a ">" hint at the right edge while more chips
-/// are off-screen; tapping the hint scrolls further.
-class _ScrollableChipRow extends StatefulWidget {
-  const _ScrollableChipRow({
-    required this.height,
-    required this.itemCount,
-    required this.itemBuilder,
-  });
-
-  final double height;
-  final int itemCount;
-  final IndexedWidgetBuilder itemBuilder;
-
-  @override
-  State<_ScrollableChipRow> createState() => _ScrollableChipRowState();
-}
-
-class _ScrollableChipRowState extends State<_ScrollableChipRow> {
-  final _controller = ScrollController();
-  bool _canScrollRight = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(_update);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _update() {
-    if (!mounted || !_controller.hasClients) return;
-    final pos = _controller.position;
-    final next = pos.maxScrollExtent - pos.pixels > 4;
-    if (next != _canScrollRight) setState(() => _canScrollRight = next);
-  }
-
-  void _scrollRight() {
-    if (!_controller.hasClients) return;
-    final pos = _controller.position;
-    final target = (pos.pixels + pos.viewportDimension * 0.7).clamp(
-      0.0,
-      pos.maxScrollExtent,
-    );
-    _controller.animateTo(
-      target,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: widget.height,
-      child: NotificationListener<ScrollMetricsNotification>(
-        onNotification: (_) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _update());
-          return false;
-        },
-        child: Stack(
-          children: [
-            ListView.separated(
-              controller: _controller,
-              scrollDirection: Axis.horizontal,
-              itemCount: widget.itemCount,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: widget.itemBuilder,
-            ),
-            if (_canScrollRight)
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: Container(
-                  width: 48,
-                  alignment: Alignment.centerRight,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.white.withValues(alpha: 0), Colors.white],
-                      stops: const [0, 0.45],
-                    ),
-                  ),
-                  child: Material(
-                    color: Colors.white,
-                    shape: const CircleBorder(
-                      side: BorderSide(color: PortalTheme.border),
-                    ),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _scrollRight,
-                      child: const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: Icon(
-                          Icons.chevron_right_rounded,
-                          size: 18,
-                          color: PortalTheme.navy,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }

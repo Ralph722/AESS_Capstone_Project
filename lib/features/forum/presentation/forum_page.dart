@@ -172,29 +172,22 @@ class _ForumScreenState extends State<ForumScreen> {
   }
 
   Widget _buildFilterChips() {
-    return SizedBox(
-      height: PortalFilterChip.height,
-      width: double.infinity,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: _buildSortChip(),
-            ),
-            for (final f in ForumListFilter.values)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: PortalFilterChip(
-                  label: f.label,
-                  selected: _filters.contains(f),
-                  onTap: () => _toggleFilter(f),
-                ),
-              ),
-          ],
+    return PortalScrollableFilterRow(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: _buildSortChip(),
         ),
-      ),
+        for (final f in ForumListFilter.values)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: PortalFilterChip(
+              label: f.label,
+              selected: _filters.contains(f),
+              onTap: () => _toggleFilter(f),
+            ),
+          ),
+      ],
     );
   }
 

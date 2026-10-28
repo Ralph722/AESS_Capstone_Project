@@ -206,3 +206,150 @@ class PortalDropdownChip<T> extends StatelessWidget {
     );
   }
 }
+
+/// A horizontally scrolling filter row with an edge feather-fade indicator
+/// when additional filters extend beyond the visible screen width.
+class PortalScrollableFilterRow extends StatefulWidget {
+  const PortalScrollableFilterRow({
+    super.key,
+    required this.children,
+    this.height = PortalFilterChip.height,
+    this.fadeWidth = 36.0,
+    this.fadeColor = Colors.white,
+  })  : itemCount = null,
+        itemBuilder = null,
+        separatorWidth = 8.0;
+
+  const PortalScrollableFilterRow.builder({
+    super.key,
+    required this.itemCount,
+    required this.itemBuilder,
+    this.separatorWidth = 8.0,
+    this.height = PortalFilterChip.height,
+    this.fadeWidth = 36.0,
+    this.fadeColor = Colors.white,
+  }) : children = null;
+
+  final List<Widget>? children;
+  final int? itemCount;
+  final IndexedWidgetBuilder? itemBuilder;
+  final double separatorWidth;
+  final double height;
+  final double fadeWidth;
+  final Color fadeColor;
+
+  @override
+  State<PortalScrollableFilterRow> createState() =>
+      _PortalScrollableFilterRowState();
+}
+
+class _PortalScrollableFilterRowState
+    extends State<PortalScrollableFilterRow> {
+  final _controller = ScrollController();
+  bool _canScrollRight = false;
+  bool _canScrollLeft = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_update);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _update() {
+    if (!mounted || !_controller.hasClients) return;
+    final pos = _controller.position;
+    final nextRight = pos.maxScrollExtent - pos.pixels > 4;
+    final nextLeft = pos.pixels > 4;
+    if (nextRight != _canScrollRight || nextLeft != _canScrollLeft) {
+      setState(() {
+        _canScrollRight = nextRight;
+        _canScrollLeft = nextLeft;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: widget.height,
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: (_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _update());
+          return false;
+        },
+        child: Stack(
+          children: [
+            if (widget.itemBuilder != null)
+              ListView.separated(
+                controller: _controller,
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.hardEdge,
+                itemCount: widget.itemCount!,
+                separatorBuilder: (_, __) =>
+                    SizedBox(width: widget.separatorWidth),
+                itemBuilder: widget.itemBuilder!,
+              )
+            else
+              SingleChildScrollView(
+                controller: _controller,
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.hardEdge,
+                child: Row(
+                  children: widget.children!,
+                ),
+              ),
+            if (_canScrollLeft)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    width: widget.fadeWidth,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          widget.fadeColor,
+                          widget.fadeColor.withValues(alpha: 0),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (_canScrollRight)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    width: widget.fadeWidth,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          widget.fadeColor.withValues(alpha: 0),
+                          widget.fadeColor,
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

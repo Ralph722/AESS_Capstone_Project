@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:alumni_system/core/constants/philippine_location_constants.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_help_service.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_help_sheet.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_prefill.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
+import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 typedef ChedGtsAnswersChanged = void Function(Map<String, dynamic> answers);
@@ -1121,6 +1123,49 @@ class _ItemCard extends StatelessWidget {
     switch (item.type) {
       case ChedGtsFieldType.text:
       case ChedGtsFieldType.longText:
+        if (item.id == 'ched_10') {
+          final strValue = value?.toString() ?? '';
+          return Builder(
+            builder: (context) {
+              return InkWell(
+                onTap: readOnly
+                    ? null
+                    : () async {
+                        final picked = await showProvincePicker(
+                          context: context,
+                          provinces: PhilippineLocationConstants.allProvinces,
+                          selected: strValue.isEmpty ? null : strValue,
+                        );
+                        if (picked != null) {
+                          onChanged(picked);
+                        }
+                      },
+                borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                child: InputDecorator(
+                  decoration: _portalFieldDecoration(
+                    label: item.required ? 'Province *' : 'Province (optional)',
+                    hint: 'Search and select province',
+                    icon: Icons.location_on_outlined,
+                    readOnly: readOnly,
+                  ).copyWith(
+                    suffixIcon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: PortalTheme.textSecondary,
+                    ),
+                  ),
+                  child: Text(
+                    strValue.isEmpty ? 'Search and select province' : strValue,
+                    style: PortalTheme.body.copyWith(
+                      color: strValue.isEmpty
+                          ? PortalTheme.textMuted
+                          : PortalTheme.textPrimary,
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        }
         final locked = readOnly || nameLocked;
         return TextField(
           controller: textController,
@@ -1811,6 +1856,77 @@ class _TableRowsField extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ...item.tableColumns.map((col) {
+            if (item.id == 'ched_13' && col == 'Date Taken') {
+              final val = rows[index][col]?.toString() ?? '';
+              DateTime? parsed;
+              if (val.isNotEmpty) {
+                parsed = DateTime.tryParse(val);
+              }
+              final label = parsed != null
+                  ? DateFormat.yMMMd().format(parsed)
+                  : (val.isNotEmpty
+                      ? val
+                      : (isRowLocked
+                          ? 'None recorded'
+                          : 'Tap to select date taken'));
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: isRowLocked
+                      ? null
+                      : () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: parsed ?? DateTime.now(),
+                            firstDate: DateTime(1970),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            final next = rows
+                                .map((r) => Map<String, dynamic>.from(r))
+                                .toList();
+                            next[index][col] =
+                                DateFormat('yyyy-MM-dd').format(picked);
+                            onChanged(next);
+                          }
+                        },
+                  borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                  child: InputDecorator(
+                    decoration: _portalFieldDecoration(
+                      label: 'Date Taken',
+                      hint: 'Tap to select date taken',
+                      icon: Icons.calendar_today_outlined,
+                      readOnly: isRowLocked,
+                    ).copyWith(
+                      suffixIcon: (val.isNotEmpty && !isRowLocked)
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              color: PortalTheme.textSecondary,
+                              tooltip: 'Clear date',
+                              onPressed: () {
+                                final next = rows
+                                    .map((r) => Map<String, dynamic>.from(r))
+                                    .toList();
+                                next[index][col] = '';
+                                onChanged(next);
+                              },
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      label,
+                      style: PortalTheme.body.copyWith(
+                        color: (parsed != null || val.isNotEmpty)
+                            ? PortalTheme.textPrimary
+                            : PortalTheme.textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: TextFormField(

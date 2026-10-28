@@ -91,7 +91,7 @@ class MyApp extends StatelessWidget {
               : PortalOverlayTheme.apply(Theme.of(context)),
           child: EnvironmentBanner(
             label: SupabaseConfig.environmentLabel,
-            child: child!,
+            child: AppFocusDismissWrapper(child: child!),
           ),
         ),
       ),
@@ -104,6 +104,70 @@ class MyApp extends StatelessWidget {
         }
         return const AuthGate();
       }(),
+    );
+  }
+}
+
+/// Automatically clears active text focus and stops blinking cursor animations when:
+/// 1. The software keyboard is dismissed (via Android back button, swipe, or minimize).
+/// 2. The user taps outside the currently focused text field anywhere in the application.
+class AppFocusDismissWrapper extends StatefulWidget {
+  const AppFocusDismissWrapper({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<AppFocusDismissWrapper> createState() => _AppFocusDismissWrapperState();
+}
+
+class _AppFocusDismissWrapperState extends State<AppFocusDismissWrapper>
+    with WidgetsBindingObserver {
+  double _lastBottomInsets = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    final view = View.maybeOf(context);
+    if (view == null) return;
+    final bottomInsets = view.viewInsets.bottom;
+    // When keyboard was showing and has now closed (e.g. system back button or gesture navigation)
+    if (_lastBottomInsets > 0 && bottomInsets == 0) {
+      final primaryFocus = FocusManager.instance.primaryFocus;
+      if (primaryFocus != null && primaryFocus.hasFocus) {
+        primaryFocus.unfocus();
+      }
+    }
+    _lastBottomInsets = bottomInsets;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        final currentFocus = FocusManager.instance.primaryFocus;
+        if (currentFocus != null && currentFocus.hasFocus) {
+          final renderBox = currentFocus.context?.findRenderObject();
+          if (renderBox is RenderBox && renderBox.hasSize) {
+            final local = renderBox.globalToLocal(event.position);
+            if (!renderBox.paintBounds.contains(local)) {
+              currentFocus.unfocus();
+            }
+          }
+        }
+      },
+      child: widget.child,
     );
   }
 }

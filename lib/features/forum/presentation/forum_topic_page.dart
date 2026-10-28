@@ -1303,6 +1303,8 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                     child: TextField(
                       controller: _replyController,
                       focusNode: _replyFocus,
+                      onTapOutside: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
                       style: PortalTheme.body,
                       decoration: PortalComposer.inputDecoration(
                         hintText: 'Write a reply… Use @ to mention',

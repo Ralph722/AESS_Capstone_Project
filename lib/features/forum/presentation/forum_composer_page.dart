@@ -625,6 +625,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         ],
         TextFormField(
           controller: _titleController,
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           maxLength: ForumService.titleMaxLength,
           decoration: InputDecoration(
             labelText: 'Title',
@@ -725,6 +726,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     return TextFormField(
       controller: _bodyController,
       focusNode: _bodyFocus,
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       maxLength: ForumService.bodyMaxLength,
       minLines: widget.asSidePanel ? 10 : 8,
       maxLines: 18,

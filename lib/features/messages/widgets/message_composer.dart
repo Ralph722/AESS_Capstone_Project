@@ -206,6 +206,8 @@ class MessageComposer extends StatelessWidget {
                     child: TextField(
                       controller: controller,
                       enabled: enabled && !isUploading,
+                      onTapOutside: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
                       minLines: 1,
                       maxLines: 5,
                       maxLength: MessageTheme.messageMaxLength,

@@ -1052,18 +1052,30 @@ class _AlumniJobCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: isFavorite ? 'Remove saved' : 'Save job',
-                onPressed: onFavorite,
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                icon: Icon(
-                  isFavorite
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  color: isFavorite ? JobUiTheme.navy : JobUiTheme.textMuted,
-                  size: 24,
-                ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (deadlineHint != null) ...[
+                    JobDeadlineBadge(hint: deadlineHint),
+                    const SizedBox(width: 4),
+                  ],
+                  IconButton(
+                    tooltip: isFavorite ? 'Remove saved' : 'Save job',
+                    onPressed: onFavorite,
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      isFavorite
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      color: isFavorite ? JobUiTheme.navy : JobUiTheme.textMuted,
+                      size: 24,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1074,9 +1086,7 @@ class _AlumniJobCard extends StatelessWidget {
             posted: '',
             isRemote: job.isRemote,
           ),
-          if (salary.isNotEmpty ||
-              experience.isNotEmpty ||
-              deadlineHint != null) ...[
+          if (salary.isNotEmpty || experience.isNotEmpty) ...[
             const SizedBox(height: 14),
             Row(
               children: [
@@ -1121,19 +1131,6 @@ class _AlumniJobCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                if (deadlineHint != null) ...[
-                  const Spacer(),
-                  Text(
-                    deadlineHint,
-                    style: PortalTheme.caption.copyWith(
-                      color: deadlineHint == 'Application closed'
-                          ? JobUiTheme.danger
-                          : PortalTheme.warning,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
               ],
             ),
           ],

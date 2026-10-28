@@ -598,6 +598,7 @@ class _AnnouncementFilterBar extends StatelessWidget {
     return TextField(
       controller: controller,
       onChanged: (_) => onSearchChanged(),
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       style: PortalTheme.body,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(

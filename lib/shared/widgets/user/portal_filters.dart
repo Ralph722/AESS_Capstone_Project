@@ -32,6 +32,7 @@ class PortalSearchField extends StatelessWidget {
           controller: controller,
           onChanged: onChanged,
           textInputAction: textInputAction,
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           style: PortalTheme.body,
           decoration: InputDecoration(
             hintText: hintText,

@@ -1140,36 +1140,56 @@ class _ItemCard extends StatelessWidget {
           onChanged: onChanged,
         );
       case ChedGtsFieldType.single:
+        final chips = item.options.map((opt) {
+          final selected = value?.toString() == opt;
+          return ChoiceChip(
+            label: Text(opt),
+            selected: selected,
+            onSelected: readOnly ? null : (_) => onChanged(opt),
+            selectedColor: PortalTheme.navy.withValues(alpha: 0.12),
+            backgroundColor: PortalTheme.surfaceMuted,
+            disabledColor: selected
+                ? PortalTheme.navy.withValues(alpha: 0.12)
+                : PortalTheme.surfaceMuted.withValues(alpha: 0.4),
+            side: BorderSide(
+              color: selected
+                  ? PortalTheme.navy.withValues(alpha: 0.35)
+                  : PortalTheme.border.withValues(alpha: readOnly ? 0.4 : 1.0),
+            ),
+            labelStyle: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: selected
+                  ? PortalTheme.navy
+                  : (readOnly
+                      ? PortalTheme.textMuted
+                      : PortalTheme.textSecondary),
+              fontSize: 12,
+            ),
+          );
+        }).toList();
+
+        final isScrollable = item.id == 'ched_20' || item.id == 'ched_28';
+        if (isScrollable) {
+          return _VisibleHorizontalScroll(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < chips.length; i++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: i == chips.length - 1 ? 0 : 8,
+                    ),
+                    child: chips[i],
+                  ),
+              ],
+            ),
+          );
+        }
+
         return Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: item.options.map((opt) {
-            final selected = value?.toString() == opt;
-            return ChoiceChip(
-              label: Text(opt),
-              selected: selected,
-              onSelected: readOnly ? null : (_) => onChanged(opt),
-              selectedColor: PortalTheme.navy.withValues(alpha: 0.12),
-              backgroundColor: PortalTheme.surfaceMuted,
-              disabledColor: selected
-                  ? PortalTheme.navy.withValues(alpha: 0.12)
-                  : PortalTheme.surfaceMuted.withValues(alpha: 0.4),
-              side: BorderSide(
-                color: selected
-                    ? PortalTheme.navy.withValues(alpha: 0.35)
-                    : PortalTheme.border.withValues(alpha: readOnly ? 0.4 : 1.0),
-              ),
-              labelStyle: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: selected
-                    ? PortalTheme.navy
-                    : (readOnly
-                        ? PortalTheme.textMuted
-                        : PortalTheme.textSecondary),
-                fontSize: 12,
-              ),
-            );
-          }).toList(),
+          children: chips,
         );
       case ChedGtsFieldType.multi:
         final selected = value is List

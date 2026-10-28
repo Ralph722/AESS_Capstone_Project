@@ -350,6 +350,8 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       return;
     }
 
+    FocusScope.of(context).unfocus();
+
     setState(() => _checkingContent = true);
     ForumModerationResult moderation;
     try {

@@ -12,20 +12,25 @@ class SupabaseUserBridge {
 
   /// [userId] is the Supabase auth UUID (primary key of `public.users`).
   Future<String?> resolveSupabaseUserId(String userId) async {
-    if (userId.isEmpty) return AppSession.userId;
+    final trimmed = userId.trim();
+    if (trimmed.isEmpty) return AppSession.userId;
 
     final current = AppSession.userId;
-    if (current != null && current == userId) return current;
+    if (current != null && current == trimmed) return current;
 
     try {
       final byId = await _client
           .from('users')
           .select('id')
-          .eq('id', userId)
+          .eq('id', trimmed)
           .maybeSingle();
-      return byId?['id'] as String? ?? current;
+      final id = byId?['id'] as String?;
+      if (id != null && id.isNotEmpty) {
+        return id;
+      }
+      return trimmed;
     } catch (_) {
-      return current;
+      return trimmed;
     }
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
@@ -261,14 +262,16 @@ class _ForumScreenState extends State<ForumScreen> {
       floatingActionButton: Padding(
         // Clear the floating pill bottom nav when embedded in Community hub.
         // Tablet / web use a side rail instead, so no offset there.
+        // When keyboard is visible (viewInsets.bottom > 0), bottom clearance is zero.
         padding: EdgeInsets.only(
           bottom:
               widget.embeddedInHub &&
-                  !PortalBreakpoints.useNavigationRail(
-                    PortalBreakpoints.widthOf(context),
-                  )
-              ? PortalFloating.bottomClearance(context) - 16
-              : 0,
+                      !PortalBreakpoints.useNavigationRail(
+                        PortalBreakpoints.widthOf(context),
+                      ) &&
+                      MediaQuery.viewInsetsOf(context).bottom == 0
+                  ? math.max(0.0, PortalFloating.bottomClearance(context) - 16)
+                  : 0.0,
         ),
         child: FloatingActionButton.extended(
           onPressed: _openComposer,

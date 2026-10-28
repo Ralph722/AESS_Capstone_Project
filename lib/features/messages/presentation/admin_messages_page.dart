@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -515,6 +515,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
       _scrollToBottom();
     } catch (e) {
+      debugPrint('[AdminMessagesScreen] Send message failed: $e');
       if (imageUrl != null) {
         await _messageService.discardUploadedMessageImage(imageUrl);
       }

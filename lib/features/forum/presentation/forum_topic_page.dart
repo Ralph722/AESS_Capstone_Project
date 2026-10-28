@@ -270,6 +270,8 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     final text = _replyController.text.trim();
     if (text.isEmpty) return;
 
+    FocusScope.of(context).unfocus();
+
     setState(() => _sending = true);
     try {
       final moderation = await _moderationService.reviewReply(

@@ -444,6 +444,15 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         'sendStatus': 'sending',
       });
 
+      if (mounted && hasImage) {
+        setState(() {
+          _selectedImage = null;
+          _selectedImageBytes = null;
+          _uploadFailed = false;
+          _uploadProgress = null;
+        });
+      }
+
       await _messageService.sendMessage(
         messageId: messageId,
         senderId: _currentUserId!,
@@ -476,6 +485,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
         });
       }
     } catch (e) {
+      debugPrint('[UserMessagesScreen] Send message failed: $e');
       if (mounted) {
         final failedId = messageId;
         if (failedId != null) {
@@ -495,10 +505,12 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
           });
         }
         showPortalErrorSnack(context, e);
-        setState(() {
-          _selectedImage = tempImage;
-          _selectedImageBytes = tempImageBytes;
-        });
+        if (failedId == null) {
+          setState(() {
+            _selectedImage = tempImage;
+            _selectedImageBytes = tempImageBytes;
+          });
+        }
       }
     }
   }
@@ -537,6 +549,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
       });
       _messageController.clear();
     } catch (e) {
+      debugPrint('[UserMessagesScreen] Retry message failed: $e');
       _upsertLocalMessage({'docId': docId, 'sendStatus': 'failed'});
       if (!mounted) return;
       showPortalErrorSnack(context, e);

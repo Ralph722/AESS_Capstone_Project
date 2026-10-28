@@ -1243,29 +1243,81 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
               padding: EdgeInsets.zero,
               children: [
                 if (job.hasCoverImage)
-                  JobCoverPhoto(
-                    job: job,
-                    overlay: Center(
-                      child: Container(
-                        margin: const EdgeInsets.only(top: 10),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 4),
+                  Container(
+                    width: double.infinity,
+                    color: PortalTheme.surfaceMuted,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            JobCoverPhoto(
+                              job: job,
+                              height: 155,
+                              overlay: Center(
+                                child: Container(
+                                  margin: const EdgeInsets.only(top: 10),
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    borderRadius: BorderRadius.circular(999),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 20,
+                              bottom: -28,
+                              child: Container(
+                                padding: const EdgeInsets.all(3.5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(
+                                    JobUiTheme.radiusLg,
+                                  ),
+                                  border: Border.all(
+                                    color: PortalTheme.border,
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x1F000000),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: JobCompanyLogo(
+                                  job: job,
+                                  size: 58,
+                                  radius: 11,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 36),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                          child: _buildJobHeaderInfo(locationLabel),
+                        ),
+                      ],
                     ),
-                  ),
-                Container(
-                  width: double.infinity,
-                  color: PortalTheme.surfaceMuted,
-                  child: Column(
-                    children: [
-                      if (!job.hasCoverImage) ...[
+                  )
+                else
+                  Container(
+                    width: double.infinity,
+                    color: PortalTheme.surfaceMuted,
+                    child: Column(
+                      children: [
                         const SizedBox(height: 10),
                         Container(
                           width: 40,
@@ -1275,105 +1327,36 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
-                      ],
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(
-                                  JobUiTheme.radiusLg,
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(
+                                    JobUiTheme.radiusLg,
+                                  ),
+                                  border: Border.all(color: PortalTheme.border),
                                 ),
-                                border: Border.all(color: PortalTheme.border),
+                                child: JobCompanyLogo(
+                                  job: job,
+                                  size: 56,
+                                  radius: 11,
+                                ),
                               ),
-                              child: JobCompanyLogo(
-                                job: job,
-                                size: 56,
-                                radius: 11,
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: _buildJobHeaderInfo(locationLabel),
                               ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    job.jobTitle.isEmpty
-                                        ? 'Open role'
-                                        : job.jobTitle,
-                                    style: const TextStyle(
-                                      color: PortalTheme.navy,
-                                      fontSize: 21,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    job.companyName,
-                                    style: const TextStyle(
-                                      color: PortalTheme.textPrimary,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  if (locationLabel.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.place_outlined,
-                                          size: 14,
-                                          color: PortalTheme.textSecondary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            locationLabel,
-                                            style: const TextStyle(
-                                              color: PortalTheme.textSecondary,
-                                              fontSize: 12.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                  const SizedBox(height: 12),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: [
-                                      if (job.jobType.isNotEmpty)
-                                        JobHeaderPill(label: job.jobType),
-                                      if (job.isRemote)
-                                        const JobHeaderPill(label: 'Remote'),
-                                      if (job.category.isNotEmpty)
-                                        JobHeaderPill(label: job.category),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    jobPostedAgo(job.postedDate),
-                                    style: const TextStyle(
-                                      color: PortalTheme.textSecondary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                   child: Column(
@@ -1772,6 +1755,76 @@ class _AlumniJobDetailsState extends State<_AlumniJobDetails> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildJobHeaderInfo(String locationLabel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          job.jobTitle.isEmpty ? 'Open role' : job.jobTitle,
+          style: const TextStyle(
+            color: PortalTheme.navy,
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          job.companyName,
+          style: const TextStyle(
+            color: PortalTheme.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (locationLabel.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(
+                Icons.place_outlined,
+                size: 14,
+                color: PortalTheme.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  locationLabel,
+                  style: const TextStyle(
+                    color: PortalTheme.textSecondary,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            if (job.jobType.isNotEmpty)
+              JobHeaderPill(label: job.jobType),
+            if (job.isRemote)
+              const JobHeaderPill(label: 'Remote'),
+            if (job.category.isNotEmpty)
+              JobHeaderPill(label: job.category),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          jobPostedAgo(job.postedDate),
+          style: const TextStyle(
+            color: PortalTheme.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 

@@ -13,12 +13,20 @@ String _coverFileName(JobPosting job) {
 /// Full-width job cover for the top of the details sheet: tap to view full
 /// screen, round download button in the corner. Height is 16:9, capped.
 class JobCoverPhoto extends StatelessWidget {
-  const JobCoverPhoto({super.key, required this.job, this.overlay});
+  const JobCoverPhoto({
+    super.key,
+    required this.job,
+    this.overlay,
+    this.height,
+  });
 
   final JobPosting job;
 
   /// Drawn over the photo's top edge (e.g. the sheet drag handle).
   final Widget? overlay;
+
+  /// Explicit height override for hero banners (defaults to 16:9 capped at 260).
+  final double? height;
 
   static const double maxHeight = 260;
 
@@ -26,9 +34,10 @@ class JobCoverPhoto extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final height = math.min(constraints.maxWidth * 9 / 16, maxHeight);
+        final resolvedHeight =
+            height ?? math.min(constraints.maxWidth * 9 / 16, maxHeight);
         return SizedBox(
-          height: height,
+          height: resolvedHeight,
           width: double.infinity,
           child: Stack(
             fit: StackFit.expand,

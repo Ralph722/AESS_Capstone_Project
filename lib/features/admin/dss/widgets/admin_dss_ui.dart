@@ -6,7 +6,9 @@ import 'package:alumni_system/features/admin/dss/application/dss_priority.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
@@ -82,6 +84,7 @@ class DssPageHeader extends StatelessWidget {
     this.selectedSubnav,
     this.onSubnavSelected,
     this.trailingSubnav,
+    this.findingsCount,
   });
 
   final String title;
@@ -92,149 +95,108 @@ class DssPageHeader extends StatelessWidget {
   final int? selectedSubnav;
   final ValueChanged<int>? onSubnavSelected;
   final Widget? trailingSubnav;
+  final int? findingsCount;
 
   @override
   Widget build(BuildContext context) {
     final hasTabs = selectedSubnav != null && onSubnavSelected != null;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AdminColors.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AdminColors.border),
-        boxShadow: AdminSurfaces.cardShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
+
+    Widget? leading;
+    if (onBack != null) {
+      leading = Tooltip(
+        message: backTooltip,
+        child: InkWell(
+          onTap: onBack,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AdminColors.surface,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(color: AdminColors.border),
             ),
-            child: Row(
-              children: [
-                if (onBack != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: IconButton(
-                      tooltip: backTooltip,
-                      onPressed: onBack,
-                      style: IconButton.styleFrom(
-                        backgroundColor: AdminColors.surface,
-                        foregroundColor: AdminColors.textPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: const BorderSide(color: AdminColors.border),
-                        ),
-                        minimumSize: const Size(36, 36),
-                      ),
-                      icon: const Icon(Icons.arrow_back, size: 18),
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AdminColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AdminColors.primary.withValues(alpha: 0.16),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.insights_rounded,
-                        size: 20,
-                        color: AdminColors.primary,
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: AdminDensity.titleFontSize,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                          color: AdminColors.textPrimary,
-                        ),
-                      ),
-                      if (subtitle != null && subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: AdminDensity.subtitleFontSize,
-                            color: AdminColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (actions.isNotEmpty) ...[
-                  const SizedBox(width: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    alignment: WrapAlignment.end,
-                    children: actions,
-                  ),
-                ],
-              ],
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              size: 16,
+              color: AdminColors.textPrimary,
             ),
           ),
-          if (hasTabs) ...[
-            const Divider(height: 1, thickness: 1, color: AdminColors.border),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
-              child: Row(
+        ),
+      );
+    }
+
+    final header = AdminCompactHeader(
+      title: title,
+      subtitle: subtitle,
+      leading: leading,
+      actions: actions,
+    );
+
+    if (!hasTabs) {
+      return header;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        header,
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final tabs = AdminSaaSTabs(
+              tabs: [
+                AdminSaaSTabSpec(
+                  label: 'Findings',
+                  icon: Icons.flag_outlined,
+                  count: findingsCount != null && findingsCount! > 0
+                      ? findingsCount
+                      : null,
+                  isSelected: selectedSubnav == 0,
+                  onTap: () => onSubnavSelected!(0),
+                ),
+                AdminSaaSTabSpec(
+                  label: 'History',
+                  icon: Icons.timeline_outlined,
+                  isSelected: selectedSubnav == 1,
+                  onTap: () => onSubnavSelected!(1),
+                ),
+                AdminSaaSTabSpec(
+                  label: 'Rules',
+                  icon: Icons.tune_rounded,
+                  isSelected: selectedSubnav == 2,
+                  onTap: () => onSubnavSelected!(2),
+                ),
+              ],
+            );
+
+            if (trailingSubnav == null) {
+              return Align(alignment: Alignment.centerLeft, child: tabs);
+            }
+
+            if (constraints.maxWidth < 640) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: AdminTabBar(
-                      selectedIndex: selectedSubnav!.clamp(0, 2),
-                      onSelected: onSubnavSelected!,
-                      isScrollable: true,
-                      background: Colors.transparent,
-                      tabs: const [
-                        AdminTabSpec(
-                          label: 'Findings',
-                          icon: Icons.flag_outlined,
-                        ),
-                        AdminTabSpec(
-                          label: 'History',
-                          icon: Icons.timeline,
-                        ),
-                        AdminTabSpec(
-                          label: 'Rules',
-                          icon: Icons.tune,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (trailingSubnav != null) ...[
-                    const SizedBox(width: 8),
-                    trailingSubnav!,
-                  ],
+                  tabs,
+                  const SizedBox(height: 8),
+                  trailingSubnav!,
                 ],
-              ),
-            ),
-          ],
-        ],
-      ),
+              );
+            }
+
+            return Row(
+              children: [
+                tabs,
+                const Spacer(),
+                trailingSubnav!,
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }

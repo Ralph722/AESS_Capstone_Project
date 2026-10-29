@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_instant_content.dart';
@@ -22,7 +23,7 @@ import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 
@@ -621,11 +622,34 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           subtitle: 'Work queue for tracer Findings and Watch items.',
           selectedSubnav: _subnavIndex,
           onSubnavSelected: _onSubnavSelected,
-          trailingSubnav: Text(
-            _lastEvaluatedLabel,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AdminDssTheme.textMuted,
+          findingsCount: _openCount + _inProgressCount,
+          trailingSubnav: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AdminColors.surface,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(color: AdminColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _lastEvaluatedAt != null
+                      ? Icons.schedule_rounded
+                      : Icons.info_outline_rounded,
+                  size: 13,
+                  color: AdminColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _lastEvaluatedLabel,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: AdminColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
           actions: [
@@ -635,6 +659,10 @@ class _AdminDssScreenState extends State<AdminDssScreen>
               position: PopupMenuPosition.under,
               color: Colors.white,
               surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                side: const BorderSide(color: AdminColors.border),
+              ),
               onSelected: (v) {
                 if (v == 'export') {
                   _exportFlags();
@@ -646,46 +674,59 @@ class _AdminDssScreenState extends State<AdminDssScreen>
                 PopupMenuItem(
                   value: 'export',
                   enabled: filtered.isNotEmpty,
-                  child: const Text('Export CSV'),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.table_chart_outlined, size: 16, color: AdminColors.textSecondary),
+                      SizedBox(width: 8),
+                      Text('Export CSV', style: TextStyle(fontSize: 13)),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'report',
                   enabled: !_buildingReport,
-                  child: Text(
-                    _buildingReport ? 'Building report…' : 'Report card PDF',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.picture_as_pdf_outlined, size: 16, color: AdminColors.textSecondary),
+                      const SizedBox(width: 8),
+                      Text(
+                        _buildingReport ? 'Building report…' : 'Report card PDF',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
                   ),
                 ),
               ],
               child: Container(
-                height: AdminDssTheme.buttonHeight,
+                height: AdminDensity.buttonHeight,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: AdminDssTheme.card,
-                  borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-                  border: Border.all(color: AdminDssTheme.border),
+                  color: AdminColors.surface,
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                  border: Border.all(color: AdminColors.border),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.download_outlined,
-                      size: 17,
-                      color: AdminDssTheme.textPrimary,
+                      Icons.file_download_outlined,
+                      size: 15,
+                      color: AdminColors.textPrimary,
                     ),
                     SizedBox(width: 6),
                     Text(
                       'Reports',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: AdminDssTheme.textPrimary,
+                        color: AdminColors.textPrimary,
                       ),
                     ),
-                    SizedBox(width: 2),
+                    SizedBox(width: 4),
                     Icon(
-                      Icons.arrow_drop_down,
-                      size: 18,
-                      color: AdminDssTheme.textSecondary,
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: AdminColors.textSecondary,
                     ),
                   ],
                 ),
@@ -708,42 +749,11 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             ),
           ],
         ),
-        if (_showRulesRefreshHint) ...[
-          const SizedBox(height: AdminDssTheme.space1),
-          DssInsightBanner(
-            text:
-                'If you changed Rules, click Re-run analysis so Findings use the new thresholds.',
-            icon: Icons.tune,
-            onDismiss: () => setState(() => _showRulesRefreshHint = false),
-          ),
-        ],
-        if (_showHowThisWorks) ...[
-          const SizedBox(height: AdminDssTheme.space1),
-          DssHowThisWorksStrip(
-            onDismiss: _dismissHowThisWorks,
-            onSeeExample: () => showDssExampleFindingPreview(context),
-          ),
-        ],
-        const SizedBox(height: AdminDssTheme.space2),
+        _buildNotificationBanners(),
+        const SizedBox(height: 10),
         _buildMetrics(),
-        const SizedBox(height: AdminDssTheme.space2),
+        const SizedBox(height: 10),
         _buildToolbar(),
-        if (_rerunSummary != null) ...[
-          const SizedBox(height: AdminDssTheme.space1),
-          DssInsightBanner(
-            text: _rerunSummary!,
-            icon: Icons.analytics_outlined,
-            onDismiss: () => setState(() => _rerunSummary = null),
-          ),
-        ],
-        if (_evalMessage != null) ...[
-          const SizedBox(height: AdminDssTheme.space1),
-          DssInsightBanner(
-            text: _evalMessage!,
-            icon: Icons.info_outline,
-            onDismiss: () => setState(() => _evalMessage = null),
-          ),
-        ],
         const SizedBox(height: AdminDssTheme.space1),
         if (_error != null)
           Expanded(
@@ -796,54 +806,110 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     );
   }
 
+  Widget _buildNotificationBanners() {
+    final hasAny = _showRulesRefreshHint ||
+        _showHowThisWorks ||
+        _rerunSummary != null ||
+        _evalMessage != null;
+    if (!hasAny) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_showRulesRefreshHint) ...[
+            DssInsightBanner(
+              text:
+                  'If you changed Rules, click Re-run analysis so Findings use the new thresholds.',
+              icon: Icons.tune,
+              onDismiss: () => setState(() => _showRulesRefreshHint = false),
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (_showHowThisWorks) ...[
+            DssHowThisWorksStrip(
+              onDismiss: _dismissHowThisWorks,
+              onSeeExample: () => showDssExampleFindingPreview(context),
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (_rerunSummary != null) ...[
+            DssInsightBanner(
+              text: _rerunSummary!,
+              icon: Icons.analytics_outlined,
+              onDismiss: () => setState(() => _rerunSummary = null),
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (_evalMessage != null) ...[
+            DssInsightBanner(
+              text: _evalMessage!,
+              icon: Icons.info_outline,
+              onDismiss: () => setState(() => _evalMessage = null),
+            ),
+            const SizedBox(height: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildMetrics() {
-    return DirectoryKpiRow(
-      children: [
-        AdminKpiCard(
-          dense: true,
+    return AdminMetricRibbon(
+      items: [
+        AdminMetricRibbonItem(
           label: 'Open',
           value: '$_openCount',
-          caption: 'Not started',
           icon: Icons.flag_outlined,
-          accent: AdminColors.primary,
-          palette: AdminAccents.blue,
-          selected: _statusFilter == _DssStatusFilter.open,
-          onTap: () => setState(() => _statusFilter = _DssStatusFilter.open),
+          color: AdminColors.primary,
+          isSelected: _statusFilter == _DssStatusFilter.open,
+          tooltip: 'Active findings waiting to be addressed',
+          onTap: () => setState(() {
+            _statusFilter = _statusFilter == _DssStatusFilter.open
+                ? _DssStatusFilter.queue
+                : _DssStatusFilter.open;
+          }),
         ),
-        AdminKpiCard(
-          dense: true,
+        AdminMetricRibbonItem(
           label: 'In progress',
           value: '$_inProgressCount',
-          caption: 'Being handled',
           icon: Icons.pending_actions_outlined,
-          accent: AdminColors.accent,
-          palette: AdminAccents.gold,
-          selected: _statusFilter == _DssStatusFilter.inProgress,
-          onTap: () =>
-              setState(() => _statusFilter = _DssStatusFilter.inProgress),
+          color: UstpColors.orange,
+          isSelected: _statusFilter == _DssStatusFilter.inProgress,
+          tooltip: 'Findings with action currently underway',
+          onTap: () => setState(() {
+            _statusFilter = _statusFilter == _DssStatusFilter.inProgress
+                ? _DssStatusFilter.queue
+                : _DssStatusFilter.inProgress;
+          }),
         ),
-        AdminKpiCard(
-          dense: true,
+        AdminMetricRibbonItem(
           label: 'Resolved',
           value: '$_resolvedCount',
-          caption: 'Closed with action',
           icon: Icons.check_circle_outline,
-          accent: AdminColors.primary,
-          palette: AdminAccents.midBlue,
-          selected: _statusFilter == _DssStatusFilter.resolved,
-          onTap: () =>
-              setState(() => _statusFilter = _DssStatusFilter.resolved),
+          color: AdminColors.success,
+          isSelected: _statusFilter == _DssStatusFilter.resolved,
+          tooltip: 'Findings closed with action documentation',
+          onTap: () => setState(() {
+            _statusFilter = _statusFilter == _DssStatusFilter.resolved
+                ? _DssStatusFilter.queue
+                : _DssStatusFilter.resolved;
+          }),
         ),
-        AdminKpiCard(
-          dense: true,
+        AdminMetricRibbonItem(
           label: 'Watch',
           value: '$_watchCount',
-          caption: 'Too few answers',
           icon: Icons.visibility_outlined,
-          accent: AdminColors.accent,
-          palette: AdminAccents.orange,
-          selected: _statusFilter == _DssStatusFilter.watch,
-          onTap: () => setState(() => _statusFilter = _DssStatusFilter.watch),
+          color: AdminColors.secondary,
+          isSelected: _statusFilter == _DssStatusFilter.watch,
+          tooltip: 'Threshold reached but too few responses for finding status',
+          onTap: () => setState(() {
+            _statusFilter = _statusFilter == _DssStatusFilter.watch
+                ? _DssStatusFilter.queue
+                : _DssStatusFilter.watch;
+          }),
         ),
       ],
     );

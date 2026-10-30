@@ -2,7 +2,7 @@
 echo ========================================
 echo Building Flutter Web App for Production
 echo ========================================
-flutter build web --release
+flutter build web --release --no-tree-shake-icons
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

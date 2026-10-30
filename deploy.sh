@@ -9,7 +9,7 @@ echo "Firebase project: aess-alumni"
 echo "Hosting site:     ustp-aess"
 echo ""
 
-flutter build web --release
+flutter build web --release --no-tree-shake-icons
 
 echo ""
 echo "========================================"

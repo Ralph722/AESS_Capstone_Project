@@ -6,8 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-import 'package:alumni_system/core/utils/pdf_safe_text.dart';
-import 'package:alumni_system/core/utils/personal_data_notice.dart';
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/features/surveys/data/classic_survey_visibility.dart';
@@ -122,40 +121,19 @@ class SurveySingleResponseExportService {
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              PdfSafeText.sanitize(survey.title),
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.blue900,
-              ),
-            ),
-            pw.Text(
-              PdfSafeText.sanitize(
-                'Individual response export - ${fmt.format(DateTime.now())}',
-              ),
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Divider(color: PdfColors.blue900),
-            pw.SizedBox(height: 8),
-          ],
+        margin: AessPdfTheme.pageMargin,
+        header: (ctx) => AessPdfHeader.build(
+          title: 'Individual Survey Response',
+          subtitle: survey.title,
+          generationDate: fmt.format(DateTime.now()),
+          classification: 'CONFIDENTIAL',
         ),
-        footer: pdfPageFooter,
+        footer: (ctx) => AessPdfFooter.build(
+          ctx,
+          containsPersonalData: true,
+        ),
         build: (ctx) => [
-          pw.Text(
-            'Alumni information',
-            style: pw.TextStyle(
-              fontSize: 12,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.blue900,
-            ),
-          ),
-          pw.SizedBox(height: 6),
+          AessPdfTable.sectionHeading('1. Alumni Information'),
           _pdfMetaTable([
             ['Name', participant.displayName],
             ['Email', participant.email],
@@ -169,15 +147,10 @@ class SurveySingleResponseExportService {
             ['Device', response.deviceSummary],
           ]),
           pw.SizedBox(height: 14),
-          pw.Text(
-            'Answers',
-            style: pw.TextStyle(
-              fontSize: 12,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.blue900,
-            ),
+          AessPdfTable.sectionHeading(
+            '2. Recorded Responses',
+            countBadge: '${answerRows.length} answers',
           ),
-          pw.SizedBox(height: 6),
           _pdfAnswerTable(answerRows),
         ],
       ),
@@ -186,36 +159,9 @@ class SurveySingleResponseExportService {
   }
 
   static pw.Widget _pdfMetaTable(List<List<String>> rows) {
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-      columnWidths: const {
-        0: pw.FlexColumnWidth(1.2),
-        1: pw.FlexColumnWidth(2.8),
-      },
-      children: [
-        for (final row in rows)
-          pw.TableRow(
-            children: [
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(6),
-                child: pw.Text(
-                  PdfSafeText.sanitize(row[0]),
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-              ),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(6),
-                child: pw.Text(
-                  PdfSafeText.sanitize(row[1]),
-                  style: const pw.TextStyle(fontSize: 9),
-                ),
-              ),
-            ],
-          ),
-      ],
+    return AessPdfKpiGrid.buildKeyValueTable(
+      pairs: [for (final r in rows) (r[0], r[1])],
+      labelWidth: 140,
     );
   }
 
@@ -223,56 +169,28 @@ class SurveySingleResponseExportService {
     if (rows.isEmpty) {
       return pw.Text(
         'No visible answers recorded.',
-        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+        style: AessPdfTheme.tableCellMuted,
       );
     }
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+    return AessPdfTable.build(
+      headers: const ['Section', 'Question', 'Answer'],
+      rows: [
+        for (final row in rows)
+          [
+            row.section,
+            row.itemNumber == null || row.itemNumber!.isEmpty
+                ? row.question
+                : '${row.itemNumber}. ${row.question}',
+            row.answer,
+          ],
+      ],
       columnWidths: const {
         0: pw.FlexColumnWidth(1.4),
-        1: pw.FlexColumnWidth(2.2),
-        2: pw.FlexColumnWidth(2.4),
+        1: pw.FlexColumnWidth(3.0),
+        2: pw.FlexColumnWidth(3.6),
       },
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [
-            _pdfHeaderCell('Section'),
-            _pdfHeaderCell('Question'),
-            _pdfHeaderCell('Answer'),
-          ],
-        ),
-        for (final row in rows)
-          pw.TableRow(
-            children: [
-              _pdfBodyCell(row.section),
-              _pdfBodyCell(
-                row.itemNumber == null || row.itemNumber!.isEmpty
-                    ? row.question
-                    : '${row.itemNumber}. ${row.question}',
-              ),
-              _pdfBodyCell(row.answer),
-            ],
-          ),
-      ],
     );
   }
-
-  static pw.Widget _pdfHeaderCell(String text) => pw.Padding(
-        padding: const pw.EdgeInsets.all(5),
-        child: pw.Text(
-          PdfSafeText.sanitize(text),
-          style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
-        ),
-      );
-
-  static pw.Widget _pdfBodyCell(String text) => pw.Padding(
-        padding: const pw.EdgeInsets.all(5),
-        child: pw.Text(
-          PdfSafeText.sanitize(text),
-          style: const pw.TextStyle(fontSize: 8),
-        ),
-      );
 
   static Uint8List toExcel({
     required Survey survey,
@@ -305,7 +223,7 @@ class SurveySingleResponseExportService {
       ['Survey', survey.title],
       ['Alumni name', participant.displayName],
       ['Email', participant.email],
-      ['Student ID', participant.studentId ?? '—'],
+      ['Student ID', participant.studentId ?? 'â€”'],
       ['Program', participant.program],
       ['Batch', participant.batchYear],
       ['Submitted', fmt.format(submitted)],

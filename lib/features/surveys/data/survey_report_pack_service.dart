@@ -5,6 +5,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
@@ -15,7 +16,7 @@ import 'package:alumni_system/features/surveys/models/survey_reports_aggregate.d
 /// Professional multi-section survey report packs (Phase 6).
 ///
 /// Sections: Executive, Survey, Participation, Audience, Question, Response,
-/// Insights, Recommendations — exportable as PDF, Excel, or CSV.
+/// Insights, Recommendations â€” exportable as PDF, Excel, or CSV.
 class SurveyReportPackService {
   SurveyReportPackService._();
 
@@ -57,13 +58,13 @@ class SurveyReportPackService {
     }
     if (analytics.draftSurveys > 0) {
       recommendations.add(
-        '${analytics.draftSurveys} draft survey(s) await publish — finish '
+        '${analytics.draftSurveys} draft survey(s) await publish â€” finish '
         'audience/schedule and publish when ready.',
       );
     }
     if (analytics.pendingSurveyAssignments > 20) {
       recommendations.add(
-        'Large pending backlog — use Remind pending from each wave, then '
+        'Large pending backlog â€” use Remind pending from each wave, then '
         're-assign if new alumni matched the audience.',
       );
     }
@@ -158,12 +159,12 @@ class SurveyReportPackService {
           'pending assignments as in-progress/not-started combined.',
       audienceBuckets: const [],
       audienceNote:
-          'Open a single survey’s Responses → Overview for course/batch '
+          'Open a single surveyâ€™s Responses â†’ Overview for course/batch '
           'audience analytics, or export a per-survey pack.',
       questionRows: questionRows,
       responseRows: const [],
       responseNote:
-          'Per-respondent extracts are available from each survey’s export '
+          'Per-respondent extracts are available from each surveyâ€™s export '
           'menu (CSV / CHED Excel). This pack focuses on management summaries.',
       insights: insights,
       recommendations: recommendations,
@@ -214,7 +215,7 @@ class SurveyReportPackService {
     if (participation.notStarted > participation.inProgress &&
         participation.notStarted > 5) {
       recommendations.add(
-        'Many assignees have not started — push an in-app notification wave.',
+        'Many assignees have not started â€” push an in-app notification wave.',
       );
     }
     if (skipped.isNotEmpty) {
@@ -230,7 +231,7 @@ class SurveyReportPackService {
       insights.add(
         'Schedule window: '
         '${survey.openAt != null ? DateFormat.yMMMd().add_jm().format(survey.openAt!) : "open"}'
-        ' → '
+        ' â†’ '
         '${survey.closeAt != null ? DateFormat.yMMMd().add_jm().format(survey.closeAt!) : "no close"}.',
       );
     }
@@ -341,7 +342,7 @@ class SurveyReportPackService {
     }
     if (a.scaleAverage != null) {
       return 'avg ${a.scaleAverage!.toStringAsFixed(1)} '
-          '(${a.scaleMinObserved}–${a.scaleMaxObserved})';
+          '(${a.scaleMinObserved}â€“${a.scaleMaxObserved})';
     }
     if (a.textAnswerCount > 0) {
       return '${a.textAnswerCount} text answers';
@@ -427,51 +428,44 @@ class SurveyReportPackService {
   static Future<Uint8List> toPdf(SurveyReportPack pack) async {
     final doc = pw.Document();
     final date = DateFormat.yMMMMEEEEd().add_jm().format(pack.generatedAt);
+    final hasPersonalData = pack.responseRows.isNotEmpty;
 
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              PdfSafeText.sanitize(pack.title),
-              style: pw.TextStyle(
-                fontSize: 18,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.blue900,
-              ),
-            ),
-            pw.Text(
-              PdfSafeText.sanitize('${pack.subtitle} - $date'),
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Divider(color: PdfColors.blue900),
-            pw.SizedBox(height: 8),
-          ],
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: AessPdfTheme.pageMarginLandscape,
+        header: (ctx) => AessPdfHeader.build(
+          title: pack.title,
+          subtitle: pack.subtitle,
+          generationDate: date,
+          classification:
+              hasPersonalData ? 'CONFIDENTIAL' : 'MANAGEMENT REPORT',
+          isLandscape: true,
         ),
-        footer: (ctx) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-          ),
+        footer: (ctx) => AessPdfFooter.build(
+          ctx,
+          containsPersonalData: hasPersonalData,
         ),
         build: (ctx) => [
-          _pdfH2('1. Executive Summary'),
+          AessPdfTable.sectionHeading(
+            '1. Executive Summary',
+            subtitle: 'Portfolio and wave health overview',
+          ),
           ...pack.executiveBullets.map(
             (b) => pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 3),
+              padding: const pw.EdgeInsets.only(bottom: 3.5),
               child: pw.Bullet(
                 text: PdfSafeText.sanitize(b),
-                style: const pw.TextStyle(fontSize: 10),
+                style: AessPdfTheme.tableCell,
               ),
             ),
           ),
           pw.SizedBox(height: 12),
-          _pdfH2('2. Survey Summary'),
+          AessPdfTable.sectionHeading(
+            '2. Survey Summary',
+            countBadge:
+                '${pack.surveyRows.length} ${pack.surveyRows.length == 1 ? "survey" : "surveys"}',
+          ),
           _pdfTable(
             headers: const [
               'Title',
@@ -492,15 +486,20 @@ class SurveyReportPackService {
                   r.completionPct.toStringAsFixed(0),
                 ],
             ],
+            columnWidths: const {
+              0: pw.FlexColumnWidth(3.0),
+              1: pw.FlexColumnWidth(1.2),
+              2: pw.FlexColumnWidth(1.3),
+              3: pw.FixedColumnWidth(55),
+              4: pw.FixedColumnWidth(55),
+              5: pw.FixedColumnWidth(55),
+            },
           ),
           pw.SizedBox(height: 12),
-          _pdfH2('3. Participation Summary'),
-          if (pack.participationNote != null)
-            pw.Text(
-              PdfSafeText.sanitize(pack.participationNote!),
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-          pw.SizedBox(height: 6),
+          AessPdfTable.sectionHeading(
+            '3. Participation Funnel',
+            subtitle: pack.participationNote,
+          ),
           _pdfTable(
             headers: const [
               'Assigned',
@@ -518,67 +517,85 @@ class SurveyReportPackService {
                 pack.participation.completionRate.toStringAsFixed(0),
               ],
             ],
+            columnWidths: const {
+              0: pw.FlexColumnWidth(1.0),
+              1: pw.FlexColumnWidth(1.0),
+              2: pw.FlexColumnWidth(1.0),
+              3: pw.FlexColumnWidth(1.0),
+              4: pw.FlexColumnWidth(1.0),
+            },
           ),
           pw.SizedBox(height: 12),
-          _pdfH2('4. Audience Summary'),
-          if (pack.audienceByProgram.isEmpty && pack.audienceByBatch.isEmpty)
+          AessPdfTable.sectionHeading(
+            '4. Audience Breakdown',
+            subtitle:
+                (pack.audienceByProgram.isEmpty && pack.audienceByBatch.isEmpty)
+                    ? (pack.audienceNote ??
+                        'No audience breakdown in this pack.')
+                    : null,
+          ),
+          if (pack.audienceByProgram.isNotEmpty) ...[
             pw.Text(
-              pack.audienceNote ?? 'No audience breakdown in this pack.',
-              style: const pw.TextStyle(fontSize: 10),
-            )
-          else ...[
-            if (pack.audienceByProgram.isNotEmpty) ...[
-              pw.Text(
-                'By course / program',
-                style: pw.TextStyle(
-                  fontSize: 11,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              _pdfTable(
-                headers: const ['Program', 'Assigned', 'Completed', 'Rate %'],
-                rows: [
-                  for (final a in pack.audienceByProgram)
-                    [
-                      a.label,
-                      '${a.assigned}',
-                      '${a.completed}',
-                      a.completionPctLabel,
-                    ],
-                ],
-              ),
-              pw.SizedBox(height: 8),
-            ],
-            if (pack.audienceByBatch.isNotEmpty) ...[
-              pw.Text(
-                'By batch year',
-                style: pw.TextStyle(
-                  fontSize: 11,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              _pdfTable(
-                headers: const ['Batch', 'Assigned', 'Completed', 'Rate %'],
-                rows: [
-                  for (final a in pack.audienceByBatch)
-                    [
-                      a.label,
-                      '${a.assigned}',
-                      '${a.completed}',
-                      a.completionPctLabel,
-                    ],
-                ],
-              ),
-            ],
+              'By course / program',
+              style: AessPdfTheme.subSectionHeading,
+            ),
+            pw.SizedBox(height: 4),
+            _pdfTable(
+              headers: const ['Program', 'Assigned', 'Completed', 'Rate %'],
+              rows: [
+                for (final a in pack.audienceByProgram)
+                  [
+                    a.label,
+                    '${a.assigned}',
+                    '${a.completed}',
+                    a.completionPctLabel,
+                  ],
+              ],
+              columnWidths: const {
+                0: pw.FlexColumnWidth(3.5),
+                1: pw.FixedColumnWidth(65),
+                2: pw.FixedColumnWidth(65),
+                3: pw.FixedColumnWidth(55),
+              },
+            ),
+            pw.SizedBox(height: 8),
+          ],
+          if (pack.audienceByBatch.isNotEmpty) ...[
+            pw.Text(
+              'By batch year',
+              style: AessPdfTheme.subSectionHeading,
+            ),
+            pw.SizedBox(height: 4),
+            _pdfTable(
+              headers: const ['Batch', 'Assigned', 'Completed', 'Rate %'],
+              rows: [
+                for (final a in pack.audienceByBatch)
+                  [
+                    a.label,
+                    '${a.assigned}',
+                    '${a.completed}',
+                    a.completionPctLabel,
+                  ],
+              ],
+              columnWidths: const {
+                0: pw.FlexColumnWidth(3.5),
+                1: pw.FixedColumnWidth(65),
+                2: pw.FixedColumnWidth(65),
+                3: pw.FixedColumnWidth(55),
+              },
+            ),
           ],
           pw.SizedBox(height: 12),
-          _pdfH2('5. Question Summary'),
+          AessPdfTable.sectionHeading(
+            '5. Question Summary',
+            countBadge: pack.questionRows.isEmpty
+                ? null
+                : 'Top ${pack.questionRows.length > 40 ? 40 : pack.questionRows.length} questions',
+          ),
           if (pack.questionRows.isEmpty)
             pw.Text(
               'No question aggregates available.',
-              style: const pw.TextStyle(fontSize: 10),
+              style: AessPdfTheme.tableCellMuted,
             )
           else
             _pdfTable(
@@ -599,18 +616,20 @@ class SurveyReportPackService {
                     q.detail,
                   ],
               ],
+              columnWidths: AessPdfTable.surveyPackQuestionColumnWidths,
             ),
           pw.SizedBox(height: 12),
-          _pdfH2('6. Response Summary'),
-          if (pack.responseNote != null)
-            pw.Text(
-              pack.responseNote!,
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
+          AessPdfTable.sectionHeading(
+            '6. Response Summary',
+            subtitle: pack.responseNote,
+            countBadge: pack.responseRows.isEmpty
+                ? null
+                : 'Showing ${pack.responseRows.length > 80 ? 80 : pack.responseRows.length} respondents',
+          ),
           if (pack.responseRows.isEmpty)
             pw.Text(
               'No per-respondent rows in this pack.',
-              style: const pw.TextStyle(fontSize: 10),
+              style: AessPdfTheme.tableCellMuted,
             )
           else
             _pdfTable(
@@ -631,26 +650,33 @@ class SurveyReportPackService {
                     '${r.answerCount}',
                   ],
               ],
+              columnWidths: const {
+                0: pw.FlexColumnWidth(2.5),
+                1: pw.FlexColumnWidth(2.0),
+                2: pw.FixedColumnWidth(48),
+                3: pw.FixedColumnWidth(75),
+                4: pw.FixedColumnWidth(48),
+              },
             ),
           pw.SizedBox(height: 12),
-          _pdfH2('7. Insights'),
+          AessPdfTable.sectionHeading('7. Insights'),
           ...pack.insights.map(
             (i) => pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 3),
+              padding: const pw.EdgeInsets.only(bottom: 3.5),
               child: pw.Bullet(
                 text: PdfSafeText.sanitize(i),
-                style: const pw.TextStyle(fontSize: 10),
+                style: AessPdfTheme.tableCell,
               ),
             ),
           ),
           pw.SizedBox(height: 12),
-          _pdfH2('8. Recommendations'),
+          AessPdfTable.sectionHeading('8. Recommendations'),
           ...pack.recommendations.map(
             (i) => pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 3),
+              padding: const pw.EdgeInsets.only(bottom: 3.5),
               child: pw.Bullet(
                 text: PdfSafeText.sanitize(i),
-                style: const pw.TextStyle(fontSize: 10),
+                style: AessPdfTheme.tableCell,
               ),
             ),
           ),
@@ -661,37 +687,15 @@ class SurveyReportPackService {
     return doc.save();
   }
 
-  static pw.Widget _pdfH2(String text) => pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 6),
-        child: pw.Text(
-          text,
-          style: pw.TextStyle(
-            fontSize: 13,
-            fontWeight: pw.FontWeight.bold,
-            color: PdfColors.blue900,
-          ),
-        ),
-      );
-
   static pw.Widget _pdfTable({
     required List<String> headers,
     required List<List<String>> rows,
+    Map<int, pw.TableColumnWidth>? columnWidths,
   }) {
-    if (rows.isEmpty) {
-      return pw.Text('-', style: const pw.TextStyle(fontSize: 10));
-    }
-    return pw.TableHelper.fromTextArray(
-      headers: PdfSafeText.sanitizeRow(headers),
-      data: PdfSafeText.sanitizeRows(rows),
-      headerStyle: pw.TextStyle(
-        fontWeight: pw.FontWeight.bold,
-        color: PdfColors.white,
-        fontSize: 8,
-      ),
-      cellStyle: const pw.TextStyle(fontSize: 8),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
-      cellAlignment: pw.Alignment.centerLeft,
-      headerAlignment: pw.Alignment.centerLeft,
+    return AessPdfTable.build(
+      headers: headers,
+      rows: rows,
+      columnWidths: columnWidths,
     );
   }
 

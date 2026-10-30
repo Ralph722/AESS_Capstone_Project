@@ -259,9 +259,9 @@ class AdminDashboardHome extends StatelessWidget {
   Widget _buildPageHeader() {
     return AdminPageHeader(
       title: greeting(_now, adminName),
-      subtitle:
-          'Dashboard overview · ${DateFormat('EEEE, MMMM d').format(_now)}',
+      subtitle: "Here's what's happening across the alumni portal today.",
       actions: [
+        _DashboardDateChip(date: _now),
         Builder(
           builder: (context) => OutlinedButton.icon(
             onPressed: () => showAlumniCardVerifyDialog(context),
@@ -269,10 +269,10 @@ class AdminDashboardHome extends StatelessWidget {
             label: const Text('Verify card'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AdminColors.primary,
-              backgroundColor: AdminColors.surface,
+              backgroundColor: AdminColors.card,
               side: const BorderSide(color: AdminColors.border),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              minimumSize: const Size(0, 32),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              minimumSize: const Size(0, AdminDensity.buttonHeight),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
               ),
@@ -292,6 +292,11 @@ class AdminDashboardHome extends StatelessWidget {
     final m = metrics;
     final i = insights;
     final insightsStatus = _insightsStatus;
+    final findingsAttention = _insightsPill(i) != null;
+    final findingsTotal = (i?.findingsOpen ?? 0) + (i?.findingsInProgress ?? 0);
+    final findingsRatio = findingsTotal == 0
+        ? 0.0
+        : (i?.findingsOpen ?? 0) / findingsTotal;
     final cards = [
       AdminKpiCard(
         label: 'Alumni registered',
@@ -302,6 +307,10 @@ class AdminDashboardHome extends StatelessWidget {
         icon: Icons.how_to_reg_outlined,
         palette: AdminAccents.blue,
         dense: dense,
+        chart: _KpiProgress(
+          value: m.rosterTotal == 0 ? null : m.registrationRate,
+          color: AdminColors.primary,
+        ),
         onTap: () => onMenuSelected(2),
       ),
       AdminKpiCard(
@@ -312,8 +321,9 @@ class AdminDashboardHome extends StatelessWidget {
             '${i!.tracerResponded} of ${i.registered} registered alumni',
         pill: _tracerPill(i),
         icon: Icons.school_outlined,
-        palette: AdminAccents.gold,
+        palette: AdminAccents.midBlue,
         dense: dense,
+        chart: _KpiProgress(value: i?.tracerRate, color: AdminColors.secondary),
         onTap: () => onMenuSelected(9),
       ),
       AdminKpiCard(
@@ -328,6 +338,10 @@ class AdminDashboardHome extends StatelessWidget {
         icon: Icons.work_outline,
         palette: AdminAccents.blue,
         dense: dense,
+        chart: _KpiProgress(
+          value: i?.employmentRate,
+          color: AdminColors.primary,
+        ),
         onTap: () => onMenuSelected(9),
       ),
       AdminKpiCard(
@@ -340,8 +354,14 @@ class AdminDashboardHome extends StatelessWidget {
                 : "Couldn't load"),
         pill: _insightsPill(i),
         icon: Icons.lightbulb_outline,
-        palette: AdminAccents.gold,
+        palette: findingsAttention ? AdminAccents.gold : AdminAccents.midBlue,
         dense: dense,
+        chart: _KpiProgress(
+          value: findingsTotal == 0 ? null : findingsRatio,
+          color: findingsAttention
+              ? AdminColors.warning
+              : AdminColors.secondary,
+        ),
         onTap: () => onMenuSelected(15),
       ),
     ];
@@ -360,16 +380,28 @@ class AdminDashboardHome extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= AdminDensity.statsFourColMin) {
-          return row(cards);
+        final columns = constraints.maxWidth >= AdminDensity.statsFourColMin
+            ? 4
+            : constraints.maxWidth >= AdminDensity.statsTwoColMin
+            ? 2
+            : 1;
+        if (columns == 1) {
+          return Column(
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(height: _gap),
+                cards[i],
+              ],
+            ],
+          );
         }
-        return Column(
-          children: [
-            row(cards.sublist(0, 2)),
-            const SizedBox(height: _gap),
-            row(cards.sublist(2)),
-          ],
-        );
+        final rows = <Widget>[];
+        for (var start = 0; start < cards.length; start += columns) {
+          final end = (start + columns).clamp(0, cards.length);
+          rows.add(row(cards.sublist(start, end)));
+          if (end < cards.length) rows.add(const SizedBox(height: _gap));
+        }
+        return Column(children: rows);
       },
     );
   }
@@ -427,8 +459,8 @@ class AdminDashboardHome extends StatelessWidget {
 
   Widget _buildProgramsPanel({bool expand = false}) {
     final programs = insights?.programs ?? const <DashboardProgramStat>[];
-    final Widget body;
     final state = _insightsStateView();
+    final Widget body;
     if (state != null) {
       body = state;
     } else if (programs.isEmpty) {
@@ -438,18 +470,28 @@ class AdminDashboardHome extends StatelessWidget {
         compact: true,
       );
     } else {
-      final rows = [for (final p in programs) _programRow(p)];
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _programHeaderRow(),
-          if (expand)
-            Expanded(
-              child: ListView(padding: EdgeInsets.zero, children: rows),
-            )
-          else
-            ...rows.take(6),
-        ],
+      body = LayoutBuilder(
+        builder: (context, constraints) {
+          final showAlumni = constraints.maxWidth >= 300;
+          final rows = [
+            for (final p in programs) _programRow(p, showAlumni: showAlumni),
+          ];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _programHeaderRow(showAlumni: showAlumni),
+              if (expand)
+                Expanded(
+                  child: _PanelScrollList(
+                    itemCount: rows.length,
+                    itemBuilder: (context, i) => rows[i],
+                  ),
+                )
+              else
+                ...rows.take(6),
+            ],
+          );
+        },
       );
     }
 
@@ -458,6 +500,7 @@ class AdminDashboardHome extends StatelessWidget {
       title: 'Programs at a glance',
       icon: Icons.account_tree_outlined,
       accent: AdminAccents.blue,
+      count: state == null && programs.isNotEmpty ? programs.length : null,
       trailing: DashboardViewAllButton(
         onPressed: () => onMenuSelected(9),
         semanticsLabel: 'View program figures in Reports',
@@ -466,9 +509,11 @@ class AdminDashboardHome extends StatelessWidget {
     );
   }
 
-  static const _programNumberWidths = (56.0, 78.0, 56.0);
+  static const _programAlumniWidth = 56.0;
+  static const _programRegisteredWidth = 78.0;
+  static const _programTracerWidth = 56.0;
 
-  Widget _programHeaderRow() {
+  Widget _programHeaderRow({required bool showAlumni}) {
     const style = TextStyle(
       fontSize: 11,
       fontWeight: FontWeight.w600,
@@ -480,21 +525,24 @@ class AdminDashboardHome extends StatelessWidget {
       child: Text(text, style: style, textAlign: TextAlign.right),
     );
     return ExcludeSemantics(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+      child: Container(
+        padding: const EdgeInsets.only(bottom: 6),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AdminColors.border)),
+        ),
         child: Row(
           children: [
             const Expanded(child: Text('PROGRAM', style: style)),
-            cell('ALUMNI', _programNumberWidths.$1),
-            cell('REGISTERED', _programNumberWidths.$2),
-            cell('TRACER', _programNumberWidths.$3),
+            if (showAlumni) cell('ALUMNI', _programAlumniWidth),
+            cell('REGISTERED', _programRegisteredWidth),
+            cell('TRACER', _programTracerWidth),
           ],
         ),
       ),
     );
   }
 
-  Widget _programRow(DashboardProgramStat p) {
+  Widget _programRow(DashboardProgramStat p, {required bool showAlumni}) {
     const numberStyle = TextStyle(
       fontSize: 13,
       fontWeight: FontWeight.w600,
@@ -504,7 +552,7 @@ class AdminDashboardHome extends StatelessWidget {
       width: width,
       child: Text(text, style: numberStyle, textAlign: TextAlign.right),
     );
-    Widget rateCell(double? rate, double width, AdminAccent accent) => SizedBox(
+    Widget rateCell(double? rate, double width, Color color) => SizedBox(
       width: width,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -513,14 +561,14 @@ class AdminDashboardHome extends StatelessWidget {
           Text(_pct(rate), style: numberStyle, textAlign: TextAlign.right),
           const SizedBox(height: 3),
           SizedBox(
-            width: 44,
+            width: 48,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
                 value: (rate ?? 0).clamp(0.0, 1.0),
                 minHeight: 3,
-                color: accent.color,
-                backgroundColor: accent.tint,
+                color: color,
+                backgroundColor: AdminColors.surface,
               ),
             ),
           ),
@@ -534,8 +582,11 @@ class AdminDashboardHome extends StatelessWidget {
           '${p.program}: ${p.alumni} alumni, '
           '${_pct(p.registrationRate)} registered, $tracer tracer response',
       excludeSemantics: true,
-      child: SizedBox(
-        height: 34,
+      child: Container(
+        height: 38,
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AdminColors.border)),
+        ),
         child: Row(
           children: [
             Expanded(
@@ -546,13 +597,13 @@ class AdminDashboardHome extends StatelessWidget {
                 style: AdminText.cardTitle,
               ),
             ),
-            cell('${p.alumni}', _programNumberWidths.$1),
+            if (showAlumni) cell('${p.alumni}', _programAlumniWidth),
             rateCell(
               p.registrationRate,
-              _programNumberWidths.$2,
-              AdminAccents.blue,
+              _programRegisteredWidth,
+              AdminColors.primary,
             ),
-            rateCell(p.tracerRate, _programNumberWidths.$3, AdminAccents.gold),
+            rateCell(p.tracerRate, _programTracerWidth, AdminColors.secondary),
           ],
         ),
       ),
@@ -566,54 +617,45 @@ class AdminDashboardHome extends StatelessWidget {
       body = state;
     } else {
       final s = insights!.otherSurveys;
-      final tiles = <(String, String, IconData, AdminAccent)>[
-        (
-          'Published',
-          '${s.published}',
-          Icons.campaign_outlined,
-          AdminAccents.blue,
-        ),
-        ('Drafts', '${s.drafts}', Icons.edit_note, AdminAccents.gold),
-        (
-          'Response rate',
-          _pct(s.responseRate),
-          Icons.percent,
-          AdminAccents.blue,
-        ),
-        (
-          'Responses',
-          '${s.submitted} of ${s.assigned}',
-          Icons.inbox_outlined,
-          AdminAccents.gold,
-        ),
+      final tiles = <(String, String, IconData)>[
+        ('Published', '${s.published}', Icons.campaign_outlined),
+        ('Drafts', '${s.drafts}', Icons.edit_note_outlined),
+        ('Response rate', _pct(s.responseRate), Icons.percent_rounded),
+        ('Responses', '${s.submitted} of ${s.assigned}', Icons.inbox_outlined),
       ];
       final grid = LayoutBuilder(
         builder: (context, constraints) {
           const spacing = 6.0;
-          final cellWidth = (constraints.maxWidth - spacing) / 2;
+          final columns = constraints.maxWidth >= 300 ? 2 : 1;
+          final cellWidth = columns == 1
+              ? constraints.maxWidth
+              : (constraints.maxWidth - spacing) / 2;
           return Wrap(
             spacing: spacing,
             runSpacing: spacing,
             children: [
-              for (final (label, value, icon, accent) in tiles)
+              for (final (label, value, icon) in tiles)
                 SizedBox(
                   width: cellWidth,
                   child: DashboardStatTile(
                     label: label,
                     value: value,
                     icon: icon,
-                    accent: accent,
-                    showIcon: cellWidth >= 180,
+                    showIcon: cellWidth >= 145,
                     onTap: () => onMenuSelected(10),
                   ),
                 ),
               if (s.lowestTitle != null)
-                DashboardStatTile(
-                  label: 'Lowest: ${s.lowestTitle}',
-                  value: _pct(s.lowestRate),
-                  icon: Icons.trending_down,
-                  accent: AdminAccents.gold,
-                  onTap: () => onMenuSelected(10),
+                SizedBox(
+                  width: constraints.maxWidth,
+                  child: DashboardStatTile(
+                    label: 'Lowest: ${s.lowestTitle}',
+                    value: _pct(s.lowestRate),
+                    icon: Icons.trending_down_rounded,
+                    accent: AdminAccents.gold,
+                    showIcon: constraints.maxWidth >= 145,
+                    onTap: () => onMenuSelected(10),
+                  ),
                 ),
             ],
           );
@@ -626,7 +668,7 @@ class AdminDashboardHome extends StatelessWidget {
       expandBody: expand,
       title: 'Other surveys',
       icon: Icons.poll_outlined,
-      accent: AdminAccents.gold,
+      accent: AdminAccents.blue,
       trailing: DashboardViewAllButton(
         onPressed: () => onMenuSelected(10),
         semanticsLabel: 'View all surveys',
@@ -650,8 +692,7 @@ class AdminDashboardHome extends StatelessWidget {
         compact: true,
       );
     } else if (expand) {
-      body = ListView.builder(
-        padding: EdgeInsets.zero,
+      body = _PanelScrollList(
         itemCount: recentActivity.length,
         itemBuilder: (context, i) => _activityRow(recentActivity[i]),
       );
@@ -666,6 +707,7 @@ class AdminDashboardHome extends StatelessWidget {
       title: 'Recent activity',
       icon: Icons.history,
       accent: AdminAccents.blue,
+      count: recentActivity.isEmpty ? null : recentActivity.length,
       trailing: DashboardViewAllButton(
         onPressed: () => onMenuSelected(7),
         semanticsLabel: 'View all activity',
@@ -697,15 +739,20 @@ class AdminDashboardHome extends StatelessWidget {
       } else if (insights == null && !insightsFailed) {
         list = const AdminStateView.loading(compact: true);
       } else {
-        list = const AdminStateView.empty(
+        list = AdminStateView.empty(
           title: 'Nothing due in the next 30 days',
+          message: 'New events, surveys and deadlines will appear here.',
           icon: Icons.event_available_outlined,
           compact: true,
+          primaryAction: AdminStateAction(
+            label: 'Browse events',
+            icon: Icons.event_outlined,
+            onPressed: () => onMenuSelected(1),
+          ),
         );
       }
     } else if (expand) {
-      list = ListView.builder(
-        padding: EdgeInsets.zero,
+      list = _PanelScrollList(
         itemCount: items.length,
         itemBuilder: (context, i) => _agendaRow(items[i]),
       );
@@ -734,7 +781,8 @@ class AdminDashboardHome extends StatelessWidget {
       expandBody: expand,
       title: 'Upcoming & deadlines',
       icon: Icons.event_note_outlined,
-      accent: AdminAccents.gold,
+      accent: AdminAccents.midBlue,
+      count: items.isEmpty ? null : items.length,
       trailing: Text('Next $agendaWindowDays days', style: AdminText.caption),
       child: body,
     );
@@ -748,6 +796,16 @@ class AdminDashboardHome extends StatelessWidget {
     DashboardAgendaKind.job => Icons.work_outline,
     DashboardAgendaKind.insightDue => Icons.flag_outlined,
     DashboardAgendaKind.insightReview => Icons.update,
+  };
+
+  static String _agendaKindLabel(DashboardAgendaKind kind) => switch (kind) {
+    DashboardAgendaKind.event ||
+    DashboardAgendaKind.eventRegistration => 'Event',
+    DashboardAgendaKind.survey => 'Survey',
+    DashboardAgendaKind.tracer => 'Tracer',
+    DashboardAgendaKind.job => 'Job',
+    DashboardAgendaKind.insightDue ||
+    DashboardAgendaKind.insightReview => 'Insight',
   };
 
   static AdminAccent agendaAccent(DashboardAgendaKind kind) => switch (kind) {
@@ -849,14 +907,37 @@ class AdminDashboardHome extends StatelessWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        Icon(
-                          _agendaIcon(item.kind),
-                          size: 13,
-                          color: item.overdue
-                              ? AdminColors.danger
-                              : AdminColors.textSecondary,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: fg.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(_agendaIcon(item.kind), size: 10, color: fg),
+                              const SizedBox(width: 3),
+                              Text(
+                                _agendaKindLabel(item.kind),
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: fg,
+                                  height: 1.2,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             detail,
@@ -874,6 +955,12 @@ class AdminDashboardHome extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: AdminColors.textMuted,
+              ),
             ],
           ),
         ),
@@ -884,47 +971,235 @@ class AdminDashboardHome extends StatelessWidget {
   Widget _activityRow(AuditLog log) {
     final color = activityColor(log.action);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 5),
-            width: 8,
-            height: 8,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.35),
-                  blurRadius: 4,
-                  spreadRadius: 1,
-                ),
-              ],
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(7),
             ),
+            child: Icon(_activityIcon(log.action), size: 14, color: color),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              log.description.isNotEmpty
-                  ? log.description
-                  : '${log.action} ${log.resource}',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AdminColors.textPrimary,
-                height: 1.35,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                log.description.isNotEmpty
+                    ? log.description
+                    : '${log.action} ${log.resource}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AdminColors.textPrimary,
+                  height: 1.35,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            DateFormat('MMM d').format(log.timestamp),
-            style: AdminText.caption,
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _activityDate(log.timestamp, _now),
+              maxLines: 1,
+              style: AdminText.caption.copyWith(fontSize: 11.5),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Compact action icon matching [activityColor].
+  static IconData _activityIcon(String action) {
+    final a = action.toUpperCase();
+    bool has(List<String> words) => words.any(a.contains);
+    if (has(['DELETE', 'REMOVE', 'DEACTIVAT', 'ARCHIV'])) {
+      return Icons.delete_outline_rounded;
+    }
+    if (has(['CREATE', 'REGISTER', 'IMPORT', 'ADD'])) {
+      return Icons.add_circle_outline_rounded;
+    }
+    if (has(['SUBMIT', 'COMPLETE'])) {
+      return Icons.check_circle_outline_rounded;
+    }
+    if (has(['LOGIN', 'LOGOUT', 'PASSWORD'])) return Icons.login_rounded;
+    if (has(['EXPORT'])) return Icons.download_rounded;
+    if (has(['UPDATE', 'EDIT'])) return Icons.edit_outlined;
+    return Icons.bolt_outlined;
+  }
+
+  /// "Today · 9:12 AM", "Yesterday", then a short date.
+  static String _activityDate(DateTime timestamp, DateTime now) {
+    final day = DateTime(timestamp.year, timestamp.month, timestamp.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final days = today.difference(day).inDays;
+    if (days == 0) {
+      return 'Today · ${DateFormat('h:mm a').format(timestamp)}';
+    }
+    if (days == 1) return 'Yesterday';
+    return DateFormat('MMM d').format(timestamp);
+  }
+}
+
+/// Thin proportional rail under a KPI value.
+class _KpiProgress extends StatelessWidget {
+  const _KpiProgress({this.value, required this.color});
+
+  final double? value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: LinearProgressIndicator(
+        value: (value ?? 0).clamp(0.0, 1.0),
+        minHeight: 4,
+        color: color,
+        backgroundColor: AdminColors.surface,
+      ),
+    );
+  }
+}
+
+/// Scrollable panel body with an always-visible desktop scrollbar.
+class _PanelScrollList extends StatefulWidget {
+  const _PanelScrollList({required this.itemCount, required this.itemBuilder});
+
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+
+  @override
+  State<_PanelScrollList> createState() => _PanelScrollListState();
+}
+
+class _PanelScrollListState extends State<_PanelScrollList> {
+  final ScrollController _controller = ScrollController();
+  bool _canScroll = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleMetricsCheck();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PanelScrollList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.itemCount != widget.itemCount) _scheduleMetricsCheck();
+  }
+
+  void _scheduleMetricsCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncMetrics());
+  }
+
+  void _syncMetrics() {
+    if (!mounted || !_controller.hasClients) return;
+    final canScroll = _controller.position.maxScrollExtent > 0.5;
+    if (canScroll != _canScroll) {
+      setState(() => _canScroll = canScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        NotificationListener<ScrollMetricsNotification>(
+          onNotification: (_) {
+            _scheduleMetricsCheck();
+            return false;
+          },
+          child: Scrollbar(
+            controller: _controller,
+            thumbVisibility: true,
+            thickness: 3.5,
+            radius: const Radius.circular(999),
+            child: ListView.builder(
+              controller: _controller,
+              padding: const EdgeInsets.only(right: 8),
+              physics: const ClampingScrollPhysics(),
+              itemCount: widget.itemCount,
+              itemBuilder: widget.itemBuilder,
+            ),
+          ),
+        ),
+        if (_canScroll)
+          Positioned(
+            left: 0,
+            right: 8,
+            bottom: 0,
+            height: 20,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AdminColors.card.withValues(alpha: 0),
+                      AdminColors.card,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Compact date pill shown next to the header actions.
+class _DashboardDateChip extends StatelessWidget {
+  const _DashboardDateChip({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: DateFormat('EEEE, MMMM d, y').format(date),
+      child: Container(
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: AdminColors.card,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AdminColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.calendar_today_outlined,
+              size: 13,
+              color: AdminColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              DateFormat('EEE, MMM d').format(date),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AdminColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

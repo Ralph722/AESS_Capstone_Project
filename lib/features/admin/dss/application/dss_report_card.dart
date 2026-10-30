@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_copy.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_history.dart';
@@ -160,7 +161,6 @@ class DssReportCardData {
 abstract final class DssReportCardPdf {
   static const _navy = PdfColor.fromInt(0xFF1F3A5F);
   static const _muted = PdfColors.grey700;
-  static const _rule = PdfColors.grey400;
 
   /// Rows listed in the institution report before "N more in the app".
   static const institutionListMax = 15;
@@ -180,63 +180,19 @@ abstract final class DssReportCardPdf {
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.fromLTRB(36, 32, 36, 32),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              data.institution
-                  ? 'Institution Report Card'
-                  : 'Program Report Card',
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: _navy,
-              ),
-            ),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              _s(data.course),
-              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              _s('Generated $stamp - AESS Program Insights (CHED GTS)'),
-              style: const pw.TextStyle(fontSize: 8.5, color: _muted),
-            ),
-            pw.SizedBox(height: 6),
-            pw.Divider(color: _rule, height: 1),
-            pw.SizedBox(height: 8),
-          ],
+        margin: AessPdfTheme.pageMargin,
+        header: (ctx) => AessPdfHeader.build(
+          title: data.institution
+              ? 'Institution Report Card'
+              : 'Program Report Card',
+          subtitle: '${_s(data.course)} - AESS Decision Support System (CHED GTS)',
+          generationDate: stamp,
+          classification: 'DECISION SUPPORT',
         ),
-        footer: (ctx) => pw.Column(
-          children: [
-            pw.Divider(color: _rule, height: 1),
-            pw.SizedBox(height: 4),
-            pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Expanded(
-                  child: pw.Text(
-                    _s(
-                      'Based on submitted CHED GTS responses from alumni '
-                      'linked to a roster course. Ranges are 95% margins of '
-                      'error. n = alumni who answered that question; fewer '
-                      'than ${DssPolicy.notEnoughBelow} shows "Not enough '
-                      'data", fewer than ${DssPolicy.findingMin} is a small '
-                      'sample. Response rates use the current roster.',
-                    ),
-                    style: const pw.TextStyle(fontSize: 7.5, color: _muted),
-                  ),
-                ),
-                pw.SizedBox(width: 12),
-                pw.Text(
-                  'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-                  style: const pw.TextStyle(fontSize: 7.5, color: _muted),
-                ),
-              ],
-            ),
-          ],
+        footer: (ctx) => AessPdfFooter.build(
+          ctx,
+          customNotice:
+              'Based on submitted CHED GTS responses from alumni linked to a roster course. 95% MOE. For authorized academic and administrative evaluation.',
         ),
         build: (ctx) => [
           _heading(
@@ -429,7 +385,7 @@ abstract final class DssReportCardPdf {
     final group = parts.length >= 4
         ? [parts[2], if (parts[3].isNotEmpty) 'Batch ${parts[3]}']
               .where((s) => s.isNotEmpty)
-              .join(' · ')
+              .join(' Â· ')
         : '';
     final stored = data.flags
         .where((f) => f.ruleId == i.ruleId && (f.ruleName ?? '').isNotEmpty)

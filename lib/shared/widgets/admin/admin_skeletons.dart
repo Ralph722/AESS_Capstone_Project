@@ -15,96 +15,176 @@ class AdminDashboardHomeSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShimmerScope(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(
-            height: 44,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Skeleton(width: 200, height: 20),
-                      SizedBox(height: 6),
-                      Skeleton(width: 90, height: 12),
-                    ],
-                  ),
-                ),
-                Skeleton(width: 96, height: 36, borderRadius: _chip),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: List.generate(
-              4,
-              (i) => Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(left: i == 0 ? 0 : 6, right: i == 3 ? 0 : 6),
-                  child: _panelBox(height: 96),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final kpiColumns = width >= 900
+              ? 4
+              : width >= 560
+              ? 2
+              : 1;
+          final bottomColumns = width >= 700 ? 3 : 1;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(
+                height: 44,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Skeleton(width: 200, height: 20),
+                          SizedBox(height: 6),
+                          Skeleton(width: 220, height: 12),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Skeleton(width: 108, height: 36, borderRadius: _chip),
+                  ],
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
+              const SizedBox(height: 12),
+              _kpiRow(kpiColumns),
+              const SizedBox(height: 12),
+              if (width >= 700)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 2, child: _panelBox(height: 240)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _panelBox(height: 240)),
+                  ],
+                )
+              else ...[
+                _panelBox(height: 200),
+                const SizedBox(height: 12),
+                _panelBox(height: 200),
+              ],
+              const SizedBox(height: 12),
+              _bottomRow(bottomColumns),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _kpiRow(int columns) {
+    final tiles = List.generate(4, (_) => _kpiBox());
+    if (columns == 1) {
+      return Column(
+        children: [
+          for (var i = 0; i < tiles.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            tiles[i],
+          ],
+        ],
+      );
+    }
+    final rows = <Widget>[];
+    for (var start = 0; start < tiles.length; start += columns) {
+      final end = (start + columns).clamp(0, tiles.length);
+      rows.add(
+        Row(
+          children: [
+            for (var i = start; i < end; i++) ...[
+              if (i > start) const SizedBox(width: 12),
+              Expanded(child: tiles[i]),
+            ],
+          ],
+        ),
+      );
+      if (end < tiles.length) rows.add(const SizedBox(height: 12));
+    }
+    return Column(children: rows);
+  }
+
+  Widget _kpiBox() {
+    return Container(
+      height: 118,
+      padding: const EdgeInsets.all(12),
+      decoration: AdminSurfaces.card(),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(flex: 2, child: _panelBox(height: 240)),
-              const SizedBox(width: 12),
-              Expanded(child: _panelBox(height: 240)),
+              Skeleton(width: 32, height: 32, borderRadius: _chip),
+              SizedBox(width: 10),
+              Expanded(child: Skeleton(width: double.infinity, height: 10)),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _panelBox(height: 200)),
-              const SizedBox(width: 12),
-              Expanded(child: _panelBox(height: 200)),
-              const SizedBox(width: 12),
-              Expanded(child: _panelBox(height: 200)),
-            ],
-          ),
+          SizedBox(height: 10),
+          Skeleton(width: 54, height: 22),
+          SizedBox(height: 8),
+          Skeleton(width: double.infinity, height: 10),
+          Spacer(),
+          Skeleton(width: double.infinity, height: 4),
         ],
       ),
     );
   }
 
+  Widget _bottomRow(int columns) {
+    if (columns == 1) {
+      return Column(
+        children: [
+          _panelBox(height: 200),
+          const SizedBox(height: 12),
+          _panelBox(height: 200),
+          const SizedBox(height: 12),
+          _panelBox(height: 200),
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _panelBox(height: 200)),
+        const SizedBox(width: 12),
+        Expanded(child: _panelBox(height: 200)),
+        const SizedBox(width: 12),
+        Expanded(child: _panelBox(height: 200)),
+      ],
+    );
+  }
+
   Widget _panelBox({required double height}) {
-    final compact = height < 100;
     return Container(
       height: height,
-      padding: EdgeInsets.all(compact ? 12 : 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: AdminSurfaces.card(),
-      child: compact
-          ? const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Skeleton(width: 28, height: 28, borderRadius: _chip),
+              SizedBox(width: 10),
+              Skeleton(width: 110, height: 12),
+              Spacer(),
+              Skeleton(width: 44, height: 16, borderRadius: _chip),
+            ],
+          ),
+          const SizedBox(height: 16),
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            const Row(
               children: [
-                Skeleton(width: 72, height: 10),
-                SizedBox(height: 6),
-                Skeleton(width: 40, height: 16),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Skeleton(width: 120, height: 12),
-                SizedBox(height: height > 140 ? 10 : 6),
-                const Skeleton(width: double.infinity, height: 10),
-                if (height > 140) ...[
-                  const SizedBox(height: 6),
-                  const Skeleton(width: double.infinity, height: 10),
-                ],
+                Skeleton(width: 26, height: 26, borderRadius: _chip),
+                SizedBox(width: 10),
+                Expanded(child: Skeleton(width: double.infinity, height: 10)),
+                SizedBox(width: 10),
+                Skeleton(width: 36, height: 10),
               ],
             ),
+          ],
+        ],
+      ),
     );
   }
 }

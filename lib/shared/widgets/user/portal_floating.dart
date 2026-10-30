@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Floating surfaces over scrolling content: the bottom nav pill and the

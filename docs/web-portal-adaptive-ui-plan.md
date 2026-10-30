@@ -126,3 +126,4 @@ class AdaptivePageScaffold extends StatelessWidget {
 - Implement sticky filter sidebar on Job Opportunities.
 - Implement side-by-side profile overview cards.
 - End-to-end responsiveness verification across Chrome, Edge, Safari, and mobile viewports.
+

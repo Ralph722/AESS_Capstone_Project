@@ -6,6 +6,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/core/utils/personal_data_notice.dart';
@@ -131,28 +132,17 @@ abstract final class GtsListExportService {
       pw.MultiPage(
         maxPages: 400,
         pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(24),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              safe(GtsListTables.title(result)),
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.blue900,
-              ),
-            ),
-            pw.Text(
-              'CHED Graduate Tracer Study alumni list',
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Divider(color: PdfColors.blue900),
-            pw.SizedBox(height: 6),
-          ],
+        margin: AessPdfTheme.pageMarginLandscape,
+        header: (ctx) => AessPdfHeader.build(
+          title: safe(GtsListTables.title(result)),
+          subtitle: 'CHED Graduate Tracer Study Alumni Directory',
+          classification: 'CONFIDENTIAL',
+          isLandscape: true,
         ),
-        footer: (ctx) => pdfPageFooter(ctx),
+        footer: (ctx) => AessPdfFooter.build(
+          ctx,
+          containsPersonalData: true,
+        ),
         build: (ctx) => [
           _section('About this list'),
           _pairs(GtsListTables.about(result)),
@@ -187,14 +177,25 @@ abstract final class GtsListExportService {
             pw.TableHelper.fromTextArray(
               headers: PdfSafeText.sanitizeRow(headers),
               data: PdfSafeText.sanitizeRows(rows),
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-                fontSize: fontSize,
-              ),
-              cellStyle: pw.TextStyle(fontSize: fontSize),
+              headerCount: 1,
+              headerStyle:
+                  AessPdfTheme.tableHeader.copyWith(fontSize: fontSize),
+              cellStyle: AessPdfTheme.tableCell.copyWith(fontSize: fontSize),
               headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.blue900,
+                color: AessPdfTheme.primaryNavy,
+              ),
+              oddRowDecoration: const pw.BoxDecoration(
+                color: AessPdfTheme.zebraBg,
+              ),
+              border: const pw.TableBorder(
+                horizontalInside: pw.BorderSide(
+                  color: AessPdfTheme.borderColor,
+                  width: 0.5,
+                ),
+                bottom: pw.BorderSide(
+                  color: AessPdfTheme.borderDark,
+                  width: 0.8,
+                ),
               ),
               cellAlignment: pw.Alignment.topLeft,
               headerAlignment: pw.Alignment.centerLeft,
@@ -202,7 +203,7 @@ abstract final class GtsListExportService {
                 for (var i = 0; i < headers.length; i++)
                   i: pw.FlexColumnWidth(_flex(headers[i], rows, i)),
               },
-              cellPadding: const pw.EdgeInsets.all(3),
+              cellPadding: AessPdfTheme.cellPaddingCompact,
             ),
           pw.SizedBox(height: 14),
           // The block heading is the table's first header so it repeats on
@@ -214,15 +215,27 @@ abstract final class GtsListExportService {
                 for (final l in lines)
                   [safe(l.label), safe(l.count), safe(l.share)],
               ],
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-                fontSize: 9,
-              ),
-              cellStyle: const pw.TextStyle(fontSize: 8),
+              headerCount: 1,
+              headerStyle:
+                  AessPdfTheme.tableHeader.copyWith(fontSize: 8.5),
+              cellStyle: AessPdfTheme.tableCell.copyWith(fontSize: 8),
               headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.blue900,
+                color: AessPdfTheme.subHeaderBg,
               ),
+              oddRowDecoration: const pw.BoxDecoration(
+                color: AessPdfTheme.zebraBg,
+              ),
+              border: const pw.TableBorder(
+                horizontalInside: pw.BorderSide(
+                  color: AessPdfTheme.borderColor,
+                  width: 0.5,
+                ),
+                bottom: pw.BorderSide(
+                  color: AessPdfTheme.borderDark,
+                  width: 0.8,
+                ),
+              ),
+              cellPadding: AessPdfTheme.cellPaddingCompact,
               cellAlignment: pw.Alignment.centerLeft,
               cellAlignments: const {
                 1: pw.Alignment.centerRight,
@@ -300,17 +313,7 @@ abstract final class GtsListExportService {
     ...body.skip(1),
   ];
 
-  static pw.Widget _section(String text) => pw.Padding(
-    padding: const pw.EdgeInsets.only(bottom: 4),
-    child: pw.Text(
-      text,
-      style: pw.TextStyle(
-        fontSize: 12,
-        fontWeight: pw.FontWeight.bold,
-        color: PdfColors.blue900,
-      ),
-    ),
-  );
+  static pw.Widget _section(String text) => AessPdfTable.sectionHeading(text);
 
   static String _csvCell(Object value) =>
       value is num ? value.toString() : CsvSafe.cell(value.toString());

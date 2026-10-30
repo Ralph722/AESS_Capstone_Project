@@ -6,6 +6,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_report_chart.dart';
@@ -140,34 +141,13 @@ abstract final class GtsReportExportService {
         pageFormat: table.headers.length > 7
             ? PdfPageFormat.a4.landscape
             : PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              safe(GtsReportTables.title(result)),
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.blue900,
-              ),
-            ),
-            pw.Text(
-              'CHED Graduate Tracer Study report',
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Divider(color: PdfColors.blue900),
-            pw.SizedBox(height: 6),
-          ],
+        margin: AessPdfTheme.pageMargin,
+        header: (ctx) => AessPdfHeader.build(
+          title: safe(GtsReportTables.title(result)),
+          subtitle: 'CHED Graduate Tracer Study Analytics',
+          isLandscape: table.headers.length > 7,
         ),
-        footer: (ctx) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-          ),
-        ),
+        footer: (ctx) => AessPdfFooter.build(ctx),
         build: (ctx) => [
           _section('About this report'),
           pw.Table(
@@ -225,15 +205,26 @@ abstract final class GtsReportExportService {
                 for (final row in rows)
                   [for (final c in row) safe(GtsReportTables.display(c))],
               ],
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-                fontSize: 8,
-              ),
-              cellStyle: const pw.TextStyle(fontSize: 8),
+              headerCount: 1,
+              headerStyle: AessPdfTheme.tableHeader,
+              cellStyle: AessPdfTheme.tableCell.copyWith(fontSize: 7.5),
               headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.blue900,
+                color: AessPdfTheme.primaryNavy,
               ),
+              oddRowDecoration: const pw.BoxDecoration(
+                color: AessPdfTheme.zebraBg,
+              ),
+              border: const pw.TableBorder(
+                horizontalInside: pw.BorderSide(
+                  color: AessPdfTheme.borderColor,
+                  width: 0.5,
+                ),
+                bottom: pw.BorderSide(
+                  color: AessPdfTheme.borderDark,
+                  width: 0.8,
+                ),
+              ),
+              cellPadding: AessPdfTheme.cellPaddingCompact,
               cellAlignment: pw.Alignment.centerLeft,
               cellAlignments: {
                 for (final i in numeric) i: pw.Alignment.centerRight,
@@ -285,17 +276,7 @@ abstract final class GtsReportExportService {
     ...body.skip(1),
   ];
 
-  static pw.Widget _section(String text) => pw.Padding(
-    padding: const pw.EdgeInsets.only(bottom: 4),
-    child: pw.Text(
-      text,
-      style: pw.TextStyle(
-        fontSize: 12,
-        fontWeight: pw.FontWeight.bold,
-        color: PdfColors.blue900,
-      ),
-    ),
-  );
+  static pw.Widget _section(String text) => AessPdfTable.sectionHeading(text);
 
   static String _csvRow(List<Object?> cells) => cells.map(_csvCell).join(',');
 

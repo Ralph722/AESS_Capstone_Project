@@ -161,14 +161,14 @@ class HomeAlumniIdentityHero extends StatelessWidget {
                     height: 90,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: PortalTheme.gold.withValues(alpha: 0.12),
+                      color: Colors.white.withValues(alpha: 0.06),
                     ),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 18, 16, 18),
                   child: Row(
-                    children: [
+                children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

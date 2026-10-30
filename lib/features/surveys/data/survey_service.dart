@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'dart:typed_data';
 import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/local_id.dart';
@@ -64,7 +65,7 @@ class SurveyAccess {
   };
 }
 
-/// Surveys data access — Supabase only.
+/// Surveys data access â€” Supabase only.
 class SurveyService {
   SurveyService({
     SupabaseClient? supabase,
@@ -127,7 +128,7 @@ class SurveyService {
     return counts;
   }
 
-  /// Admin list — merges live submission counts into survey models.
+  /// Admin list â€” merges live submission counts into survey models.
   Future<List<Survey>> getAllSurveysForAdmin() async {
     final surveys = await getAllSurveys();
     final liveCounts = await countSubmittedResponsesBySurvey();
@@ -214,7 +215,7 @@ class SurveyService {
 
   /// Batch-load surveys by id (avoids N+1 on Home / assignment lists).
   ///
-  /// Creator display names are skipped unless [resolveCreators] is true —
+  /// Creator display names are skipped unless [resolveCreators] is true â€”
   /// attention badges only need schedule / kind fields.
   Future<Map<String, Survey>> getSurveysByIds(
     Iterable<String> surveyIds, {
@@ -1137,7 +1138,7 @@ class SurveyService {
     }
   }
 
-  /// Per-user CHED GTS wave progress for the admin directory: auth uid →
+  /// Per-user CHED GTS wave progress for the admin directory: auth uid â†’
   /// how many waves the member was assigned vs has submitted. A submitted
   /// response without an assignment still counts (as both assigned and
   /// submitted), and a `completed` assignment counts as submitted.
@@ -1252,7 +1253,7 @@ class SurveyService {
       }
 
       // Submitted responses the admin has not yet opened in View responses
-      // (NOT pending assignments — publishing must not raise this alert).
+      // (NOT pending assignments â€” publishing must not raise this alert).
       var unread = 0;
       try {
         final rows = await _supabase.from('surveys').select('id, data');
@@ -1334,7 +1335,7 @@ class SurveyService {
 
       if (!dirty) return;
 
-      // Update badge cursor / heal publish stamp only — do not bump updated_at.
+      // Update badge cursor / heal publish stamp only â€” do not bump updated_at.
       await _supabase.from('surveys').update({'data': data}).eq('id', surveyId);
     } catch (e) {
       throw Exception('Error marking survey responses seen: $e');
@@ -1812,82 +1813,74 @@ class SurveyService {
       }
     }
 
+    final stamp = DateFormat.yMMMMEEEEd().add_jm().format(DateTime.now());
+    final hasPersonal = submitted.isNotEmpty;
+
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
+        margin: AessPdfTheme.pageMargin,
+        header: (ctx) => AessPdfHeader.build(
+          title: survey.title,
+          subtitle: survey.description.trim().isNotEmpty
+              ? survey.description.trim()
+              : 'Detailed Survey Response Summary',
+          generationDate: stamp,
+          classification: hasPersonal ? 'CONFIDENTIAL' : 'OFFICIAL REPORT',
+        ),
+        footer: (ctx) => AessPdfFooter.build(
+          ctx,
+          containsPersonalData: hasPersonal,
+        ),
         build: (context) => [
-          pw.Header(
-            level: 0,
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  PdfSafeText.sanitize(survey.title),
-                  style: pw.TextStyle(
-                    fontSize: 20,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.Text(
-                  DateTime.now().toIso8601String().split('T').first,
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-          if (survey.description.trim().isNotEmpty)
-            pw.Text(
-              PdfSafeText.sanitize(survey.description),
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
-            ),
-          pw.SizedBox(height: 10),
-          pw.TableHelper.fromTextArray(
-            headers: const ['Assigned', 'Submitted', 'Completion'],
-            data: [
-              [
-                '${participants.length}',
-                '${submitted.length}',
-                '${participants.isEmpty ? 0 : ((submitted.length / participants.length) * 100).toStringAsFixed(0)}%',
-              ],
+          AessPdfTable.sectionHeading('1. Participation Overview'),
+          AessPdfKpiGrid.build(
+            items: [
+              AessKpiItem(label: 'Assigned', value: '${participants.length}'),
+              AessKpiItem(
+                label: 'Submitted',
+                value: '${submitted.length}',
+                isHighlight: true,
+              ),
+              AessKpiItem(
+                label: 'Completion',
+                value:
+                    '${participants.isEmpty ? 0 : ((submitted.length / participants.length) * 100).toStringAsFixed(0)}%',
+                isHighlight: true,
+              ),
             ],
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-            ),
-            headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
-            cellStyle: const pw.TextStyle(fontSize: 10),
-            cellAlignment: pw.Alignment.centerLeft,
+            columns: 3,
           ),
           pw.SizedBox(height: 14),
-          pw.Text(
-            'Respondents',
-            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.TableHelper.fromTextArray(
-            headers: const ['Name', 'Program', 'Batch', 'Submitted At'],
-            data: PdfSafeText.sanitizeRows(
-              submitted.map((p) {
-                final ts = p.response!.submittedAt ?? p.response!.updatedAt;
-                return [
-                  p.displayName,
-                  p.program,
-                  p.batchYear,
-                  ts.toIso8601String(),
-                ];
-              }).toList(),
+          if (submitted.isNotEmpty) ...[
+            AessPdfTable.sectionHeading(
+              '2. Submitted Respondents',
+              countBadge: '${submitted.length} submitted',
             ),
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
+            AessPdfTable.build(
+              headers: const ['Name', 'Program', 'Batch', 'Submitted At'],
+              rows: [
+                for (final p in submitted)
+                  [
+                    p.displayName,
+                    p.program,
+                    p.batchYear,
+                    (p.response!.submittedAt ?? p.response!.updatedAt)
+                        .toIso8601String()
+                        .split('T')
+                        .first,
+                  ],
+              ],
+              columnWidths: const {
+                0: pw.FlexColumnWidth(2.5),
+                1: pw.FlexColumnWidth(2.0),
+                2: pw.FixedColumnWidth(48),
+                3: pw.FixedColumnWidth(85),
+              },
             ),
-            headerDecoration: const pw.BoxDecoration(
-              color: PdfColors.indigo700,
-            ),
-            cellStyle: const pw.TextStyle(fontSize: 9),
-          ),
-          pw.SizedBox(height: 14),
+            pw.SizedBox(height: 14),
+          ],
+          AessPdfTable.sectionHeading('3. Question Responses'),
           ...questions.expand((q) {
             final answers =
                 byQuestion[q.id] ?? const <(SurveyParticipant, dynamic)>[];
@@ -1972,26 +1965,21 @@ class SurveyService {
                   style: const pw.TextStyle(fontSize: 9),
                 ),
               pw.SizedBox(height: 4),
-              pw.TableHelper.fromTextArray(
+              AessPdfTable.build(
                 headers: const ['Respondent', 'Response'],
-                data: PdfSafeText.sanitizeRows(
-                  answers.map((entry) {
-                    final respondent = entry.$1.displayName;
-                    final value = entry.$2;
-                    final responseText = value is List
-                        ? value.map((e) => '$e').join(' | ')
-                        : '$value';
-                    return [respondent, responseText];
-                  }).toList(),
-                ),
-                headerStyle: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.white,
-                ),
-                headerDecoration: const pw.BoxDecoration(
-                  color: PdfColors.blueGrey700,
-                ),
-                cellStyle: const pw.TextStyle(fontSize: 8.5),
+                rows: [
+                  for (final entry in answers)
+                    [
+                      entry.$1.displayName,
+                      entry.$2 is List
+                          ? (entry.$2 as List).map((e) => '$e').join(' | ')
+                          : '${entry.$2}',
+                    ],
+                ],
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(2.0),
+                  1: pw.FlexColumnWidth(4.5),
+                },
               ),
             ];
           }),

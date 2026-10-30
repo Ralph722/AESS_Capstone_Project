@@ -1,3 +1,5 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_dashboard_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,5 +69,31 @@ void main() {
   testWidgets('footer is hidden without a toggle callback', (tester) async {
     await _pumpSidebar(tester);
     expect(find.text('Collapse sidebar'), findsNothing);
+  });
+
+  testWidgets('hovering over sidebar scrollbar does not throw scroll position error', (
+    tester,
+  ) async {
+    await _pumpSidebar(tester, onToggleCollapse: () {});
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(tester.getCenter(find.byType(RawScrollbar)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('hovering over collapsed sidebar scrollbar does not throw scroll position error', (
+    tester,
+  ) async {
+    await _pumpSidebar(tester, collapsed: true, onToggleCollapse: () {});
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(tester.getCenter(find.byType(RawScrollbar)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
   });
 }

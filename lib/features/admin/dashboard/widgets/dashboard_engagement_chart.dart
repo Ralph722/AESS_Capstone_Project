@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -67,25 +69,31 @@ class DashboardEngagementTrendChart extends StatelessWidget {
       title: 'Portal activity',
       caption: 'Daily actions logged in the system (last 90 days)',
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      trailing: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           if (!isLoading && maxVal > 0)
             Text(
-              'Max: $maxVal',
+              peak == null
+                  ? 'Max: $maxVal'
+                  : 'Max: $maxVal · ${DateFormat('MMM d').format(peak.date)}',
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: AdminColors.textSecondary,
               ),
             ),
-          if (onViewReports != null) ...[
-            const SizedBox(width: 8),
+          if (onViewReports != null)
             TextButton(
               onPressed: onViewReports,
               style: TextButton.styleFrom(
                 foregroundColor: AdminColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 minimumSize: const Size(0, 28),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
@@ -96,7 +104,6 @@ class DashboardEngagementTrendChart extends StatelessWidget {
                 style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
               ),
             ),
-          ],
         ],
       ),
       isEmpty: isEmpty,
@@ -120,12 +127,11 @@ class DashboardEngagementTrendChart extends StatelessWidget {
       spots.add(FlSpot(i.toDouble(), trend.points[i].count.toDouble()));
     }
 
-    final maxY = (maxVal == 0 ? 1 : maxVal).toDouble();
-    final yPad = maxY * 0.12;
-    final chartMaxY = maxY + yPad;
+    final (chartMaxY, yStep) = _niceScale(maxVal);
 
     final labelStep = _xLabelStep(trend.points.length);
     final lastIndex = trend.points.length - 1;
+    final peakIndex = peak == null ? -1 : trend.points.indexOf(peak);
 
     return LineChart(
       LineChartData(
@@ -135,13 +141,10 @@ class DashboardEngagementTrendChart extends StatelessWidget {
         maxY: chartMaxY,
         gridData: FlGridData(
           show: true,
-          drawVerticalLine: true,
-          horizontalInterval: chartMaxY / 4,
-          verticalInterval: labelStep.toDouble(),
+          drawVerticalLine: false,
+          horizontalInterval: yStep,
           getDrawingHorizontalLine: (value) =>
               const FlLine(color: AdminColors.border, strokeWidth: 1),
-          getDrawingVerticalLine: (value) =>
-              const FlLine(color: AdminColors.surface, strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(
@@ -153,10 +156,10 @@ class DashboardEngagementTrendChart extends StatelessWidget {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 36,
-              interval: chartMaxY / 4,
+              reservedSize: 34,
+              interval: yStep,
               getTitlesWidget: (value, meta) {
-                if (value < 0 || value > maxY + 0.01) {
+                if (value < -0.01 || value > chartMaxY + 0.01) {
                   return const SizedBox.shrink();
                 }
                 return Text(
@@ -213,29 +216,7 @@ class DashboardEngagementTrendChart extends StatelessWidget {
             },
           ),
         ),
-        extraLinesData: peak != null && peak.count > 0
-            ? ExtraLinesData(
-                horizontalLines: [
-                  HorizontalLine(
-                    y: peak.count.toDouble(),
-                    color: AdminAccents.gold.color,
-                    strokeWidth: 1.5,
-                    dashArray: [6, 4],
-                    label: HorizontalLineLabel(
-                      show: true,
-                      alignment: Alignment.topRight,
-                      padding: const EdgeInsets.only(right: 4, bottom: 4),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AdminColors.textSecondary,
-                      ),
-                      labelResolver: (_) => 'Peak: ${peak.count}',
-                    ),
-                  ),
-                ],
-              )
-            : const ExtraLinesData(),
+        extraLinesData: const ExtraLinesData(),
         lineBarsData: [
           LineChartBarData(
             spots: spots,
@@ -246,13 +227,30 @@ class DashboardEngagementTrendChart extends StatelessWidget {
             barWidth: 2.5,
             isStrokeCapRound: true,
             dotData: FlDotData(
-              show: trend.points.length <= 24,
-              getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                radius: 3,
-                color: Colors.white,
-                strokeWidth: 2,
-                strokeColor: _line,
-              ),
+              show: true,
+              getDotPainter: (spot, percent, bar, index) {
+                if (index == peakIndex) {
+                  return FlDotCirclePainter(
+                    radius: 4,
+                    color: AdminColors.accent,
+                    strokeWidth: 2,
+                    strokeColor: AdminColors.card,
+                  );
+                }
+                if (trend.points.length <= 24) {
+                  return FlDotCirclePainter(
+                    radius: 2.5,
+                    color: AdminColors.card,
+                    strokeWidth: 2,
+                    strokeColor: _line,
+                  );
+                }
+                return FlDotCirclePainter(
+                  radius: 0,
+                  color: Colors.transparent,
+                  strokeWidth: 0,
+                );
+              },
             ),
             belowBarData: BarAreaData(
               show: true,
@@ -260,8 +258,8 @@ class DashboardEngagementTrendChart extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AdminAccents.sky.color.withValues(alpha: 0.28),
-                  AdminAccents.sky.color.withValues(alpha: 0.02),
+                  AdminColors.primary.withValues(alpha: 0.22),
+                  AdminColors.primary.withValues(alpha: 0.01),
                 ],
               ),
             ),
@@ -280,6 +278,26 @@ class DashboardEngagementTrendChart extends StatelessWidget {
     if (i == lastIndex) return true;
     if (i % step != 0) return false;
     return lastIndex - i >= step * 0.6;
+  }
+
+  /// Rounded axis maximum and tick interval (0, 20, 40 … rather than 12.5).
+  static (double, double) _niceScale(int maxVal) {
+    final top = math.max(1, maxVal).toDouble();
+    final rawStep = math.max(1.0, top / 4);
+    final exponent = (math.log(rawStep) / math.ln10).floor();
+    final magnitude = math.pow(10, exponent).toDouble();
+    final normalized = rawStep / magnitude;
+    final step =
+        (normalized <= 1
+            ? 1
+            : normalized <= 2
+            ? 2
+            : normalized <= 5
+            ? 5
+            : 10) *
+        magnitude;
+    final maxY = (top / step).ceil() * step;
+    return (maxY, step);
   }
 
   static int _xLabelStep(int pointCount) {

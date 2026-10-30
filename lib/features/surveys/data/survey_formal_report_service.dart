@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:alumni_system/core/config/ai_config.dart';
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/ai/data/ai_assistant_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
@@ -53,7 +54,7 @@ class SurveyFormalReportService {
         usedAi: false,
         generatedAt: generatedAt,
         disclaimer:
-            'Metric-based draft (AI turned off) — review before official use.',
+            'Metric-based draft (AI turned off) â€” review before official use.',
       );
     }
 
@@ -69,7 +70,7 @@ class SurveyFormalReportService {
           usedAi: false,
           generatedAt: generatedAt,
           disclaimer:
-              'AI returned empty text — showing metric-based draft. Review before official use.',
+              'AI returned empty text â€” showing metric-based draft. Review before official use.',
         );
       }
       return SurveyFormalReportResult(
@@ -79,11 +80,11 @@ class SurveyFormalReportService {
       );
     } catch (e) {
       return SurveyFormalReportResult(
-        body: '$fallback\n\n(Note: AI unavailable — $e)',
+        body: '$fallback\n\n(Note: AI unavailable â€” $e)',
         usedAi: false,
         generatedAt: generatedAt,
         disclaimer:
-            'Metric-based draft (AI unavailable) — review before official use.',
+            'Metric-based draft (AI unavailable) â€” review before official use.',
       );
     }
   }
@@ -118,7 +119,7 @@ class SurveyFormalReportService {
         scored.add((
           answered: agg.answeredCount,
           line:
-              '${agg.prompt}: most common answer “${best.key}” '
+              '${agg.prompt}: most common answer â€œ${best.key}â€ '
               '(${best.value.toStringAsFixed(0)}% of ${agg.answeredCount} answers).',
         ));
       } else if (agg.scaleAverage != null) {
@@ -186,13 +187,13 @@ class SurveyFormalReportService {
       buf.writeln('  (No question-level aggregates available yet.)');
     } else {
       for (final f in findings) {
-        buf.writeln('  • $f');
+        buf.writeln('  â€¢ $f');
       }
     }
     buf
       ..writeln()
       ..writeln(
-        'Tone: formal institutional English. Keep roughly 450–800 words. '
+        'Tone: formal institutional English. Keep roughly 450â€“800 words. '
         'Do not invent statistics beyond the facts above.',
       );
     return buf.toString();
@@ -213,7 +214,7 @@ class SurveyFormalReportService {
       ..writeln('Purpose and Scope')
       ..writeln()
       ..writeln(
-        'This report summarizes results for “$title” ($kind), created on $created. '
+        'This report summarizes results for â€œ$titleâ€ ($kind), created on $created. '
         'It is intended for alumni office briefing and internal coordination'
         '${isChed ? ' in support of graduate tracer monitoring' : ''}.',
       )
@@ -235,7 +236,7 @@ class SurveyFormalReportService {
       );
     } else {
       for (final f in findings.take(6)) {
-        buf.writeln('• $f');
+        buf.writeln('â€¢ $f');
       }
     }
     buf
@@ -294,64 +295,16 @@ class SurveyFormalReportService {
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(40),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              'Formal Survey Report',
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.blueGrey900,
-              ),
-            ),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              safeTitle,
-              style: const pw.TextStyle(
-                fontSize: 11,
-                color: PdfColors.blueGrey700,
-              ),
-            ),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              PdfSafeText.sanitize(
-                'Generated $stamp - ${usedAi ? 'AI-assisted draft' : 'Metric-based draft'}',
-              ),
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Divider(color: PdfColors.blueGrey300),
-            pw.SizedBox(height: 8),
-          ],
+        margin: AessPdfTheme.pageMargin,
+        header: (ctx) => AessPdfHeader.build(
+          title: 'Formal Survey Report',
+          subtitle: '$safeTitle - ${usedAi ? "AI-assisted draft" : "Metric-based report"}',
+          generationDate: stamp,
+          classification: 'EXECUTIVE DRAFT',
         ),
-        footer: (ctx) => pw.Column(
-          children: [
-            pw.Divider(color: PdfColors.grey400),
-            pw.SizedBox(height: 4),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Expanded(
-                  child: pw.Text(
-                    safeDisclaimer,
-                    style: const pw.TextStyle(
-                      fontSize: 8,
-                      color: PdfColors.grey600,
-                    ),
-                  ),
-                ),
-                pw.Text(
-                  'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-                  style: const pw.TextStyle(
-                    fontSize: 8,
-                    color: PdfColors.grey600,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        footer: (ctx) => AessPdfFooter.build(
+          ctx,
+          customNotice: safeDisclaimer,
         ),
         build: (ctx) {
           final widgets = <pw.Widget>[];

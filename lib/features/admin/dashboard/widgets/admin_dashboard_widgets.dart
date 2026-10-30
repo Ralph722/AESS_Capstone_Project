@@ -9,6 +9,7 @@ class DashboardPanel extends StatelessWidget {
     required this.title,
     required this.child,
     this.trailing,
+    this.count,
     this.icon,
     this.accent,
     this.expandBody = false,
@@ -17,6 +18,9 @@ class DashboardPanel extends StatelessWidget {
   final String title;
   final Widget child;
   final Widget? trailing;
+
+  /// Optional count shown as a compact neutral pill before [trailing].
+  final int? count;
   final IconData? icon;
 
   /// Shows [icon] in a tinted chip instead of plain grey.
@@ -28,6 +32,16 @@ class DashboardPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const bodyPad = EdgeInsets.fromLTRB(16, 0, 16, 14);
+    final trailingRow = count == null && trailing == null
+        ? null
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (count != null) _DashboardCountBadge(count!),
+              if (count != null && trailing != null) const SizedBox(width: 6),
+              if (trailing != null) trailing!,
+            ],
+          );
     return Container(
       decoration: AdminSurfaces.card(),
       child: Column(
@@ -72,7 +86,7 @@ class DashboardPanel extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (trailing != null) trailing!,
+                  if (trailingRow != null) trailingRow,
                 ],
               ),
             ),
@@ -84,6 +98,33 @@ class DashboardPanel extends StatelessWidget {
           else
             Padding(padding: bodyPad, child: child),
         ],
+      ),
+    );
+  }
+}
+
+class _DashboardCountBadge extends StatelessWidget {
+  const _DashboardCountBadge(this.count);
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AdminColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AdminColors.border),
+      ),
+      child: Text(
+        '$count',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AdminColors.textSecondary,
+          height: 1.2,
+        ),
       ),
     );
   }
@@ -112,10 +153,17 @@ class DashboardViewAllButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
         ),
       ),
-      child: Text(
-        'View all',
-        semanticsLabel: semanticsLabel,
-        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'View all',
+            semanticsLabel: semanticsLabel,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 2),
+          const Icon(Icons.arrow_forward_rounded, size: 14),
+        ],
       ),
     );
   }
@@ -146,55 +194,78 @@ class DashboardStatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = this.accent;
+    final background = accent?.tint ?? AdminColors.background;
+    final borderColor = accent == null
+        ? AdminColors.border
+        : accent.color.withValues(alpha: 0.18);
+    final iconBackground = accent == null
+        ? AdminColors.primaryTint
+        : Colors.white.withValues(alpha: 0.6);
+    final iconColor = accent?.onTint ?? AdminColors.primary;
+
     return Semantics(
       button: true,
       label: '$label: $value',
       excludeSemantics: true,
       onTap: onTap,
       child: Material(
-        color: accent?.tint ?? AdminColors.background,
+        color: background,
         borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
           hoverColor: AdminColors.primary.withValues(alpha: 0.05),
           child: Container(
-            height: 40,
+            height: 44,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-              border: Border.all(
-                color: accent != null
-                    ? accent!.color.withValues(alpha: 0.16)
-                    : AdminColors.border,
-                width: 1,
-              ),
+              border: Border.all(color: borderColor, width: 1),
             ),
             child: Row(
               children: [
                 if (showIcon) ...[
-                  Icon(
-                    icon,
-                    size: 16,
-                    color: accent?.onTint ?? AdminColors.textSecondary,
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: iconBackground,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(icon, size: 14, color: iconColor),
                   ),
                   const SizedBox(width: 8),
                 ],
                 Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AdminText.body,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AdminColors.textPrimary,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: AdminColors.textSecondary,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AdminColors.textPrimary,
+                          height: 1.15,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -229,15 +300,12 @@ class DashboardLiveIndicator extends StatelessWidget {
         label: 'Live. $text',
         child: ExcludeSemantics(
           child: Container(
-            height: 30,
+            height: 32,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: AdminColors.successBg,
+              color: AdminColors.card,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: AdminColors.success.withValues(alpha: 0.28),
-                width: 1,
-              ),
+              border: Border.all(color: AdminColors.border, width: 1),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,

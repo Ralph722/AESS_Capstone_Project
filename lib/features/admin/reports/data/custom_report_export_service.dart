@@ -5,9 +5,8 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/csv_safe.dart';
-import 'package:alumni_system/core/utils/personal_data_notice.dart';
-import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
@@ -319,79 +318,57 @@ class CustomReportExportService {
   static Future<Uint8List> toPdf(CustomReportDocument doc) async {
     final pdf = pw.Document();
     final date = DateFormat.yMMMMEEEEd().add_jm().format(doc.generatedAt);
-    final title = PdfSafeText.sanitize(doc.title);
-    final filterLine = doc.filterSummary.isEmpty
-        ? ''
-        : PdfSafeText.sanitize(
-            'Filters: ${doc.filterSummary.join(' | ')}',
-          );
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(28),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              title,
-              style: pw.TextStyle(
-                fontSize: 18,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.blue900,
-              ),
-            ),
-            pw.Text(
-              PdfSafeText.sanitize('Custom report - $date'),
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            if (filterLine.isNotEmpty) ...[
-              pw.SizedBox(height: 4),
-              pw.Text(
-                filterLine,
-                style:
-                    const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-              ),
-            ],
-            pw.SizedBox(height: 6),
-            pw.Divider(color: PdfColors.blue900),
-            pw.SizedBox(height: 8),
-          ],
+        margin: AessPdfTheme.pageMarginLandscape,
+        header: (ctx) => AessPdfHeader.build(
+          title: doc.title,
+          subtitle: 'CHED Graduate Tracer Study & Custom Reporting',
+          generationDate: date,
+          filterSummary: doc.filterSummary,
+          classification:
+              doc.containsPersonalData ? 'CONFIDENTIAL' : 'OFFICIAL REPORT',
+          isLandscape: true,
         ),
-        footer: (ctx) =>
-            pdfPageFooter(ctx, personal: doc.containsPersonalData),
+        footer: (ctx) => AessPdfFooter.build(
+          ctx,
+          containsPersonalData: doc.containsPersonalData,
+        ),
         build: (ctx) {
           final widgets = <pw.Widget>[];
           for (var i = 0; i < doc.sections.length; i++) {
             final section = doc.sections[i];
-            if (i > 0) widgets.add(pw.SizedBox(height: 16));
+            if (i > 0) widgets.add(pw.SizedBox(height: 14));
+
             widgets.add(
-              pw.Text(
-                PdfSafeText.sanitize(section.title),
-                style: pw.TextStyle(
-                  fontSize: 13,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blue900,
-                ),
+              AessPdfTable.sectionHeading(
+                section.title,
+                countBadge:
+                    '${section.rowCount} ${section.rowCount == 1 ? "row" : "rows"}',
               ),
             );
-            widgets.add(pw.SizedBox(height: 6));
+
             if (section.rows.isEmpty) {
               widgets.add(
-                pw.Text(
-                  'No rows matched the selected filters.',
-                  style: const pw.TextStyle(fontSize: 10),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                  child: pw.Text(
+                    'No rows matched the selected filters.',
+                    style: AessPdfTheme.tableCellMuted,
+                  ),
                 ),
               );
             } else {
-              widgets.add(_pdfTable(section.headers, section.rows));
+              widgets.addAll(_buildSectionPdfWidgets(section));
             }
           }
           if (widgets.isEmpty) {
             widgets.add(
               pw.Text(
                 'No sections selected.',
-                style: const pw.TextStyle(fontSize: 10),
+                style: AessPdfTheme.tableCellMuted,
               ),
             );
           }
@@ -401,6 +378,99 @@ class CustomReportExportService {
     );
 
     return pdf.save();
+  }
+
+  static List<pw.Widget> _buildSectionPdfWidgets(
+    CustomReportSectionData section,
+  ) {
+    switch (section.id) {
+      case CustomReportSectionId.executiveKpis:
+        final kpiItems = <AessKpiItem>[
+          for (final r in section.rows)
+            AessKpiItem(
+              label: r[0],
+              value: r[1],
+              isHighlight: r[0].contains('%') ||
+                  r[0].contains('rate') ||
+                  r[0].contains('total') ||
+                  r[0].contains('Employed ('),
+            ),
+        ];
+        return [
+          AessPdfKpiGrid.build(items: kpiItems, columns: 4),
+          pw.SizedBox(height: 10),
+          AessPdfKpiGrid.buildKeyValueTable(
+            pairs: [for (final r in section.rows) (r[0], r[1])],
+            labelWidth: 260,
+          ),
+        ];
+
+      case CustomReportSectionId.surveyQuestions:
+        // Group questions by survey wave to cleanly resolve the "repeated questions" issue
+        final bySurvey = <String, List<List<String>>>{};
+        for (final row in section.rows) {
+          final surveyTitle = row.isNotEmpty ? row[0] : 'Survey';
+          bySurvey.putIfAbsent(surveyTitle, () => []).add(row);
+        }
+
+        final widgets = <pw.Widget>[];
+        for (final entry in bySurvey.entries) {
+          int? submitted;
+          if (entry.value.isNotEmpty && entry.value.first.length > 4) {
+            submitted = int.tryParse(entry.value.first[4]);
+          }
+          widgets.add(
+            AessPdfTable.waveHeaderCard(
+              waveTitle: entry.key,
+              submittedCount: submitted,
+            ),
+          );
+          widgets.add(
+            AessPdfTable.build(
+              headers: section.headers,
+              rows: entry.value,
+              columnWidths: AessPdfTable.surveyQuestionColumnWidths,
+            ),
+          );
+          widgets.add(pw.SizedBox(height: 6));
+        }
+        return widgets;
+
+      case CustomReportSectionId.employmentRecords:
+        return [
+          AessPdfTable.build(
+            headers: section.headers,
+            rows: section.rows,
+            columnWidths: AessPdfTable.employmentRecordColumnWidths,
+          ),
+        ];
+
+      case CustomReportSectionId.surveySummary:
+        return [
+          AessPdfTable.build(
+            headers: section.headers,
+            rows: section.rows,
+            columnWidths: AessPdfTable.surveySummaryColumnWidths,
+          ),
+        ];
+
+      case CustomReportSectionId.alumniRoster:
+        return [
+          AessPdfTable.build(
+            headers: section.headers,
+            rows: section.rows,
+            columnWidths: AessPdfTable.alumniRosterColumnWidths,
+          ),
+        ];
+
+      default:
+        return [
+          AessPdfTable.build(
+            headers: section.headers,
+            rows: section.rows,
+          ),
+        ];
+    }
   }
 
   static Uint8List toExcel(CustomReportDocument doc) {
@@ -421,7 +491,7 @@ class CustomReportExportService {
         ['Custom report'],
         ['Generated', DateFormat.yMMMd().add_jm().format(doc.generatedAt)],
         if (doc.filterSummary.isNotEmpty)
-          ['Filters', doc.filterSummary.join(' · ')],
+          ['Filters', doc.filterSummary.join(' Â· ')],
         [''],
         [
           'Data is on the following tabs: '
@@ -459,7 +529,7 @@ class CustomReportExportService {
       ]),
     );
     if (doc.filterSummary.isNotEmpty) {
-      b.writeln(_csvRow(['Filters', doc.filterSummary.join(' · ')]));
+      b.writeln(_csvRow(['Filters', doc.filterSummary.join(' Â· ')]));
     }
     b.writeln();
 
@@ -488,7 +558,7 @@ class CustomReportExportService {
     }
   }
 
-  // —— section builders ——
+  // â€”â€” section builders â€”â€”
 
   static CustomReportSectionData _executiveKpis(AdminReportsAnalytics a) {
     return CustomReportSectionData(
@@ -721,7 +791,7 @@ class CustomReportExportService {
   static CustomReportSectionData _surveyParticipation(SurveyReportPack pack) {
     final p = pack.participation;
     final rate = p.assigned == 0
-        ? '—'
+        ? 'â€”'
         : '${(100 * p.completed / p.assigned).toStringAsFixed(1)}%';
     return CustomReportSectionData(
       id: CustomReportSectionId.surveyParticipation,
@@ -730,7 +800,7 @@ class CustomReportExportService {
       rows: [
         [
           'Funnel',
-          '${p.assigned} assigned · ${p.notStarted + p.inProgress} pending · '
+          '${p.assigned} assigned Â· ${p.notStarted + p.inProgress} pending Â· '
               '${p.completed} completed ($rate completion)',
         ],
         for (final line in pack.executiveBullets) ['KPI', line],
@@ -923,7 +993,7 @@ class CustomReportExportService {
     );
   }
 
-  // —— filters ——
+  // â€”â€” filters â€”â€”
 
   static bool _matchesBatch(String batch, CustomReportFilters filters) {
     if (filters.batchYears.isEmpty) return true;
@@ -1024,9 +1094,9 @@ class CustomReportExportService {
     if (filters.hasDateRange) {
       final fmt = DateFormat('yyyy-MM-dd');
       final start =
-          filters.dateStart != null ? fmt.format(filters.dateStart!) : '…';
-      final end = filters.dateEnd != null ? fmt.format(filters.dateEnd!) : '…';
-      parts.add('Dates: $start → $end');
+          filters.dateStart != null ? fmt.format(filters.dateStart!) : 'â€¦';
+      final end = filters.dateEnd != null ? fmt.format(filters.dateEnd!) : 'â€¦';
+      parts.add('Dates: $start â†’ $end');
     }
     return parts;
   }
@@ -1038,22 +1108,6 @@ class CustomReportExportService {
         .replaceAll(' ', '_');
     if (raw.isEmpty) return section.id.name;
     return raw.length > 28 ? raw.substring(0, 28) : raw;
-  }
-
-  static pw.Widget _pdfTable(List<String> headers, List<List<String>> rows) {
-    return pw.TableHelper.fromTextArray(
-      headers: PdfSafeText.sanitizeRow(headers),
-      data: PdfSafeText.sanitizeRows(rows),
-      headerStyle: pw.TextStyle(
-        fontWeight: pw.FontWeight.bold,
-        color: PdfColors.white,
-        fontSize: 8,
-      ),
-      cellStyle: const pw.TextStyle(fontSize: 8),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
-      cellAlignment: pw.Alignment.centerLeft,
-      headerAlignment: pw.Alignment.centerLeft,
-    );
   }
 
   static String _csvRow(List<String> cells) =>

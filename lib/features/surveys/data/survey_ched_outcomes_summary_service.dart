@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
@@ -197,124 +198,101 @@ abstract final class SurveyChedOutcomesSummaryService {
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              PdfSafeText.sanitize('CHED tracer outcomes summary'),
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.blue900,
-              ),
-            ),
-            pw.Text(
-              PdfSafeText.sanitize('$title · $stamp'),
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 6),
-            pw.Divider(color: PdfColors.blue900),
-            pw.SizedBox(height: 6),
-          ],
+        margin: AessPdfTheme.pageMargin,
+        header: (ctx) => AessPdfHeader.build(
+          title: 'CHED Tracer Outcomes Summary',
+          subtitle: title,
+          generationDate: stamp,
+          classification: 'OFFICIAL REPORT',
         ),
-        footer: (ctx) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-          ),
-        ),
+        footer: (ctx) => AessPdfFooter.build(ctx),
         build: (ctx) {
           final widgets = <pw.Widget>[
-            pw.Text(
-              PdfSafeText.sanitize('Participation'),
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-              ),
+            AessPdfTable.sectionHeading(
+              '1. Wave Participation',
+              subtitle:
+                  'Rates include sample size (n). Treat percentages as directional when n is small.',
             ),
-            pw.SizedBox(height: 6),
-            _pdfTable(
-              headers: const [
-                'Assigned',
-                'Submitted',
-                'Pending',
-                'Completion %',
+            AessPdfKpiGrid.build(
+              items: [
+                AessKpiItem(label: 'Assigned', value: '${summary.assigned}'),
+                AessKpiItem(
+                  label: 'Submitted',
+                  value: '${summary.submitted}',
+                  isHighlight: true,
+                ),
+                AessKpiItem(label: 'Pending', value: '${summary.pending}'),
+                AessKpiItem(
+                  label: 'Completion Rate',
+                  value: '${summary.completionRate.toStringAsFixed(1)}%',
+                  isHighlight: true,
+                ),
               ],
-              rows: [
-                [
-                  '${summary.assigned}',
-                  '${summary.submitted}',
-                  '${summary.pending}',
-                  summary.completionRate.toStringAsFixed(0),
-                ],
-              ],
-            ),
-            pw.SizedBox(height: 8),
-            pw.Text(
-              PdfSafeText.sanitize(
-                'Rates below always include sample size (n). '
-                'Treat percentages as directional when n is small.',
-              ),
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+              columns: 4,
             ),
             pw.SizedBox(height: 14),
+            AessPdfTable.sectionHeading(
+              '2. Key Outcome Distributions',
+              subtitle: 'Official CHED GTS mandatory outcome indicators',
+            ),
           ];
 
           for (final field in summary.fields) {
+            final highlight = field.highlightLabel != null &&
+                    field.highlightPercent != null
+                ? 'Highlight: "${field.highlightLabel}" at ${field.highlightPercent!.toStringAsFixed(0)}% (n=${field.answeredCount})'
+                : 'Sample size: n=${field.answeredCount}';
+
             widgets.add(
-              pw.Text(
-                PdfSafeText.sanitize(field.label),
-                style: pw.TextStyle(
-                  fontSize: 11,
-                  fontWeight: pw.FontWeight.bold,
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(top: 6, bottom: 3),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Text(
+                        PdfSafeText.sanitize(field.label),
+                        style: AessPdfTheme.subSectionHeading,
+                      ),
+                    ),
+                    pw.Text(
+                      PdfSafeText.sanitize(highlight),
+                      style: AessPdfTheme.caption,
+                    ),
+                  ],
                 ),
               ),
             );
-            widgets.add(pw.SizedBox(height: 3));
+
             if (field.answeredCount == 0) {
               widgets.add(
                 pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 10),
+                  padding: const pw.EdgeInsets.only(bottom: 8),
                   child: pw.Text(
-                    'No answers yet (n=0)',
-                    style: const pw.TextStyle(
-                      fontSize: 9,
-                      color: PdfColors.grey600,
-                    ),
+                    'No answers recorded yet (n=0)',
+                    style: AessPdfTheme.tableCellMuted,
                   ),
                 ),
               );
               continue;
             }
-            final highlight = field.highlightLabel != null &&
-                    field.highlightPercent != null
-                ? 'Highlight “${field.highlightLabel}”: '
-                    '${field.highlightPercent!.toStringAsFixed(0)}% '
-                    '(n=${field.answeredCount})'
-                : 'Answered n=${field.answeredCount}';
-            widgets.add(
-              pw.Text(
-                PdfSafeText.sanitize(highlight),
-                style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-              ),
-            );
-            widgets.add(pw.SizedBox(height: 4));
+
             widgets.add(
               _pdfTable(
-                headers: const ['Option', 'Count', '%'],
+                headers: const ['Option', 'Count (n)', 'Percentage (%)'],
                 rows: [
                   for (final r in field.rows)
                     [
                       r.label,
                       '${r.count}',
-                      r.percent.toStringAsFixed(0),
+                      '${r.percent.toStringAsFixed(1)}%',
                     ],
                 ],
+                columnWidths: AessPdfTable.chedOutcomesColumnWidths,
               ),
             );
-            widgets.add(pw.SizedBox(height: 12));
+            widgets.add(pw.SizedBox(height: 8));
           }
 
           return widgets;
@@ -425,23 +403,12 @@ abstract final class SurveyChedOutcomesSummaryService {
   static pw.Widget _pdfTable({
     required List<String> headers,
     required List<List<String>> rows,
+    Map<int, pw.TableColumnWidth>? columnWidths,
   }) {
-    return pw.TableHelper.fromTextArray(
-      headers: headers.map(PdfSafeText.sanitize).toList(),
-      data: [
-        for (final row in rows)
-          row.map(PdfSafeText.sanitize).toList(),
-      ],
-      headerStyle: pw.TextStyle(
-        fontSize: 9,
-        fontWeight: pw.FontWeight.bold,
-        color: PdfColors.white,
-      ),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
-      cellStyle: const pw.TextStyle(fontSize: 8),
-      cellAlignment: pw.Alignment.centerLeft,
-      headerAlignment: pw.Alignment.centerLeft,
-      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+    return AessPdfTable.build(
+      headers: headers,
+      rows: rows,
+      columnWidths: columnWidths,
     );
   }
 }

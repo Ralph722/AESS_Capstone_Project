@@ -28,6 +28,7 @@ import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_prefill.dart';
 import 'package:alumni_system/features/surveys/data/classic_survey_visibility.dart';
+import 'package:alumni_system/features/surveys/data/survey_submitted_responses_export.dart';
 import 'package:alumni_system/features/share/shareable_content.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
@@ -1649,35 +1650,11 @@ class SurveyService {
     required List<SurveyQuestion> questions,
     required List<SurveyParticipant> participants,
   }) {
-    final submitted = participants
-        .where((p) => !p.isPending && p.response != null)
-        .toList();
-    final buffer = StringBuffer();
-    final headers = [
-      'Name',
-      'Email',
-      'Program',
-      'Batch',
-      'Status',
-      'Submitted At',
-      ...questions.map((q) => _csvEscape(q.prompt)),
-    ];
-    buffer.writeln(headers.join(','));
-
-    for (final p in submitted) {
-      final r = p.response!;
-      final row = <String>[
-        _csvEscape(p.displayName),
-        _csvEscape(p.email),
-        _csvEscape(p.program),
-        _csvEscape(p.batchYear),
-        _csvEscape(p.assignment.status.name),
-        _csvEscape(r.submittedAt?.toIso8601String() ?? ''),
-        ...questions.map((q) => _csvEscape('${r.answers[q.id] ?? ''}')),
-      ];
-      buffer.writeln(row.join(','));
-    }
-    return buffer.toString();
+    return SurveySubmittedResponsesExport.buildCsv(
+      survey: survey,
+      questions: questions,
+      participants: participants,
+    );
   }
 
   /// Detailed per-survey export:

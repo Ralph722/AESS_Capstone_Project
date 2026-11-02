@@ -50,20 +50,22 @@ abstract final class GtsListTemplates {
     GtsListTemplate(
       key: 'list_untracked_follow_up',
       name: 'Untracked alumni for follow-up',
-      summary: 'Who has not answered, with contact details.',
+      summary: 'Who has not answered, with section A contact details.',
       config: GtsListConfig(
         templateKey: 'list_untracked_follow_up',
         title: 'Untracked alumni for follow-up',
         description:
-            'Alumni who have not answered the tracer, with roster contact '
-            'details. "Not registered" alumni need a portal account first.',
+            'Alumni who have not answered the tracer. Registered alumni '
+            'include their section A email and mobile number. Alumni who '
+            'are not registered show their roster name, course, and '
+            'student ID only.',
         columns: [
           _name,
           _batch,
           _course,
-          GtsListColumns.registrationColumn,
-          GtsListColumns.emailColumn,
-          GtsListColumns.contactColumn,
+          GtsListColumns.studentIdColumn,
+          'ched_3',
+          'ched_5',
           _status,
         ],
         statuses: [
@@ -94,6 +96,7 @@ abstract final class GtsListTemplates {
           'ched_21',
         ],
         statuses: [GtsTracerStatus.employed],
+        includeUntracked: false,
         chart: GtsListChart.none,
       ),
     ),
@@ -109,6 +112,7 @@ abstract final class GtsListTemplates {
             'reasons (item 17).',
         columns: [_batch, _name, _course, 'ched_16', 'ched_17'],
         statuses: [GtsTracerStatus.notEmployed, GtsTracerStatus.neverEmployed],
+        includeUntracked: false,
         chart: GtsListChart.none,
       ),
     ),

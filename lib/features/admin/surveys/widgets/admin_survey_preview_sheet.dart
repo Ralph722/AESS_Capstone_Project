@@ -204,7 +204,9 @@ class _ClassicSurveyPreviewBodyState extends State<_ClassicSurveyPreviewBody> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: SurveyTakeHeaderCard(
               title: widget.survey.title,
-              description: '',
+              description: widget.survey.isChedGtsBuiltin
+                  ? ''
+                  : widget.survey.description,
               totalQuestions: visible.length,
               answeredCount: answered,
             ),

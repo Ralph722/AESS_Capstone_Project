@@ -2,6 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_metrics.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_policy.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_alumni_list.dart';
+import 'package:alumni_system/features/admin/reports/application/gts_list_columns.dart';
+import 'package:alumni_system/features/admin/reports/application/gts_list_narrative.dart';
+import 'package:alumni_system/features/admin/reports/application/gts_list_tables.dart';
+import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_coverage.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_tab_stats.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
@@ -367,7 +371,7 @@ void main() {
     test('round-trip as JSON with the list mode', () {
       const config = GtsListConfig(
         surveyId: 'w2',
-        columns: ['year_graduated', 'name', 'ched_16', 'ched_19'],
+        columns: ['year_graduated', GtsListConfig.nameColumn, 'ched_16', 'ched_19'],
         courses: ['BSIT'],
         batches: ['2023'],
         statuses: [GtsTracerStatus.employed],
@@ -375,7 +379,7 @@ void main() {
           GtsReportFilter(field: 'ched_18', values: ['Contractual']),
         ],
         subtotalBy: GtsListSubtotal.course,
-        sortBy: 'name',
+        sortBy: GtsListConfig.nameColumn,
         sortDescending: true,
         title: 'Employed IT graduates',
       );
@@ -416,12 +420,159 @@ void main() {
       );
     });
 
+    test('version 1 columns migrate and removed columns are dropped', () {
+      final back = GtsListConfig.fromJson({
+        'mode': 'list',
+        'version': 1,
+        'columns': ['name', 'registration', 'email', 'contact', 'wave', 'ched_16'],
+        'sortBy': 'name',
+        'chart': 'none',
+      });
+      expect(back.version, GtsListConfig.currentVersion);
+      expect(back.columns, [GtsListConfig.nameColumn, 'ched_16']);
+      expect(back.sortBy, GtsListConfig.nameColumn);
+      expect(back.chart, GtsListChart.none);
+      expect(back.includeTable, isTrue);
+      expect(back.includeTally, isTrue);
+      expect(back.includeUntracked, isTrue);
+    });
+
+    test('section A Name migrates into the alumni Name column', () {
+      final back = GtsListConfig.fromJson({
+        'mode': 'list',
+        'version': 2,
+        'columns': ['ched_1', 'untracked_name', 'course', 'ched_16'],
+        'sortBy': 'ched_1',
+        'includeUntracked': false,
+      });
+      expect(back.columns, [
+        GtsListConfig.nameColumn,
+        'course',
+        'ched_16',
+      ]);
+      expect(back.sortBy, GtsListConfig.nameColumn);
+      expect(back.includeUntracked, isFalse);
+    });
+
     test('unknown statuses in saved settings are skipped', () {
       final back = GtsListConfig.fromJson({
         ...const GtsListConfig().toJson(),
         'statuses': ['employed', 'retired'],
       });
       expect(back.statuses, [GtsTracerStatus.employed]);
+    });
+  });
+
+  group('column rules and tally accuracy', () {
+    TracerProfile profile(String uid) => TracerProfile(
+      uid: uid,
+      email: 'ana@portal.test',
+      displayName: 'Ana Lopez',
+      studentId: 'S-Ana',
+      program: 'BSCS',
+      batchYear: '2024',
+      yearGraduated: '2024',
+      address: 'Oroquieta',
+      mobileNumber: '09170000000',
+      gender: 'Female',
+      civilStatus: 'Single',
+      regionOfOrigin: 'Region X',
+      province: 'Misamis Occidental',
+      locationOfResidence: 'City',
+    );
+
+    test('section A comes from the profile only when the tracer was not submitted', () {
+      final result = GtsAlumniList.build(
+        const GtsListConfig(
+          surveyId: 'w2',
+          columns: ['ched_1', 'ched_3', 'ched_7', 'ched_12', 'ched_16'],
+        ),
+        roster: [
+          _member('Ana Lopez', course: 'BSCS', batch: '2024', uid: 'u4'),
+          _member('Jose Rizal', course: 'BSIT', batch: '2024', registered: false),
+          _member('Juan Dela Cruz', course: 'BSIT', batch: '2023', uid: 'u1'),
+        ],
+        responses: [
+          _answer(
+            'u1',
+            'w2',
+            'Yes',
+            at: _w2,
+            extra: {'ched_1': 'Juan Submitted', 'ched_3': 'juan@tracer.test'},
+          ),
+        ],
+        waveIds: const ['w2'],
+        sectionAByUser: {'u4': GtsListColumns.sectionAFromProfile(profile('u4'))},
+      );
+      String cell(String name, String key) => GtsListColumns.cell(
+        GtsListColumns.byKey(key)!,
+        result.rows.firstWhere((row) => row.name == name),
+      );
+
+      expect(cell('Ana Lopez', 'ched_1'), 'Ana Lopez');
+      expect(cell('Ana Lopez', 'ched_3'), 'ana@portal.test');
+      expect(cell('Ana Lopez', 'ched_7'), 'Female');
+      expect(cell('Ana Lopez', 'ched_12'), '');
+      expect(cell('Ana Lopez', 'ched_16'), '');
+      expect(cell('Jose Rizal', 'ched_1'), '');
+      expect(cell('Jose Rizal', 'ched_3'), '');
+      expect(cell('Juan Dela Cruz', 'ched_1'), 'Juan Submitted');
+      expect(cell('Juan Dela Cruz', 'ched_3'), 'juan@tracer.test');
+    });
+
+    test('tallies follow the selected columns and match item 16', () {
+      final plain = _build();
+      final summary = GtsListTables.sections(plain);
+      expect(summary.map((section) => section.title), [
+        'Summary',
+        'Tracer status',
+      ]);
+      final response = summary.first.line(GtsListTables.responseRateLabel)!;
+      expect(response.count, '5 of 7');
+      expect(response.share, '71.4%');
+      expect(
+        summary[1].line('Answered')!.count,
+        '${plain.tally.answered}',
+      );
+      expect(summary[1].line(GtsListTables.employmentRateLabel), isNull);
+
+      final withItem16 = _build(
+        const GtsListConfig(surveyId: 'w2', columns: ['ched_16']),
+      );
+      final item16 = GtsListTables.sections(withItem16).firstWhere(
+        (section) => section.title == 'Presently employed',
+      );
+      expect(item16.line('Yes')!.count, '${withItem16.tally.count(GtsTracerStatus.employed)}');
+      expect(
+        item16.line(GtsListTables.employmentRateLabel)!.share,
+        GtsListTables.percent(withItem16.tally.employmentRate),
+      );
+      final note = GtsListNarrative.compose(withItem16);
+      expect(note, contains(GtsListTables.percent(withItem16.tally.responseRate)));
+      expect(note, contains(item16.line('Yes')!.count));
+      expect(note, isNot(contains('Juan')));
+    });
+
+    test('a chart count is the tally count for that category', () {
+      final result = _build(
+        const GtsListConfig(
+          surveyId: 'w2',
+          columns: ['ched_16'],
+          chart: GtsListChart.donut,
+        ),
+      );
+      final chart = GtsListTables.charts(result).firstWhere(
+        (chart) => chart.title == 'Presently employed',
+      );
+      final section = GtsListTables.sections(result).firstWhere(
+        (section) => section.title == 'Presently employed',
+      );
+      for (var i = 0; i < chart.labels.length; i++) {
+        expect(
+          chart.series.single.values[i],
+          int.parse(section.line(chart.labels[i])!.count),
+        );
+      }
     });
   });
 }

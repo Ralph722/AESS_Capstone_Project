@@ -176,7 +176,9 @@ void main() {
         GtsTracerStatus.untrackedRegistered,
         GtsTracerStatus.untrackedNotRegistered,
       });
-      expect(t.config.columns, contains(GtsListColumns.emailColumn));
+      expect(t.config.columns, contains('ched_3'));
+      expect(t.config.columns, contains('ched_5'));
+      expect(t.config.columns, contains(GtsListColumns.studentIdColumn));
     });
   });
 

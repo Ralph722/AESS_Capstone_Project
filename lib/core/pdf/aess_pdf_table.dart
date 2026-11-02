@@ -79,7 +79,7 @@ abstract final class AessPdfTable {
     final safeTitle = PdfSafeText.sanitize(waveTitle);
     final countText = submittedCount != null ? ' ($submittedCount submitted' : '';
     final rateText = completionRate != null
-        ? ' · ${completionRate.toStringAsFixed(1)}% completion)'
+        ? ' | ${completionRate.toStringAsFixed(1)}% completion)'
         : (submittedCount != null ? ')' : '');
 
     return pw.Container(
@@ -173,32 +173,32 @@ abstract final class AessPdfTable {
 
   /// Dedicated column widths for Survey Question Summaries (7 columns).
   ///
-  /// Prevents narrow vertical ribbons by allocating generous width to
-  /// question prompts and answer details, while constraining counts.
+  /// Question and detail keep most of the width; count headers use enough
+  /// flex that labels like "Not answered" stay readable.
   static const Map<int, pw.TableColumnWidth> surveyQuestionColumnWidths = {
-    0: pw.FlexColumnWidth(1.2), // Survey Wave
-    1: pw.FlexColumnWidth(3.8), // Question Prompt
+    0: pw.FlexColumnWidth(1.3), // Survey Wave
+    1: pw.FlexColumnWidth(3.6), // Question Prompt
     2: pw.FlexColumnWidth(1.0), // Type
-    3: pw.FixedColumnWidth(46), // Answered
-    4: pw.FixedColumnWidth(38), // Total
-    5: pw.FixedColumnWidth(46), // Not Answered
-    6: pw.FlexColumnWidth(4.6), // Detail / Choice Breakdown
+    3: pw.FlexColumnWidth(1.1), // Answered
+    4: pw.FlexColumnWidth(1.0), // Total
+    5: pw.FlexColumnWidth(1.4), // Not answered
+    6: pw.FlexColumnWidth(4.2), // Detail / Choice Breakdown
   };
 
   /// Dedicated column widths for 5-column Survey Pack Question rows.
   static const Map<int, pw.TableColumnWidth> surveyPackQuestionColumnWidths = {
     0: pw.FlexColumnWidth(4.0), // Question Prompt
     1: pw.FlexColumnWidth(1.1), // Type
-    2: pw.FixedColumnWidth(55), // Answered
-    3: pw.FixedColumnWidth(45), // Skipped
+    2: pw.FlexColumnWidth(1.2), // Answered
+    3: pw.FlexColumnWidth(1.1), // Skipped
     4: pw.FlexColumnWidth(5.0), // Detail
   };
 
   /// Dedicated column widths for Employment Records (9 columns).
   static const Map<int, pw.TableColumnWidth> employmentRecordColumnWidths = {
     0: pw.FlexColumnWidth(1.8), // Name
-    1: pw.FixedColumnWidth(50), // Course
-    2: pw.FixedColumnWidth(38), // Batch
+    1: pw.FlexColumnWidth(1.0), // Course
+    2: pw.FlexColumnWidth(0.8), // Batch
     3: pw.FlexColumnWidth(1.3), // Status
     4: pw.FlexColumnWidth(1.1), // Type
     5: pw.FlexColumnWidth(2.2), // Position
@@ -212,19 +212,19 @@ abstract final class AessPdfTable {
     0: pw.FlexColumnWidth(2.8), // Title
     1: pw.FlexColumnWidth(1.0), // Status
     2: pw.FlexColumnWidth(1.1), // Kind
-    3: pw.FixedColumnWidth(48), // Assigned
-    4: pw.FixedColumnWidth(48), // Submitted
-    5: pw.FixedColumnWidth(45), // Rate %
+    3: pw.FlexColumnWidth(1.1), // Assigned
+    4: pw.FlexColumnWidth(1.1), // Submitted
+    5: pw.FlexColumnWidth(1.0), // Rate %
     6: pw.FlexColumnWidth(2.2), // Target programs
   };
 
   /// Dedicated column widths for CHED 3-column outcomes (Option, Count, %).
   ///
-  /// Allocates ~70% of width to Option prompt so choices never wrap awkwardly.
+  /// Allocates most width to the option prompt so choices stay readable.
   static const Map<int, pw.TableColumnWidth> chedOutcomesColumnWidths = {
     0: pw.FlexColumnWidth(5.5), // Option label
-    1: pw.FixedColumnWidth(55), // Count (n)
-    2: pw.FixedColumnWidth(50), // Percent (%)
+    1: pw.FlexColumnWidth(1.1), // Count (n)
+    2: pw.FlexColumnWidth(1.0), // Percent (%)
   };
 
   /// Dedicated column widths for Pending Alumni list (6 columns).
@@ -232,17 +232,17 @@ abstract final class AessPdfTable {
     0: pw.FlexColumnWidth(2.2), // Name
     1: pw.FlexColumnWidth(3.0), // Email
     2: pw.FlexColumnWidth(1.4), // Program
-    3: pw.FixedColumnWidth(45), // Batch
+    3: pw.FlexColumnWidth(0.9), // Batch
     4: pw.FlexColumnWidth(1.3), // Status
-    5: pw.FixedColumnWidth(48), // Reminders
+    5: pw.FlexColumnWidth(1.1), // Reminders
   };
 
   /// Dedicated column widths for Alumni Roster (6 columns).
   static const Map<int, pw.TableColumnWidth> alumniRosterColumnWidths = {
     0: pw.FlexColumnWidth(2.2), // Name
     1: pw.FlexColumnWidth(2.8), // Email
-    2: pw.FixedColumnWidth(55), // Course
-    3: pw.FixedColumnWidth(40), // Batch
+    2: pw.FlexColumnWidth(1.1), // Course
+    3: pw.FlexColumnWidth(0.9), // Batch
     4: pw.FlexColumnWidth(1.2), // Registered
     5: pw.FlexColumnWidth(1.2), // Tracer
   };
@@ -293,15 +293,19 @@ abstract final class AessPdfTable {
       } else if (header.contains('email')) {
         widths[i] = const pw.FlexColumnWidth(2.5);
       } else if (header == 'batch' || header == 'year') {
-        widths[i] = const pw.FixedColumnWidth(42);
+        widths[i] = const pw.FlexColumnWidth(0.9);
+      } else if (header.contains('not answered')) {
+        widths[i] = const pw.FlexColumnWidth(1.4);
       } else if (header.contains('%') || header.contains('rate')) {
-        widths[i] = const pw.FixedColumnWidth(48);
-      } else if (header == 'answered' ||
+        widths[i] = const pw.FlexColumnWidth(1.0);
+      } else if (header.contains('answered') ||
           header == 'total' ||
-          header == 'skipped' ||
+          header.contains('skipped') ||
           header == 'count' ||
-          header == 'reminders') {
-        widths[i] = const pw.FixedColumnWidth(45);
+          header.contains('reminders') ||
+          header.contains('assigned') ||
+          header.contains('submitted')) {
+        widths[i] = const pw.FlexColumnWidth(1.1);
       } else {
         widths[i] = const pw.FlexColumnWidth(1.2);
       }

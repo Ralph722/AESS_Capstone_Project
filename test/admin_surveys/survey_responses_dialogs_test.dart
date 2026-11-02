@@ -95,9 +95,14 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.byTooltip('Details'), findsNWidgets(6));
         expect(find.text('Needs submitted responses'), findsNWidgets(4));
+        expect(find.text('This survey only'), findsWidgets);
+        expect(find.text('RESPONSE AND PARTICIPATION'), findsOneWidget);
+        expect(find.text('SURVEY FINDINGS'), findsOneWidget);
+        expect(find.text('OFFICIAL CHED OUTPUTS'), findsOneWidget);
+        expect(find.text('DETAILED DATA EXPORTS'), findsOneWidget);
         expect(_downloadButton(tester).onPressed, isNull);
 
-        final pending = find.text('Pending list');
+        final pending = find.text('Pending assignments');
         await tester.ensureVisible(pending);
         await tester.pumpAndSettle();
         await tester.tap(pending);
@@ -120,6 +125,7 @@ void main() {
       await tester.tap(find.byTooltip('Details').first);
       await tester.pumpAndSettle();
       expect(find.text('What it is'), findsOneWidget);
+      expect(find.text('Privacy'), findsOneWidget);
     });
 
     testWidgets('cohort filters fit at 768', (tester) async {

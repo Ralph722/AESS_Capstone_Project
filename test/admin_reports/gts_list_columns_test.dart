@@ -99,10 +99,12 @@ void main() {
       );
     });
 
-    test('headers carry the CHED number and a short label', () {
-      expect(_col('ched_16').header, '16. Presently employed');
-      expect(_col('ched_19').header, '19. Present occupation');
-      expect(_col('ched_20').header, '20. Line of business');
+    test('headers use the question label, and the number stays searchable', () {
+      expect(_col('ched_16').header, 'Presently employed');
+      expect(_col('ched_19').header, 'Present occupation');
+      expect(_col('ched_20').header, 'Line of business');
+      expect(_col('ched_16').header, isNot(contains('16.')));
+      expect(_col('ched_16').searchText, '16');
       expect(_col('ched_16').description, contains('presently employed'));
     });
 
@@ -110,8 +112,6 @@ void main() {
       for (final key in [
         GtsListConfig.nameColumn,
         GtsListColumns.studentIdColumn,
-        GtsListColumns.emailColumn,
-        GtsListColumns.contactColumn,
         'ched_1',
         'ched_3',
       ]) {
@@ -128,22 +128,42 @@ void main() {
       );
       expect(GtsListColumns.resolve(config).map((c) => c.key), [
         'ched_19',
-        'name',
+        GtsListConfig.nameColumn,
       ]);
       expect(GtsListColumns.unknownKeys(config), ['gone']);
     });
 
-    test('latest-from-any-wave lists always show the wave answered', () {
-      const config = GtsListConfig(columns: ['name']);
+    test('the Name column is titled Name in the table and the picker', () {
+      final column = _col(GtsListConfig.nameColumn);
+      expect(column.header, 'Name');
+      expect(
+        GtsListColumns.pickable.any(
+          (c) => c.key == GtsListConfig.sectionANameColumn,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a saved name column is the Name column', () {
+      const config = GtsListConfig(columns: ['name', 'wave', 'email']);
       expect(GtsListColumns.resolve(config).map((c) => c.key), [
-        'name',
-        GtsListColumns.waveColumn,
+        GtsListConfig.nameColumn,
       ]);
-      const placed = GtsListConfig(columns: ['wave', 'name']);
-      expect(GtsListColumns.resolve(placed).map((c) => c.key), [
-        'wave',
-        'name',
+      expect(GtsListColumns.unknownKeys(config), ['wave', 'email']);
+    });
+
+    test('section A Name folds into the alumni Name column', () {
+      const config = GtsListConfig(
+        columns: ['ched_1', 'course', GtsListConfig.nameColumn],
+      );
+      expect(GtsListColumns.resolve(config).map((c) => c.key), [
+        GtsListConfig.nameColumn,
+        'course',
       ]);
+      expect(
+        GtsListConfig.migrateColumns(['ched_1', 'untracked_name']),
+        [GtsListConfig.nameColumn],
+      );
     });
   });
 
@@ -177,12 +197,7 @@ void main() {
         'Yes',
         'AI engineer',
       ]);
-      expect(table['Maria Santos'], [
-        '2023',
-        'Maria Santos',
-        'No',
-        'Not asked',
-      ]);
+      expect(table['Maria Santos'], ['2023', 'Maria Santos', 'No', 'Not asked']);
       expect(table['Ana Lopez'], ['2023', 'Ana Lopez', '', '']);
       expect(table['Jose Rizal'], ['2023', 'Jose Rizal', '', '']);
     });
@@ -322,66 +337,107 @@ void main() {
   });
 
   group('roster cells', () {
-    test('registration, email and contact come from the roster', () {
+    test('answered alumni show Answered, and Name uses their best name', () {
       final result = _list(
         [
-          _member(
-            'Juan Dela Cruz',
-            uid: 'u1',
-            registeredEmail: 'juan@portal.test',
-            email: 'juan@old.test',
-            contact: '0917',
-          ),
-          _member('Jose Rizal', registered: false, email: 'jose@old.test'),
+          _member('Juan Dela Cruz', uid: 'u1'),
+          _member('Jose Rizal', registered: false),
         ],
         [
           _response('u1', _employed),
-          _response('u9', {
-            ..._employed,
-            'ched_1': 'Off Roster Person',
-            'ched_3': 'off@mail.test',
-            'ched_5': '0999',
-          }),
+          _response('u9', {..._employed, 'ched_1': 'Off Roster Person'}),
         ],
       );
-      Map<String, String> row(String name) {
-        final r = result.rows.firstWhere((r) => r.name == name);
-        return {
-          for (final key in [
-            'registration',
-            'email',
-            'contact',
-            'student_id',
-            'tracer_status',
-          ])
-            key: GtsListColumns.cell(_col(key), r),
-        };
+      String cell(String name, String key) {
+        final row = result.rows.firstWhere((r) => r.name == name);
+        return GtsListColumns.cell(_col(key), row);
       }
 
-      expect(row('Juan Dela Cruz'), {
-        'registration': 'Registered',
-        'email': 'juan@portal.test',
-        'contact': '0917',
-        'student_id': 'S-Juan Dela Cruz',
-        'tracer_status': 'Employed',
-      });
-      expect(row('Jose Rizal'), {
-        'registration': 'Not registered',
-        'email': 'jose@old.test',
-        'contact': '',
-        'student_id': 'S-Jose Rizal',
-        'tracer_status': GtsTracerStatus.untrackedNotRegistered.label,
-      });
-      expect(row('Off Roster Person'), {
-        'registration': 'Not on active roster',
-        'email': 'off@mail.test',
-        'contact': '0999',
-        'student_id': '',
-        'tracer_status': GtsTracerStatus.offRoster.label,
-      });
+      expect(cell('Juan Dela Cruz', GtsListConfig.nameColumn), 'Juan Dela Cruz');
+      expect(cell('Juan Dela Cruz', 'student_id'), 'S-Juan Dela Cruz');
+      expect(cell('Juan Dela Cruz', 'tracer_status'), 'Answered');
+      expect(cell('Juan Dela Cruz', 'ched_16'), 'Yes');
+      expect(cell('Jose Rizal', GtsListConfig.nameColumn), 'Jose Rizal');
+      expect(cell('Jose Rizal', 'ched_1'), '');
+      expect(cell('Jose Rizal', 'ched_3'), '');
+      expect(
+        cell('Jose Rizal', 'tracer_status'),
+        GtsTracerStatus.untrackedNotRegistered.label,
+      );
+      expect(
+        cell('Off Roster Person', GtsListConfig.nameColumn),
+        'Off Roster Person',
+      );
+      expect(cell('Off Roster Person', 'ched_1'), 'Off Roster Person');
+      expect(
+        cell('Off Roster Person', 'tracer_status'),
+        GtsTracerStatus.offRoster.label,
+      );
     });
 
-    test('wave answered and date answered', () {
+    test('one Name column fills every included person', () {
+      const config = GtsListConfig(
+        surveyId: 'w2',
+        columns: [GtsListConfig.nameColumn, 'course'],
+      );
+      final shown = GtsListColumns.displayColumns(config);
+      expect(shown.map((c) => c.header), ['Name', 'Course']);
+
+      final result = GtsAlumniList.build(
+        config,
+        roster: [
+          _member('Catherine Jala', uid: 'u1'),
+          _member('Jose Rizal', registered: false),
+          _member('Ralph Juab', uid: 'u3'),
+        ],
+        responses: [
+          _response('u3', {..._employed, 'ched_1': 'Ralph Jezron A. Juab'}),
+        ],
+        waveIds: const ['w2'],
+        sectionAByUser: {
+          'u1': {'ched_1': 'Catherine J. Jala'},
+        },
+      );
+      String shownName(String rosterName) {
+        final row = result.rows.firstWhere(
+          (r) => r.member?.fullName == rosterName,
+        );
+        return GtsListColumns.cell(shown.first, row);
+      }
+
+      expect(shownName('Catherine Jala'), 'Catherine J. Jala');
+      expect(shownName('Jose Rizal'), 'Jose Rizal');
+      expect(shownName('Ralph Juab'), 'Ralph Jezron A. Juab');
+    });
+
+    test('turning off includeUntracked hides people who have not answered', () {
+      final withUntracked = _list(
+        [
+          _member('Juan Dela Cruz', uid: 'u1'),
+          _member('Ana Lopez', uid: 'u2'),
+          _member('Jose Rizal', registered: false),
+        ],
+        [_response('u1', _employed)],
+      );
+      final without = _list(
+        [
+          _member('Juan Dela Cruz', uid: 'u1'),
+          _member('Ana Lopez', uid: 'u2'),
+          _member('Jose Rizal', registered: false),
+        ],
+        [_response('u1', _employed)],
+        config: const GtsListConfig(surveyId: 'w2', includeUntracked: false),
+      );
+      expect(withUntracked.rows.map((r) => r.name).toSet(), {
+        'Juan Dela Cruz',
+        'Ana Lopez',
+        'Jose Rizal',
+      });
+      expect(without.rows.map((r) => r.name), ['Juan Dela Cruz']);
+      expect(without.rows.every((r) => !r.status.untracked), isTrue);
+    });
+
+    test('date answered', () {
       final result = _list(
         [_member('Juan Dela Cruz', uid: 'u1'), _member('Ana Lopez', uid: 'u2')],
         [_response('u1', _employed, wave: 'w1')],
@@ -389,16 +445,8 @@ void main() {
       );
       final juan = result.rows.firstWhere((r) => r.name == 'Juan Dela Cruz');
       final ana = result.rows.firstWhere((r) => r.name == 'Ana Lopez');
-      const labels = {'w1': 'Tracer 2025'};
-      final wave = _col(GtsListColumns.waveColumn);
       final date = _col(GtsListColumns.answeredOnColumn);
-      expect(
-        GtsListColumns.cell(wave, juan, waveLabels: labels),
-        'Tracer 2025',
-      );
-      expect(GtsListColumns.cell(wave, juan), 'w1');
       expect(GtsListColumns.cell(date, juan), matches(r'^2026-06-1[45]$'));
-      expect(GtsListColumns.cell(wave, ana, waveLabels: labels), '');
       expect(GtsListColumns.cell(date, ana), '');
     });
   });

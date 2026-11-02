@@ -19,6 +19,7 @@ class SurveyQuestionAggregate {
     required this.answeredCount,
     required this.totalResponses,
     this.choicePercentages = const {},
+    this.choiceCounts = const {},
     this.scaleAverage,
     this.scaleMinObserved,
     this.scaleMaxObserved,
@@ -33,6 +34,9 @@ class SurveyQuestionAggregate {
   final int totalResponses;
   /// Label → % of respondents who answered this question (for choices).
   final Map<String, double> choicePercentages;
+
+  /// Label → raw respondent counts (preferred over reconstructing from %).
+  final Map<String, int> choiceCounts;
   final double? scaleAverage;
   final int? scaleMinObserved;
   final int? scaleMaxObserved;

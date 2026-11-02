@@ -1641,14 +1641,33 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
         SurveyEditorSection(
           first: true,
           title: 'Details',
-          subtitle: 'Title shown to alumni.',
-          child: TextField(
-            controller: _titleController,
-            onChanged: (_) => setState(() => _titleTouched = true),
-            decoration: AdminSurveyTheme.fieldDecoration(
-              label: 'Title *',
-              error: _titleTouched ? _titleError : null,
-            ),
+          subtitle: isBuiltin
+              ? 'Title shown to alumni.'
+              : 'Title and description shown to alumni.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _titleController,
+                onChanged: (_) => setState(() => _titleTouched = true),
+                decoration: AdminSurveyTheme.fieldDecoration(
+                  label: 'Title *',
+                  error: _titleTouched ? _titleError : null,
+                ),
+              ),
+              if (!isBuiltin) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _descController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: AdminSurveyTheme.fieldDecoration(
+                    label: 'Description (optional)',
+                    hint: 'Shown on the survey card and while alumni answer.',
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         SurveyEditorSection(

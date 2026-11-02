@@ -16,6 +16,10 @@ final _requests = <http.Request>[];
 /// Mimics a project with "Confirm email" off: sign-up returns a session.
 var _autoConfirm = false;
 
+/// When true, the emailed code is accepted and the password write answers
+/// that the chosen password is already saved.
+var _confirmCode = false;
+
 const _eligible = {
   'eligible': true,
   'memberId': 'member-1',
@@ -60,6 +64,45 @@ void main() {
         if (path == '/rest/v1/rpc/validate_alumni_eligibility') {
           return http.Response(
             jsonEncode(_eligibility),
+            200,
+            headers: json,
+            request: request,
+          );
+        }
+        if (path == '/auth/v1/verify' && _confirmCode) {
+          return http.Response(
+            jsonEncode({
+              'access_token': 'test-token',
+              'token_type': 'bearer',
+              'expires_in': 3600,
+              'refresh_token': 'test-refresh',
+              'user': {
+                ..._signUpUser,
+                'email_confirmed_at': '2026-01-01T00:00:00.000000Z',
+              },
+            }),
+            200,
+            headers: json,
+            request: request,
+          );
+        }
+        if (path == '/auth/v1/user' &&
+            request.method == 'PUT' &&
+            _confirmCode) {
+          return http.Response(
+            jsonEncode({
+              'code': 422,
+              'error_code': 'same_password',
+              'msg': 'New password should be different from the old password.',
+            }),
+            422,
+            headers: json,
+            request: request,
+          );
+        }
+        if (path == '/rest/v1/rpc/link_alumni_registration') {
+          return http.Response(
+            jsonEncode({'ok': true}),
             200,
             headers: json,
             request: request,
@@ -149,6 +192,7 @@ void main() {
   setUp(() {
     _requests.clear();
     _autoConfirm = false;
+    _confirmCode = false;
     _eligibility = _eligible;
   });
 
@@ -353,4 +397,36 @@ void main() {
     await tester.pump(const Duration(seconds: 61));
     await settle(tester);
   });
+
+  testWidgets(
+    'an unchanged password still links the roster and leaves the code step',
+    (tester) async {
+      _confirmCode = true;
+      await pumpRegister(tester);
+
+      await tester.enterText(field('Full name'), 'Maria Santos');
+      await tester.enterText(field('ID number'), '2019-12345');
+      await tap(tester, button('Verify alumni status'));
+      await tester.enterText(field('Gmail address'), _email);
+      await tester.enterText(field('Password'), _password);
+      await tester.enterText(field('Confirm password'), _password);
+      await sendCode(tester);
+
+      await tester.enterText(field('Verification code'), '29043084');
+      await tap(tester, button('Verify code & create account'));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 500)),
+      );
+      await settle(tester);
+
+      expect(calls('/auth/v1/verify'), hasLength(1));
+      expect(calls('/auth/v1/user'), hasLength(1));
+      expect(calls('/rest/v1/rpc/link_alumni_registration'), hasLength(1));
+      expect(find.textContaining('could not save your password'), findsNothing);
+      expect(find.byType(RegisterScreen), findsNothing);
+
+      await tester.pump(const Duration(seconds: 2));
+      await settle(tester);
+    },
+  );
 }

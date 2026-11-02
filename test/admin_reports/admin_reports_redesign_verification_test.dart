@@ -112,30 +112,38 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: ReportsDownloadsPanel(
-              filterLabel: 'Batch 2024 · BSIT',
-              chedWaveCount: 2,
-              rowCounts: const {
-                CustomReportSectionId.executiveKpis: 1,
-                CustomReportSectionId.surveySummary: 2,
-                CustomReportSectionId.employmentRecords: 45,
-                CustomReportSectionId.alumniRoster: 100,
-              },
-              onDownload: (preset, {required format, required printPreview}) async {
-                downloads.add('${preset.id}:${format.name}:$printPreview');
-              },
+            body: SingleChildScrollView(
+              child: ReportsDownloadsPanel(
+                filterLabel: 'Batch 2024 · BSIT',
+                chedWaveCount: 2,
+                rowCounts: const {
+                  CustomReportSectionId.executiveKpis: 1,
+                  CustomReportSectionId.surveySummary: 2,
+                  CustomReportSectionId.employmentRecords: 45,
+                  CustomReportSectionId.alumniRoster: 100,
+                },
+                onDownload: (preset, {required format, required printPreview}) async {
+                  downloads.add('${preset.id}:${format.name}:$printPreview');
+                },
+              ),
             ),
           ),
         ),
       );
 
       expect(find.text('Exports use: Batch 2024 · BSIT'), findsOneWidget);
-      expect(find.text('Executive snapshot'), findsOneWidget);
-      expect(find.text('CHED GTS pack'), findsOneWidget);
+      expect(find.text('CHED GTS institutional summary'), findsOneWidget);
+      expect(find.text('Graduate employment report'), findsOneWidget);
+      expect(find.text('Curriculum relevance report'), findsOneWidget);
+      expect(find.text('First-job and salary report'), findsOneWidget);
+      expect(find.text('Program and cohort comparison'), findsOneWidget);
+      expect(find.text('GTS participation and data quality'), findsOneWidget);
+      expect(find.text('Portal executive snapshot'), findsOneWidget);
       expect(find.text('CHED wave comparison'), findsOneWidget);
-      expect(find.text('Tracer outcomes'), findsOneWidget);
-      expect(find.text('Survey participation'), findsOneWidget);
-      expect(find.text('Roster extract'), findsOneWidget);
+      expect(find.text('Active roster extract'), findsOneWidget);
+      expect(find.text('INSTITUTIONAL GTS'), findsOneWidget);
+      expect(find.text('COMPARISONS AND DATA QUALITY'), findsOneWidget);
+      expect(find.text('OPERATIONS'), findsOneWidget);
 
       // Verify format buttons exist (PDF, Excel, CSV, Print)
       expect(find.text('PDF'), findsWidgets);
@@ -143,10 +151,37 @@ void main() {
       expect(find.text('CSV'), findsWidgets);
       expect(find.text('Print'), findsWidgets);
 
-      // Tap PDF on first card
+      // Tap PDF on first card (Institutional GTS summary).
       await tester.tap(find.text('PDF').first);
       await tester.pump();
-      expect(downloads.first, 'executive:pdf:false');
+      expect(downloads.first, 'institutional_gts:pdf:false');
+    });
+
+    testWidgets(
+        'ReportsDownloadsPanel lays out with fitHeight inside unbounded scroll',
+        (tester) async {
+      // Mirrors the live page: SliverToBoxAdapter/scroll parent + fitHeight
+      // budget. Expanded without a bounded SizedBox used to leave the Column
+      // with size MISSING and a blank Downloads tab.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ReportsDownloadsPanel(
+                fitHeight: 720,
+                filterLabel: 'All batches · All courses',
+                chedWaveCount: 2,
+                rowCounts: const {},
+                onDownload: (preset, {required format, required printPreview}) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('CHED GTS institutional summary'), findsOneWidget);
+      expect(find.text('GTS participation and data quality'), findsOneWidget);
     });
 
     testWidgets('GtsBuilderModeSwitch switches between Summary and List modes', (tester) async {

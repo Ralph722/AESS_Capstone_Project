@@ -10,6 +10,7 @@ import 'package:alumni_system/core/pdf/aess_pdf_components.dart';
 import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
+import 'package:alumni_system/features/admin/reports/application/report_metrics.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -144,17 +145,28 @@ abstract final class SurveyChedOutcomesSummaryService {
       final agg = byId[spec.questionId];
       final answered = agg?.answeredCount ?? 0;
       final pct = agg?.choicePercentages ?? const <String, double>{};
+      final counts = agg?.choiceCounts ?? const <String, int>{};
       final rows = <ChedOutcomeChoiceRow>[];
       if (answered > 0) {
-        final ordered = pct.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-        for (final e in ordered) {
-          final count = ((e.value / 100) * answered).round();
+        final labels = <String>{...pct.keys, ...counts.keys}.toList()
+          ..sort((a, b) => (pct[b] ?? 0).compareTo(pct[a] ?? 0));
+        for (final label in labels) {
+          final rawCount = counts[label];
+          final percent = pct[label] ??
+              ReportMetrics.optionShare(
+                optionCount: rawCount ?? 0,
+                answeredCount: answered,
+              ).percent;
+          // Prefer stored counts; fall back only for aggregates built without them.
+          final count = rawCount ?? ((percent / 100) * answered).round();
           rows.add(
             ChedOutcomeChoiceRow(
-              label: e.key,
-              count: count,
-              percent: e.value,
+              label: label,
+              count: ReportMetrics.countFromShare(
+                optionCount: count,
+                ignoredRoundedPercent: percent,
+              ),
+              percent: percent,
             ),
           );
         }

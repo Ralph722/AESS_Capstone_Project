@@ -269,10 +269,14 @@ void main() {
       // Extract rendered text and verify content & institutional structure
       final text = _extractText(bytes);
       expect(text, contains('UNIVERSITY OF SCIENCE AND TECHNOLOGY OF SOUTHERN PHILIPPINES'));
-      expect(text, contains('ALUMNI EMPLOYMENT & SURVEY SYSTEM'));
+      expect(text, contains('ALUMNI ENGAGEMENT AND SUPPORT SYSTEM'));
       expect(text, contains('CHED GTS pack'));
       expect(text, contains('Executive KPIs'));
       expect(text, contains('Survey question summaries'));
+      // Count headers must appear as whole words (not mid-word wraps only).
+      expect(text, contains('Answered'));
+      expect(text, contains('Total'));
+      expect(text, contains('Not answered'));
       // Verify wave separation headers eliminate question duplication confusion
       expect(text, contains('CHED GTS 2025'));
       expect(text, contains('CHED GTS 2026'));

@@ -63,6 +63,7 @@ final _responses = [
 GtsAlumniListResult _build({
   GtsListConfig config = const GtsListConfig(
     surveyId: 'w2',
+    chart: GtsListChart.none,
     columns: [
       'year_graduated',
       'name',
@@ -125,6 +126,7 @@ void main() {
       expect(rows.first, ['Report', GtsListTables.defaultTitle]);
       expect(rows, contains(equals(['Answers from', 'Tracer 2026'])));
       expect(rows, contains(equals(['Privacy', personalDataNotice])));
+      expect(rows, contains(equals(['Explanation'])));
       final headers = GtsListTables.headers(r);
       final header = rows.indexWhere(
         (row) => row.join('\u0000') == headers.join('\u0000'),
@@ -132,19 +134,19 @@ void main() {
       expect(header, greaterThan(0));
       expect(rows[header - 1], isEmpty);
       expect(rows.sublist(header + 1, header + 6), GtsListTables.rows(r));
-      expect(rows[header + 6], isEmpty);
-      expect(rows[header + 7], ['Tally']);
-      expect(rows[header + 8], GtsListTables.tallyHeaders);
-      expect(rows.sublist(header + 9), [
-        ['Employed', '1', '20.0%'],
-        ['Not employed', '1', '20.0%'],
-        ['Never employed', '1', '20.0%'],
-        ['Untracked – registered, not yet answered', '1', '20.0%'],
-        ['Untracked – not registered', '1', '20.0%'],
-        [GtsListTables.totalLabel, '5', '100%'],
-        [GtsListTables.responseRateLabel, '3 of 5', '60.0%'],
-        [GtsListTables.employmentRateLabel, '1 of 3', '33.3%'],
-      ]);
+      expect(rows, contains(equals(['Summary'])));
+      expect(rows, contains(equals([GtsListTables.totalLabel, '5', '100%'])));
+      expect(
+        rows,
+        contains(equals([GtsListTables.responseRateLabel, '3 of 5', '60.0%'])),
+      );
+      expect(rows, contains(equals(['Answered', '3', '60.0%'])));
+      expect(rows, contains(equals(['Yes', '1', '33.3%'])));
+      expect(
+        rows,
+        contains(equals([GtsListTables.employmentRateLabel, '1 of 3', '33.3%'])),
+      );
+      expect(rows.join('\n'), isNot(contains('16. Presently employed')));
     });
 
     test('the example row reads as on screen', () {
@@ -158,7 +160,7 @@ void main() {
             'Yes',
             'AI engineer, team lead',
             'Others: =HYPERLINK("http://x","y")',
-            'Employed',
+            'Answered',
           ]),
         ),
       );
@@ -193,7 +195,7 @@ void main() {
       expect(
         notes,
         contains(
-          equals(['16. Presently employed', 'Are you presently employed?']),
+          equals(['Presently employed', 'Are you presently employed?']),
         ),
       );
     });
@@ -207,20 +209,21 @@ void main() {
       );
       final headings = [
         for (final row in _csv(r))
-          if (row.length == 1 &&
-              (row.first.startsWith('Batch ') || row.first == 'Overall'))
-            row.first,
+          if (row.length == 1) row.first,
       ];
-      expect(headings, ['Batch 2023', 'Batch 2024', 'Overall']);
+      expect(headings, contains('Summary by batch'));
+      expect(headings, contains('Tracer status by batch'));
       expect(_excel(r), _csv(r));
     });
 
     test('PDF has the rows, the tally and the privacy footer', () async {
       final text = await _pdfText(_build());
       for (final s in [
-        'Juan Dela Cruz',
+        'ALUMNI ENGAGEMENT AND SUPPORT SYSTEM',
         'Jose Rizal',
         'AI engineer, team lead',
+        'Presently employed',
+        'Tracer status',
         'Untracked - not registered',
         'Total alumni',
         '3 of 5',
@@ -320,7 +323,7 @@ void main() {
               surveyId: 'w2',
               statuses: [GtsTracerStatus.untrackedNotRegistered],
               batches: ['2024'],
-              sortBy: 'name',
+              sortBy: GtsListConfig.nameColumn,
               sortDescending: true,
             ),
           ),

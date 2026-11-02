@@ -12,6 +12,9 @@ enum UserRole { admin, user }
 
 enum RegistrationStart { codeSent, signedIn }
 
+/// Result of asking Auth to email another sign-up code.
+enum RegistrationResend { codeSent, alreadyConfirmed }
+
 enum PasswordChangeFailure {
   incorrectCurrentPassword,
   invalidCode,
@@ -211,60 +214,101 @@ class AuthService {
     }
   }
 
-  Future<void> resendRegistrationCode(String email) async {
+  /// Emails another sign-up code, unless this address is already confirmed.
+  ///
+  /// After a successful [verifyRegistrationCode], Auth will accept
+  /// `resend(signup)` and send nothing. Callers must not tell the person a
+  /// new code is on the way in that case.
+  Future<RegistrationResend> resendRegistrationCode(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (_emailAlreadyConfirmed(normalizedEmail)) {
+      return RegistrationResend.alreadyConfirmed;
+    }
     try {
       await _supabase.auth.resend(
         type: OtpType.signup,
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
       );
     } on AuthException catch (e) {
       throw Exception(_handleAuthException(e));
     }
+    return RegistrationResend.codeSent;
   }
 
   /// Confirms the emailed code, which signs the user in.
+  ///
+  /// A second tap after the code was already accepted skips [verifyOTP] and
+  /// finishes with the session from the first tap. [password] is written when
+  /// a repeated sign-up left an older password in place. Supabase rejects an
+  /// unchanged password; that means the chosen password is already saved.
   Future<User> verifyRegistrationCode({
     required String email,
     required String code,
     required String password,
   }) async {
-    final AuthResponse response;
-    try {
-      response = await _supabase.auth.verifyOTP(
-        email: email.trim().toLowerCase(),
-        token: code.trim(),
-        type: OtpType.signup,
-      );
-    } on AuthException catch (e) {
-      final message = e.message.toLowerCase();
-      if (e.code == 'otp_expired' ||
-          message.contains('expired') ||
-          message.contains('invalid')) {
-        throw Exception(
-          'That code is invalid or has expired. '
-          'Use the latest code we emailed, or request a new one.',
+    final normalizedEmail = email.trim().toLowerCase();
+    User? user = _emailAlreadyConfirmed(normalizedEmail)
+        ? _supabase.auth.currentUser
+        : null;
+    if (user == null) {
+      final AuthResponse response;
+      try {
+        response = await _supabase.auth.verifyOTP(
+          email: normalizedEmail,
+          token: code.trim(),
+          type: OtpType.signup,
         );
+      } on AuthException catch (e) {
+        final message = e.message.toLowerCase();
+        if (e.code == 'otp_expired' ||
+            message.contains('expired') ||
+            message.contains('invalid')) {
+          throw Exception(
+            'That code is invalid or has expired. '
+            'Use the latest code we emailed, or request a new one.',
+          );
+        }
+        throw Exception(_handleAuthException(e));
       }
-      throw Exception(_handleAuthException(e));
+      user = response.user ?? _supabase.auth.currentUser;
     }
 
-    final user = response.user ?? AppSession.currentUser;
     if (user == null) {
       throw Exception('Verification failed. Request a new code and try again.');
     }
-    // Repeating a sign-up for an unconfirmed email keeps the first password,
-    // so set the one this person just chose. Never swallow failures — the UI
-    // must not treat registration as complete if the chosen password was lost.
+    await _saveRegistrationPassword(password);
+    return user;
+  }
+
+  /// True when [email] is the signed-in user and Auth has confirmed it.
+  bool _emailAlreadyConfirmed(String email) {
+    final user = _supabase.auth.currentUser;
+    if (user == null || user.emailConfirmedAt == null) return false;
+    return user.email?.trim().toLowerCase() == email.trim().toLowerCase();
+  }
+
+  /// Stores [password] after the email code is accepted.
+  ///
+  /// `signUp` already stored it on the first attempt. Auth then answers
+  /// `same_password`, which is success: the password the person chose is the
+  /// one on the account. Any other failure still blocks registration.
+  Future<void> _saveRegistrationPassword(String password) async {
     try {
       await _supabase.auth.updateUser(UserAttributes(password: password));
     } on AuthException catch (e) {
+      if (_isUnchangedPassword(e)) return;
       throw Exception(
         'Your email was verified, but we could not save your password. '
-        'Use Forgot password on the sign-in screen to set it, then try again. '
-        '${_handleAuthException(e)}',
+        'Please try again. ${_handleAuthException(e)}',
       );
     }
-    return user;
+  }
+
+  bool _isUnchangedPassword(AuthException e) {
+    final message = e.message.toLowerCase();
+    return e.code == 'same_password' ||
+        message.contains('different from the old password') ||
+        message.contains('same password');
   }
 
   /// Changes the signed-in user's own password in Supabase Auth.

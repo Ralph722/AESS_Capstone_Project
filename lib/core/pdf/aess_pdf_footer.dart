@@ -1,5 +1,6 @@
 import 'package:pdf/widgets.dart' as pw;
 import 'package:alumni_system/core/pdf/aess_pdf_theme.dart';
+import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/core/utils/personal_data_notice.dart';
 
 /// Standard institutional footer for all AESS PDF documents.
@@ -9,15 +10,19 @@ abstract final class AessPdfFooter {
   static const String administrativeNotice =
       'Official Institutional Document. For authorized university administrative & academic evaluation only.';
 
+  static const String _systemTag = 'AESS v2.0 | University Tracer System';
+
   /// Unified footer builder matching the institutional reporting standard.
   static pw.Widget build(
     pw.Context ctx, {
     bool containsPersonalData = false,
     String? customNotice,
   }) {
-    final noticeText = containsPersonalData
-        ? personalDataNotice
-        : (customNotice ?? administrativeNotice);
+    final noticeText = PdfSafeText.sanitize(
+      containsPersonalData
+          ? personalDataNotice
+          : (customNotice ?? administrativeNotice),
+    );
 
     return pw.Column(
       mainAxisSize: pw.MainAxisSize.min,
@@ -44,11 +49,11 @@ abstract final class AessPdfFooter {
             ),
             pw.SizedBox(width: 8),
 
-            // Center: System tag
+            // Center: System tag (ASCII only — Helvetica has no Unicode)
             pw.Expanded(
               flex: 2,
               child: pw.Text(
-                'AESS v2.0 · University Tracer System',
+                _systemTag,
                 textAlign: pw.TextAlign.center,
                 style: AessPdfTheme.footerNotice,
               ),

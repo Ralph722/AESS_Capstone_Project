@@ -20,7 +20,6 @@ class AiQuotaException implements Exception {
 /// What the AI is asked to do. The `ai-assist` Edge Function holds the
 /// instructions and settings for each task; the app sends only the content.
 enum AiTask {
-  assistant('assistant'),
   forumModeration('forum_moderation'),
   dssExplain('dss_explain'),
   dssThemes('dss_themes'),

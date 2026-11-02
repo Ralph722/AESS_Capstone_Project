@@ -8,6 +8,7 @@ import 'package:alumni_system/features/admin/dss/application/dss_policy.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_alumni_list.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_field_dictionary.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_list_columns.dart';
+import 'package:alumni_system/features/admin/reports/application/gts_list_narrative.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_list_tables.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_report_engine.dart';
 import 'package:alumni_system/features/admin/reports/data/gts_list_data_service.dart';
@@ -22,6 +23,7 @@ import 'package:alumni_system/features/admin/reports/models/gts_report_config.da
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_report_preview.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
+import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
@@ -31,6 +33,9 @@ import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 typedef GtsListResponseLoader =
     Future<List<GtsListResponse>> Function(List<String> surveyIds);
 
+typedef GtsListProfileLoader =
+    Future<Map<String, TracerProfile>> Function(List<String> userIds);
+
 /// Alumni list builder: one row per alumnus on the active roster with the
 /// columns the admin picks, and the tracer-status tally underneath.
 class GtsAlumniListPanel extends StatefulWidget {
@@ -39,6 +44,7 @@ class GtsAlumniListPanel extends StatefulWidget {
     required this.waves,
     required this.roster,
     this.loadResponses,
+    this.loadProfiles,
     this.responseCache,
     this.initialConfig,
     this.onConfigChanged,
@@ -67,6 +73,10 @@ class GtsAlumniListPanel extends StatefulWidget {
   /// Defaults to [GtsListDataService.loadResponses].
   final GtsListResponseLoader? loadResponses;
 
+  /// Section A profiles for registered alumni. Defaults to
+  /// [GtsListDataService.loadProfiles].
+  final GtsListProfileLoader? loadProfiles;
+
   /// Loaded responses per wave id, kept by the page across tab switches.
   final Map<String, List<GtsListResponse>>? responseCache;
 
@@ -79,6 +89,7 @@ class GtsAlumniListPanel extends StatefulWidget {
 
 class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   late GtsListResponseLoader _load;
+  late GtsListProfileLoader _loadProfiles;
   late GtsListConfig _config;
   final _title = TextEditingController();
   late final Map<String, List<GtsListResponse>> _cache =
@@ -94,7 +105,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     CustomReportFormat.pdf,
   ];
   String? _loadError;
+  String? _profileWarning;
   GtsAlumniListResult? _result;
+  String _explanation = '';
+  final Map<String, TracerProfile> _profiles = {};
+  final Set<String> _profileMiss = {};
 
   /// Saved list the current settings were opened from or saved as.
   late GtsSavedReport? _open = widget.initialOpen;
@@ -184,7 +199,9 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   @override
   void initState() {
     super.initState();
-    _load = widget.loadResponses ?? GtsListDataService().loadResponses;
+    _load = widget.loadResponses ?? (ids) => GtsListDataService().loadResponses(ids);
+    _loadProfiles =
+        widget.loadProfiles ?? (ids) => GtsListDataService().loadProfiles(ids);
     final initial = widget.initialConfig;
     _config = initial == null
         ? GtsListConfig(surveyId: widget.waves.firstOrNull?.id)
@@ -196,7 +213,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   @override
   void didUpdateWidget(GtsAlumniListPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.roster, widget.roster)) _recalculate();
+    if (!identical(oldWidget.roster, widget.roster)) unawaited(_refresh());
   }
 
   @override
@@ -221,19 +238,23 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
       for (final id in _neededWaves)
         if (!_cache.containsKey(id)) id,
     ];
-    if (missing.isNotEmpty) {
+    final missingProfiles = _profileWarning == null ? _missingProfileIds() : const <String>[];
+    if (missing.isNotEmpty || missingProfiles.isNotEmpty) {
       setState(() {
         _loading = true;
         _loadError = null;
       });
       try {
-        final rows = await _load(missing);
-        for (final id in missing) {
-          _cache[id] = [];
+        if (missing.isNotEmpty) {
+          final rows = await _load(missing);
+          for (final id in missing) {
+            _cache[id] = [];
+          }
+          for (final r in rows) {
+            (_cache[r.surveyId] ??= []).add(r);
+          }
         }
-        for (final r in rows) {
-          (_cache[r.surveyId] ??= []).add(r);
-        }
+        if (missingProfiles.isNotEmpty) await _loadMissingProfiles(missingProfiles);
       } catch (_) {
         if (!mounted) return;
         setState(() {
@@ -255,6 +276,50 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     _recalculate();
   }
 
+  List<String> _missingProfileIds() => [
+    for (final member in widget.roster)
+      if (member.isRegisteredUser && (member.authUid ?? '').trim().isNotEmpty)
+        if (!_profiles.containsKey(member.authUid!.trim()) &&
+            !_profileMiss.contains(member.authUid!.trim()))
+          member.authUid!.trim(),
+  ];
+
+  Future<void> _loadMissingProfiles(List<String> ids) async {
+    try {
+      final found = await _loadProfiles(ids);
+      for (final id in ids) {
+        final profile = found[id];
+        if (profile == null) {
+          _profileMiss.add(id);
+        } else {
+          _profiles[id] = profile;
+        }
+      }
+      _profileWarning = null;
+    } catch (_) {
+      _profileWarning =
+          'Registered profile details could not be loaded. Section A for '
+          'alumni who have not answered the tracer may be incomplete.';
+    }
+  }
+
+  Map<String, Map<String, dynamic>> _sectionAByUser() {
+    final out = <String, Map<String, dynamic>>{};
+    for (final member in widget.roster) {
+      if (!member.isRegisteredUser) continue;
+      final uid = (member.authUid ?? '').trim();
+      if (uid.isEmpty) continue;
+      final profile = _profiles[uid];
+      out[uid] = profile == null
+          ? GtsListColumns.sectionANameOnly(member.fullName)
+          : GtsListColumns.sectionAFromProfile(
+              profile,
+              rosterName: member.fullName,
+            );
+    }
+    return out;
+  }
+
   void _recalculate() {
     final needed = _neededWaves;
     if (!needed.every(_cache.containsKey)) return;
@@ -264,12 +329,19 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
       responses: [for (final id in needed) ..._cache[id]!],
       waveIds: [for (final w in widget.waves) w.id],
       waveLabels: _waveLabels,
+      sectionAByUser: _sectionAByUser(),
     );
-    setState(() => _result = result);
+    setState(() {
+      _result = result;
+      _explanation = GtsListNarrative.compose(result);
+    });
   }
 
   void _reloadData() {
     _cache.clear();
+    _profiles.clear();
+    _profileMiss.clear();
+    _profileWarning = null;
     unawaited(_refresh());
   }
 
@@ -610,6 +682,13 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
           subtitle: 'Filter by tracer status, course, batch, or answers',
           children: [
             _label('Tracer status'),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 6),
+              child: Text(
+                'These filters still use item 16. The Tracer status column shows Answered once a tracer is submitted.',
+                style: _muted,
+              ),
+            ),
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -684,10 +763,10 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
         _stepCard(
           step: '4',
           title: 'Grouping & Sorting',
-          subtitle: 'Order rows, add subtotals, and configure status charts',
+          subtitle: 'Order rows, add subtotals, and choose what the export includes',
           children: [
             _label('Order'),
-            _sortControls(columns),
+            _sortControls(),
             const SizedBox(height: 10),
             _label('Subtotals'),
             Wrap(
@@ -723,6 +802,64 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
               ],
             ),
             const SizedBox(height: 10),
+            _label('Include in the preview and the export'),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                FilterChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: const Text('Alumni table'),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _config.includeTable ? FontWeight.w700 : FontWeight.w500,
+                    color: _config.includeTable ? AdminColors.primary : AdminColors.textPrimary,
+                  ),
+                  selected: _config.includeTable,
+                  selectedColor: AdminColors.primary.withValues(alpha: 0.1),
+                  backgroundColor: AdminColors.surface,
+                  checkmarkColor: AdminColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    side: BorderSide(
+                      color: _config.includeTable ? AdminColors.primary : AdminColors.border,
+                      width: _config.includeTable ? 1.4 : 1.0,
+                    ),
+                  ),
+                  onSelected: (on) => _update(_config.copyWith(includeTable: on)),
+                ),
+                FilterChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: const Text('Tally'),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _config.includeTally ? FontWeight.w700 : FontWeight.w500,
+                    color: _config.includeTally ? AdminColors.primary : AdminColors.textPrimary,
+                  ),
+                  selected: _config.includeTally,
+                  selectedColor: AdminColors.primary.withValues(alpha: 0.1),
+                  backgroundColor: AdminColors.surface,
+                  checkmarkColor: AdminColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    side: BorderSide(
+                      color: _config.includeTally ? AdminColors.primary : AdminColors.border,
+                      width: _config.includeTally ? 1.4 : 1.0,
+                    ),
+                  ),
+                  onSelected: (on) => _update(_config.copyWith(includeTally: on)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Turn the table, the tally, and the chart on or off separately. '
+              'Charts only, the table and tally only, or both, all export the same figures.',
+              style: _muted,
+            ),
+            const SizedBox(height: 10),
             _label('Chart'),
             Wrap(
               spacing: 6,
@@ -733,7 +870,8 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     label: Text(switch (c) {
                       GtsListChart.none => 'No chart',
-                      GtsListChart.bars => 'Bars',
+                      GtsListChart.bars => 'Horizontal bars',
+                      GtsListChart.verticalBars => 'Vertical bars',
                       GtsListChart.donut => 'Donut',
                     }),
                     labelStyle: TextStyle(
@@ -803,9 +941,6 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     );
   }
 
-  bool _isLockedColumn(GtsListColumn c) =>
-      c.key == GtsListColumns.waveColumn && _config.latestFromAnyWave;
-
   Widget _columnList(List<GtsListColumn> columns) {
     if (columns.isEmpty) {
       return const Text(
@@ -826,7 +961,6 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
       },
       itemBuilder: (context, i) {
         final c = columns[i];
-        final isLocked = _isLockedColumn(c);
         return Container(
           key: ValueKey(c.key),
           margin: const EdgeInsets.only(bottom: 6),
@@ -876,20 +1010,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                     ),
                   ),
                 ),
-              if (isLocked)
-                const Tooltip(
-                  message: 'Always shown when answers come from any wave.',
-                  child: Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.lock_outline,
-                      size: 16,
-                      color: AdminColors.textMuted,
-                    ),
-                  ),
-                )
-              else
-                IconButton(
+              IconButton(
                   tooltip: 'Remove column',
                   visualDensity: VisualDensity.compact,
                   onPressed: () => _removeColumn(columns, c.key),
@@ -915,24 +1036,34 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   }
 
   Future<void> _pickColumns(List<GtsListColumn> current) async {
-    final picked = await showDialog<List<String>>(
+    final picked = await showDialog<GtsListColumnPickResult>(
       context: context,
-      builder: (_) =>
-          GtsListColumnPicker(selected: [for (final c in current) c.key]),
+      builder: (_) => GtsListColumnPicker(
+        selected: [for (final c in current) c.key],
+        includeUntracked: _config.includeUntracked,
+      ),
     );
     if (picked == null || !mounted) return;
+    final columns = GtsListConfig.migrateColumns(picked.columns);
+    final sortBy = _config.sortBy == null
+        ? null
+        : GtsListConfig.migrateSort(_config.sortBy);
     _update(
       _config.copyWith(
-        columns: picked,
-        clearSortBy: _config.sortBy != null && !picked.contains(_config.sortBy),
+        columns: columns,
+        includeUntracked: picked.includeUntracked,
+        clearSortBy: sortBy != null && !columns.contains(sortBy),
+        sortBy: sortBy,
       ),
     );
   }
 
-  Widget _sortControls(List<GtsListColumn> columns) {
-    final current = columns.any((c) => c.key == _config.sortBy)
-        ? _config.sortBy
-        : null;
+  Widget _sortControls() {
+    final columns = GtsListColumns.displayColumns(_config);
+    final sortBy = _config.sortBy == null
+        ? null
+        : GtsListConfig.migrateSort(_config.sortBy);
+    final current = columns.any((c) => c.key == sortBy) ? sortBy : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1184,7 +1315,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     if (!mounted) return;
     setState(() => _exporting = format);
     try {
-      final bytes = await GtsListExportService.exportBytes(result, format);
+      final bytes = await GtsListExportService.exportBytes(
+        result,
+        format,
+        explanation: _explanation,
+      );
       if (!mounted) return;
       tryDownloadBytesOnWeb(
         context,
@@ -1209,7 +1344,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
 
   Widget _previewArea() {
     final result = _result;
-    final columnCount = GtsListColumns.resolve(_config).length;
+    final columnCount = GtsListColumns.displayColumns(_config).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1287,7 +1422,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
             ],
           )
         else if (result != null)
-          GtsAlumniListPreview(result: result),
+          GtsAlumniListPreview(
+            result: result,
+            explanation: _explanation,
+            profileWarning: _profileWarning,
+          ),
       ],
     );
   }
@@ -1329,7 +1468,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
                           ),
                           Text(
-                            'Full-screen preview · ${result.rows.length} records · ${GtsListColumns.resolve(result.config).length} columns',
+                            'Full-screen preview · ${result.rows.length} records · ${GtsListColumns.displayColumns(result.config).length} columns',
                             style: const TextStyle(fontSize: 12, color: AdminColors.textSecondary),
                           ),
                         ],
@@ -1361,7 +1500,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                 const SizedBox(height: 12),
                 Expanded(
                   child: SingleChildScrollView(
-                    child: GtsAlumniListPreview(result: result),
+                    child: GtsAlumniListPreview(
+                      result: result,
+                      explanation: _explanation,
+                      profileWarning: _profileWarning,
+                    ),
                   ),
                 ),
               ],
@@ -1376,17 +1519,25 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
 /// On-screen alumni list: heading, status chart, the rows (200 at a time)
 /// and the tally, which is always shown in full.
 class GtsAlumniListPreview extends StatelessWidget {
-  const GtsAlumniListPreview({super.key, required this.result});
+  const GtsAlumniListPreview({
+    super.key,
+    required this.result,
+    this.explanation = '',
+    this.profileWarning,
+  });
 
   static const rowStep = GtsReportPreview.rowStep;
 
   final GtsAlumniListResult result;
+  final String explanation;
+  final String? profileWarning;
 
   @override
   Widget build(BuildContext context) {
-    final columns = GtsListColumns.resolve(result.config);
-    final chart = GtsListTables.chart(result);
+    final columns = GtsListColumns.displayColumns(result.config);
+    final charts = GtsListTables.charts(result);
     final tally = result.tally;
+    final config = result.config;
     final filtered =
         result.config.courses.isNotEmpty ||
         result.config.batches.isNotEmpty ||
@@ -1420,27 +1571,75 @@ class GtsAlumniListPreview extends StatelessWidget {
               style: const TextStyle(fontSize: 13, color: AdminColors.textPrimary),
             ),
           ),
-        const SizedBox(height: 16),
-        if (chart != null) ...[
-          GtsReportChartView(data: chart),
-          const SizedBox(height: 16),
-        ],
-        if (result.rows.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('No alumni match these settings.'),
-          )
-        else if (columns.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Add at least one column to see the list.'),
-          )
-        else
-          _ListTable(
-            result: result,
-            columns: columns,
-            key: ValueKey(result.config),
+        if (explanation.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AdminColors.surface,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(color: AdminColors.border),
+            ),
+            child: Text(
+              explanation,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: AdminColors.textPrimary,
+              ),
+            ),
           ),
+        ],
+        if (profileWarning != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            profileWarning!,
+            style: const TextStyle(fontSize: 12, color: AdminColors.warning),
+          ),
+        ],
+        const SizedBox(height: 16),
+        if (config.includeCharts)
+          for (final chart in charts) ...[
+            Text(chart.title, style: _headingStyle),
+            const SizedBox(height: 6),
+            GtsReportChartView(data: chart),
+            if (chart.omittedNote != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  chart.omittedNote!,
+                  style: const TextStyle(fontSize: 11, color: AdminColors.textMuted),
+                ),
+              ),
+            const SizedBox(height: 16),
+          ],
+        if (!config.includeTable && !config.includeTally && !config.includeCharts)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Turn on the alumni table, the tally, or a chart to include it in the preview and the export.',
+            ),
+          ),
+        if (config.includeTable) ...[
+          if (result.rows.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('No alumni match these settings.'),
+            )
+          else if (columns.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Add at least one column to see the list.'),
+            )
+          else
+            _ListTable(
+              result: result,
+              columns: columns,
+              key: ValueKey(result.config),
+            ),
+        ],
+        if (config.includeTally) ...[
         const SizedBox(height: 20),
         const Text(
           'TALLY',
@@ -1453,7 +1652,9 @@ class GtsAlumniListPreview extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _TallyTable(result),
-        if (tally.count(GtsTracerStatus.offRoster) > 0)
+        ],
+        if (tally.count(GtsTracerStatus.offRoster) > 0 &&
+            (config.includeTable || config.includeTally))
           const Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
@@ -1626,59 +1827,25 @@ class _TallyTableState extends State<_TallyTable> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final result = widget.result;
-    final overall = GtsListTables.tally(result.tally);
+  static String _both(GtsTallyLine line) =>
+      line.share.isEmpty ? line.count : '${line.count} (${line.share})';
+
+  DataTable _table(GtsTallySection section, GtsAlumniListResult result) {
     final groups = result.groups;
-    DataRow row(int i, List<String> cells) {
-      final line = overall[i];
-      return DataRow(
-        color: line.isTotal
-            ? const WidgetStatePropertyAll(AdminColors.surface)
-            : null,
-        cells: [
-          for (final c in cells)
-            DataCell(
-              Text(
-                c,
-                style: line.isTotal
-                    ? const TextStyle(fontWeight: FontWeight.w700)
-                    : null,
-              ),
+    DataRow row(GtsTallyLine line, List<String> cells) => DataRow(
+      color: line.isTotal ? const WidgetStatePropertyAll(AdminColors.surface) : null,
+      cells: [
+        for (final cell in cells)
+          DataCell(
+            Text(
+              cell,
+              style: line.isTotal ? const TextStyle(fontWeight: FontWeight.w700) : null,
             ),
-        ],
-      );
-    }
-
-    String both(GtsTallyLine l) =>
-        l.share.isEmpty ? l.count : '${l.count} (${l.share})';
-
-    final DataTable table;
+          ),
+      ],
+    );
     if (groups.isEmpty) {
-      table = DataTable(
-        headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
-        headingRowHeight: 34,
-        dataRowMinHeight: 28,
-        dataRowMaxHeight: 36,
-        columnSpacing: 24,
-        headingTextStyle: _headingStyle,
-        dataTextStyle: _cellStyle,
-        columns: const [
-          DataColumn(label: Text('Tracer status')),
-          DataColumn(label: Text('Alumni'), numeric: true),
-          DataColumn(label: Text('Share'), numeric: true),
-        ],
-        rows: [
-          for (var i = 0; i < overall.length; i++)
-            row(i, [overall[i].label, overall[i].count, overall[i].share]),
-        ],
-      );
-    } else {
-      final perGroup = [
-        for (final g in groups) _byLabel(GtsListTables.tally(g.tally)),
-      ];
-      table = DataTable(
+      return DataTable(
         headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
         headingRowHeight: 34,
         dataRowMinHeight: 28,
@@ -1687,74 +1854,125 @@ class _TallyTableState extends State<_TallyTable> {
         headingTextStyle: _headingStyle,
         dataTextStyle: _cellStyle,
         columns: [
-          DataColumn(
-            label: Text(
-              'Tracer status by '
-              '${GtsListTables.groupHeading(result.config.subtotalBy).toLowerCase()}',
-            ),
-          ),
-          for (final g in groups) DataColumn(label: Text(g.label)),
-          const DataColumn(label: Text('Overall')),
+          DataColumn(label: Text(section.title)),
+          const DataColumn(label: Text('Alumni'), numeric: true),
+          const DataColumn(label: Text('Share'), numeric: true),
         ],
         rows: [
-          for (var i = 0; i < overall.length; i++)
-            row(i, [
-              overall[i].label,
-              for (final lines in perGroup)
-                switch (lines[overall[i].label]) {
-                  final l? => both(l),
-                  null => '0',
-                },
-              both(overall[i]),
-            ]),
+          for (final line in section.lines)
+            row(line, [line.label, line.count, line.share]),
         ],
       );
     }
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AdminColors.card,
-        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-        border: Border.all(color: AdminColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Scrollbar(
+    final by = GtsListTables.groupHeading(result.config.subtotalBy).toLowerCase();
+    return DataTable(
+      headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
+      headingRowHeight: 34,
+      dataRowMinHeight: 28,
+      dataRowMaxHeight: 36,
+      columnSpacing: 24,
+      headingTextStyle: _headingStyle,
+      dataTextStyle: _cellStyle,
+      columns: [
+        DataColumn(label: Text('${section.title} by $by')),
+        for (final group in groups) DataColumn(label: Text(group.label)),
+        const DataColumn(label: Text('Overall')),
+      ],
+      rows: [
+        for (var i = 0; i < section.lines.length; i++)
+          row(section.lines[i], [
+            section.lines[i].label,
+            for (final lines in section.groupLines) _both(lines[i]),
+            _both(section.lines[i]),
+          ]),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.result;
+    final sections = GtsListTables.sections(result);
+    final groups = result.groups;
+    return Scrollbar(
+      controller: _hScrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
         controller: _hScrollController,
-        thumbVisibility: true,
-        trackVisibility: true,
-        child: SingleChildScrollView(
-          controller: _hScrollController,
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: groups.isEmpty ? 500 : math.max(600, (groups.length + 2) * 110.0),
-            ),
-            child: table,
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: groups.isEmpty
+                ? 500
+                : math.max(600, (groups.length + 2) * 110.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final section in sections) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: AdminColors.card,
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    border: Border.all(color: AdminColors.border),
+                  ),
+                  child: _table(section, result),
+                ),
+                if (section.note != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      section.note!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AdminColors.textMuted,
+                      ),
+                    ),
+                  ),
+              ],
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  static Map<String, GtsTallyLine> _byLabel(List<GtsTallyLine> lines) => {
-    for (final l in lines) l.label: l,
-  };
+/// Result of the configure-columns dialog.
+class GtsListColumnPickResult {
+  const GtsListColumnPickResult({
+    required this.columns,
+    required this.includeUntracked,
+  });
+
+  final List<String> columns;
+  final bool includeUntracked;
 }
 
 /// Column picker: every column grouped by section, with search and
-/// select-all per section. Pops the new column keys, or null.
+/// select-all per section. Pops [GtsListColumnPickResult], or null.
 class GtsListColumnPicker extends StatefulWidget {
-  const GtsListColumnPicker({super.key, required this.selected});
+  const GtsListColumnPicker({
+    super.key,
+    required this.selected,
+    this.includeUntracked = true,
+  });
 
   /// Current column keys in display order.
   final List<String> selected;
+  final bool includeUntracked;
 
   @override
   State<GtsListColumnPicker> createState() => _GtsListColumnPickerState();
 }
 
 class _GtsListColumnPickerState extends State<GtsListColumnPicker> {
-  late final Set<String> _picked = {...widget.selected};
+  late final Set<String> _picked = {
+    for (final k in GtsListConfig.migrateColumns(widget.selected)) k,
+  };
+  late bool _includeUntracked = widget.includeUntracked;
   final _search = TextEditingController();
 
   @override
@@ -1766,18 +1984,26 @@ class _GtsListColumnPickerState extends State<GtsListColumnPicker> {
   bool _matches(GtsListColumn c) {
     final q = _search.text.trim().toLowerCase();
     if (q.isEmpty) return true;
-    return c.header.toLowerCase().contains(q) ||
-        c.description.toLowerCase().contains(q) ||
-        c.group.toLowerCase().contains(q);
+    final blob = '${c.searchText} ${c.header} ${c.description} ${c.group}'
+        .toLowerCase();
+    return blob.contains(q);
   }
 
   /// Kept columns stay in place; new ones follow in questionnaire order.
-  List<String> _result() => [
-    for (final k in widget.selected)
-      if (_picked.contains(k)) k,
-    for (final c in GtsListColumns.all)
-      if (_picked.contains(c.key) && !widget.selected.contains(c.key)) c.key,
-  ];
+  List<String> _resultColumns() {
+    final selected = GtsListConfig.migrateColumns(widget.selected);
+    return [
+      for (final k in selected)
+        if (_picked.contains(k)) k,
+      for (final c in GtsListColumns.pickable)
+        if (_picked.contains(c.key) && !selected.contains(c.key)) c.key,
+    ];
+  }
+
+  GtsListColumnPickResult _result() => GtsListColumnPickResult(
+    columns: _resultColumns(),
+    includeUntracked: _includeUntracked,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -1842,6 +2068,8 @@ class _GtsListColumnPickerState extends State<GtsListColumnPicker> {
                       children: [
                         for (final (group, columns) in groups) ...[
                           _groupHeader(group, columns),
+                          if (group == GtsListColumns.alumniGroup)
+                            _includeUntrackedToggle(),
                           for (final c in columns) _option(c),
                         ],
                       ],
@@ -1901,6 +2129,23 @@ class _GtsListColumnPickerState extends State<GtsListColumnPicker> {
             child: Text(all ? 'Clear section' : 'Select all'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _includeUntrackedToggle() {
+    return SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      value: _includeUntracked,
+      onChanged: (on) => setState(() => _includeUntracked = on),
+      title: const Text(
+        'Include people who have not answered',
+        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+      ),
+      subtitle: const Text(
+        'When off, only alumni who submitted the tracer stay in the list.',
+        style: TextStyle(fontSize: 12),
       ),
     );
   }

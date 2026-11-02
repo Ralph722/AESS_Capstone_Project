@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:alumni_system/features/admin/reports/models/report_catalog.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
@@ -42,6 +43,8 @@ class _ReportSpec {
     required this.icon,
     required this.formats,
     required this.details,
+    required this.category,
+    required this.privacy,
     this.formatHint,
   });
 
@@ -51,6 +54,8 @@ class _ReportSpec {
   final IconData icon;
   final Set<SurveyExportFormat> formats;
   final _ExportDetailContent details;
+  final ReportCatalogCategory category;
+  final ReportPrivacyClass privacy;
   final String? formatHint;
 }
 
@@ -74,8 +79,24 @@ class _ExportDetailContent {
   final List<_ExportDetailSection> sections;
 }
 
+String _privacyLabel(ReportPrivacyClass privacy) => switch (privacy) {
+      ReportPrivacyClass.aggregated => 'Aggregated',
+      ReportPrivacyClass.confidentialIdentifiable => 'Confidential',
+      ReportPrivacyClass.restrictedFollowUp => 'Restricted follow-up',
+    };
+
+String _privacyBlurb(ReportPrivacyClass privacy) => switch (privacy) {
+      ReportPrivacyClass.aggregated =>
+        'Counts and distributions only — no alumni names or contact details.',
+      ReportPrivacyClass.confidentialIdentifiable =>
+        'Includes personal alumni information. Handle under RA 10173.',
+      ReportPrivacyClass.restrictedFollowUp =>
+        'Identifiable follow-up list for limited staff use.',
+    };
+
 _ExportDetailContent _exportDetails({
   required String definition,
+  required ReportPrivacyClass privacy,
   String? includes,
   List<String>? includeItems,
   String? bestFor,
@@ -86,6 +107,11 @@ _ExportDetailContent _exportDetails({
       label: 'What it is',
       body: definition,
       icon: Icons.description_outlined,
+    ),
+    _ExportDetailSection(
+      label: 'Privacy',
+      body: '${_privacyLabel(privacy)}. ${_privacyBlurb(privacy)}',
+      icon: Icons.shield_outlined,
     ),
     if ((includes != null && includes.trim().isNotEmpty) ||
         (includeItems != null && includeItems.isNotEmpty))
@@ -110,6 +136,70 @@ _ExportDetailContent _exportDetails({
   ]);
 }
 
+_ReportSpec _specFromCatalog(AessReportCatalogEntry entry) {
+  final kindName = entry.surveyExportKindName;
+  if (kindName == null) {
+    throw StateError('Catalog entry ${entry.id} missing surveyExportKindName');
+  }
+  final kind = SurveyExportReportKind.values.byName(kindName);
+  return _ReportSpec(
+    kind: kind,
+    title: entry.title,
+    subtitle: entry.subtitle,
+    icon: entry.icon ?? Icons.description_outlined,
+    formats: _formatsForKind(kind),
+    formatHint: _formatHintForKind(kind),
+    category: entry.category,
+    privacy: entry.privacy,
+    details: _exportDetails(
+      definition: entry.definition,
+      privacy: entry.privacy,
+      includeItems: entry.includeItems,
+      bestFor: entry.bestFor,
+      limitation: [
+        if (entry.scopeNote != null && entry.scopeNote!.trim().isNotEmpty)
+          entry.scopeNote!.trim(),
+        if (entry.limitation != null && entry.limitation!.trim().isNotEmpty)
+          entry.limitation!.trim(),
+      ].join(' '),
+    ),
+  );
+}
+
+Set<SurveyExportFormat> _formatsForKind(SurveyExportReportKind kind) {
+  return switch (kind) {
+    SurveyExportReportKind.responses => const {
+      SurveyExportFormat.excel,
+      SurveyExportFormat.csv,
+    },
+    SurveyExportReportKind.ched => const {SurveyExportFormat.excel},
+    SurveyExportReportKind.chedFillable => const {SurveyExportFormat.pdf},
+    SurveyExportReportKind.management ||
+    SurveyExportReportKind.chedOutcomes ||
+    SurveyExportReportKind.pending => const {
+      SurveyExportFormat.pdf,
+      SurveyExportFormat.excel,
+      SurveyExportFormat.csv,
+      SurveyExportFormat.print,
+    },
+  };
+}
+
+String? _formatHintForKind(SurveyExportReportKind kind) {
+  return switch (kind) {
+    SurveyExportReportKind.responses =>
+      'Choose Excel or CSV for spreadsheets.',
+    SurveyExportReportKind.ched => 'Available as Excel only.',
+    SurveyExportReportKind.chedFillable =>
+      'Downloads a ZIP folder of filled PDF forms.',
+    SurveyExportReportKind.chedOutcomes =>
+      'PDF or Print works well for meetings; Excel or CSV for deeper review.',
+    SurveyExportReportKind.pending =>
+      'Useful when sending reminders or following up.',
+    SurveyExportReportKind.management => null,
+  };
+}
+
 /// Two-step export: pick report type, then PDF / Excel / CSV / Print.
 ///
 /// [showCohortFilters] is for open-to-all CHED tracers only (no publish targets).
@@ -123,177 +213,17 @@ Future<SurveyExportChoice?> showAdminSurveyExportDialog({
   String? initialBatchYear,
   String? initialCourse,
 }) {
-  final reports = <_ReportSpec>[
-    _ReportSpec(
-      kind: SurveyExportReportKind.responses,
-      title: 'Submitted responses',
-      subtitle:
-          'A full list of everyone who already answered, with their answers',
-      icon: Icons.table_rows_outlined,
-      formats: const {SurveyExportFormat.excel, SurveyExportFormat.csv},
-      formatHint: 'Choose Excel or CSV for spreadsheets.',
-      details: _exportDetails(
-        definition:
-            'Downloads a spreadsheet of alumni who already submitted this survey, '
-            'with their answers side by side.',
-        includeItems: const [
-          'Name, email, course, and batch year',
-          'When they submitted',
-          'Each survey answer',
-        ],
-        bestFor:
-            'Reviewing answers in Excel or sharing raw results with staff.',
-        limitation:
-            'This is a data file, not a presentation. For meetings, use a summary report.',
-      ),
-    ),
-    _ReportSpec(
-      kind: SurveyExportReportKind.management,
-      title: 'Management report',
-      subtitle: 'Overview of how many answered and what the results look like',
-      icon: Icons.summarize_outlined,
-      formats: const {
-        SurveyExportFormat.pdf,
-        SurveyExportFormat.excel,
-        SurveyExportFormat.csv,
-        SurveyExportFormat.print,
-      },
-      details: _exportDetails(
-        definition:
-            'A ready-made summary of this survey for office review: how many were '
-            'invited, how many finished, and highlights from the answers.',
-        includeItems: const [
-          'Completion overview',
-          'Results by course and batch',
-          'Question summaries and short takeaways',
-        ],
-        bestFor:
-            'Meetings, printouts, and quick status updates for the office.',
-        limitation:
-            'For tracer employment and related CHED questions, the “CHED outcomes '
-            'summary” is clearer.',
-      ),
-    ),
-    if (isChedGts) ...[
-      _ReportSpec(
-        kind: SurveyExportReportKind.chedOutcomes,
-        title: 'CHED outcomes summary',
-        subtitle: 'Are they employed? Did the job match their course? And more',
-        icon: Icons.insights_outlined,
-        formats: const {
-          SurveyExportFormat.pdf,
-          SurveyExportFormat.excel,
-          SurveyExportFormat.csv,
-          SurveyExportFormat.print,
-        },
-        formatHint:
-            'PDF or Print works well for meetings; Excel or CSV for deeper review.',
-        details: _exportDetails(
-          definition:
-              'A short tracer report for this survey that answers the main CHED '
-              'questions offices care about. Percentages always show how many people '
-              'answered, so small groups are easy to spot.',
-          includeItems: const [
-            'How many finished the tracer',
-            'Whether graduates are employed',
-            'Why some are not employed',
-            'Type of work, and local or abroad',
-            'Whether the job matches their course',
-            'Time to first job, starting pay, and curriculum help',
-            'Reasons for further studies',
-          ],
-          bestFor:
-              'School meetings, CHED reporting talks, and “what did this tracer find?”',
-          limitation:
-              'This covers the current survey only. To compare older and newer tracers, '
-              'use Reports & Analytics → Downloads.',
-        ),
-      ),
-      _ReportSpec(
-        kind: SurveyExportReportKind.ched,
-        title: 'CHED GTS Excel pack',
-        subtitle:
-            'Detailed tracer workbook with personal, school, and job sheets',
-        icon: Icons.verified_outlined,
-        formats: const {SurveyExportFormat.excel},
-        formatHint: 'Available as Excel only.',
-        details: _exportDetails(
-          definition:
-              'A detailed Excel file for this tracer, organized into sheets that follow '
-              'the CHED Graduate Tracer Study sections.',
-          includeItems: const [
-            'Personal background',
-            'Education history',
-            'Employment information',
-            'Survey answers arranged for office filing',
-          ],
-          bestFor:
-              'Registrar handoff, archiving, and detailed CHED data review.',
-          limitation:
-              'This is a workbook, not the official fillable PDF form. Use “Official '
-              'fillable PDFs” if you need individual forms.',
-        ),
-      ),
-      _ReportSpec(
-        kind: SurveyExportReportKind.chedFillable,
-        title: 'Official fillable PDFs',
-        subtitle:
-            'One official CHED form per graduate who submitted, in a ZIP folder',
-        icon: Icons.picture_as_pdf_outlined,
-        formats: const {SurveyExportFormat.pdf},
-        formatHint: 'Downloads a ZIP folder of filled PDF forms.',
-        details: _exportDetails(
-          definition:
-              'Creates the official CHED tracer PDF form for each graduate who already '
-              'submitted, then downloads them together in one ZIP folder.',
-          includeItems: const [
-            'One filled form per submitted graduate',
-            'Answers taken from this survey',
-            'Missing blanks may be completed from their profile when available',
-          ],
-          bestFor:
-              'Printing, filing, or submitting individual official tracer forms.',
-          limitation:
-              'Large groups are limited to 100 forms at a time. Export again for the '
-              'next group if needed. Forms that cannot be filled are skipped.',
-        ),
-      ),
-    ],
-    _ReportSpec(
-      kind: SurveyExportReportKind.pending,
-      title: 'Pending list',
-      subtitle: 'Alumni invited to this survey who have not finished yet',
-      icon: Icons.person_off_outlined,
-      formats: const {
-        SurveyExportFormat.pdf,
-        SurveyExportFormat.excel,
-        SurveyExportFormat.csv,
-        SurveyExportFormat.print,
-      },
-      formatHint: 'Useful when sending reminders or following up.',
-      details: _exportDetails(
-        definition:
-            'A contact list of alumni who were invited but still have not submitted '
-            'this survey.',
-        includeItems: const [
-          'Name and email',
-          'Course and batch year',
-          'Invitation status',
-          'When they were assigned',
-          'How many reminders were sent',
-        ],
-        bestFor: 'Follow-ups, reminder messages, and improving response rates.',
-        limitation:
-            'People who already submitted are not included. The list is empty if '
-            'everyone has finished.',
-      ),
-    ),
+  final reports = [
+    for (final entry in AessReportCatalog.surveyModalEntries(
+      isChedGts: isChedGts,
+    ))
+      _specFromCatalog(entry),
   ];
 
   return showAdminDialogSurface<SurveyExportChoice>(
     context: context,
     maxWidth: 520,
-    maxHeight: showCohortFilters ? 760 : 680,
+    maxHeight: showCohortFilters ? 820 : 740,
     child: _SurveyExportDialogBody(
       reports: reports,
       hasSubmitted: hasSubmitted,
@@ -347,6 +277,57 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
 
   _ReportSpec get _currentSpec =>
       widget.reports.firstWhere((r) => r.kind == _report);
+
+  static const _categoryOrder = <ReportCatalogCategory>[
+    ReportCatalogCategory.responseAndParticipation,
+    ReportCatalogCategory.surveyFindings,
+    ReportCatalogCategory.officialChed,
+    ReportCatalogCategory.detailedData,
+  ];
+
+  List<Widget> _groupedReportWidgets() {
+    final widgets = <Widget>[];
+    for (final category in _categoryOrder) {
+      final group =
+          widget.reports.where((r) => r.category == category).toList();
+      if (group.isEmpty) continue;
+      if (widgets.isNotEmpty) widgets.add(const SizedBox(height: 12));
+      widgets.add(
+        Text(
+          category.label.toUpperCase(),
+          style: AdminText.caption.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
+            color: AdminColors.textSecondary,
+          ),
+        ),
+      );
+      widgets.add(const SizedBox(height: 6));
+      for (var i = 0; i < group.length; i++) {
+        if (i > 0) widgets.add(const SizedBox(height: 8));
+        final r = group[i];
+        widgets.add(
+          _ReportRow(
+            report: r,
+            selected: r.kind == _report,
+            blockedReason: _reportNeedsSubmissions(r.kind) && !widget.hasSubmitted
+                ? 'Needs submitted responses'
+                : null,
+            onSelect: () {
+              setState(() {
+                _report = r.kind;
+                if (_format == null || !r.formats.contains(_format)) {
+                  _format = _preferredFormat(r);
+                }
+              });
+            },
+            onDetails: () => _showReportDetails(r),
+          ),
+        );
+      }
+    }
+    return widgets;
+  }
 
   SurveyExportFormat? _preferredFormat(_ReportSpec spec) {
     const order = [
@@ -481,34 +462,37 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Pick what you need first, then choose how to save or print it.',
+                  AessReportCatalog.surveyModalIntro,
                   style: AdminText.caption.copyWith(height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AdminSurveyTheme.surface,
+                      borderRadius: BorderRadius.circular(
+                        AdminSurveyTheme.radiusSm,
+                      ),
+                      border: Border.all(color: AdminSurveyTheme.border),
+                    ),
+                    child: Text(
+                      AessReportCatalog.surveyScopeBadge,
+                      style: AdminText.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AdminSurveyTheme.primary,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 18),
                 const Text('1. What do you need?', style: _stepStyle),
                 const SizedBox(height: 8),
-                for (var i = 0; i < widget.reports.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 8),
-                  _ReportRow(
-                    report: widget.reports[i],
-                    selected: widget.reports[i].kind == _report,
-                    blockedReason:
-                        _reportNeedsSubmissions(widget.reports[i].kind) &&
-                            !widget.hasSubmitted
-                        ? 'Needs submitted responses'
-                        : null,
-                    onSelect: () {
-                      final r = widget.reports[i];
-                      setState(() {
-                        _report = r.kind;
-                        if (_format == null || !r.formats.contains(_format)) {
-                          _format = _preferredFormat(r);
-                        }
-                      });
-                    },
-                    onDetails: () => _showReportDetails(widget.reports[i]),
-                  ),
-                ],
+                ..._groupedReportWidgets(),
                 if (widget.showCohortFilters) ...[
                   const SizedBox(height: 16),
                   const Text(
@@ -517,7 +501,8 @@ class _SurveyExportDialogBodyState extends State<_SurveyExportDialogBody> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Optional — leave as All to include everyone.',
+                    'Optional — leave as All to include everyone assigned to '
+                    'this survey.',
                     style: AdminText.caption.copyWith(height: 1.35),
                   ),
                   const SizedBox(height: 8),
@@ -761,6 +746,18 @@ class _ReportRow extends StatelessWidget {
                       Text(
                         report.subtitle,
                         style: AdminText.caption.copyWith(height: 1.3),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _privacyLabel(report.privacy),
+                        style: AdminText.caption.copyWith(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: report.privacy ==
+                                  ReportPrivacyClass.aggregated
+                              ? AdminColors.textSecondary
+                              : AdminColors.warning,
+                        ),
                       ),
                       if (blockedReason != null) ...[
                         const SizedBox(height: 4),

@@ -277,6 +277,7 @@ class SurveyReportAnalytics {
       answeredCount: answered,
       totalResponses: totalResponses,
       choicePercentages: pct,
+      choiceCounts: Map<String, int>.unmodifiable(counts),
       skippedCount: totalResponses - answered,
     );
   }

@@ -27,11 +27,15 @@ import 'package:alumni_system/features/admin/reports/application/admin_reports_a
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_field_dictionary.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_report_engine.dart';
+import 'package:alumni_system/features/admin/reports/application/institutional_ched_templates.dart';
+import 'package:alumni_system/features/admin/reports/application/report_file_names.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_coverage.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_tab_stats.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_respondent.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_alumni_list.dart';
+import 'package:alumni_system/features/admin/reports/models/report_catalog.dart';
+import 'package:alumni_system/features/admin/reports/models/report_filter_config.dart';
 import 'package:alumni_system/features/admin/reports/models/reports_dashboard_filters.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_header.dart';
@@ -47,10 +51,14 @@ import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
+import 'package:alumni_system/features/admin/reports/widgets/reports_download_config_dialog.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_downloads_panel.dart';
 import 'package:alumni_system/features/admin/reports/widgets/tracer_outcome_extras.dart';
 import 'package:alumni_system/features/admin/reports/data/custom_report_export_service.dart';
 import 'package:alumni_system/features/admin/reports/data/gts_saved_report_service.dart';
+import 'package:alumni_system/features/admin/reports/data/institutional_cohort_comparison_service.dart';
+import 'package:alumni_system/features/admin/reports/data/institutional_gts_participation_quality_service.dart';
+import 'package:alumni_system/features/admin/reports/data/institutional_gts_summary_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
@@ -3358,12 +3366,33 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  CustomReportFilters _presetExportFilters() => CustomReportFilters(
-    batchYears: [
-      if (_dashboardFilters.batchYear != null) _dashboardFilters.batchYear!,
-    ],
-    courses: [if (_dashboardFilters.course != null) _dashboardFilters.course!],
-  );
+  CustomReportFilters _presetExportFilters([
+    ReportFilterSelection? selection,
+  ]) {
+    final batch = selection?.batchYear ?? _dashboardFilters.batchYear;
+    final course = selection?.course ?? _dashboardFilters.course;
+    return CustomReportFilters(
+      batchYears: [if (batch != null && batch.trim().isNotEmpty) batch],
+      courses: [if (course != null && course.trim().isNotEmpty) course],
+      registration: CustomReportRegistrationFilter.values.firstWhere(
+        (e) => e.name == selection?.registrationStatus,
+        orElse: () => CustomReportRegistrationFilter.all,
+      ),
+      tracer: CustomReportTracerFilter.values.firstWhere(
+        (e) => e.name == selection?.tracerStatus,
+        orElse: () => CustomReportTracerFilter.all,
+      ),
+      employment: CustomReportEmploymentFilter.values.firstWhere(
+        (e) => e.name == selection?.employmentStatus,
+        orElse: () => CustomReportEmploymentFilter.all,
+      ),
+    );
+  }
+
+  ReportFilterSelection _seedDownloadFilters() => ReportFilterSelection(
+        batchYear: _dashboardFilters.batchYear,
+        course: _dashboardFilters.course,
+      );
 
   static const _rollupSections = {
     CustomReportSectionId.surveyQuestions,
@@ -4348,7 +4377,60 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       return;
     }
 
-    if (preset.sections.any(CustomReportExportService.personalSections.contains) &&
+    var activeFormat = format;
+    var activePrint = printPreview;
+    var selection = _seedDownloadFilters();
+    if (preset.needsConfigDialog) {
+      final configured = await showReportsDownloadConfigDialog(
+        context: context,
+        preset: preset,
+        initialFormat: format,
+        printPreview: printPreview,
+        batchYears: reportsFilterBatchOptions(a.members),
+        chedWaves: _chedComparisonWaves(a),
+        initialFilters: selection,
+      );
+      if (configured == null || !mounted) return;
+      selection = configured.filters;
+      activeFormat = configured.format;
+      activePrint = configured.printPreview;
+    }
+
+    if (InstitutionalChedTemplates.isOutcomePreset(preset.id)) {
+      await _downloadInstitutionalChedOutcomeReport(
+        a,
+        presetId: preset.id,
+        format: activeFormat,
+        printPreview: activePrint,
+        filters: selection,
+      );
+      return;
+    }
+
+    if (preset.id == InstitutionalChedTemplates.programCohortComparison) {
+      await _downloadProgramCohortComparison(
+        a,
+        format: activeFormat,
+        printPreview: activePrint,
+        filters: selection,
+      );
+      return;
+    }
+
+    if (preset.id == InstitutionalChedTemplates.gtsParticipationQuality) {
+      await _downloadGtsParticipationQuality(
+        a,
+        format: activeFormat,
+        printPreview: activePrint,
+        filters: selection,
+      );
+      return;
+    }
+
+    final personal = preset.sections.any(
+      CustomReportExportService.personalSections.contains,
+    );
+    if (personal &&
         (!await confirmPersonalDataExport(
               context,
               what: 'The ${preset.title} file',
@@ -4372,8 +4454,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         id: 'preset_${preset.id}',
         name: preset.title,
         sections: List.of(preset.sections),
-        format: format,
-        filters: _presetExportFilters(),
+        format: activeFormat,
+        filters: _presetExportFilters(selection),
         createdAt: now,
         updatedAt: now,
       );
@@ -4391,7 +4473,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         profilesByAuthUid: _registeredProfiles,
       );
 
-      if (printPreview) {
+      if (activePrint) {
         final bytes = await CustomReportExportService.toPdf(doc);
         await Printing.layoutPdf(onLayout: (_) async => bytes, name: doc.title);
         return;
@@ -4399,21 +4481,403 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
       final bytes = await CustomReportExportService.exportBytes(
         doc: doc,
-        format: format,
+        format: activeFormat,
       );
       if (!mounted) return;
+      final stem = preset.catalogId == null
+          ? 'AESS_Report'
+          : (AessReportCatalog.byId(preset.catalogId!)?.fileNameStem ??
+              'AESS_Report');
       final ok = tryDownloadBytesOnWeb(
         context,
         bytes: bytes,
-        fileName:
-            '${preset.id}_${DateFormat('yyyyMMdd').format(now)}.${format.fileExtension}',
-        mimeType: format.mimeType,
+        fileName: ReportFileNames.dated(
+          stem: stem,
+          extension: activeFormat.fileExtension,
+          cohortScope: ReportFileNames.cohortScopeLabel(
+            batchYear: selection.batchYear,
+            course: selection.course,
+          ),
+          at: now,
+        ),
+        mimeType: activeFormat.mimeType,
       );
       if (ok && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Downloaded ${preset.title} (${format.label}).'),
+            content: Text(
+              'Downloaded ${preset.title} (${activeFormat.label}).',
+            ),
           ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+    } finally {
+      if (mounted) setState(() => _downloadBusy = false);
+    }
+  }
+
+  Future<
+      ({
+        List<Survey> waves,
+        Map<String, List<SurveyResponse>> responsesBySurveyId,
+        Map<String, AlumniMember> memberByAuth,
+        int assigned,
+        int submitted,
+        int pending,
+      })?
+  > _loadInstitutionalChedScope(
+    AdminReportsAnalytics a,
+    ReportFilterSelection filters,
+  ) async {
+    final allWaves = _chedComparisonWaves(a);
+    if (allWaves.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Need at least one Official CHED GTS wave with submissions.',
+          ),
+        ),
+      );
+      return null;
+    }
+
+    final selected = filters.surveyIds.isEmpty
+        ? allWaves
+        : allWaves
+            .where((s) => filters.surveyIds.contains(s.id))
+            .toList(growable: false);
+    if (selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select at least one Official CHED wave.')),
+      );
+      return null;
+    }
+
+    final batch = filters.batchYear?.trim().toLowerCase();
+    final course = filters.course?.trim().toLowerCase();
+    final memberByAuth = <String, AlumniMember>{
+      for (final m in a.activeRoster)
+        if (m.authUid != null && m.authUid!.trim().isNotEmpty)
+          m.authUid!.trim(): m,
+    };
+
+    final responsesBySurveyId = <String, List<SurveyResponse>>{};
+    var assigned = 0;
+    var submitted = 0;
+    for (final survey in selected) {
+      final responses = await _surveyService.getSurveyResponses(survey.id);
+      final submittedRows = responses
+          .where((r) => r.status == SurveyResponseStatus.submitted)
+          .where(
+            (r) => _respondentMatchesCohort(
+              userId: r.userId,
+              batch: batch,
+              course: course,
+              memberByAuth: memberByAuth,
+            ),
+          )
+          .toList(growable: false);
+      responsesBySurveyId[survey.id] = submittedRows;
+      submitted += submittedRows.length;
+      final waveAssigned =
+          a.assignmentCountsBySurveyId[survey.id] ?? survey.assignmentCount;
+      assigned += waveAssigned;
+    }
+    final pending = (assigned - submitted).clamp(0, assigned);
+    return (
+      waves: selected,
+      responsesBySurveyId: responsesBySurveyId,
+      memberByAuth: memberByAuth,
+      assigned: assigned,
+      submitted: submitted,
+      pending: pending,
+    );
+  }
+
+  Future<void> _downloadInstitutionalChedOutcomeReport(
+    AdminReportsAnalytics a, {
+    required String presetId,
+    required CustomReportFormat format,
+    required bool printPreview,
+    required ReportFilterSelection filters,
+  }) async {
+    setState(() => _downloadBusy = true);
+    try {
+      final scope = await _loadInstitutionalChedScope(a, filters);
+      if (scope == null || !mounted) return;
+
+      final title = InstitutionalChedTemplates.reportTitle(presetId);
+      final summary = InstitutionalGtsSummaryService.build(
+        waves: scope.waves,
+        responsesBySurveyId: scope.responsesBySurveyId,
+        assigned: scope.assigned,
+        submitted: scope.submitted,
+        pending: scope.pending,
+        batchFilter: filters.batchYear,
+        courseFilter: filters.course,
+        fields: InstitutionalChedTemplates.fieldsFor(presetId),
+        reportTitle: title,
+        sectionTwoTitle: 'Indicator distributions',
+      );
+      final stem = InstitutionalChedTemplates.fileStem(presetId);
+
+      if (printPreview || format == CustomReportFormat.pdf) {
+        final bytes = await InstitutionalGtsSummaryService.toPdf(summary);
+        if (!mounted) return;
+        if (printPreview) {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: title);
+          return;
+        }
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'pdf',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: 'application/pdf',
+        );
+      } else if (format == CustomReportFormat.excel) {
+        final bytes = InstitutionalGtsSummaryService.toExcel(summary);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'xlsx',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      } else {
+        final bytes = InstitutionalGtsSummaryService.toCsvBytes(summary);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'csv',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Downloaded $title (${format.label}).')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+    } finally {
+      if (mounted) setState(() => _downloadBusy = false);
+    }
+  }
+
+  Future<void> _downloadProgramCohortComparison(
+    AdminReportsAnalytics a, {
+    required CustomReportFormat format,
+    required bool printPreview,
+    required ReportFilterSelection filters,
+  }) async {
+    setState(() => _downloadBusy = true);
+    try {
+      final scope = await _loadInstitutionalChedScope(a, filters);
+      if (scope == null || !mounted) return;
+
+      final dimension = filters.surveyType == 'batch'
+          ? InstitutionalCompareDimension.batch
+          : InstitutionalCompareDimension.course;
+      final report = InstitutionalCohortComparisonService.build(
+        waves: scope.waves,
+        responsesBySurveyId: scope.responsesBySurveyId,
+        memberByAuth: scope.memberByAuth,
+        dimension: dimension,
+        batchFilter: filters.batchYear,
+        courseFilter: filters.course,
+      );
+      const title = 'Program and Cohort Comparison';
+      const stem = 'AESS_Program_Cohort_Comparison';
+
+      if (printPreview || format == CustomReportFormat.pdf) {
+        final bytes = await InstitutionalCohortComparisonService.toPdf(report);
+        if (!mounted) return;
+        if (printPreview) {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: title);
+          return;
+        }
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'pdf',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: 'application/pdf',
+        );
+      } else if (format == CustomReportFormat.excel) {
+        final bytes = InstitutionalCohortComparisonService.toExcel(report);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'xlsx',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      } else {
+        final bytes = InstitutionalCohortComparisonService.toCsvBytes(report);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'csv',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Downloaded $title (${format.label}).')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+    } finally {
+      if (mounted) setState(() => _downloadBusy = false);
+    }
+  }
+
+  Future<void> _downloadGtsParticipationQuality(
+    AdminReportsAnalytics a, {
+    required CustomReportFormat format,
+    required bool printPreview,
+    required ReportFilterSelection filters,
+  }) async {
+    setState(() => _downloadBusy = true);
+    try {
+      final scope = await _loadInstitutionalChedScope(a, filters);
+      if (scope == null || !mounted) return;
+
+      final assignedBySurveyId = <String, int>{
+        for (final w in scope.waves)
+          w.id: a.assignmentCountsBySurveyId[w.id] ?? w.assignmentCount,
+      };
+      final report = InstitutionalGtsParticipationQualityService.build(
+        waves: scope.waves,
+        responsesBySurveyId: scope.responsesBySurveyId,
+        assignedBySurveyId: assignedBySurveyId,
+        batchFilter: filters.batchYear,
+        courseFilter: filters.course,
+      );
+      final title = InstitutionalChedTemplates.reportTitle(
+        InstitutionalChedTemplates.gtsParticipationQuality,
+      );
+      final stem = InstitutionalChedTemplates.fileStem(
+        InstitutionalChedTemplates.gtsParticipationQuality,
+      );
+
+      if (printPreview || format == CustomReportFormat.pdf) {
+        final bytes =
+            await InstitutionalGtsParticipationQualityService.toPdf(report);
+        if (!mounted) return;
+        if (printPreview) {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: title);
+          return;
+        }
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'pdf',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: 'application/pdf',
+        );
+      } else if (format == CustomReportFormat.excel) {
+        final bytes =
+            InstitutionalGtsParticipationQualityService.toExcel(report);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'xlsx',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      } else {
+        final bytes =
+            InstitutionalGtsParticipationQualityService.toCsvBytes(report);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'csv',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Downloaded $title (${format.label}).')),
         );
       }
     } catch (e) {

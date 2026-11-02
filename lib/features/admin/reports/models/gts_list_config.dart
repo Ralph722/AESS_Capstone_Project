@@ -17,6 +17,15 @@ enum GtsTracerStatus {
 
   final String label;
 
+  /// Text in the Tracer status column. Employment stays on item 16.
+  String get columnLabel => switch (this) {
+    GtsTracerStatus.employed ||
+    GtsTracerStatus.notEmployed ||
+    GtsTracerStatus.neverEmployed ||
+    GtsTracerStatus.statusNotGiven => 'Answered',
+    _ => label,
+  };
+
   /// Submitted the tracer in scope.
   bool get answered => !untracked;
 
@@ -37,8 +46,15 @@ enum GtsTracerStatus {
 /// Subtotal tallies under each group of rows.
 enum GtsListSubtotal { none, batch, course }
 
-/// Chart of the tracer-status tally.
-enum GtsListChart { none, bars, donut }
+/// Chart style for alumni-list distributions.
+enum GtsListChart {
+  none,
+  /// Horizontal bars (best for long category labels).
+  bars,
+  /// Vertical bars.
+  verticalBars,
+  donut,
+}
 
 /// An alumni list definition: one row per alumnus on the active roster.
 /// Holds column keys and filters only, never names or answers.
@@ -54,6 +70,9 @@ class GtsListConfig {
     this.sortBy,
     this.sortDescending = false,
     this.chart = GtsListChart.bars,
+    this.includeTable = true,
+    this.includeTally = true,
+    this.includeUntracked = true,
     this.version = currentVersion,
     this.templateKey,
     this.title = '',
@@ -62,9 +81,20 @@ class GtsListConfig {
 
   /// Stored as `mode` so saved lists are told apart from summary reports.
   static const mode = 'list';
-  static const currentVersion = 1;
+  static const currentVersion = 3;
 
-  static const nameColumn = 'name';
+  /// Name column: best available name for every included row.
+  /// Saved lists used `name` before version 2; section A `ched_1` folds in.
+  static const nameColumn = 'untracked_name';
+  static const legacyNameColumn = 'name';
+  static const sectionANameColumn = 'ched_1';
+
+  static const _removedColumns = {
+    'registration',
+    'email',
+    'contact',
+    'wave',
+  };
   static const courseColumn = 'course';
   static const batchColumn = 'year_graduated';
   static const statusColumn = 'tracer_status';
@@ -106,6 +136,17 @@ class GtsListConfig {
   final bool sortDescending;
   final GtsListChart chart;
 
+  /// The row grid in the preview and the export.
+  final bool includeTable;
+
+  /// The column tally in the preview and the export.
+  final bool includeTally;
+
+  /// When false, alumni who have not submitted the tracer are hidden.
+  final bool includeUntracked;
+
+  bool get includeCharts => chart != GtsListChart.none;
+
   bool get latestFromAnyWave => surveyId == null;
 
   static bool isList(Map<String, dynamic> json) => json['mode'] == mode;
@@ -123,11 +164,14 @@ class GtsListConfig {
     bool clearSortBy = false,
     bool? sortDescending,
     GtsListChart? chart,
+    bool? includeTable,
+    bool? includeTally,
+    bool? includeUntracked,
     String? templateKey,
     String? title,
     String? description,
   }) => GtsListConfig(
-    version: version,
+    version: currentVersion,
     surveyId: latestFromAnyWave ? null : (surveyId ?? this.surveyId),
     columns: columns ?? this.columns,
     courses: courses ?? this.courses,
@@ -138,6 +182,9 @@ class GtsListConfig {
     sortBy: clearSortBy ? null : (sortBy ?? this.sortBy),
     sortDescending: sortDescending ?? this.sortDescending,
     chart: chart ?? this.chart,
+    includeTable: includeTable ?? this.includeTable,
+    includeTally: includeTally ?? this.includeTally,
+    includeUntracked: includeUntracked ?? this.includeUntracked,
     templateKey: templateKey ?? this.templateKey,
     title: title ?? this.title,
     description: description ?? this.description,
@@ -159,7 +206,35 @@ class GtsListConfig {
     'sortBy': ?sortBy,
     'sortDescending': sortDescending,
     'chart': chart.name,
+    'includeTable': includeTable,
+    'includeTally': includeTally,
+    'includeUntracked': includeUntracked,
   };
+
+  /// `name` and section A `ched_1` become [nameColumn]. Removed keys are dropped.
+  static List<String> migrateColumns(Iterable<String> raw) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final key in raw) {
+      if (_removedColumns.contains(key)) continue;
+      final next = key == legacyNameColumn || key == sectionANameColumn
+          ? nameColumn
+          : key;
+      if (seen.add(next)) out.add(next);
+    }
+    return out;
+  }
+
+  static String? migrateSort(Object? raw) {
+    final key = raw?.toString();
+    if (key == null || key.isEmpty || _removedColumns.contains(key)) {
+      return null;
+    }
+    if (key == legacyNameColumn || key == sectionANameColumn) {
+      return nameColumn;
+    }
+    return key;
+  }
 
   /// Throws [FormatException] for lists saved by a newer app version or
   /// for settings that are not an alumni list.
@@ -177,15 +252,16 @@ class GtsListConfig {
       for (final v in (raw as List? ?? const [])) v.toString(),
     ];
     final subtotal = json['subtotalBy'];
+    final migrated = json['columns'] is List
+        ? migrateColumns(strings(json['columns']))
+        : defaultColumns;
     return GtsListConfig(
-      version: version,
+      version: currentVersion,
       templateKey: json['templateKey']?.toString(),
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       surveyId: json['surveyId']?.toString(),
-      columns: json['columns'] is List
-          ? strings(json['columns'])
-          : defaultColumns,
+      columns: migrated.isEmpty ? defaultColumns : migrated,
       courses: strings(json['courses']),
       batches: strings(json['batches']),
       statuses: [
@@ -200,12 +276,15 @@ class GtsListConfig {
         (v) => v.name == subtotal,
         orElse: () => GtsListSubtotal.none,
       ),
-      sortBy: json['sortBy']?.toString(),
+      sortBy: migrateSort(json['sortBy']),
       sortDescending: json['sortDescending'] == true,
       chart: GtsListChart.values.firstWhere(
         (v) => v.name == json['chart'],
         orElse: () => GtsListChart.bars,
       ),
+      includeTable: json['includeTable'] != false,
+      includeTally: json['includeTally'] != false,
+      includeUntracked: json['includeUntracked'] != false,
     );
   }
 }

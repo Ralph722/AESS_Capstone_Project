@@ -12,7 +12,6 @@ import 'package:alumni_system/features/admin/roster/data/alumni_member_service.d
 import 'package:alumni_system/features/alumni/profile/data/profile_change_diff.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
-import 'package:alumni_system/features/alumni/profile/presentation/avatar_crop_dialog.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
 import 'package:alumni_system/features/contact_verification/presentation/contact_verify_sheet.dart';
@@ -171,9 +170,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
         return;
       }
       if (!mounted) return;
-      final croppedBytes = await AvatarCropDialog.show(context, rawBytes);
-      if (croppedBytes == null || !mounted) return;
-      await _uploadProfileImage(croppedBytes);
+      await _uploadProfileImage(rawBytes);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

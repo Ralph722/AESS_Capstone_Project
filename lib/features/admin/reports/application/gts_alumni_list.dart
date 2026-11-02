@@ -39,13 +39,22 @@ class GtsListResponse {
 /// One alumnus in the list: a roster record, an off-roster responder, or
 /// both a roster record and their answer.
 class GtsListRow {
-  const GtsListRow({required this.status, this.member, this.response});
+  const GtsListRow({
+    required this.status,
+    this.member,
+    this.response,
+    this.sectionA = const {},
+  });
 
   /// Null for [GtsTracerStatus.offRoster].
   final AlumniMember? member;
 
   /// Null for untracked alumni.
   final GtsListResponse? response;
+
+  /// Section A from the profile. Set only for a registered alumnus who
+  /// has not submitted the tracer in scope.
+  final Map<String, dynamic> sectionA;
   final GtsTracerStatus status;
 
   String get name {
@@ -191,6 +200,7 @@ abstract final class GtsAlumniList {
     required Iterable<GtsListResponse> responses,
     required Iterable<String> waveIds,
     Map<String, String> waveLabels = const {},
+    Map<String, Map<String, dynamic>> sectionAByUser = const {},
     DateTime? now,
   }) {
     final allowed = waveIds.toSet();
@@ -210,10 +220,15 @@ abstract final class GtsAlumniList {
       final uid = (m.authUid ?? '').trim();
       final response = uid.isEmpty ? null : latest[uid];
       if (response != null) linked.add(uid);
+      final sectionA = response != null || !m.isRegisteredUser
+          ? const <String, dynamic>{}
+          : (sectionAByUser[(m.authUid ?? '').trim()] ??
+                GtsListColumns.sectionANameOnly(m.fullName));
       rows.add(
         GtsListRow(
           member: m,
           response: response,
+          sectionA: sectionA,
           status: response != null
               ? statusOf(response.answers)
               : m.isRegisteredUser
@@ -229,10 +244,7 @@ abstract final class GtsAlumniList {
       );
     }
 
-    final sortColumn = switch (config.sortBy) {
-      final key? => GtsListColumns.byKey(key),
-      null => null,
-    };
+    final sortColumn = GtsListColumns.sortColumn(config);
     final kept = rows.where((r) => _matches(config, r)).toList()
       ..sort((a, b) => _compare(config, sortColumn, waveLabels, a, b));
 
@@ -283,6 +295,9 @@ abstract final class GtsAlumniList {
   static String _key(String s) => s.trim().toLowerCase();
 
   static bool _matches(GtsListConfig config, GtsListRow row) {
+    if (!config.includeUntracked && row.status.untracked) {
+      return false;
+    }
     if (config.statuses.isNotEmpty && !config.statuses.contains(row.status)) {
       return false;
     }
@@ -327,13 +342,30 @@ abstract final class GtsAlumniList {
       return config.sortDescending ? -c : c;
     }
 
-    final c = switch (config.sortBy) {
-      GtsListConfig.nameColumn => by(byName),
+    final sortBy = config.sortBy == null
+        ? null
+        : GtsListConfig.migrateSort(config.sortBy);
+    final c = switch (sortBy) {
+      GtsListConfig.nameColumn => _compareCells(
+        GtsListColumns.cell(
+          sortColumn ?? GtsListColumns.byKey(GtsListConfig.nameColumn)!,
+          a,
+          waveLabels: waveLabels,
+        ),
+        GtsListColumns.cell(
+          sortColumn ?? GtsListColumns.byKey(GtsListConfig.nameColumn)!,
+          b,
+          waveLabels: waveLabels,
+        ),
+        config.sortDescending,
+      ),
       GtsListConfig.courseColumn => by(
         () => _key(a.course).compareTo(_key(b.course)),
       ),
       GtsListConfig.statusColumn => by(
-        () => a.status.index.compareTo(b.status.index),
+        () => a.status.columnLabel.toLowerCase().compareTo(
+          b.status.columnLabel.toLowerCase(),
+        ),
       ),
       GtsListConfig.batchColumn || null => by(byBatch),
       _ when sortColumn != null => _compareCells(

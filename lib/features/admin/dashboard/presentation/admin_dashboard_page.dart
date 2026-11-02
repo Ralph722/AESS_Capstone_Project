@@ -43,7 +43,6 @@ import 'package:alumni_system/features/admin/announcements/presentation/admin_an
 import 'package:alumni_system/features/admin/forum/presentation/admin_forum_page.dart';
 import 'package:alumni_system/features/admin/feedback/presentation/admin_feedback_page.dart';
 import 'package:alumni_system/features/admin/dss/presentation/admin_dss_page.dart';
-import 'package:alumni_system/features/ai/presentation/ai_assistant_page.dart';
 import 'package:alumni_system/features/surveys/application/survey_catalog_refresh.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, RealtimeChannel, Supabase;
@@ -133,7 +132,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
     10,
     11,
     12,
-    13,
     14,
   ];
 
@@ -724,8 +722,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
         return const AdminAnnouncementsScreen();
       case 12:
         return const AdminForumScreen();
-      case 13:
-        return const AiAssistantScreen(isAdmin: true);
       case 14:
         return const AdminFeedbackScreen();
       case 15:

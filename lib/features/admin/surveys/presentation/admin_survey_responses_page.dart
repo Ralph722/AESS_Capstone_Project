@@ -16,6 +16,7 @@ import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_respon
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_response_timeline_sheet.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_analytics_panel.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_formal_report_dialog.dart';
+import 'package:alumni_system/features/admin/reports/application/report_file_names.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_export_dialog.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/admin/surveys/widgets/survey_question_editor.dart';
@@ -34,6 +35,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/surveys/data/survey_single_response_export_service.dart';
+import 'package:alumni_system/features/surveys/data/survey_submitted_responses_export.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
@@ -501,8 +503,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       final ok = tryDownloadBytesOnWeb(
         context,
         bytes: bytes,
-        fileName:
-            'survey_${_survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_')}_responses.csv',
+        fileName: _surveyExportFileName(
+          kind: SurveyExportReportKind.responses,
+          extension: 'csv',
+        ),
         mimeType: 'text/csv;charset=utf-8',
       );
       if (ok && mounted) {
@@ -546,47 +550,19 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     }
     setState(() => _isExportingChed = true);
     try {
-      final book = Excel.createExcel();
-      final defaultName = book.getDefaultSheet();
-      if (defaultName != null) {
-        book.rename(defaultName, 'Responses');
-      }
-      final sheet = book['Responses'];
-      sheet.appendRow([
-        'Name',
-        'Email',
-        'Program',
-        'Batch',
-        'Status',
-        'Submitted At',
-        ..._questions.map((q) => q.prompt),
-      ]);
-      final submitted = people
-          .where((p) => !p.isPending && p.response != null)
-          .toList(growable: false);
-      for (final p in submitted) {
-        final response = p.response!;
-        sheet.appendRow([
-          p.displayName,
-          p.email,
-          p.program,
-          p.batchYear,
-          p.assignment.status.name,
-          response.submittedAt?.toIso8601String() ?? '',
-          ..._questions.map((q) => '${response.answers[q.id] ?? ''}'),
-        ]);
-      }
-      final encoded = book.encode();
-      if (encoded == null) {
-        throw StateError('Excel encode returned null');
-      }
+      final bytes = SurveySubmittedResponsesExport.buildExcelBytes(
+        survey: _survey!,
+        questions: _questions,
+        participants: people,
+      );
       if (!mounted) return;
-      final safe = _survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_');
       tryDownloadBytesOnWeb(
         context,
-        bytes: Uint8List.fromList(encoded),
-        fileName:
-            'survey_${safe}_responses_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx',
+        bytes: bytes,
+        fileName: _surveyExportFileName(
+          kind: SurveyExportReportKind.responses,
+          extension: 'xlsx',
+        ),
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
@@ -611,6 +587,13 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   }) async {
     if (!printPreview && !requireWebExport(context)) return;
     if (_survey == null) return;
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The survey management summary',
+        ) ||
+        !mounted) {
+      return;
+    }
     setState(() => _isExportingChed = true);
     try {
       final pack = SurveyReportPackService.buildSurveyPack(
@@ -619,8 +602,6 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         questions: _questions,
         responses: responses ?? _responses,
       );
-      final safe = _survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_');
-      final stamp = DateFormat('yyyyMMdd').format(DateTime.now());
 
       if (printPreview || format == 'pdf') {
         final bytes = await SurveyReportPackService.toPdf(pack);
@@ -628,23 +609,29 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         if (printPreview) {
           await Printing.layoutPdf(
             onLayout: (_) async => bytes,
-            name: '${_survey!.title} management report',
+            name: '${_survey!.title} survey management summary',
           );
           return;
         }
         tryDownloadBytesOnWeb(
           context,
           bytes: bytes,
-          fileName: 'survey_${safe}_report_pack_$stamp.pdf',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.management,
+            extension: 'pdf',
+          ),
           mimeType: 'application/pdf',
         );
       } else if (format == 'xlsx') {
         final bytes = SurveyReportPackService.toExcel(pack);
-      if (!mounted) return;
-      tryDownloadBytesOnWeb(
-        context,
-        bytes: bytes,
-          fileName: 'survey_${safe}_report_pack_$stamp.xlsx',
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.management,
+            extension: 'xlsx',
+          ),
           mimeType:
               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         );
@@ -656,17 +643,23 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         tryDownloadBytesOnWeb(
           context,
           bytes: bytes,
-          fileName: 'survey_${safe}_report_pack_$stamp.csv',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.management,
+            extension: 'csv',
+          ),
           mimeType: 'text/csv;charset=utf-8',
         );
       }
 
       if (!mounted) return;
-      _showSnack('Management report downloaded', color: AdminColors.success);
+      _showSnack(
+        'Survey management summary downloaded',
+        color: AdminColors.success,
+      );
     } catch (e) {
       if (mounted) {
         _showSnack(
-          surveyExportErrorMessage('the management report', e),
+          surveyExportErrorMessage('the survey management summary', e),
           color: AdminColors.danger,
         );
       }
@@ -711,12 +704,13 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         ).showSnackBar(const SnackBar(content: Text('Nothing to export')));
         return;
       }
-      final slug = _survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_');
-      final date = DateFormat('yyyyMMdd').format(DateTime.now());
       tryDownloadBytesOnWeb(
         context,
         bytes: bytes,
-        fileName: 'ched_gts_${slug}_$date.xlsx',
+        fileName: _surveyExportFileName(
+          kind: SurveyExportReportKind.ched,
+          extension: 'xlsx',
+        ),
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
@@ -1551,7 +1545,25 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         .toList(growable: false);
   }
 
+  String? _exportBatchYear;
+  String? _exportCourse;
+
+  String _surveyExportFileName({
+    required SurveyExportReportKind kind,
+    required String extension,
+  }) {
+    return ReportFileNames.forSurveyExportKind(
+      kindName: kind.name,
+      surveyTitle: _survey?.title ?? 'survey',
+      extension: extension,
+      batchYear: _exportBatchYear,
+      course: _exportCourse,
+    );
+  }
+
   Future<void> _runSurveyExport(SurveyExportChoice choice) async {
+    _exportBatchYear = choice.batchYear;
+    _exportCourse = choice.course;
     final scopedParticipants = _participantsForExport(choice);
     final scopedResponses = _responsesForExport(scopedParticipants);
     final scopedSubmitted =
@@ -1579,7 +1591,8 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                 const SnackBar(
                   content: Text(
                     'Submitted responses export as Excel or CSV. '
-                    'Use Management report or CHED outcomes for PDF / Print.',
+                    'Use Survey management summary or CHED outcomes for '
+                    'PDF / Print.',
                   ),
                 ),
               );
@@ -1675,8 +1688,6 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         participants: participants ?? _participants,
         responses: responses ?? _responses,
       );
-      final safe = _survey!.title.replaceAll(RegExp(r'[^\w\-]+'), '_');
-      final stamp = DateFormat('yyyyMMdd').format(DateTime.now());
 
       if (printPreview || format == SurveyExportFormat.pdf) {
         final bytes = await SurveyChedOutcomesSummaryService.toPdf(summary);
@@ -1684,14 +1695,17 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         if (printPreview || format == SurveyExportFormat.print) {
           await Printing.layoutPdf(
             onLayout: (_) async => bytes,
-            name: '${_survey!.title} CHED outcomes',
+            name: '${_survey!.title} CHED outcomes summary',
           );
           return;
         }
         tryDownloadBytesOnWeb(
           context,
           bytes: bytes,
-          fileName: 'ched_outcomes_${safe}_$stamp.pdf',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.chedOutcomes,
+            extension: 'pdf',
+          ),
           mimeType: 'application/pdf',
         );
       } else if (format == SurveyExportFormat.excel) {
@@ -1700,7 +1714,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         tryDownloadBytesOnWeb(
           context,
           bytes: bytes,
-          fileName: 'ched_outcomes_${safe}_$stamp.xlsx',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.chedOutcomes,
+            extension: 'xlsx',
+          ),
           mimeType:
               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         );
@@ -1710,7 +1727,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         tryDownloadBytesOnWeb(
           context,
           bytes: bytes,
-          fileName: 'ched_outcomes_${safe}_$stamp.csv',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.chedOutcomes,
+            extension: 'csv',
+          ),
           mimeType: 'text/csv;charset=utf-8',
         );
       }
@@ -1746,17 +1766,16 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       );
       return;
     }
-    if (!await confirmPersonalDataExport(context, what: 'The pending list') ||
+    if (!await confirmPersonalDataExport(
+          context,
+          what: 'The pending assignments list',
+        ) ||
         !mounted) {
       return;
     }
 
     setState(() => _isExportingChed = true);
     try {
-      final safe = (_survey?.title ?? 'survey')
-          .replaceAll(RegExp(r'[^\w\-]+'), '_');
-      final stamp = DateFormat('yyyyMMdd').format(DateTime.now());
-
       if (printPreview ||
           format == SurveyExportFormat.pdf ||
           format == SurveyExportFormat.print) {
@@ -1765,21 +1784,29 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         if (printPreview || format == SurveyExportFormat.print) {
           await Printing.layoutPdf(
             onLayout: (_) async => bytes,
-            name: '${_survey?.title ?? 'Survey'} pending list',
+            name: '${_survey?.title ?? 'Survey'} pending assignments',
           );
           return;
         }
         tryDownloadBytesOnWeb(
           context,
           bytes: bytes,
-          fileName: '${safe}_pending_$stamp.pdf',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.pending,
+            extension: 'pdf',
+          ),
           mimeType: 'application/pdf',
         );
       } else if (format == SurveyExportFormat.excel) {
+        const pendingSheet = 'Pending';
         final book = Excel.createExcel();
         final def = book.getDefaultSheet();
-        if (def != null) book.rename(def, 'Pending');
-        final sheet = book['Pending'];
+        if (def != null && def != pendingSheet) {
+          book[def].appendRow([
+            'Pending assignments are on the "$pendingSheet" sheet.',
+          ]);
+        }
+        final sheet = book[pendingSheet];
         sheet.appendRow([
           'Name',
           'Email',
@@ -1803,13 +1830,17 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
             a.reminderCount,
           ]);
         }
-        final encoded = book.encode();
+        book.setDefaultSheet(pendingSheet);
+        final encoded = book.save();
         if (encoded == null) throw StateError('Excel encode returned null');
         if (!mounted) return;
         tryDownloadBytesOnWeb(
           context,
           bytes: Uint8List.fromList(encoded),
-          fileName: '${safe}_pending_$stamp.xlsx',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.pending,
+            extension: 'xlsx',
+          ),
           mimeType:
               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         );
@@ -1838,20 +1869,23 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         tryDownloadBytesOnWeb(
           context,
           bytes: Uint8List.fromList(utf8.encode('\uFEFF${buf.toString()}')),
-          fileName: '${safe}_pending_$stamp.csv',
+          fileName: _surveyExportFileName(
+            kind: SurveyExportReportKind.pending,
+            extension: 'csv',
+          ),
           mimeType: 'text/csv;charset=utf-8',
         );
       }
 
       if (!mounted) return;
       _showSnack(
-        'Pending list exported (${list.length})',
+        'Pending assignments exported (${list.length})',
         color: AdminColors.success,
       );
     } catch (e) {
       if (mounted) {
         _showSnack(
-          surveyExportErrorMessage('the pending list', e),
+          surveyExportErrorMessage('the pending assignments list', e),
           color: AdminColors.danger,
         );
       }

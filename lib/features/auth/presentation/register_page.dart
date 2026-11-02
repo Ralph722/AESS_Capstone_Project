@@ -603,9 +603,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _resendCode() async {
     setState(() => _isLoading = true);
     try {
-      await _authService.resendRegistrationCode(_emailController.text);
-      _startResendCooldown();
+      final result = await _authService.resendRegistrationCode(
+        _emailController.text,
+      );
       if (!mounted) return;
+      if (result == RegistrationResend.alreadyConfirmed) {
+        showAuthFeedback(
+          context,
+          'Your email is already confirmed. '
+          'Tap Verify code & create account to finish.',
+          error: false,
+        );
+        return;
+      }
+      _startResendCooldown();
       showAuthFeedback(context, 'A new code is on its way.', error: false);
     } catch (e) {
       _showError(e.toString().replaceFirst('Exception: ', ''));

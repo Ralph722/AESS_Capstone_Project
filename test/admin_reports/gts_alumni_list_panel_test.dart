@@ -113,9 +113,15 @@ Finder _inTable(String text) => find.descendant(
 
 void main() {
   group('settings', () {
-    test('the chart choice round-trips; bars by default', () {
-      const config = GtsListConfig(surveyId: 'w2', chart: GtsListChart.donut);
-      expect(GtsListConfig.fromJson(config.toJson()).chart, GtsListChart.donut);
+    test('the chart choice round-trips; horizontal bars by default', () {
+      const config = GtsListConfig(
+        surveyId: 'w2',
+        chart: GtsListChart.verticalBars,
+      );
+      expect(
+        GtsListConfig.fromJson(config.toJson()).chart,
+        GtsListChart.verticalBars,
+      );
       expect(const GtsListConfig().chart, GtsListChart.bars);
       expect(
         GtsListConfig.fromJson(const {'mode': 'list'}).chart,
@@ -146,19 +152,22 @@ void main() {
         waveIds: const ['w2', 'w1'],
       );
       final lines = {
-        for (final l in GtsListTables.tally(result.tally))
-          l.label: '${l.count} | ${l.share}',
+        for (final section in GtsListTables.sections(result))
+          for (final line in section.lines)
+            '${section.title}: ${line.label}': '${line.count} | ${line.share}',
       };
-      expect(lines, {
-        'Employed': '1 | 20.0%',
-        'Not employed': '1 | 20.0%',
-        'Never employed': '1 | 20.0%',
-        'Untracked – registered, not yet answered': '1 | 20.0%',
-        'Untracked – not registered': '1 | 20.0%',
-        GtsListTables.totalLabel: '5 | 100%',
-        GtsListTables.responseRateLabel: '3 of 5 | 60.0%',
-        GtsListTables.employmentRateLabel: '1 of 3 | 33.3%',
-      });
+      expect(lines['Summary: ${GtsListTables.totalLabel}'], '5 | 100%');
+      expect(
+        lines['Summary: ${GtsListTables.responseRateLabel}'],
+        '3 of 5 | 60.0%',
+      );
+      expect(lines['Tracer status: Answered'], '3 | 60.0%');
+      expect(
+        lines['Tracer status: Untracked – registered, not yet answered'],
+        '1 | 20.0%',
+      );
+      expect(lines['Tracer status: Untracked – not registered'], '1 | 20.0%');
+      expect(lines.containsKey('Summary: ${GtsListTables.employmentRateLabel}'), isFalse);
     });
 
     test('an empty list has no shares', () {
@@ -168,9 +177,11 @@ void main() {
         responses: const [],
         waveIds: const ['w2'],
       );
-      final tally = GtsListTables.tally(result.tally);
+      final tally = [
+        for (final section in GtsListTables.sections(result)) ...section.lines,
+      ];
       expect(tally.firstWhere((l) => l.isTotal).share, '–');
-      expect(tally.where((l) => l.isRate).map((l) => l.share), ['–', '–']);
+      expect(tally.where((l) => l.isRate).map((l) => l.share), ['–']);
     });
 
     test('scope names the wave, or latest from any wave', () {
@@ -202,15 +213,20 @@ void main() {
         responses: _responses,
         waveIds: const ['w2', 'w1'],
       );
-      final bars = GtsListTables.chart(build(GtsListChart.bars))!;
+      final bars = GtsListTables.charts(build(GtsListChart.bars)).single;
       expect(bars.type, GtsChartType.horizontalBar);
-      expect(bars.labels.first, 'Employed');
-      expect(bars.series.single.values, [1, 1, 1, 1, 1]);
+      expect(bars.title, 'Tracer coverage');
+      expect(bars.labels.first, 'Answered');
+      expect(bars.series.single.values, [3, 1, 1]);
       expect(
-        GtsListTables.chart(build(GtsListChart.donut))!.type,
+        GtsListTables.charts(build(GtsListChart.verticalBars)).single.type,
+        GtsChartType.bar,
+      );
+      expect(
+        GtsListTables.charts(build(GtsListChart.donut)).single.type,
         GtsChartType.donut,
       );
-      expect(GtsListTables.chart(build(GtsListChart.none)), isNull);
+      expect(GtsListTables.charts(build(GtsListChart.none)), isEmpty);
     });
   });
 
@@ -242,18 +258,18 @@ void main() {
       expect(calls, [
         ['w2'],
       ]);
-      for (final header in ['Batch', 'Name', 'Course', 'Tracer status']) {
+      for (final header in [
+        'Batch',
+        'Name',
+        'Course',
+        'Tracer status',
+      ]) {
         expect(_inTable(header), findsOneWidget);
       }
-      for (final name in [
-        'Juan Dela Cruz',
-        'Maria Santos',
-        'Pedro Reyes',
-        'Ana Lopez',
-        'Jose Rizal',
-      ]) {
-        expect(_inTable(name), findsOneWidget);
-      }
+      expect(_inTable('Ana Lopez'), findsOneWidget);
+      expect(_inTable('Jose Rizal'), findsOneWidget);
+      expect(_inTable('Juan Dela Cruz'), findsOneWidget);
+      expect(_inTable('Answered'), findsWidgets);
       expect(find.text(GtsListTables.totalLabel), findsOneWidget);
       expect(find.text('3 of 5'), findsOneWidget);
       expect(
@@ -262,8 +278,8 @@ void main() {
       );
     });
 
-    testWidgets('latest from any wave loads every wave and adds the wave '
-        'column', (tester) async {
+    testWidgets('latest from any wave loads every wave and does not add a '
+        'wave column', (tester) async {
       final changes = <GtsListConfig>[];
       final calls = await _pump(tester, changes: changes);
       await tester.tap(find.text('Tracer 2026').first);
@@ -272,9 +288,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(calls.last, ['w1']);
       expect(changes.last.latestFromAnyWave, isTrue);
-      expect(_inTable('Wave answered'), findsOneWidget);
-      expect(_inTable('Tracer 2025'), findsOneWidget);
-      expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+      expect(_inTable('Wave answered'), findsNothing);
+      expect(_inTable('Jose Rizal'), findsOneWidget);
+      expect(_inTable('Ana Lopez'), findsOneWidget);
     });
 
     testWidgets('columns are added from the picker and removed from the '
@@ -285,12 +301,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, 'occupation');
       await tester.pumpAndSettle();
-      await tester.tap(find.text('19. Present occupation'));
+      await tester.tap(find.text('Present occupation'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Use these columns'));
       await tester.pumpAndSettle();
       expect(changes.last.columns.last, 'ched_19');
-      expect(_inTable('19. Present occupation'), findsOneWidget);
+      expect(_inTable('Present occupation'), findsOneWidget);
       expect(_inTable('AI engineer'), findsOneWidget);
       expect(_inTable('Not asked'), findsNWidgets(2));
 
@@ -336,9 +352,9 @@ void main() {
       await tester.tap(find.widgetWithText(ChoiceChip, 'By batch'));
       await tester.pumpAndSettle();
       expect(find.text('Tracer status by batch'), findsOneWidget);
-      expect(find.text('Overall'), findsOneWidget);
-      expect(find.text('2 (100%)'), findsOneWidget);
-      expect(find.text('3 (100%)'), findsOneWidget);
+      expect(find.text('Overall'), findsWidgets);
+      expect(find.text('2 (100%)'), findsWidgets);
+      expect(find.text('3 (100%)'), findsWidgets);
     });
 
     testWidgets('a failed load offers to try again', (tester) async {
@@ -357,7 +373,7 @@ void main() {
       fail = false;
       await tester.tap(find.text('Try again'));
       await tester.pumpAndSettle();
-      expect(_inTable('Juan Dela Cruz'), findsOneWidget);
+      expect(_inTable('Ana Lopez'), findsOneWidget);
     });
 
     testWidgets('long lists show 200 rows at a time; the tally covers all', (

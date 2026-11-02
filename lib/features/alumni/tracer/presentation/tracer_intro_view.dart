@@ -49,7 +49,6 @@ class TracerIntroView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final description = survey?.description.trim() ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -80,22 +79,6 @@ class TracerIntroView extends StatelessWidget {
                 'improve its programs for future students.',
                 style: PortalTheme.bodySecondary,
               ),
-              if (description.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: PortalTheme.pageBg,
-                    borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
-                    border: Border.all(color: PortalTheme.border),
-                  ),
-                  child: Text(
-                    description,
-                    style: PortalTheme.body.copyWith(fontSize: 13.5),
-                  ),
-                ),
-              ],
             ],
           ),
         ),

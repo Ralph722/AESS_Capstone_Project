@@ -247,12 +247,6 @@ const List<AdminNavSection> kAdminNavSections = [
         label: 'Feedback',
         keywords: ['feedback', 'tickets', 'support'],
       ),
-      AdminNavItem(
-        index: 13,
-        icon: Icons.auto_awesome_outlined,
-        label: 'AI Assistant',
-        keywords: ['ai', 'assistant', 'chatbot', 'help'],
-      ),
     ],
   ),
 ];
@@ -3128,14 +3122,17 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               ),
             ),
         ],
+        // Container, not Ink: Ink draws under the header's opaque white
+        // DecoratedBox, so a navy fill + white icon would be invisible.
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           onEnter: (_) => setState(() => _quickActionsHovered = true),
           onExit: (_) => setState(() => _quickActionsHovered = false),
-          child: Ink(
+          child: Container(
             height: _AdminChrome.controlHeight,
             padding: EdgeInsets.symmetric(horizontal: showLabel ? 12 : 0),
             width: showLabel ? null : _AdminChrome.controlHeight,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: _quickActionsHovered
                   ? Color.alphaBlend(

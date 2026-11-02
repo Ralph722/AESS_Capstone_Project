@@ -34,6 +34,7 @@ class GtsChartData {
     required this.labels,
     required this.series,
     required this.isPercent,
+    this.title = '',
     this.omitted = 0,
   });
 
@@ -43,6 +44,9 @@ class GtsChartData {
   final GtsChartType type;
   final List<String> labels;
   final List<GtsChartSeries> series;
+
+  /// Heading printed with this chart. Empty for summary-report charts.
+  final String title;
 
   /// Values are shares in percent (0-100); otherwise counts.
   final bool isPercent;
@@ -78,6 +82,7 @@ class GtsChartData {
     if (data == null || data.labels.length <= maxLabels) return data;
     return GtsChartData(
       type: data.type,
+      title: data.title,
       labels: data.labels.take(maxLabels).toList(),
       series: [
         for (final s in data.series)

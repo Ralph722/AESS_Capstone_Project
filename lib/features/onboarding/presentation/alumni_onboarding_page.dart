@@ -275,6 +275,8 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
         resourceId: userId,
         description: 'User logged out during onboarding',
         status: 'SUCCESS',
+        module: 'auth',
+        category: 'security',
       );
     }
     await AuthService().logout();
@@ -579,6 +581,7 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
           resource: 'User',
           resourceId: userId,
           description: 'Alumni completed mandatory onboarding',
+          module: 'auth',
         ),
       );
 

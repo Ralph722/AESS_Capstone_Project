@@ -262,6 +262,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 '${roleString == 'admin' ? 'Admin' : 'User'} logged in: ${user.email}',
             status: 'SUCCESS',
             userRole: roleString,
+            module: 'auth',
+            category: 'security',
           ),
         );
 
@@ -289,13 +291,11 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      await _auditService.logAction(
+      // Failed attempts have no session — use the trusted RPC writer.
+      await _auditService.logFailedAuthAttempt(
         action: 'LOGIN',
-        resource: 'User',
-        resourceId: 'unknown',
-        description: 'Failed login attempt: ${_emailController.text}',
-        status: 'FAILED',
-        userRole: 'user',
+        email: _emailController.text,
+        description: 'Failed login attempt',
       );
 
       if (mounted) {

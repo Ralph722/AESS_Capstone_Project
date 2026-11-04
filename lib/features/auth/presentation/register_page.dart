@@ -682,6 +682,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         resourceId: user.id,
         description: 'Alumni registered: $email ($studentId)',
         status: 'SUCCESS',
+        module: 'auth',
+        category: 'security',
       );
 
       if (!mounted) return;
@@ -691,12 +693,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
     } catch (e) {
       await _authService.logout();
-      await _auditService.logAction(
+      await _auditService.logFailedAuthAttempt(
         action: 'REGISTER',
-        resource: 'User',
-        resourceId: 'unknown',
-        description: 'Failed registration: ${_emailController.text}',
-        status: 'FAILED',
+        email: _emailController.text,
+        description: 'Failed registration attempt',
       );
       final raw = e.toString();
       if (raw.contains('permission-denied') ||

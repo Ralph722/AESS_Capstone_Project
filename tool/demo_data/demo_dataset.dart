@@ -274,20 +274,23 @@ class DemoDataset {
     return !(read && createdAt.isBefore(now.subtract(const Duration(days: 90))));
   }
 
-  /// Mirrors `purge_expired_audit_logs`: logins and logouts are kept for 90
-  /// days, everything else for a year.
-  static bool keptByAuditRetention(String action, DateTime at, DateTime now) {
+  /// Mirrors hot-table `purge_expired_audit_logs` retention:
+  /// LOGIN/LOGOUT 90d, activity 1y, security 3y.
+  static bool keptByAuditRetention(
+    String action,
+    DateTime at,
+    DateTime now, {
+    String category = 'activity',
+  }) {
     final session = action == 'LOGIN' || action == 'LOGOUT';
-    final cutoff = session
-        ? now.subtract(const Duration(days: 90))
-        : DateTime.utc(
-            now.year - 1,
-            now.month,
-            now.day,
-            now.hour,
-            now.minute,
-            now.second,
-          );
+    final DateTime cutoff;
+    if (session) {
+      cutoff = now.subtract(const Duration(days: 90));
+    } else if (category == 'security') {
+      cutoff = DateTime.utc(now.year - 3, now.month, now.day);
+    } else {
+      cutoff = DateTime.utc(now.year - 1, now.month, now.day);
+    }
     return at.isAfter(cutoff);
   }
 

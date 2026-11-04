@@ -8,6 +8,7 @@ import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/models/forum_filters.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/forum/data/forum_bookmark_service.dart';
 import 'package:alumni_system/features/forum/data/forum_refresh_bus.dart';
 import 'package:alumni_system/features/share/share_destination.dart';
@@ -645,6 +646,19 @@ class ForumService {
       'reason': trimmed,
       'status': 'open',
     });
+    unawaited(
+      AuditService().logAction(
+        action: 'FORUM_REPORT',
+        resource: 'ForumTopic',
+        resourceId: topicId,
+        description: 'Reported forum content',
+        module: 'forum',
+        category: 'security',
+        meta: {
+          if (postId != null) 'postId': postId,
+        },
+      ),
+    );
   }
 
   Future<List<ForumReport>> getReports({String? status}) async {
@@ -677,6 +691,18 @@ class ForumService {
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', reportId);
+    unawaited(
+      AuditService().logAction(
+        action: 'FORUM_MODERATE',
+        resource: 'ForumReport',
+        resourceId: reportId,
+        description: 'Forum report status → $status',
+        changes: {'status': status},
+        userRole: 'admin',
+        module: 'forum',
+        category: 'security',
+      ),
+    );
   }
 
   Future<Map<String, int>> _helpfulCounts(List<String> postIds) async {

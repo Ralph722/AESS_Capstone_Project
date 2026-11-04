@@ -107,14 +107,45 @@ class AuthService {
     String? displayName,
     String? email,
   }) async {
+    String? previousRole;
+    try {
+      final existing = await _supabase
+          .from('users')
+          .select('role')
+          .eq('id', uid)
+          .maybeSingle();
+      previousRole = existing?['role'] as String?;
+    } catch (_) {}
+
+    final nextRole = role == UserRole.admin ? 'admin' : 'user';
     await _supabase.from('users').upsert({
       'id': uid,
-      'role': role == UserRole.admin ? 'admin' : 'user',
+      'role': nextRole,
       if (displayName != null && displayName.isNotEmpty)
         'display_name': displayName,
       if (email != null && email.isNotEmpty) 'email': email.trim(),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'id');
+
+    if (previousRole != nextRole) {
+      unawaited(
+        AuditService(supabase: _supabase).logAction(
+          action: 'ROLE_CHANGE',
+          resource: 'User',
+          resourceId: uid,
+          description: 'Role changed${email != null ? ' for $email' : ''}',
+          changes: {
+            'from': previousRole ?? '(none)',
+            'to': nextRole,
+          },
+          status: 'SUCCESS',
+          userRole: 'admin',
+          module: 'administration',
+          category: 'security',
+          targetLabel: email,
+        ),
+      );
+    }
   }
 
   Future<User?> loginWithEmailPassword(String email, String password) async {
@@ -529,6 +560,8 @@ class AuthService {
         description: '$label $description: ${user.email ?? ''}',
         status: 'SUCCESS',
         userRole: isAdmin ? 'admin' : 'user',
+        module: 'auth',
+        category: 'security',
       ),
     );
 

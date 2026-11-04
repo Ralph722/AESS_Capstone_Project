@@ -144,6 +144,7 @@ class UserProfileService {
           'Updated ${fields.length} profile field${fields.length == 1 ? '' : 's'} '
           'via ${profileChangeSourceLabel(source).toLowerCase()}',
       changes: {'source': source, 'fields': fields},
+      module: 'profile',
     );
     return true;
   }

@@ -169,6 +169,9 @@ class ChedGtsPdfPersonExportService {
           'Exported official CHED GTS PDF for ${member.fullName}'
           '${assembled.surveyTitle != null ? ' (${assembled.surveyTitle})' : ''}',
       userRole: 'admin',
+      module: 'reports',
+      category: 'security',
+      targetLabel: member.fullName,
       changes: {
         'source': assembled.source.name,
         'surveyId': assembled.surveyId,
@@ -203,6 +206,9 @@ class ChedGtsPdfPersonExportService {
           'Failed to export official CHED GTS PDF for ${member.fullName}: $error',
       userRole: 'admin',
       status: 'FAILED',
+      module: 'reports',
+      category: 'security',
+      targetLabel: member.fullName,
       changes: {
         'surveyId': surveyId,
         'error': error.toString(),

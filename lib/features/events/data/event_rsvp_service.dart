@@ -2,13 +2,17 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/core/services/audit_events.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/events/models/event_rsvp_model.dart';
 
 class EventRsvpService {
-  EventRsvpService({SupabaseClient? supabase})
-    : _supabase = supabase ?? Supabase.instance.client;
+  EventRsvpService({SupabaseClient? supabase, AuditService? auditService})
+    : _supabase = supabase ?? Supabase.instance.client,
+      _audit = auditService ?? AuditService(supabase: supabase);
 
   final SupabaseClient _supabase;
+  final AuditService _audit;
 
   Future<EventRsvp?> getMyRsvp(String eventId) async {
     final userId = AppSession.userId;
@@ -145,6 +149,16 @@ class EventRsvpService {
           }, onConflict: 'event_id,user_id')
           .select()
           .single();
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.eventRsvp,
+          resource: 'Event',
+          resourceId: eventId,
+          description: 'RSVP set to ${status.dbValue}',
+          changes: {'status': status.dbValue},
+          module: AuditModules.events,
+        ),
+      );
       return EventRsvp.fromSupabaseRow(row);
     } catch (e) {
       throw Exception('Error saving RSVP: $e');
@@ -160,6 +174,15 @@ class EventRsvpService {
           .delete()
           .eq('event_id', eventId)
           .eq('user_id', userId);
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.eventRsvpClear,
+          resource: 'Event',
+          resourceId: eventId,
+          description: 'RSVP cleared',
+          module: AuditModules.events,
+        ),
+      );
     } catch (e) {
       throw Exception('Error clearing RSVP: $e');
     }

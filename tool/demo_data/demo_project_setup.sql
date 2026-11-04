@@ -16,8 +16,8 @@ begin
     raise exception 'Not a demo-only database. Nothing was changed.';
   end if;
 
-  -- No reminders, scheduled notifications or push dispatch in the demo.
-  -- The nightly DSS re-check (aess-dss-recheck) stays scheduled.
+  -- No reminders, scheduled notifications, push dispatch, or outbound
+  -- survey email/SMS in the demo. Nightly DSS jobs stay scheduled.
   perform cron.unschedule(jobname)
   from cron.job
   where jobname in (
@@ -25,7 +25,9 @@ begin
     'aess-notify-events',
     'aess-notify-morning',
     'aess-notify-tracer-reminders',
-    'aess-push-dispatch'
+    'aess-push-dispatch',
+    'aess-email-scheduled',
+    'aess-sms-scheduled'
   );
 end;
 $$;

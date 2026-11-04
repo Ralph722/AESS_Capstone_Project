@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:alumni_system/core/services/audit_events.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/jobs/application/job_expiration.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 
 /// Job postings data access — Supabase only.
 class JobService {
-  JobService({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+  JobService({SupabaseClient? supabase, AuditService? auditService})
+      : _supabase = supabase ?? Supabase.instance.client,
+        _audit = auditService ?? AuditService(supabase: supabase);
 
   final SupabaseClient _supabase;
+  final AuditService _audit;
 
   /// Columns needed by [JobPosting.fromSupabaseRow].
   static const jobSelectColumns =
@@ -23,6 +29,17 @@ class JobService {
   Future<void> addJobPosting(JobPosting job) async {
     try {
       await _supabase.from('jobs').upsert(job.toSupabaseRow(), onConflict: 'id');
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.createJob,
+          resource: 'Job',
+          resourceId: job.id,
+          description: 'Created job: ${job.jobTitle}',
+          userRole: 'admin',
+          module: AuditModules.jobs,
+          targetLabel: job.jobTitle,
+        ),
+      );
     } catch (e) {
       throw Exception('Error adding job posting: $e');
     }
@@ -68,6 +85,18 @@ class JobService {
   Future<void> updateJobPosting(JobPosting job) async {
     try {
       await _supabase.from('jobs').upsert(job.toSupabaseRow(), onConflict: 'id');
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.updateJob,
+          resource: 'Job',
+          resourceId: job.id,
+          description: 'Updated job: ${job.jobTitle} (${job.status})',
+          changes: {'status': job.status},
+          userRole: 'admin',
+          module: AuditModules.jobs,
+          targetLabel: job.jobTitle,
+        ),
+      );
     } catch (e) {
       throw Exception('Error updating job posting: $e');
     }
@@ -76,6 +105,17 @@ class JobService {
   Future<void> deleteJobPosting(String jobId) async {
     try {
       await _supabase.from('jobs').delete().eq('id', jobId);
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.deleteJob,
+          resource: 'Job',
+          resourceId: jobId,
+          description: 'Deleted job posting',
+          userRole: 'admin',
+          module: AuditModules.jobs,
+          category: AuditCategories.security,
+        ),
+      );
     } catch (e) {
       throw Exception('Error deleting job posting: $e');
     }

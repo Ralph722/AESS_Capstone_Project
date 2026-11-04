@@ -1,3 +1,5 @@
+import 'package:alumni_system/core/services/audit_events.dart';
+
 class AuditLog {
   final String id;
   final String userId;
@@ -12,6 +14,12 @@ class AuditLog {
   final String? ipAddress;
   final String status;
   final String userRole; // 'admin' or 'user'
+  final String module;
+  final String category;
+  final String actorType;
+  final String? correlationId;
+  final String? targetLabel;
+  final Map<String, dynamic>? meta;
 
   AuditLog({
     required this.id,
@@ -27,6 +35,12 @@ class AuditLog {
     this.ipAddress,
     required this.status,
     this.userRole = 'user',
+    this.module = '',
+    this.category = AuditCategories.activity,
+    this.actorType = AuditActorTypes.alumni,
+    this.correlationId,
+    this.targetLabel,
+    this.meta,
   });
 
   /// Convert to a `public.audit_logs` row. Fields without a dedicated
@@ -45,6 +59,14 @@ class AuditLog {
         if (ipAddress != null) 'ipAddress': ipAddress,
         'status': status,
         'userRole': userRole,
+        if (module.isNotEmpty) 'module': module,
+        'category': category,
+        'actorType': actorType,
+        if (correlationId != null && correlationId!.isNotEmpty)
+          'correlationId': correlationId,
+        if (targetLabel != null && targetLabel!.isNotEmpty)
+          'targetLabel': targetLabel,
+        if (meta != null && meta!.isNotEmpty) 'meta': meta,
       },
       'created_at': timestamp.toUtc().toIso8601String(),
     };
@@ -52,6 +74,8 @@ class AuditLog {
 
   factory AuditLog.fromSupabaseRow(Map<String, dynamic> row) {
     final details = row['details'] as Map<String, dynamic>? ?? {};
+    final role = details['userRole'] as String? ?? 'user';
+    final actorType = details['actorType'] as String?;
     return AuditLog(
       id: row['id']?.toString() ?? '',
       userId: row['user_id']?.toString() ?? '',
@@ -61,12 +85,30 @@ class AuditLog {
       resource: row['entity_type'] as String? ?? '',
       resourceId: row['entity_id'] as String? ?? '',
       description: details['description'] as String? ?? '',
-      changes: details['changes'] as Map<String, dynamic>?,
+      changes: _asStringKeyedMap(details['changes']),
       timestamp: _parseDateTime(row['created_at']),
       ipAddress: details['ipAddress'] as String?,
-      status: details['status'] as String? ?? 'SUCCESS',
-      userRole: details['userRole'] as String? ?? 'user',
+      status: details['status'] as String? ?? AuditStatus.success,
+      userRole: role,
+      module: details['module'] as String? ?? '',
+      category: details['category'] as String? ?? AuditCategories.activity,
+      actorType:
+          actorType ??
+          (role == 'admin'
+              ? AuditActorTypes.admin
+              : AuditActorTypes.alumni),
+      correlationId: details['correlationId'] as String?,
+      targetLabel: details['targetLabel'] as String?,
+      meta: _asStringKeyedMap(details['meta']),
     );
+  }
+
+  static Map<String, dynamic>? _asStringKeyedMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return null;
   }
 
   static DateTime _parseDateTime(dynamic value) {
@@ -77,7 +119,6 @@ class AuditLog {
     return DateTime.now();
   }
 
-  // Copy with method
   AuditLog copyWith({
     String? id,
     String? userId,
@@ -92,6 +133,12 @@ class AuditLog {
     String? ipAddress,
     String? status,
     String? userRole,
+    String? module,
+    String? category,
+    String? actorType,
+    String? correlationId,
+    String? targetLabel,
+    Map<String, dynamic>? meta,
   }) {
     return AuditLog(
       id: id ?? this.id,
@@ -107,6 +154,12 @@ class AuditLog {
       ipAddress: ipAddress ?? this.ipAddress,
       status: status ?? this.status,
       userRole: userRole ?? this.userRole,
+      module: module ?? this.module,
+      category: category ?? this.category,
+      actorType: actorType ?? this.actorType,
+      correlationId: correlationId ?? this.correlationId,
+      targetLabel: targetLabel ?? this.targetLabel,
+      meta: meta ?? this.meta,
     );
   }
 }

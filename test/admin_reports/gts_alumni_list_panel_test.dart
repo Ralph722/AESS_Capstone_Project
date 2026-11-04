@@ -376,9 +376,7 @@ void main() {
       expect(_inTable('Ana Lopez'), findsOneWidget);
     });
 
-    testWidgets('long lists show 200 rows at a time; the tally covers all', (
-      tester,
-    ) async {
+    testWidgets('long lists paginate; the tally covers all', (tester) async {
       await _pump(
         tester,
         roster: [
@@ -387,14 +385,25 @@ void main() {
         ],
         loader: (ids) async => const [],
       );
-      expect(find.text('Showing the first 200 of 450 alumni.'), findsOneWidget);
+      const pageSize = GtsAlumniListPreview.previewPageSize;
+      expect(find.text('Showing 1–$pageSize of 450'), findsOneWidget);
+      expect(find.text('Page 1 of 9'), findsOneWidget);
       expect(find.text('0 of 450'), findsOneWidget);
-      await tester.ensureVisible(find.text('Show 200 more'));
+      expect(_inTable('Graduate 000'), findsOneWidget);
+      expect(_inTable('Graduate 050'), findsNothing);
+
+      final next = find.byTooltip('Next page');
+      await tester.ensureVisible(next);
+      await tester.tap(next);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Show 200 more'));
-      await tester.pumpAndSettle();
-      expect(find.text('Showing the first 400 of 450 alumni.'), findsOneWidget);
-      expect(find.text('Show 50 more'), findsOneWidget);
+      expect(
+        find.text('Showing ${pageSize + 1}–${pageSize * 2} of 450'),
+        findsOneWidget,
+      );
+      expect(find.text('Page 2 of 9'), findsOneWidget);
+      expect(_inTable('Graduate 000'), findsNothing);
+      expect(_inTable('Graduate 050'), findsOneWidget);
+      expect(find.text('0 of 450'), findsOneWidget);
     });
 
     testWidgets('a saved wave that no longer exists falls back to the newest', (

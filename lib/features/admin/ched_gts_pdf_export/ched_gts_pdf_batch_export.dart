@@ -193,6 +193,8 @@ class ChedGtsPdfBatchExportService {
           'Exported official CHED GTS PDF batch ZIP '
           '(${result.successCount} of $selectedCount)',
       userRole: 'admin',
+      module: 'reports',
+      category: 'security',
       changes: {
         'selectedCount': selectedCount,
         'attemptedCount': result.attemptedCount,
@@ -227,6 +229,8 @@ class ChedGtsPdfBatchExportService {
       description: 'Failed official CHED GTS PDF batch ZIP: $error',
       userRole: 'admin',
       status: 'FAILED',
+      module: 'reports',
+      category: 'security',
       changes: {
         'selectedCount': selectedCount,
         'error': error.toString(),

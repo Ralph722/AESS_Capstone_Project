@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:alumni_system/core/services/audit_events.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/core/utils/avatar_image_prepare.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
@@ -167,6 +169,21 @@ class AdminProfileService {
         UserAttributes(data: {'display_name': normalized}),
       );
     }
+
+    await AuditService(supabase: _supabase).logAction(
+      action: AuditActions.updateAdminProfile,
+      resource: 'Admin',
+      resourceId: user.id,
+      description: 'Updated admin profile',
+      changes: {
+        if (current.name != normalized)
+          'displayName': {'from': current.name, 'to': normalized},
+        if (photo != null) 'photo': 'updated',
+        if (removePhoto) 'photo': 'removed',
+      },
+      userRole: 'admin',
+      module: AuditModules.administration,
+    );
 
     return AdminProfile(
       name: normalized,

@@ -332,6 +332,8 @@ class ProfileScreenState extends State<ProfileScreen>
                       resourceId: userId,
                       description: 'User logged out: ${AppSession.email}',
                       status: 'SUCCESS',
+                      module: 'auth',
+                      category: 'security',
                     );
                   }
                   await _authService.logout();

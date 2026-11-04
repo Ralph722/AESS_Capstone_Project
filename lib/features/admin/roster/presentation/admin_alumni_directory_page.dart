@@ -423,6 +423,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
               resource: 'AlumniMember',
               resourceId: created.id,
               description: 'Added roster: ${created.fullName}',
+              userRole: 'admin',
+              module: 'alumni',
+              targetLabel: created.fullName,
             );
             successMessage = '${created.fullName} added to roster';
           } else {
@@ -438,6 +441,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
               resource: 'AlumniMember',
               resourceId: existing.id,
               description: 'Updated roster: ${input.fullName.trim()}',
+              userRole: 'admin',
+              module: 'alumni',
+              targetLabel: input.fullName.trim(),
             );
             successMessage = 'Roster entry updated';
           }
@@ -477,6 +483,14 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
         resource: 'AlumniMember',
         resourceId: 'bulk',
         description: 'Imported ${result.imported}, skipped ${result.skipped}',
+        userRole: 'admin',
+        module: 'alumni',
+        category: 'security',
+        changes: {
+          'imported': result.imported,
+          'skipped': result.skipped,
+          'errorCount': result.errors.length,
+        },
       );
 
       var message =
@@ -547,6 +561,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           resourceId: member.id,
           description: '$action: ${member.fullName}',
           userRole: 'admin',
+          module: 'alumni',
+          category: 'security',
+          targetLabel: member.fullName,
         );
       }
       await _loadMembers();
@@ -570,6 +587,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
         resourceId: member.id,
         description: 'reactivate: ${member.fullName}',
         userRole: 'admin',
+        module: 'alumni',
+        category: 'security',
+        targetLabel: member.fullName,
       );
       _showSnack('${member.fullName} reactivated');
       await _loadMembers();

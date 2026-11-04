@@ -1,19 +1,34 @@
 import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:alumni_system/core/services/audit_events.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 
 /// Events data access — Supabase only.
 class EventService {
-  EventService({SupabaseClient? supabase})
-    : _supabase = supabase ?? Supabase.instance.client;
+  EventService({SupabaseClient? supabase, AuditService? auditService})
+    : _supabase = supabase ?? Supabase.instance.client,
+      _audit = auditService ?? AuditService(supabase: supabase);
 
   final SupabaseClient _supabase;
+  final AuditService _audit;
 
   Future<void> addEvent(AlumniEvent event) async {
     await _supabase
         .from('events')
         .upsert(event.toSupabaseRow(), onConflict: 'id');
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.createEvent,
+        resource: 'Event',
+        resourceId: event.id,
+        description: 'Created event: ${event.theme}',
+        userRole: 'admin',
+        module: AuditModules.events,
+        targetLabel: event.theme,
+      ),
+    );
   }
 
   Future<void> autoArchivePastEvents() async {
@@ -29,7 +44,7 @@ class EventService {
           event.date.day,
         );
         if (eventDate.isBefore(today)) {
-          await updateEventStatus(event.id, 'Archived');
+          await updateEventStatus(event.id, 'Archived', audit: false);
         }
       }
     } catch (_) {}
@@ -102,7 +117,11 @@ class EventService {
     return events.where((e) => e.batchYear == batchYear).toList();
   }
 
-  Future<void> updateEventStatus(String eventId, String newStatus) async {
+  Future<void> updateEventStatus(
+    String eventId,
+    String newStatus, {
+    bool audit = true,
+  }) async {
     await _supabase
         .from('events')
         .update({
@@ -110,10 +129,38 @@ class EventService {
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', eventId);
+    if (!audit) return;
+    final action = switch (newStatus) {
+      'Archived' => AuditActions.archiveEvent,
+      'Active' => AuditActions.restoreEvent,
+      _ => AuditActions.updateEvent,
+    };
+    unawaited(
+      _audit.logAction(
+        action: action,
+        resource: 'Event',
+        resourceId: eventId,
+        description: 'Event status → $newStatus',
+        changes: {'status': newStatus},
+        userRole: 'admin',
+        module: AuditModules.events,
+      ),
+    );
   }
 
   Future<void> deleteEvent(String eventId) async {
     await _supabase.from('events').delete().eq('id', eventId);
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.deleteEvent,
+        resource: 'Event',
+        resourceId: eventId,
+        description: 'Deleted event',
+        userRole: 'admin',
+        module: AuditModules.events,
+        category: AuditCategories.security,
+      ),
+    );
   }
 
   Future<void> archiveEvent(String eventId) async {
@@ -155,6 +202,17 @@ class EventService {
     await _supabase
         .from('events')
         .upsert(event.toSupabaseRow(), onConflict: 'id');
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.updateEvent,
+        resource: 'Event',
+        resourceId: event.id,
+        description: 'Updated event: ${event.theme}',
+        userRole: 'admin',
+        module: AuditModules.events,
+        targetLabel: event.theme,
+      ),
+    );
   }
 
   Future<void> restoreEvent(String eventId) async {
@@ -169,6 +227,16 @@ class EventService {
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', eventId);
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.cancelEvent,
+        resource: 'Event',
+        resourceId: eventId,
+        description: 'Cancelled event',
+        userRole: 'admin',
+        module: AuditModules.events,
+      ),
+    );
   }
 
   Future<void> incrementViews(String eventId) async {

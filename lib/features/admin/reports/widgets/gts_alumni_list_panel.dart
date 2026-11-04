@@ -27,6 +27,7 @@ import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 
@@ -1516,8 +1517,8 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   }
 }
 
-/// On-screen alumni list: heading, status chart, the rows (200 at a time)
-/// and the tally, which is always shown in full.
+/// On-screen alumni list: heading, status chart, the rows (paged) and the
+/// tally, which is always shown in full.
 class GtsAlumniListPreview extends StatelessWidget {
   const GtsAlumniListPreview({
     super.key,
@@ -1526,7 +1527,7 @@ class GtsAlumniListPreview extends StatelessWidget {
     this.profileWarning,
   });
 
-  static const rowStep = GtsReportPreview.rowStep;
+  static const previewPageSize = GtsReportPreview.previewPageSize;
 
   final GtsAlumniListResult result;
   final String explanation;
@@ -1689,7 +1690,8 @@ class _ListTable extends StatefulWidget {
 }
 
 class _ListTableState extends State<_ListTable> {
-  var _limit = GtsAlumniListPreview.rowStep;
+  var _page = 0;
+  var _pageSize = GtsAlumniListPreview.previewPageSize;
   final ScrollController _hScrollController = ScrollController();
 
   @override
@@ -1721,7 +1723,8 @@ class _ListTableState extends State<_ListTable> {
   @override
   Widget build(BuildContext context) {
     final rows = widget.result.rows;
-    final shown = rows.take(_limit).toList();
+    final safePage = adminClampPage(_page, rows.length, _pageSize);
+    final shown = adminPaginate(rows, safePage, _pageSize);
     final labels = widget.result.waveLabels;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1780,27 +1783,18 @@ class _ListTableState extends State<_ListTable> {
             ),
           ),
         ),
-        if (rows.length > _limit) ...[
+        if (rows.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            children: [
-              Text(
-                'Showing the first $_limit of ${rows.length} alumni.',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AdminColors.textMuted,
-                ),
-              ),
-              TextButton(
-                onPressed: () =>
-                    setState(() => _limit += GtsAlumniListPreview.rowStep),
-                child: Text(
-                  'Show ${math.min(GtsAlumniListPreview.rowStep, rows.length - _limit)} more',
-                ),
-              ),
-            ],
+          AdminPaginationBar(
+            totalItems: rows.length,
+            page: safePage,
+            pageSize: _pageSize,
+            onPageChanged: (p) => setState(() => _page = p),
+            onPageSizeChanged: (s) => setState(() {
+              _pageSize = s;
+              _page = 0;
+            }),
+            dense: true,
           ),
         ],
       ],

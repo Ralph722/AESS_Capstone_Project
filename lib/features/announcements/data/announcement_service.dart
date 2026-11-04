@@ -7,14 +7,18 @@ import 'package:alumni_system/features/announcements/models/announcement_model.d
 import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/core/services/audit_events.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/core/services/email_service.dart';
 import 'package:alumni_system/features/share/share_link_config.dart';
 /// Announcements data access — Supabase only.
 class AnnouncementService {
-  AnnouncementService({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+  AnnouncementService({SupabaseClient? supabase, AuditService? auditService})
+      : _supabase = supabase ?? Supabase.instance.client,
+        _audit = auditService ?? AuditService(supabase: supabase);
 
   final SupabaseClient _supabase;
+  final AuditService _audit;
 
   /// Columns needed by [Announcement.fromSupabaseRow].
   static const announcementSelectColumns =
@@ -75,6 +79,17 @@ class AnnouncementService {
             announcement.toSupabaseRow(),
             onConflict: 'id',
           );
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.createAnnouncement,
+          resource: 'Announcement',
+          resourceId: announcement.id,
+          description: 'Created announcement: ${announcement.title}',
+          userRole: 'admin',
+          module: AuditModules.announcements,
+          targetLabel: announcement.title,
+        ),
+      );
     } catch (e) {
       throw Exception('Error creating announcement: $e');
     }
@@ -82,12 +97,28 @@ class AnnouncementService {
     return announcement.id;
   }
 
-  Future<void> updateAnnouncement(Announcement announcement) async {
+  Future<void> updateAnnouncement(
+    Announcement announcement, {
+    bool audit = true,
+  }) async {
     try {
       await _supabase.from('announcements').upsert(
             announcement.toSupabaseRow(),
             onConflict: 'id',
           );
+      if (audit) {
+        unawaited(
+          _audit.logAction(
+            action: AuditActions.updateAnnouncement,
+            resource: 'Announcement',
+            resourceId: announcement.id,
+            description: 'Updated announcement: ${announcement.title}',
+            userRole: 'admin',
+            module: AuditModules.announcements,
+            targetLabel: announcement.title,
+          ),
+        );
+      }
     } catch (e) {
       throw Exception('Error updating announcement: $e');
     }
@@ -96,6 +127,17 @@ class AnnouncementService {
   Future<void> deleteAnnouncement(String id) async {
     try {
       await _supabase.from('announcements').delete().eq('id', id);
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.deleteAnnouncement,
+          resource: 'Announcement',
+          resourceId: id,
+          description: 'Deleted announcement',
+          userRole: 'admin',
+          module: AuditModules.announcements,
+          category: AuditCategories.security,
+        ),
+      );
     } catch (e) {
       throw Exception('Error deleting announcement: $e');
     }
@@ -106,7 +148,18 @@ class AnnouncementService {
     if (item == null) throw Exception('Announcement not found');
 
     final archived = item.copyWith(status: AnnouncementStatus.archived);
-    await updateAnnouncement(archived);
+    await updateAnnouncement(archived, audit: false);
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.archiveAnnouncement,
+        resource: 'Announcement',
+        resourceId: id,
+        description: 'Archived announcement: ${item.title}',
+        userRole: 'admin',
+        module: AuditModules.announcements,
+        targetLabel: item.title,
+      ),
+    );
   }
 
   Future<List<TracerProfile>> _fetchEligibleAlumni() async {
@@ -197,7 +250,20 @@ class AnnouncementService {
       publishedAt: DateTime.now(),
       recipientCount: matched.length,
     );
-    await updateAnnouncement(published);
+    await updateAnnouncement(published, audit: false);
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.publishAnnouncement,
+        resource: 'Announcement',
+        resourceId: id,
+        description:
+            'Published announcement: ${item.title} (${matched.length} recipients)',
+        changes: {'recipientCount': matched.length},
+        userRole: 'admin',
+        module: AuditModules.announcements,
+        targetLabel: item.title,
+      ),
+    );
 
     return matched.length;
   }

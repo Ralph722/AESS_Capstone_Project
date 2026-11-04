@@ -317,6 +317,12 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
             'survey_${survey.title.replaceAll(RegExp(r'[^\w\-]+'), '_')}_detailed_export.csv',
         mimeType: 'text/csv',
       );
+      await _surveyService.logSurveyExport(
+        surveyId: survey.id,
+        surveyTitle: survey.title,
+        format: 'csv_detailed',
+        rowCount: participants.length,
+      );
     } catch (e) {
       _showSnack(
         _friendlyError(
@@ -354,6 +360,12 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
         fileName:
             'survey_${survey.title.replaceAll(RegExp(r'[^\w\-]+'), '_')}_summary.pdf',
         mimeType: 'application/pdf',
+      );
+      await _surveyService.logSurveyExport(
+        surveyId: survey.id,
+        surveyTitle: survey.title,
+        format: 'pdf_summary',
+        rowCount: participants.length,
       );
     } catch (e) {
       _showSnack(

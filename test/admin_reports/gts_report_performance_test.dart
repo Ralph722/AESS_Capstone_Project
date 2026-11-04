@@ -127,41 +127,56 @@ void main() {
     int shownRows(WidgetTester tester) =>
         tester.widget<DataTable>(find.byType(DataTable)).rows.length;
 
-    testWidgets('shows ${GtsReportPreview.rowStep} group lines at a time', (
-      tester,
-    ) async {
-      final result = _byCourse(_manyCourses(90), chart: GtsChartType.table);
+    testWidgets(
+      'shows ${GtsReportPreview.previewPageSize} group lines per page',
+      (tester) async {
+        // ~3 table lines per course; 25 courses lands between one and two pages.
+        final result = _byCourse(_manyCourses(25), chart: GtsChartType.table);
+        final table = GtsReportTables.main(result);
+        final groupLines = table.rows.where((r) => !_isTotal(r)).length;
+        final totals = table.rows.length - groupLines;
+        final pageSize = GtsReportPreview.previewPageSize;
+        expect(groupLines, greaterThan(pageSize));
+        expect(groupLines, lessThan(2 * pageSize));
+        final pageCount = (groupLines + pageSize - 1) ~/ pageSize;
+
+        await pumpPreview(tester, result);
+        expect(shownRows(tester), pageSize + totals);
+        expect(
+          find.text('Showing 1–$pageSize of $groupLines'),
+          findsOneWidget,
+        );
+        expect(find.text('Page 1 of $pageCount'), findsOneWidget);
+
+        final next = find.byTooltip('Next page');
+        await tester.ensureVisible(next);
+        await tester.tap(next);
+        await tester.pumpAndSettle();
+        expect(shownRows(tester), (groupLines - pageSize) + totals);
+        expect(
+          find.text('Showing ${pageSize + 1}–$groupLines of $groupLines'),
+          findsOneWidget,
+        );
+        expect(find.text('Page 2 of $pageCount'), findsOneWidget);
+        expect(
+          find.textContaining('Downloads contain every line'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('short tables still show the pagination bar', (tester) async {
+      final result = _byCourse(gtsFixtures(), chart: GtsChartType.table);
       final table = GtsReportTables.main(result);
       final groupLines = table.rows.where((r) => !_isTotal(r)).length;
-      final totals = table.rows.length - groupLines;
-      expect(groupLines, greaterThan(GtsReportPreview.rowStep));
-      expect(groupLines, lessThan(2 * GtsReportPreview.rowStep));
-
       await pumpPreview(tester, result);
-      expect(shownRows(tester), GtsReportPreview.rowStep + totals);
+      expect(shownRows(tester), table.rows.length);
       expect(
-        find.textContaining(
-          'Showing the first ${GtsReportPreview.rowStep} of $groupLines',
-        ),
+        find.text('Showing 1–$groupLines of $groupLines'),
         findsOneWidget,
       );
-
-      final more = find.text(
-        'Show ${groupLines - GtsReportPreview.rowStep} more',
-      );
-      await tester.ensureVisible(more);
-      await tester.tap(more);
-      await tester.pumpAndSettle();
-      expect(shownRows(tester), table.rows.length);
-      expect(find.textContaining('Showing the first'), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('short tables show every line without a note', (tester) async {
-      final result = _byCourse(gtsFixtures(), chart: GtsChartType.table);
-      await pumpPreview(tester, result);
-      expect(shownRows(tester), GtsReportTables.main(result).rows.length);
-      expect(find.textContaining('Showing the first'), findsNothing);
+      expect(find.text('Page 1 of 1'), findsOneWidget);
     });
 
     testWidgets('a capped chart says so on screen', (tester) async {

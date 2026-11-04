@@ -618,7 +618,7 @@ Latest submitted CHED GTS response per alumnus.
 
 The six ready-made Summary reports (`GtsReportTemplates`) are employment summary, employment status by graduation year, employment status by course, first job related to course, employment type, and industry. Templates are ordinary report settings, so they can be changed after they are applied. All six count roster-linked graduates; the item-16 ones' "No" plus "Never Employed" shares equal the DSS not-employed rate.
 
-A PDF prints at most 1,000 group lines plus the All graduates totals and says so when it stops early; Excel and CSV always contain every line. The on-screen table shows 200 group lines at a time (plus the totals) with a "Show more" button. Charts on screen and in the PDF draw at most 40 bars, slices or points, in table order, with a note; the table still lists every line.
+A PDF prints at most 1,000 group lines plus the All graduates totals and says so when it stops early; Excel and CSV always contain every line. The on-screen table pages group lines (default 50 per page, plus the totals on every page) with Previous / Next controls. Charts on screen and in the PDF draw at most 40 bars, slices or points, in table order, with a note; the table still lists every line.
 
 Performance: responses are read from `gts_report_facts` in pages of 1,000 for the selected waves only, and kept per wave while the admin stays on the Reports page (switching tabs does not download them again; "Reload responses" does). Calculation runs in the browser; with 50,000 synthetic responses one report takes under 0.1 s in tests, so no server-side aggregation is used. Changing only the report name does not recalculate.
 

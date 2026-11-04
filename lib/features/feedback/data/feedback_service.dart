@@ -110,6 +110,7 @@ class FeedbackService {
       description:
           'Submitted ${category.label} feedback: ${safeSubject ?? short}',
       userRole: 'user',
+      module: 'feedback',
     );
 
     return submission.id;
@@ -280,6 +281,11 @@ class FeedbackService {
       description:
           'Changed feedback status from ${existing.status.label} to ${status.label}',
       userRole: 'admin',
+      module: 'feedback',
+      changes: {
+        'from': existing.status.name,
+        'to': status.name,
+      },
     );
   }
 
@@ -319,6 +325,8 @@ class FeedbackService {
       resourceId: feedbackId,
       description: 'Replied to feedback from ${existing.userName}',
       userRole: 'admin',
+      module: 'feedback',
+      // Response body intentionally omitted from activity logs.
     );
   }
 

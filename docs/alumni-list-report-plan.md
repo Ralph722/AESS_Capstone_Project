@@ -28,7 +28,7 @@ Progress:
   select all per section, personal-data icons), filters (tracer status,
   course, batch, CHED answers), sort column and direction, subtotals
   (overall / by batch / by course, shown as one tally column per group), chart
-  (bars / donut / none). Preview: 200 rows at a time, untracked rows tinted,
+  (bars / donut / none). Preview: 50 rows per page (prev/next), untracked rows tinted,
   tally always in full. Responses load from `survey_responses`
   (`data/gts_list_data_service.dart`, existing admin RLS); the roster is the
   page's. Tally text in `application/gts_list_tables.dart` (shared with
@@ -257,7 +257,7 @@ Batch, course, tracer status (multi-select), and any single-choice CHED answer
   cap applies (Excel/CSV always complete). CSV through `CsvSafe`.
 - Chart in list mode: bar or donut of the tracer-status tally (including the
   untracked groups), using the existing chart code.
-- On-screen preview: 200 rows at a time, tally rows always visible.
+- On-screen preview: 50 rows per page with prev/next, tally rows always visible.
 
 ### 4.9 Templates
 

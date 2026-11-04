@@ -528,6 +528,19 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
   }
 
   Future<void> _logout() async {
+    final user = _authService.getCurrentUser();
+    if (user != null) {
+      await _auditService.logAction(
+        action: 'LOGOUT',
+        resource: 'Admin',
+        resourceId: user.id,
+        description: 'Admin logged out: ${user.email ?? ''}',
+        status: 'SUCCESS',
+        userRole: 'admin',
+        module: 'auth',
+        category: 'security',
+      );
+    }
     await _authService.logout();
     if (mounted) {
       Navigator.pushAndRemoveUntil(

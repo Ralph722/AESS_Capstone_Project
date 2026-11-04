@@ -8,6 +8,7 @@ import 'package:alumni_system/features/admin/reports/application/gts_report_tabl
 import 'package:alumni_system/features/admin/reports/application/gts_report_validator.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// On-screen report: warnings, chart, table and notes from one result, the
@@ -15,8 +16,8 @@ import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 class GtsReportPreview extends StatelessWidget {
   const GtsReportPreview({super.key, required this.result});
 
-  /// Group lines the on-screen table adds at a time.
-  static const rowStep = 200;
+  /// Default page size for on-screen preview tables (group lines / alumni).
+  static const previewPageSize = 50;
 
   final GtsReportResult result;
 
@@ -135,7 +136,8 @@ class _ResultTable extends StatefulWidget {
 
 class _ResultTableState extends State<_ResultTable> {
   final ScrollController _hScrollController = ScrollController();
-  var _limit = GtsReportPreview.rowStep;
+  var _page = 0;
+  var _pageSize = GtsReportPreview.previewPageSize;
 
   @override
   void dispose() {
@@ -149,10 +151,10 @@ class _ResultTableState extends State<_ResultTable> {
     bool isTotal(List<Object?> row) =>
         row.isNotEmpty && row.first == GtsReportTables.allGraduates;
     final groupRows = table.rows.where((r) => !isTotal(r)).toList();
-    final capped = groupRows.length > _limit;
-    final rows = capped
-        ? [...groupRows.take(_limit), ...table.rows.where(isTotal)]
-        : table.rows;
+    final totalRows = table.rows.where(isTotal).toList();
+    final safePage = adminClampPage(_page, groupRows.length, _pageSize);
+    final pageGroups = adminPaginate(groupRows, safePage, _pageSize);
+    final rows = [...pageGroups, ...totalRows];
     final numeric = [
       for (var i = 0; i < table.headers.length; i++)
         rows.any((r) => r[i] is num),
@@ -161,29 +163,27 @@ class _ResultTableState extends State<_ResultTable> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _table(table, rows, numeric),
-        if (capped) ...[
+        if (groupRows.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            children: [
-              Text(
-                'Showing the first $_limit of ${groupRows.length} group '
-                'lines and the All graduates totals. Downloads contain every '
-                'line.',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AdminReportsTheme.textMuted,
-                ),
-              ),
-              TextButton(
-                onPressed: () =>
-                    setState(() => _limit += GtsReportPreview.rowStep),
-                child: Text(
-                  'Show ${math.min(GtsReportPreview.rowStep, groupRows.length - _limit)} more',
-                ),
-              ),
-            ],
+          AdminPaginationBar(
+            totalItems: groupRows.length,
+            page: safePage,
+            pageSize: _pageSize,
+            onPageChanged: (p) => setState(() => _page = p),
+            onPageSizeChanged: (s) => setState(() {
+              _pageSize = s;
+              _page = 0;
+            }),
+            dense: true,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'All graduates totals stay on every page. Downloads contain every '
+            'line.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AdminReportsTheme.textMuted,
+            ),
           ),
         ],
       ],

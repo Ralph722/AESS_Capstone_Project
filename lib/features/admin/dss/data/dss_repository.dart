@@ -50,6 +50,8 @@ class DssRepository {
         'enabled': rule.enabled,
       },
       userRole: 'admin',
+      module: 'dss',
+      category: 'security',
     );
   }
 

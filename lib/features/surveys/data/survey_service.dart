@@ -15,6 +15,8 @@ import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/config/email_delivery_config.dart';
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/core/services/audit_events.dart';
+import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/core/services/email_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_template_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_template_model.dart';
@@ -74,10 +76,12 @@ class SurveyService {
     SurveyTemplateService? templateService,
     IdTracerService? idTracerService,
     UserProfileService? userProfileService,
+    AuditService? auditService,
   }) : _supabase = supabase ?? Supabase.instance.client,
        _bridge = bridge ?? SupabaseUserBridge(client: supabase),
        _templateService = templateService ?? SurveyTemplateService(),
        _idTracerService = idTracerService ?? IdTracerService(),
+       _audit = auditService ?? AuditService(supabase: supabase),
        _userProfileService = userProfileService ?? UserProfileService();
 
   final SupabaseClient _supabase;
@@ -85,6 +89,7 @@ class SurveyService {
   final SurveyTemplateService _templateService;
   final IdTracerService _idTracerService;
   final UserProfileService _userProfileService;
+  final AuditService _audit;
 
   Future<Set<String>> _activeRegisteredUserIds() async {
     return AlumniMemberService(
@@ -420,6 +425,17 @@ class SurveyService {
 
     await _upsertSurveyToSupabase(survey);
     _notifyCatalogChanged();
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.createSurvey,
+        resource: 'Survey',
+        resourceId: survey.id,
+        description: 'Created survey: ${survey.title}',
+        userRole: 'admin',
+        module: AuditModules.surveys,
+        targetLabel: survey.title,
+      ),
+    );
     return survey.id;
   }
 
@@ -452,6 +468,18 @@ class SurveyService {
     );
     await _upsertSurveyToSupabase(survey);
     _notifyCatalogChanged();
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.createSurvey,
+        resource: 'Survey',
+        resourceId: surveyId,
+        description: 'Created CHED GTS survey: ${survey.title}',
+        userRole: 'admin',
+        module: AuditModules.surveys,
+        targetLabel: survey.title,
+        meta: {'kind': 'ched_gts'},
+      ),
+    );
     return surveyId;
   }
 
@@ -461,7 +489,7 @@ class SurveyService {
     return _templateService.getTemplate(survey!.templateId!);
   }
 
-  Future<void> updateSurvey(Survey survey) async {
+  Future<void> updateSurvey(Survey survey, {bool audit = true}) async {
     await _upsertSurveyToSupabase(survey);
     // Keep alumni list titles in sync (assignments store a title snapshot).
     try {
@@ -472,6 +500,19 @@ class SurveyService {
     } catch (_) {
       // Non-fatal: My Surveys prefers live surveys.title when loaded.
     }
+    if (audit) {
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.updateSurvey,
+          resource: 'Survey',
+          resourceId: survey.id,
+          description: 'Updated survey: ${survey.title}',
+          userRole: 'admin',
+          module: AuditModules.surveys,
+          targetLabel: survey.title,
+        ),
+      );
+    }
   }
 
   Future<void> deleteSurvey(String surveyId) async {
@@ -479,6 +520,17 @@ class SurveyService {
       // Blocked server-side once the survey has submitted responses.
       await _supabase.from('surveys').delete().eq('id', surveyId);
       _notifyCatalogChanged();
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.deleteSurvey,
+          resource: 'Survey',
+          resourceId: surveyId,
+          description: 'Deleted survey',
+          userRole: 'admin',
+          module: AuditModules.surveys,
+          category: AuditCategories.security,
+        ),
+      );
     } on PostgrestException catch (e) {
       throw Exception(e.message);
     } catch (e) {
@@ -634,6 +686,19 @@ class SurveyService {
     }
 
     _notifyCatalogChanged();
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.publishSurvey,
+        resource: 'Survey',
+        resourceId: surveyId,
+        description:
+            'Published survey: ${survey.title} (${matchedUserIds.length} assigned)',
+        changes: {'assignedCount': matchedUserIds.length},
+        userRole: 'admin',
+        module: AuditModules.surveys,
+        targetLabel: survey.title,
+      ),
+    );
     return matchedUserIds.length;
   }
 
@@ -911,6 +976,17 @@ class SurveyService {
             answers: pruned,
           );
         }
+        unawaited(
+          _audit.logAction(
+            action: AuditActions.submitSurveyResponse,
+            resource: 'Survey',
+            resourceId: surveyId,
+            description: 'Submitted survey response',
+            module: AuditModules.surveys,
+            targetLabel: survey?.title,
+            // Answers intentionally omitted from activity logs.
+          ),
+        );
       }
     } catch (e) {
       throw Exception('Error saving survey response: $e');
@@ -1353,6 +1429,16 @@ class SurveyService {
           })
           .eq('id', surveyId);
       _notifyCatalogChanged();
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.closeSurvey,
+          resource: 'Survey',
+          resourceId: surveyId,
+          description: 'Closed survey',
+          userRole: 'admin',
+          module: AuditModules.surveys,
+        ),
+      );
     } catch (e) {
       throw Exception('Error closing survey: $e');
     }
@@ -1365,8 +1451,23 @@ class SurveyService {
   }) async {
     final survey = await getSurvey(surveyId);
     if (survey == null) throw Exception('Survey not found');
-    await updateSurvey(survey.copyWith(archived: archived));
+    await updateSurvey(survey.copyWith(archived: archived), audit: false);
     _notifyCatalogChanged();
+    unawaited(
+      _audit.logAction(
+        action: archived
+            ? AuditActions.archiveSurvey
+            : AuditActions.restoreSurvey,
+        resource: 'Survey',
+        resourceId: surveyId,
+        description: archived
+            ? 'Archived survey: ${survey.title}'
+            : 'Restored survey: ${survey.title}',
+        userRole: 'admin',
+        module: AuditModules.surveys,
+        targetLabel: survey.title,
+      ),
+    );
   }
 
   /// Clones survey metadata + questions (and remapped visibility rules) as a draft.
@@ -1446,6 +1547,18 @@ class SurveyService {
       await _upsertQuestionsToSupabase(newId, newQuestions);
     }
     _notifyCatalogChanged();
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.duplicateSurvey,
+        resource: 'Survey',
+        resourceId: newId,
+        description: 'Duplicated survey from ${source.title}',
+        changes: {'sourceId': sourceId},
+        userRole: 'admin',
+        module: AuditModules.surveys,
+        targetLabel: copy.title,
+      ),
+    );
     return newId;
   }
 
@@ -1635,7 +1748,7 @@ class SurveyService {
       } catch (_) {}
     }
 
-    return SurveyReminderResult(
+    final result = SurveyReminderResult(
       inAppSent: inAppSent,
       emailSent: emailSent,
       emailSkippedNoAddress: emailSkippedNoAddress,
@@ -1643,6 +1756,28 @@ class SurveyService {
       emailSkippedOptedOut: emailSkippedOptedOut,
       failures: failures,
     );
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.sendSurveyReminders,
+        resource: 'Survey',
+        resourceId: surveyId,
+        description:
+            'Sent survey reminders (in-app: $inAppSent, email: $emailSent)',
+        changes: {
+          'recipientCount': userIds.length,
+          'inAppSent': inAppSent,
+          'emailSent': emailSent,
+          'failureCount': failures.length,
+        },
+        status: failures.isEmpty
+            ? AuditStatus.success
+            : AuditStatus.failed,
+        userRole: 'admin',
+        module: AuditModules.surveys,
+        targetLabel: survey.title,
+      ),
+    );
+    return result;
   }
 
   String buildResponsesCsv({
@@ -1654,6 +1789,29 @@ class SurveyService {
       survey: survey,
       questions: questions,
       participants: participants,
+    );
+  }
+
+  /// Records that an admin exported survey data (CSV/Excel/PDF). No file contents.
+  Future<void> logSurveyExport({
+    required String surveyId,
+    required String surveyTitle,
+    required String format,
+    int? rowCount,
+  }) {
+    return _audit.logAction(
+      action: AuditActions.exportSurvey,
+      resource: 'Survey',
+      resourceId: surveyId,
+      description: 'Exported survey ($format): $surveyTitle',
+      changes: {
+        'format': format,
+        if (rowCount != null) 'rowCount': rowCount,
+      },
+      userRole: 'admin',
+      module: AuditModules.surveys,
+      category: AuditCategories.security,
+      targetLabel: surveyTitle,
     );
   }
 

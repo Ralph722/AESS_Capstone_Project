@@ -593,11 +593,12 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             ),
           ],
         ),
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: _buildFloatingHelpButton(),
-        ),
+        if (_panel == _DssPanel.list)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: _buildFloatingHelpButton(),
+          ),
       ],
     );
   }

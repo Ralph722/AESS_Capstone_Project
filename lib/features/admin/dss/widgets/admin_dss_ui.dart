@@ -935,7 +935,7 @@ class DssStageStrip extends StatelessWidget {
     ).hint;
 
     return DssSurfaceCard(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -946,10 +946,10 @@ class DssStageStrip extends StatelessWidget {
                   Expanded(
                     child: Container(
                       height: 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
                       color: i <= currentIndex
-                          ? AdminDssTheme.primary.withValues(alpha: 0.45)
-                          : AdminDssTheme.border,
+                          ? AdminColors.primary.withValues(alpha: 0.6)
+                          : AdminColors.border,
                     ),
                   ),
                 _StageDot(
@@ -960,14 +960,27 @@ class DssStageStrip extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            hint,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.35,
-              color: AdminDssTheme.textSecondary,
-            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(
+                Icons.arrow_forward_rounded,
+                size: 13,
+                color: AdminColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  hint,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                    color: AdminColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -988,40 +1001,68 @@ class _StageDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active || done
-        ? AdminDssTheme.primary
-        : AdminDssTheme.textMuted;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 22,
-          height: 22,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: active
-                ? AdminDssTheme.primary
+                ? AdminColors.primary
                 : done
-                ? AdminDssTheme.primary.withValues(alpha: 0.2)
-                : AdminDssTheme.surface,
-            border: Border.all(color: color, width: active ? 0 : 1.5),
+                ? AdminColors.success.withValues(alpha: 0.15)
+                : AdminColors.surface,
+            border: Border.all(
+              color: active
+                  ? AdminColors.primary
+                  : done
+                  ? AdminColors.success
+                  : AdminColors.border,
+              width: 1.5,
+            ),
           ),
-          child: Icon(
-            done && !active ? Icons.check : Icons.circle,
-            size: done && !active ? 12 : 8,
-            color: active
-                ? Colors.white
-                : done
-                ? AdminDssTheme.primary
-                : AdminDssTheme.textMuted,
+          child: Center(
+            child: done
+                ? const Icon(
+                    Icons.check_rounded,
+                    size: 14,
+                    color: AdminColors.success,
+                  )
+                : active
+                ? Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                  )
+                : Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AdminColors.textMuted,
+                    ),
+                  ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           label,
           style: TextStyle(
-            fontSize: 10.5,
-            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-            color: color,
+            fontSize: 11,
+            fontWeight: active
+                ? FontWeight.w700
+                : (done ? FontWeight.w600 : FontWeight.w500),
+            color: active
+                ? AdminColors.textPrimary
+                : done
+                ? AdminColors.success
+                : AdminColors.textMuted,
+            letterSpacing: -0.1,
           ),
         ),
       ],

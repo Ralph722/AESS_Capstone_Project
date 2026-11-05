@@ -18,6 +18,7 @@ import 'package:alumni_system/features/admin/dss/widgets/dss_outcome_card.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Inline DSS flag detail panel (Surveys-style workspace).
 class AdminDssDetailPanel extends StatefulWidget {
@@ -1416,13 +1417,33 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'What we found',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
-              color: AdminDssTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.insights_rounded,
+                  size: 15,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'What we found',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AdminColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           if (_evidenceBanner(flag) case final banner?) ...[
@@ -1470,29 +1491,36 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             ),
           ),
           if (detailLines.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(bottom: 4),
-                title: const Text(
-                  'Supporting details',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AdminDssTheme.textSecondary,
-                  ),
-                ),
-                children: [
-                  for (final w in detailLines)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Align(alignment: Alignment.centerLeft, child: w),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: AdminColors.surface.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                border: Border.all(color: AdminColors.border),
+              ),
+              child: Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                  childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  title: const Text(
+                    'Supporting details',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AdminColors.textSecondary,
                     ),
-                ],
+                  ),
+                  children: [
+                    for (final w in detailLines)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Align(alignment: Alignment.centerLeft, child: w),
+                      ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -3113,10 +3141,11 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
 
   Widget _kv(String k, String v) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AdminDssTheme.surface,
-        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+        color: AdminColors.surface,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       child: Text.rich(
         TextSpan(
@@ -3125,7 +3154,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               text: '$k: ',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminDssTheme.textMuted,
+                fontWeight: FontWeight.w500,
+                color: AdminColors.textSecondary,
               ),
             ),
             TextSpan(
@@ -3133,7 +3163,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AdminDssTheme.textPrimary,
+                color: AdminColors.textPrimary,
               ),
             ),
           ],

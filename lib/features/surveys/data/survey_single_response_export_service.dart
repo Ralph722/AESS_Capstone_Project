@@ -107,6 +107,7 @@ class SurveySingleResponseExportService {
     required SurveyParticipant participant,
     List<SingleResponseAnswerRow>? rows,
   }) async {
+    await AessPdfHeader.ensureLoaded();
     final answerRows = rows ??
         buildAnswerRows(
           survey: survey,

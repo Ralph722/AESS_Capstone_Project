@@ -1,15 +1,29 @@
 import 'package:pdf/widgets.dart' as pw;
 import 'package:alumni_system/core/pdf/aess_pdf_theme.dart';
+import 'package:alumni_system/core/pdf/ustp_oroquieta_letterhead_bytes.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 
-/// Institutional header banner applied across all official AESS PDF reports.
+/// Institutional header used by generated AESS PDF reports.
+///
+/// The banner is the Oroquieta Alumni Association letterhead from the office
+/// template (R.01 Series of 2025). Report title, date, and filters stay under
+/// that banner so each export is still identifiable.
 abstract final class AessPdfHeader {
   AessPdfHeader._();
 
+  /// Text used only when the letterhead image cannot be decoded.
   static const String universityName =
       'UNIVERSITY OF SCIENCE AND TECHNOLOGY OF SOUTHERN PHILIPPINES';
-  static const String systemName =
-      'ALUMNI ENGAGEMENT AND SUPPORT SYSTEM (AESS) - OFFICIAL REPORTING';
+  static const String officeName =
+      'OFFICE OF THE USTP-ALUMNI ASSOCIATION OROQUIETA CAMPUS INC.';
+  static const String secRegistration = 'SEC REG. NO.: 2023070107993-00';
+
+  static pw.MemoryImage? _letterhead;
+
+  /// Decodes the embedded letterhead once. Call before building a PDF document.
+  static Future<void> ensureLoaded() async {
+    _letterhead ??= pw.MemoryImage(ustpOroquietaLetterheadPng);
+  }
 
   /// Standard multi-line institutional header widget.
   static pw.Widget build({
@@ -28,58 +42,25 @@ abstract final class AessPdfHeader {
     final safeFilters = filterSummary.isNotEmpty
         ? PdfSafeText.sanitize('Filters: ${filterSummary.join(' | ')}')
         : null;
+    final letterhead = _letterhead;
 
     return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        // Top Institutional Bar
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    universityName,
-                    style: AessPdfTheme.superTitle,
-                  ),
-                  pw.SizedBox(height: 1.5),
-                  pw.Text(
-                    systemName,
-                    style: AessPdfTheme.systemSubline,
-                  ),
-                ],
-              ),
-            ),
-            pw.Container(
-              padding: const pw.EdgeInsets.symmetric(
-                horizontal: 6,
-                vertical: 2.5,
-              ),
-              decoration: pw.BoxDecoration(
-                color: AessPdfTheme.bannerBg,
-                border: pw.Border.all(
-                  color: AessPdfTheme.borderColor,
-                  width: 0.5,
-                ),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
-              ),
-              child: pw.Text(
-                PdfSafeText.sanitize(classification),
-                style: pw.TextStyle(
-                  fontSize: 6.5,
-                  fontWeight: pw.FontWeight.bold,
-                  color: AessPdfTheme.secondaryNavy,
-                ),
-              ),
-            ),
-          ],
-        ),
-        pw.SizedBox(height: 6),
-
-        // Report Title and Metadata
+        if (letterhead != null)
+          pw.Image(letterhead, fit: pw.BoxFit.fitWidth)
+        else
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(universityName, style: AessPdfTheme.superTitle),
+              pw.SizedBox(height: 1.5),
+              pw.Text(officeName, style: AessPdfTheme.systemSubline),
+              pw.SizedBox(height: 1.5),
+              pw.Text(secRegistration, style: AessPdfTheme.reportSubtitle),
+            ],
+          ),
+        pw.SizedBox(height: 8),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -88,37 +69,40 @@ abstract final class AessPdfHeader {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text(
-                    safeTitle,
-                    style: AessPdfTheme.reportTitle,
-                  ),
+                  pw.Text(safeTitle, style: AessPdfTheme.reportTitle),
                   if (safeSubtitle != null && safeSubtitle.isNotEmpty) ...[
                     pw.SizedBox(height: 2),
+                    pw.Text(safeSubtitle, style: AessPdfTheme.reportSubtitle),
+                  ],
+                ],
+              ),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(left: 12),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  if (classification.trim().isNotEmpty)
                     pw.Text(
-                      safeSubtitle,
+                      PdfSafeText.sanitize(classification),
+                      style: pw.TextStyle(
+                        fontSize: 6.5,
+                        fontWeight: pw.FontWeight.bold,
+                        color: AessPdfTheme.secondaryNavy,
+                      ),
+                    ),
+                  if (safeDate != null) ...[
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      'Generated: $safeDate',
                       style: AessPdfTheme.reportSubtitle,
                     ),
                   ],
                 ],
               ),
             ),
-            if (safeDate != null)
-              pw.Padding(
-                padding: const pw.EdgeInsets.only(left: 12),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      'Generated: $safeDate',
-                      style: AessPdfTheme.reportSubtitle,
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
-
-        // Filter Summary (if present)
         if (safeFilters != null && safeFilters.isNotEmpty) ...[
           pw.SizedBox(height: 4),
           pw.Container(
@@ -140,9 +124,7 @@ abstract final class AessPdfHeader {
             ),
           ),
         ],
-
         pw.SizedBox(height: 6),
-        // Clean dual-tone rule
         pw.Divider(
           color: AessPdfTheme.primaryNavy,
           thickness: 1.2,
@@ -159,4 +141,3 @@ abstract final class AessPdfHeader {
     );
   }
 }
-

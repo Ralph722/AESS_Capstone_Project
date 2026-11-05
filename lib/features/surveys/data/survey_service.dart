@@ -1930,6 +1930,7 @@ class SurveyService {
     required List<SurveyQuestion> questions,
     required List<SurveyParticipant> participants,
   }) async {
+    await AessPdfHeader.ensureLoaded();
     final submitted = participants
         .where((p) => !p.isPending && p.response != null)
         .toList(growable: false);

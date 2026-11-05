@@ -189,6 +189,7 @@ abstract final class InstitutionalGtsParticipationQualityService {
   static Future<Uint8List> toPdf(
     InstitutionalGtsParticipationQualityReport report,
   ) async {
+    await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
     final stamp = DateFormat.yMMMMEEEEd().add_jm().format(report.generatedAt);
     final rate = report.responseRate;

@@ -150,6 +150,7 @@ abstract final class InstitutionalGtsSummaryService {
   }
 
   static Future<Uint8List> toPdf(InstitutionalGtsSummary summary) async {
+    await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
     final stamp = DateFormat.yMMMMEEEEd().add_jm().format(summary.generatedAt);
     final rate = summary.responseRate;

@@ -268,8 +268,8 @@ void main() {
 
       // Extract rendered text and verify content & institutional structure
       final text = _extractText(bytes);
-      expect(text, contains('UNIVERSITY OF SCIENCE AND TECHNOLOGY OF SOUTHERN PHILIPPINES'));
-      expect(text, contains('ALUMNI ENGAGEMENT AND SUPPORT SYSTEM'));
+      expect(text, contains('PUROK 6, MOBOD, OROQUIETA CITY'));
+      expect(text, contains('MISAMIS OCCIDENTAL'));
       expect(text, contains('CHED GTS pack'));
       expect(text, contains('Executive KPIs'));
       expect(text, contains('Survey question summaries'));
@@ -287,7 +287,7 @@ void main() {
       // Verify Data Privacy Act of 2012 notice is present due to employment records
       expect(text, contains('RA 10173'));
       // Verify Page numbering
-      expect(text, contains('Page 1 of'));
+      expect(text, contains('Page | 1 of'));
 
       final outputDir = Directory('output/pdf');
       if (!outputDir.existsSync()) outputDir.createSync(recursive: true);
@@ -314,10 +314,10 @@ void main() {
       );
 
       final text = _extractText(bytes);
-      expect(text, contains('UNIVERSITY OF SCIENCE AND TECHNOLOGY OF SOUTHERN PHILIPPINES'));
+      expect(text, contains('PUROK 6, MOBOD, OROQUIETA CITY'));
       expect(text, contains('CHED GTS 2026'));
       expect(text, contains('82%'));
-      expect(text, contains('Page 1 of'));
+      expect(text, contains('Page | 1 of'));
 
       File('output/pdf/sample_survey_management_pack_redesigned.pdf')
           .writeAsBytesSync(bytes);

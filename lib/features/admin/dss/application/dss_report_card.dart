@@ -167,6 +167,7 @@ abstract final class DssReportCardPdf {
   static const _outcomeRowsMax = 25;
 
   static Future<Uint8List> build(DssReportCardData data) async {
+    await AessPdfHeader.ensureLoaded();
     final kind = data.institution
         ? 'Institution report card'
         : 'Program report card';

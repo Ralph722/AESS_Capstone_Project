@@ -192,7 +192,8 @@ abstract final class GtsListExportService {
   static Future<Uint8List> toPdf(
     GtsAlumniListResult result, {
     String? explanation,
-  }) async {
+  }  ) async {
+    await AessPdfHeader.ensureLoaded();
     final safe = PdfSafeText.sanitize;
     final config = result.config;
     final headers = GtsListTables.headers(result);

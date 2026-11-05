@@ -426,6 +426,7 @@ class SurveyReportPackService {
   static String _esc(String v) => CsvSafe.cell(v);
 
   static Future<Uint8List> toPdf(SurveyReportPack pack) async {
+    await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
     final date = DateFormat.yMMMMEEEEd().add_jm().format(pack.generatedAt);
     final hasPersonalData = pack.responseRows.isNotEmpty;

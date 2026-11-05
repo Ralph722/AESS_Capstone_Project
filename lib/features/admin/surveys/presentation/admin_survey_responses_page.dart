@@ -1895,6 +1895,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   }
 
   Future<Uint8List> _pendingListPdfBytes(List<SurveyParticipant> pending) async {
+    await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
     final title = _survey?.title.trim().isNotEmpty == true
         ? _survey!.title.trim()

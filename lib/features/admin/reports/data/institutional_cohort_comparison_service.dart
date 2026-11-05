@@ -162,6 +162,7 @@ abstract final class InstitutionalCohortComparisonService {
   }
 
   static Future<Uint8List> toPdf(InstitutionalCohortComparisonReport report) async {
+    await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
     final stamp = DateFormat.yMMMMEEEEd().add_jm().format(report.generatedAt);
     doc.addPage(

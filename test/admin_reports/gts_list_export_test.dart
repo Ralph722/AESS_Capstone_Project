@@ -219,7 +219,7 @@ void main() {
     test('PDF has the rows, the tally and the privacy footer', () async {
       final text = await _pdfText(_build());
       for (final s in [
-        'ALUMNI ENGAGEMENT AND SUPPORT SYSTEM',
+        'PUROK 6, MOBOD, OROQUIETA CITY',
         'Jose Rizal',
         'AI engineer, team lead',
         'Presently employed',

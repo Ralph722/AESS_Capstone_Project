@@ -115,6 +115,7 @@ flutter:
     - assets/AESS_20260916_201241_0000.svg
     - assets/AESS_Icon.svg
     - assets/images/aess_app_icon.png
+    - assets/images/ustp_oroquieta_alumni_letterhead.png
     - assets/ched_gts/
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -118,6 +118,7 @@ abstract final class GtsReportExportService {
   }
 
   static Future<Uint8List> toPdf(GtsReportResult result) async {
+    await AessPdfHeader.ensureLoaded();
     final table = GtsReportTables.main(result);
     final notes = GtsReportTables.notes(result);
     final about = GtsReportTables.about(result);

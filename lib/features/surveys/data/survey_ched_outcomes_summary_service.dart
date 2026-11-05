@@ -201,6 +201,7 @@ abstract final class SurveyChedOutcomesSummaryService {
   }
 
   static Future<Uint8List> toPdf(ChedOutcomesSummary summary) async {
+    await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
     final stamp = DateFormat.yMMMMEEEEd().add_jm().format(summary.generatedAt);
     final title = summary.survey.title.trim().isEmpty

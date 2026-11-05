@@ -316,6 +316,7 @@ class CustomReportExportService {
   }
 
   static Future<Uint8List> toPdf(CustomReportDocument doc) async {
+    await AessPdfHeader.ensureLoaded();
     final pdf = pw.Document();
     final date = DateFormat.yMMMMEEEEd().add_jm().format(doc.generatedAt);
 

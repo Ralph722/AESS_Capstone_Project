@@ -281,6 +281,7 @@ class SurveyFormalReportService {
     required DateTime generatedAt,
     required bool usedAi,
   }) async {
+    await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
     final stamp = DateFormat.yMMMd().add_jm().format(generatedAt);
     final safeTitle = PdfSafeText.sanitize(surveyTitle);

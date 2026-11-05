@@ -132,6 +132,13 @@ abstract final class AessPdfTheme {
         color: dangerRed,
       );
 
+  static pw.TextStyle get footerAddress => pw.TextStyle(
+        fontSize: 8,
+        fontWeight: pw.FontWeight.bold,
+        color: textDark,
+        letterSpacing: 0.2,
+      );
+
   static pw.TextStyle get footerPageNumber => pw.TextStyle(
         fontSize: 7.5,
         fontWeight: pw.FontWeight.bold,

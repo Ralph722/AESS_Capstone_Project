@@ -6,7 +6,6 @@ import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
@@ -17,11 +16,13 @@ class AdminDssSettingsPanel extends StatefulWidget {
     required this.onClose,
     this.selectedSubnav = 2,
     this.onSubnavSelected,
+    this.embedded = false,
   });
 
   final Future<void> Function() onClose;
   final int selectedSubnav;
   final ValueChanged<int>? onSubnavSelected;
+  final bool embedded;
 
   @override
   State<AdminDssSettingsPanel> createState() => _AdminDssSettingsPanelState();
@@ -203,19 +204,22 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DssPageHeader(
-          title: 'Rules',
-          subtitle: 'Thresholds and minimum answers for Findings and Watch items.',
-          onBack: widget.onSubnavSelected == null
-              ? () => widget.onClose()
-              : null,
-          backTooltip: 'Back to findings',
-          selectedSubnav: widget.onSubnavSelected != null
-              ? widget.selectedSubnav
-              : null,
-          onSubnavSelected: widget.onSubnavSelected,
-        ),
-        const SizedBox(height: AdminDssTheme.space2),
+        if (!widget.embedded) ...[
+          DssPageHeader(
+            title: 'Rules',
+            subtitle:
+                'Thresholds and minimum answers for Findings and Watch items.',
+            onBack: widget.onSubnavSelected == null
+                ? () => widget.onClose()
+                : null,
+            backTooltip: 'Back to findings',
+            selectedSubnav: widget.onSubnavSelected != null
+                ? widget.selectedSubnav
+                : null,
+            onSubnavSelected: widget.onSubnavSelected,
+          ),
+          const SizedBox(height: AdminDssTheme.space2),
+        ],
         if (_loading)
           const Expanded(child: Center(child: CircularProgressIndicator()))
         else if (_error != null)
@@ -359,37 +363,49 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
             ),
           ),
           const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controllers['${rule.ruleId}|threshold'],
-                  decoration: _fieldDecoration(
-                    DssCopy.settingsThresholdHint(rule),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controllers['${rule.ruleId}|threshold'],
+                    decoration: _fieldDecoration(
+                      DssCopy.settingsThresholdHint(rule),
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
-                  keyboardType: TextInputType.number,
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 168,
-                child: TextField(
-                  controller: _controllers['${rule.ruleId}|minN'],
-                  decoration: _fieldDecoration(
-                    'Minimum (at least '
-                    '${DssPolicy.minNFloor(rule.category)})',
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 168,
+                  child: TextField(
+                    controller: _controllers['${rule.ruleId}|minN'],
+                    decoration: _fieldDecoration(
+                      'Minimum (at least '
+                      '${DssPolicy.minNFloor(rule.category)})',
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
-                  keyboardType: TextInputType.number,
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: () => _save(rule),
-                style: AdminButtonStyles.filled(),
-                child: const Text('Save'),
-              ),
-            ],
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () => _save(rule),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AdminColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(AdminSurfaces.radiusSm),
+                    ),
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
           ),
         ],
       ),

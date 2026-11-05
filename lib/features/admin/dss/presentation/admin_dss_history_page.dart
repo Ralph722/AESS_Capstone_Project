@@ -17,11 +17,13 @@ class AdminDssHistoryPanel extends StatefulWidget {
     required this.onClose,
     this.selectedSubnav = 1,
     this.onSubnavSelected,
+    this.embedded = false,
   });
 
   final Future<void> Function() onClose;
   final int selectedSubnav;
   final ValueChanged<int>? onSubnavSelected;
+  final bool embedded;
 
   @override
   State<AdminDssHistoryPanel> createState() => _AdminDssHistoryPanelState();
@@ -87,46 +89,82 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DssPageHeader(
-          title: 'History',
-          subtitle: 'Findings raised, closed, and re-checked over time.',
-          onBack: widget.onSubnavSelected == null
-              ? () => widget.onClose()
-              : null,
-          backTooltip: 'Back to findings',
-          selectedSubnav: widget.onSubnavSelected != null
-              ? widget.selectedSubnav
-              : null,
-          onSubnavSelected: widget.onSubnavSelected,
-          actions: [
-            DirectoryFilterField<int?>(
-              label: 'Period',
-              value: _lookbackDays,
-              dense: true,
-              width: 170,
-              enabled: !_loading,
-              items: const [
-                DropdownMenuItem<int?>(
-                  value: 365,
-                  child: Text('Last 12 months'),
+        if (!widget.embedded) ...[
+          DssPageHeader(
+            title: 'History',
+            subtitle: 'Findings raised, closed, and re-checked over time.',
+            onBack: widget.onSubnavSelected == null
+                ? () => widget.onClose()
+                : null,
+            backTooltip: 'Back to findings',
+            selectedSubnav: widget.onSubnavSelected != null
+                ? widget.selectedSubnav
+                : null,
+            onSubnavSelected: widget.onSubnavSelected,
+            actions: [
+              DirectoryFilterField<int?>(
+                label: 'Period',
+                value: _lookbackDays,
+                dense: true,
+                width: 170,
+                enabled: !_loading,
+                items: const [
+                  DropdownMenuItem<int?>(
+                    value: 365,
+                    child: Text('Last 12 months'),
+                  ),
+                  DropdownMenuItem<int?>(value: null, child: Text('All time')),
+                ],
+                onChanged: (v) {
+                  if (v == _lookbackDays) return;
+                  setState(() => _lookbackDays = v);
+                  _load();
+                },
+              ),
+              OutlinedButton.icon(
+                onPressed: _loading ? null : _load,
+                icon: const Icon(Icons.refresh_rounded, size: 15),
+                label: const Text('Reload'),
+                style: AdminButtonStyles.outlined(),
+              ),
+            ],
+          ),
+          const SizedBox(height: AdminDssTheme.space2),
+        ] else ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                DirectoryFilterField<int?>(
+                  label: 'Period',
+                  value: _lookbackDays,
+                  dense: true,
+                  width: 170,
+                  enabled: !_loading,
+                  items: const [
+                    DropdownMenuItem<int?>(
+                      value: 365,
+                      child: Text('Last 12 months'),
+                    ),
+                    DropdownMenuItem<int?>(value: null, child: Text('All time')),
+                  ],
+                  onChanged: (v) {
+                    if (v == _lookbackDays) return;
+                    setState(() => _lookbackDays = v);
+                    _load();
+                  },
                 ),
-                DropdownMenuItem<int?>(value: null, child: Text('All time')),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _load,
+                  icon: const Icon(Icons.refresh_rounded, size: 15),
+                  label: const Text('Reload'),
+                  style: AdminButtonStyles.outlined(),
+                ),
               ],
-              onChanged: (v) {
-                if (v == _lookbackDays) return;
-                setState(() => _lookbackDays = v);
-                _load();
-              },
             ),
-            OutlinedButton.icon(
-              onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.refresh_rounded, size: 15),
-              label: const Text('Reload'),
-              style: AdminButtonStyles.outlined(),
-            ),
-          ],
-        ),
-        const SizedBox(height: AdminDssTheme.space2),
+          ),
+        ],
         if (_loading)
           const Expanded(child: Center(child: CircularProgressIndicator()))
         else if (_error != null)

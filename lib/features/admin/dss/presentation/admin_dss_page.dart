@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/core/services/app_session.dart';
@@ -21,9 +20,11 @@ import 'package:alumni_system/features/admin/dss/presentation/admin_dss_settings
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
@@ -76,10 +77,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   bool _loading = true;
   bool _evaluating = false;
   String? _error;
-  String? _evalMessage;
-  bool _showRulesRefreshHint = false;
-  String? _rerunSummary;
-  bool _showHowThisWorks = false;
 
   _DssPanel _panel = _DssPanel.list;
   String? _activeFlagId;
@@ -98,25 +95,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _loadHowThisWorksPref();
         _load();
       }
     });
-  }
-
-  Future<void> _loadHowThisWorksPref() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    setState(() {
-      _showHowThisWorks =
-          !(prefs.getBool(kDssHowThisWorksDismissedKey) ?? false);
-    });
-  }
-
-  Future<void> _dismissHowThisWorks() async {
-    setState(() => _showHowThisWorks = false);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(kDssHowThisWorksDismissedKey, true);
   }
 
   @override
@@ -159,28 +140,20 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     final before = {for (final f in _flags) f.id: f.status};
     setState(() {
       _evaluating = true;
-      _evalMessage = null;
-      _rerunSummary = null;
     });
     try {
-      final result = await _eval.evaluateAll(
-        onProgress: (msg) {
-          if (!mounted) return;
-          setState(() => _evalMessage = msg);
-        },
-      );
+      final result = await _eval.evaluateAll();
       if (!mounted) return;
-      setState(() {
-        _evalMessage = result.message;
-        _showRulesRefreshHint = false;
-      });
       await _load();
       if (!mounted) return;
       final diff = dssRerunDiff(before: before, after: _flags);
-      setState(() => _rerunSummary = diff.bannerText);
+      final banner = diff.bannerText;
+      final message = (banner != null && banner.isNotEmpty)
+          ? '${result.message} · $banner'
+          : result.message;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.message),
+          content: Text(message),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -284,7 +257,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           _panel = _DssPanel.history;
         case 2:
           _panel = _DssPanel.settings;
-          _showRulesRefreshHint = true;
         default:
           _panel = _DssPanel.list;
       }
@@ -308,17 +280,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       _query.isNotEmpty ||
       _sort != _DssSort.priority ||
       _mineOnly;
-
-  int get _moreFiltersCount {
-    var count = 0;
-    if (_ruleFilter.isNotEmpty) count++;
-    if (_priorityFilter != null) count++;
-    if (_sort != _DssSort.priority) count++;
-    if (_dueFilter != _DssDueFilter.all) count++;
-    if (_officeFilter.isNotEmpty) count++;
-    if (_mineOnly) count++;
-    return count;
-  }
 
   Future<void> _openMoreFiltersDialog() async {
     final result = await showDialog<({
@@ -583,175 +544,287 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    switch (_panel) {
-      case _DssPanel.detail:
-        if (_activeFlagId != null) {
-          return AdminDssDetailPanel(
-            key: ValueKey('dss-detail-$_activeFlagId'),
-            flagId: _activeFlagId!,
-            onClose: _closePanel,
-            onOpenAdminMenu: widget.onOpenAdminMenu,
-          );
-        }
-      case _DssPanel.history:
-        return AdminDssHistoryPanel(
-          onClose: _closePanel,
-          selectedSubnav: 1,
-          onSubnavSelected: _onSubnavSelected,
-        );
-      case _DssPanel.settings:
-        return AdminDssSettingsPanel(
-          onClose: () async {
-            await _closePanel();
-          },
-          selectedSubnav: 2,
-          onSubnavSelected: _onSubnavSelected,
-        );
-      case _DssPanel.list:
-        break;
+    if (_panel == _DssPanel.detail && _activeFlagId != null) {
+      return AdminDssDetailPanel(
+        key: ValueKey('dss-detail-$_activeFlagId'),
+        flagId: _activeFlagId!,
+        onClose: _closePanel,
+        onOpenAdminMenu: widget.onOpenAdminMenu,
+      );
     }
-    return _buildList();
-  }
 
-  Widget _buildList() {
     final filtered = _filtered;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DssPageHeader(
+        AdminCompactHeader(
           title: 'Program Insights',
           subtitle: 'Work queue for tracer Findings and Watch items.',
-          selectedSubnav: _subnavIndex,
-          onSubnavSelected: _onSubnavSelected,
-          findingsCount: _openCount + _inProgressCount,
-          trailingSubnav: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AdminColors.surface,
-              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-              border: Border.all(color: AdminColors.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _lastEvaluatedAt != null
-                      ? Icons.schedule_rounded
-                      : Icons.info_outline_rounded,
-                  size: 13,
-                  color: AdminColors.textSecondary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _lastEvaluatedLabel,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: AdminColors.textSecondary,
-                  ),
-                ),
-              ],
+          countBadge: '${_openCount + _inProgressCount} open',
+          actions: [
+            _buildLastEvaluatedPill(),
+            _buildRefreshButton(),
+            _buildReportsDropdown(filtered),
+            _buildRerunButton(),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _buildSubnavRow(),
+        const SizedBox(height: 10),
+        Expanded(
+          child: switch (_panel) {
+            _DssPanel.history => AdminDssHistoryPanel(
+                onClose: _closePanel,
+                selectedSubnav: 1,
+                onSubnavSelected: _onSubnavSelected,
+                embedded: true,
+              ),
+            _DssPanel.settings => AdminDssSettingsPanel(
+                onClose: _closePanel,
+                selectedSubnav: 2,
+                onSubnavSelected: _onSubnavSelected,
+                embedded: true,
+              ),
+            _ => _buildFindingsBody(filtered),
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLastEvaluatedPill() {
+    return Container(
+      height: AdminDensity.buttonHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: AdminColors.surface,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
+      ),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _lastEvaluatedAt != null
+                ? Icons.schedule_rounded
+                : Icons.info_outline_rounded,
+            size: 13,
+            color: AdminColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            _lastEvaluatedLabel,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              color: AdminColors.textSecondary,
             ),
           ),
-          actions: [
-            PopupMenuButton<String>(
-              tooltip: 'Export and reports',
-              enabled: !_loading && !_evaluating,
-              position: PopupMenuPosition.under,
-              color: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-                side: const BorderSide(color: AdminColors.border),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRefreshButton() {
+    return Tooltip(
+      message: 'Refresh insights data',
+      child: OutlinedButton.icon(
+        onPressed: _loading || _evaluating ? null : _load,
+        icon: _loading
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AdminColors.primary,
+                ),
+              )
+            : const Icon(Icons.refresh_rounded, size: 15),
+        label: const Text('Refresh'),
+        style: dssOutlinedButtonStyle(),
+      ),
+    );
+  }
+
+  Widget _buildReportsDropdown(List<DssFlag> filtered) {
+    return PopupMenuButton<String>(
+      tooltip: 'Export and reports',
+      enabled: !_loading && !_evaluating,
+      position: PopupMenuPosition.under,
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        side: const BorderSide(color: AdminColors.border),
+      ),
+      onSelected: (v) {
+        if (v == 'export') {
+          _exportFlags();
+        } else if (v == 'report') {
+          _exportReportCard();
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'export',
+          enabled: filtered.isNotEmpty,
+          child: const Row(
+            children: [
+              Icon(Icons.table_chart_outlined, size: 16, color: AdminColors.textSecondary),
+              SizedBox(width: 8),
+              Text('Export CSV', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'report',
+          enabled: !_buildingReport,
+          child: Row(
+            children: [
+              const Icon(Icons.picture_as_pdf_outlined, size: 16, color: AdminColors.textSecondary),
+              const SizedBox(width: 8),
+              Text(
+                _buildingReport ? 'Building report…' : 'Report card PDF',
+                style: const TextStyle(fontSize: 13),
               ),
-              onSelected: (v) {
-                if (v == 'export') {
-                  _exportFlags();
-                } else if (v == 'report') {
-                  _exportReportCard();
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'export',
-                  enabled: filtered.isNotEmpty,
-                  child: const Row(
-                    children: [
-                      Icon(Icons.table_chart_outlined, size: 16, color: AdminColors.textSecondary),
-                      SizedBox(width: 8),
-                      Text('Export CSV', style: TextStyle(fontSize: 13)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'report',
-                  enabled: !_buildingReport,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.picture_as_pdf_outlined, size: 16, color: AdminColors.textSecondary),
-                      const SizedBox(width: 8),
-                      Text(
-                        _buildingReport ? 'Building report…' : 'Report card PDF',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              child: Container(
-                height: AdminDensity.buttonHeight,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: AdminColors.surface,
-                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-                  border: Border.all(color: AdminColors.border),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.file_download_outlined,
-                      size: 15,
-                      color: AdminColors.textPrimary,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      'Reports',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: AdminColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: AdminColors.textSecondary,
-                    ),
-                  ],
-                ),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: AdminDensity.buttonHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: AdminColors.surface,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          border: Border.all(color: AdminColors.border),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.file_download_outlined,
+              size: 15,
+              color: AdminColors.textPrimary,
+            ),
+            SizedBox(width: 6),
+            Text(
+              'Reports',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AdminColors.textPrimary,
               ),
             ),
-            FilledButton.icon(
-              onPressed: _evaluating ? null : _refreshInsights,
-              icon: _evaluating
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.analytics_outlined, size: 17),
-              label: Text(_evaluating ? 'Evaluating…' : 'Re-run analysis'),
-              style: dssFilledButtonStyle(),
+            SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: AdminColors.textSecondary,
             ),
           ],
         ),
-        _buildNotificationBanners(),
-        const SizedBox(height: 10),
+      ),
+    );
+  }
+
+  Widget _buildRerunButton() {
+    return FilledButton.icon(
+      onPressed: _evaluating ? null : _refreshInsights,
+      icon: _evaluating
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.analytics_outlined, size: 17),
+      label: Text(_evaluating ? 'Evaluating…' : 'Re-run analysis'),
+      style: dssFilledButtonStyle(),
+    );
+  }
+
+  Widget _buildSubnavRow() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tabs = AdminSaaSTabs(
+          tabs: [
+            AdminSaaSTabSpec(
+              label: 'Findings',
+              icon: Icons.flag_outlined,
+              count: (_openCount + _inProgressCount) > 0
+                  ? (_openCount + _inProgressCount)
+                  : null,
+              isSelected: _subnavIndex == 0,
+              onTap: () => _onSubnavSelected(0),
+            ),
+            AdminSaaSTabSpec(
+              label: 'History',
+              icon: Icons.timeline_outlined,
+              isSelected: _subnavIndex == 1,
+              onTap: () => _onSubnavSelected(1),
+            ),
+            AdminSaaSTabSpec(
+              label: 'Rules',
+              icon: Icons.tune_rounded,
+              isSelected: _subnavIndex == 2,
+              onTap: () => _onSubnavSelected(2),
+            ),
+          ],
+        );
+
+        final howItWorks = TextButton.icon(
+          onPressed: () => showDssExampleFindingPreview(context),
+          icon: const Icon(
+            Icons.help_outline_rounded,
+            size: 15,
+            color: AdminColors.textSecondary,
+          ),
+          label: const Text(
+            'How it works',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: AdminColors.textSecondary,
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        );
+
+        if (constraints.maxWidth < 640) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              tabs,
+              const SizedBox(height: 6),
+              Align(alignment: Alignment.centerLeft, child: howItWorks),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            tabs,
+            const Spacer(),
+            howItWorks,
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFindingsBody(List<DssFlag> filtered) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         _buildMetrics(),
         const SizedBox(height: 10),
         _buildToolbar(),
@@ -804,56 +877,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildNotificationBanners() {
-    final hasAny = _showRulesRefreshHint ||
-        _showHowThisWorks ||
-        _rerunSummary != null ||
-        _evalMessage != null;
-    if (!hasAny) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_showRulesRefreshHint) ...[
-            DssInsightBanner(
-              text:
-                  'If you changed Rules, click Re-run analysis so Findings use the new thresholds.',
-              icon: Icons.tune,
-              onDismiss: () => setState(() => _showRulesRefreshHint = false),
-            ),
-            const SizedBox(height: 6),
-          ],
-          if (_showHowThisWorks) ...[
-            DssHowThisWorksStrip(
-              onDismiss: _dismissHowThisWorks,
-              onSeeExample: () => showDssExampleFindingPreview(context),
-            ),
-            const SizedBox(height: 6),
-          ],
-          if (_rerunSummary != null) ...[
-            DssInsightBanner(
-              text: _rerunSummary!,
-              icon: Icons.analytics_outlined,
-              onDismiss: () => setState(() => _rerunSummary = null),
-            ),
-            const SizedBox(height: 6),
-          ],
-          if (_evalMessage != null) ...[
-            DssInsightBanner(
-              text: _evalMessage!,
-              icon: Icons.info_outline,
-              onDismiss: () => setState(() => _evalMessage = null),
-            ),
-            const SizedBox(height: 6),
-          ],
-        ],
-      ),
     );
   }
 
@@ -917,83 +940,210 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   }
 
   Widget _buildToolbar() {
-    return AdminSaaSToolbar(
-      searchController: _searchController,
-      onSearchChanged: (v) => setState(() => _query = v.trim()),
-      onClearSearch: () {
-        _searchController.clear();
-        setState(() => _query = '');
-      },
-      searchHint: 'Search by rule, course, batch, or finding…',
-      searchWidth: 260,
-      filters: [
-        DirectoryFilterField<_DssStatusFilter>(
-          label: 'Status',
-          value: _statusFilter,
-          dense: true,
-          width: 135,
-          items: [
-            for (final f in _DssStatusFilter.values)
-              DropdownMenuItem(
-                value: f,
-                child: Text(
-                  _statusFilterLabel(f),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final showAllInline = width >= 1180;
+        final showPartialInline = width >= 1000 && !showAllInline;
+
+        final filterWidgets = <Widget>[
+          _buildStatusFilter(),
+          _buildRuleFilter(),
+          if (showAllInline || showPartialInline) ...[
+            _buildPriorityFilter(),
+            _buildDueFilter(),
           ],
-          onChanged: (v) {
-            if (v != null) setState(() => _statusFilter = v);
+          if (showAllInline) ...[
+            _buildOfficeFilter(),
+            _buildScopeFilter(),
+          ],
+          if (!showAllInline)
+            _buildMoreButton(
+              exceedingCount: showPartialInline
+                  ? (_officeFilter.isNotEmpty ? 1 : 0) + (_mineOnly ? 1 : 0)
+                  : (_priorityFilter != null ? 1 : 0) +
+                      (_dueFilter != _DssDueFilter.all ? 1 : 0) +
+                      (_officeFilter.isNotEmpty ? 1 : 0) +
+                      (_mineOnly ? 1 : 0),
+            ),
+        ];
+
+        return AdminSaaSToolbar(
+          searchController: _searchController,
+          onSearchChanged: (v) => setState(() => _query = v.trim()),
+          onClearSearch: () {
+            _searchController.clear();
+            setState(() => _query = '');
           },
-        ),
-        OutlinedButton.icon(
-          onPressed: _openMoreFiltersDialog,
-          icon: Icon(
-            Icons.tune_rounded,
-            size: 14,
-            color: _moreFiltersCount > 0
-                ? AdminColors.primary
-                : AdminColors.textSecondary,
-          ),
-          label: Text(
-            _moreFiltersCount > 0 ? 'More ($_moreFiltersCount)' : 'More',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight:
-                  _moreFiltersCount > 0 ? FontWeight.w700 : FontWeight.w500,
-              color: _moreFiltersCount > 0
-                  ? AdminColors.primary
-                  : AdminColors.textPrimary,
+          searchHint: 'Search by rule, course, batch, or finding…',
+          searchWidth: 230,
+          filters: filterWidgets,
+          sortControl: _buildSortControl(),
+          hasActiveFilters: _hasActiveFilters,
+          onResetFilters: _resetFilters,
+          activeFilterChips: _activeFilterChips(),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusFilter() {
+    return DirectoryFilterField<_DssStatusFilter>(
+      label: 'Status',
+      value: _statusFilter,
+      dense: true,
+      width: 120,
+      items: [
+        for (final f in _DssStatusFilter.values)
+          DropdownMenuItem(
+            value: f,
+            child: Text(
+              _statusFilterLabel(f),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          style: OutlinedButton.styleFrom(
-            backgroundColor: _moreFiltersCount > 0
-                ? AdminColors.primary.withValues(alpha: 0.08)
-                : AdminColors.surface,
-            foregroundColor: _moreFiltersCount > 0
-                ? AdminColors.primary
-                : AdminColors.textPrimary,
-            side: BorderSide(
-              color: _moreFiltersCount > 0
-                  ? AdminColors.primary
-                  : AdminColors.border,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            minimumSize: const Size(0, DirectoryFilterField.controlHeight),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-            ),
-          ),
-        ),
       ],
-      sortControl: _buildSortControl(),
-      isLoading: _loading || _evaluating,
-      onRefresh: _load,
-      refreshTooltip: 'Reload list',
-      hasActiveFilters: _hasActiveFilters,
-      onResetFilters: _resetFilters,
-      activeFilterChips: _activeFilterChips(),
+      onChanged: (v) {
+        if (v != null) setState(() => _statusFilter = v);
+      },
+    );
+  }
+
+  Widget _buildRuleFilter() {
+    return DirectoryFilterField<String>(
+      label: 'Rule',
+      value: _ruleFilter,
+      dense: true,
+      width: 130,
+      items: [
+        const DropdownMenuItem(value: '', child: Text('All rules')),
+        for (final r in _rules)
+          DropdownMenuItem(
+            value: r.ruleId,
+            child: Text(
+              r.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (v) {
+        if (v != null) setState(() => _ruleFilter = v);
+      },
+    );
+  }
+
+  Widget _buildPriorityFilter() {
+    return DirectoryFilterField<DssPriority?>(
+      label: 'Priority',
+      value: _priorityFilter,
+      dense: true,
+      width: 115,
+      items: [
+        const DropdownMenuItem(value: null, child: Text('All priorities')),
+        for (final p in DssPriority.values)
+          DropdownMenuItem(value: p, child: Text(p.label)),
+      ],
+      onChanged: (v) => setState(() => _priorityFilter = v),
+    );
+  }
+
+  Widget _buildDueFilter() {
+    return DirectoryFilterField<_DssDueFilter>(
+      label: 'Due',
+      value: _dueFilter,
+      dense: true,
+      width: 115,
+      items: [
+        for (final d in _DssDueFilter.values)
+          DropdownMenuItem(
+            value: d,
+            child: Text(
+              _dueFilterLabel(d),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (v) {
+        if (v != null) setState(() => _dueFilter = v);
+      },
+    );
+  }
+
+  Widget _buildOfficeFilter() {
+    return DirectoryFilterField<String>(
+      label: 'Office',
+      value: _officeFilter,
+      dense: true,
+      width: 120,
+      items: [
+        const DropdownMenuItem(value: '', child: Text('All offices')),
+        for (final o in _offices)
+          DropdownMenuItem(
+            value: o,
+            child: Text(
+              o,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (v) {
+        if (v != null) setState(() => _officeFilter = v);
+      },
+    );
+  }
+
+  Widget _buildScopeFilter() {
+    return DirectoryFilterField<bool>(
+      label: 'Scope',
+      value: _mineOnly,
+      dense: true,
+      width: 115,
+      items: const [
+        DropdownMenuItem(value: false, child: Text('All findings')),
+        DropdownMenuItem(value: true, child: Text('My findings')),
+      ],
+      onChanged: (v) {
+        if (v != null) setState(() => _mineOnly = v);
+      },
+    );
+  }
+
+  Widget _buildMoreButton({required int exceedingCount}) {
+    final hasActive = exceedingCount > 0;
+    return OutlinedButton.icon(
+      onPressed: _openMoreFiltersDialog,
+      icon: Icon(
+        Icons.tune_rounded,
+        size: 14,
+        color: hasActive ? AdminColors.primary : AdminColors.textSecondary,
+      ),
+      label: Text(
+        hasActive ? 'More ($exceedingCount)' : 'More',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: hasActive ? FontWeight.w700 : FontWeight.w500,
+          color: hasActive ? AdminColors.primary : AdminColors.textPrimary,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        backgroundColor: hasActive
+            ? AdminColors.primary.withValues(alpha: 0.08)
+            : AdminColors.surface,
+        foregroundColor:
+            hasActive ? AdminColors.primary : AdminColors.textPrimary,
+        side: BorderSide(
+          color: hasActive ? AdminColors.primary : AdminColors.border,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        minimumSize: const Size(0, DirectoryFilterField.controlHeight),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        ),
+      ),
     );
   }
 
@@ -1002,7 +1152,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       label: 'Sort',
       value: _sort,
       dense: true,
-      width: 135,
+      width: 125,
       items: [
         for (final s in _DssSort.values)
           DropdownMenuItem(

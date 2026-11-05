@@ -6,8 +6,10 @@ import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class AdminDssSettingsPanel extends StatefulWidget {
   const AdminDssSettingsPanel({
@@ -170,28 +172,28 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
   };
 
   InputDecoration _fieldDecoration(String label) {
-    final radius = BorderRadius.circular(AdminDssTheme.radiusSm);
+    final radius = BorderRadius.circular(AdminSurfaces.radiusSm);
     return InputDecoration(
       isDense: true,
       labelText: label,
       labelStyle: const TextStyle(
         fontSize: 12,
-        color: AdminDssTheme.textSecondary,
+        color: AdminColors.textSecondary,
       ),
       filled: true,
-      fillColor: AdminDssTheme.background,
+      fillColor: AdminColors.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: AdminDssTheme.border),
+        borderSide: const BorderSide(color: AdminColors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: AdminDssTheme.border),
+        borderSide: const BorderSide(color: AdminColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: AdminDssTheme.primary, width: 1.5),
+        borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
       ),
     );
   }
@@ -262,18 +264,19 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
   Widget _buildRuleCard(DssRule rule) {
     final sevColor = dssSeverityColor(rule.severity);
     return DssSurfaceCard(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: sevColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                  border: Border.all(color: sevColor.withValues(alpha: 0.2)),
                 ),
                 child: Icon(
                   dssRuleIcon(rule.ruleId),
@@ -281,7 +284,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                   color: sevColor,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,11 +293,11 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                       rule.displayName,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AdminDssTheme.textPrimary,
+                        fontSize: 13.5,
+                        color: AdminColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
@@ -325,7 +328,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AdminDssTheme.textSecondary,
+                  color: AdminColors.textSecondary,
                 ),
               ),
               children: [
@@ -335,7 +338,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                     rule.description,
                     style: const TextStyle(
                       fontSize: 12.5,
-                      color: AdminDssTheme.textSecondary,
+                      color: AdminColors.textSecondary,
                       height: 1.35,
                     ),
                   ),
@@ -347,7 +350,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                     DssCopy.settingsMinResponsesHint(rule),
                     style: const TextStyle(
                       fontSize: 11.5,
-                      color: AdminDssTheme.textMuted,
+                      color: AdminColors.textMuted,
                       height: 1.35,
                     ),
                   ),
@@ -355,7 +358,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -383,7 +386,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
               const SizedBox(width: 8),
               FilledButton(
                 onPressed: () => _save(rule),
-                style: dssFilledButtonStyle(),
+                style: AdminButtonStyles.filled(),
                 child: const Text('Save'),
               ),
             ],

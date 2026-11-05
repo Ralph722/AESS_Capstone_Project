@@ -6,6 +6,7 @@ import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
@@ -101,6 +102,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
             DirectoryFilterField<int?>(
               label: 'Period',
               value: _lookbackDays,
+              dense: true,
               width: 170,
               enabled: !_loading,
               items: const [
@@ -118,9 +120,9 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
             ),
             OutlinedButton.icon(
               onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.refresh, size: 17),
+              icon: const Icon(Icons.refresh_rounded, size: 15),
               label: const Text('Reload'),
-              style: dssOutlinedButtonStyle(),
+              style: AdminButtonStyles.outlined(),
             ),
           ],
         ),
@@ -154,6 +156,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                           : '$_periodLabel · ${s.superseded} superseded',
                       icon: Icons.flag_outlined,
                       accent: AdminColors.primary,
+                      palette: AdminAccents.blue,
                     ),
                     AdminKpiCard(
                       dense: true,
@@ -162,6 +165,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                       caption: 'Not started',
                       icon: Icons.pending_outlined,
                       accent: AdminColors.danger,
+                      palette: AdminAccents.orange,
                     ),
                     AdminKpiCard(
                       dense: true,
@@ -170,6 +174,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                       caption: 'With action',
                       icon: Icons.check_circle_outline,
                       accent: AdminColors.success,
+                      palette: AdminAccents.midBlue,
                     ),
                     AdminKpiCard(
                       dense: true,
@@ -180,6 +185,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                       caption: 'To close',
                       icon: Icons.timelapse_outlined,
                       accent: AdminColors.warning,
+                      palette: AdminAccents.gold,
                     ),
                   ],
                 ),
@@ -193,6 +199,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                       caption: 'Same-wave coverage',
                       icon: Icons.verified_outlined,
                       accent: AdminColors.info,
+                      palette: AdminAccents.blue,
                     ),
                     AdminKpiCard(
                       dense: true,
@@ -205,6 +212,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                           : '${s.impactImproved}/${s.impactChecked}',
                       icon: Icons.trending_up,
                       accent: AdminColors.success,
+                      palette: AdminAccents.midBlue,
                     ),
                     AdminKpiCard(
                       dense: true,
@@ -213,6 +221,7 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                       caption: 'Needs follow-up',
                       icon: Icons.warning_amber_outlined,
                       accent: AdminColors.danger,
+                      palette: AdminAccents.orange,
                     ),
                     AdminKpiCard(
                       dense: true,

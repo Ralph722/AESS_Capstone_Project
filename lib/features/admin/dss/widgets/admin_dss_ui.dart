@@ -463,6 +463,46 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
     final why = DssCopy.whyFlagged(flag);
     final next = _nextAction(flag);
 
+    final urgencyChips = <Widget>[
+      DssPriorityChip(flag: flag),
+      DssDueChip(flag: flag),
+      if (flag.evidenceStrength != null &&
+          flag.evidenceStrength != DssEvidenceStrength.strong)
+        DssEvidenceChip(flag: flag),
+      if (flag.certainty != null && flag.isFinding)
+        DssCertaintyChip(flag: flag),
+    ];
+
+    final nextActionPill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: AdminColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(
+          color: AdminColors.primary.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Next: $next',
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AdminColors.primary,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.arrow_forward_rounded,
+            size: 12,
+            color: AdminColors.primary,
+          ),
+        ],
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AdminDensity.listItemGap),
       child: MouseRegion(
@@ -472,136 +512,184 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
           color: Colors.transparent,
           child: InkWell(
             onTap: widget.onOpen,
-            borderRadius: BorderRadius.circular(AdminDssTheme.radiusMd),
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
             child: Tooltip(
               message: why,
               waitDuration: const Duration(milliseconds: 500),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
+                duration: const Duration(milliseconds: 140),
                 decoration: BoxDecoration(
-                  color: AdminDssTheme.card,
-                  borderRadius: BorderRadius.circular(AdminDssTheme.radiusMd),
+                  color: _hovered ? AdminColors.rowHover : AdminColors.card,
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
                   border: Border.all(
                     color: widget.selected
-                        ? AdminDssTheme.primary
-                        : AdminDssTheme.border,
+                        ? AdminColors.primary
+                        : AdminColors.border,
                     width: widget.selected ? 1.5 : 1,
                   ),
                   boxShadow: _hovered || widget.selected
-                      ? AdminDirectoryTheme.cardShadowHover
-                      : AdminDirectoryTheme.cardShadow,
+                      ? AdminSurfaces.cardShadowHover
+                      : AdminSurfaces.cardShadow,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 900;
+
+                      final iconBox = Container(
+                        width: 38,
+                        height: 38,
                         decoration: BoxDecoration(
                           color: AdminColors.primary.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AdminColors.border),
+                          borderRadius:
+                              BorderRadius.circular(AdminSurfaces.radiusSm),
+                          border: Border.all(
+                            color: AdminColors.primary.withValues(alpha: 0.16),
+                          ),
                         ),
                         child: Icon(
                           dssRuleIcon(flag.ruleId),
-                          size: 18,
+                          size: 19,
                           color: AdminColors.primary,
                         ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                                color: AdminDssTheme.textPrimary,
-                              ),
+                      );
+
+                      final identityColumn = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                              color: AdminColors.textPrimary,
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              why,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.3,
-                                color: AdminDssTheme.textSecondary,
-                              ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            why,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.3,
+                              color: AdminColors.textSecondary,
                             ),
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AdminColors.surface,
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: AdminColors.border),
-                                  ),
-                                  child: Text(
-                                    flag.cohortLabel,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AdminColors.textPrimary,
-                                    ),
-                                  ),
+                          ),
+                          const SizedBox(height: 5),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
                                 ),
-                                DssStatusChip(status: flag.status),
-                                Text(
-                                  '· ${DssCopy.responsesLabel(flag)}',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    color: AdminDssTheme.textMuted,
-                                  ),
+                                decoration: BoxDecoration(
+                                  color: AdminColors.surface,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: AdminColors.border),
                                 ),
-                                Text(
-                                  '· Next: $next',
+                                child: Text(
+                                  flag.cohortLabel,
                                   style: const TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: AdminColors.primary,
+                                    color: AdminColors.textPrimary,
                                   ),
+                                ),
+                              ),
+                              DssStatusChip(status: flag.status),
+                              Text(
+                                '· ${DssCopy.responsesLabel(flag)}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: AdminColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+
+                      if (isWide) {
+                        return Row(
+                          children: [
+                            iconBox,
+                            const SizedBox(width: 12),
+                            Expanded(child: identityColumn),
+                            if (urgencyChips.isNotEmpty) ...[
+                              const SizedBox(width: 12),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: urgencyChips,
+                              ),
+                            ],
+                            const SizedBox(width: 14),
+                            nextActionPill,
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AdminColors.textMuted,
+                              size: 18,
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          iconBox,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                identityColumn,
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  crossAxisAlignment:
+                                      WrapCrossAlignment.center,
+                                  alignment: WrapAlignment.spaceBetween,
+                                  children: [
+                                    if (urgencyChips.isNotEmpty)
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: urgencyChips,
+                                      ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        nextActionPill,
+                                        const SizedBox(width: 4),
+                                        const Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: AdminColors.textMuted,
+                                          size: 18,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      DssDueChip(flag: flag),
-                      const SizedBox(width: 6),
-                      DssPriorityChip(flag: flag),
-                      if (flag.evidenceStrength != null &&
-                          flag.evidenceStrength !=
-                              DssEvidenceStrength.strong) ...[
-                        const SizedBox(width: 6),
-                        DssEvidenceChip(flag: flag),
-                      ],
-                      if (flag.certainty != null && flag.isFinding) ...[
-                        const SizedBox(width: 6),
-                        DssCertaintyChip(flag: flag),
-                      ],
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: AdminDssTheme.textMuted,
-                        size: 20,
-                      ),
-                    ],
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),

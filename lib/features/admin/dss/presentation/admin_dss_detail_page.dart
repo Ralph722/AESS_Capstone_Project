@@ -2084,20 +2084,43 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
-              color: AdminDssTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.shield_outlined,
+                  size: 15,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AdminColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
             body,
             style: const TextStyle(
-              fontSize: 11.5,
-              color: AdminDssTheme.textMuted,
+              fontSize: 12,
+              color: AdminColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
             ),
           ),
           ...children,
@@ -2204,20 +2227,41 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Action',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
-              color: AdminDssTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.bolt_rounded,
+                  size: 16,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Action',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AdminColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
             next.hint,
             style: const TextStyle(
-              fontSize: 11.5,
-              color: AdminDssTheme.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AdminColors.textSecondary,
             ),
           ),
           const SizedBox(height: 10),
@@ -2381,14 +2425,16 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         runSpacing: 8,
         children: [
           if (flag.status != DssFlagStatus.dismissed && !closed)
-            TextButton(
+            OutlinedButton(
               onPressed: _saving
                   ? null
                   : () => _setStatus(DssFlagStatus.dismissed),
+              style: dssOutlinedButtonStyle(),
               child: const Text('Dismiss'),
             ),
-          TextButton(
+          OutlinedButton(
             onPressed: _saving ? null : _addNoteOnly,
+            style: dssOutlinedButtonStyle(),
             child: const Text('Add note'),
           ),
         ],
@@ -2527,79 +2573,93 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       ],
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final s in steps)
-          InkWell(
-            onTap: s.onTap,
-            borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: s.done
-                          ? AdminDssTheme.success.withValues(alpha: 0.15)
-                          : s.current
-                          ? AdminDssTheme.primary.withValues(alpha: 0.12)
-                          : AdminDssTheme.surface,
-                      border: Border.all(
-                        color: s.done
-                            ? AdminDssTheme.success
-                            : s.current
-                            ? AdminDssTheme.primary
-                            : AdminDssTheme.border,
-                      ),
-                    ),
-                    child: s.done
-                        ? const Icon(
-                            Icons.check,
-                            size: 13,
-                            color: AdminDssTheme.success,
-                          )
-                        : Text(
-                            '${s.n}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: s.current
-                                  ? AdminDssTheme.primary
-                                  : AdminDssTheme.textMuted,
-                            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AdminColors.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final s in steps)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: s.onTap,
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                hoverColor: AdminColors.rowHover,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: s.done
+                              ? AdminColors.success.withValues(alpha: 0.15)
+                              : s.current
+                              ? AdminColors.primary
+                              : AdminColors.surface,
+                          border: Border.all(
+                            color: s.done
+                                ? AdminColors.success
+                                : s.current
+                                ? AdminColors.primary
+                                : AdminColors.border,
+                            width: 1.2,
                           ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      s.label,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: s.current
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: s.done || s.current
-                            ? AdminDssTheme.textPrimary
-                            : AdminDssTheme.textMuted,
+                        ),
+                        child: s.done
+                            ? const Icon(
+                                Icons.check_rounded,
+                                size: 13,
+                                color: AdminColors.success,
+                              )
+                            : Text(
+                                '${s.n}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: s.current
+                                      ? Colors.white
+                                      : AdminColors.textMuted,
+                                ),
+                              ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          s.label,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: s.current
+                                ? FontWeight.w700
+                                : (s.done ? FontWeight.w600 : FontWeight.w500),
+                            color: s.done || s.current
+                                ? AdminColors.textPrimary
+                                : AdminColors.textMuted,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                      ),
+                      if (s.onTap != null)
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: AdminColors.textMuted,
+                        ),
+                    ],
                   ),
-                  if (s.onTap != null)
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 16,
-                      color: AdminDssTheme.textMuted,
-                    ),
-                ],
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -3080,13 +3140,13 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     String? helper,
     String? error,
   }) {
-    final radius = BorderRadius.circular(AdminDssTheme.radiusSm);
+    final radius = BorderRadius.circular(AdminSurfaces.radiusSm);
     return InputDecoration(
       isDense: true,
       labelText: label,
       labelStyle: const TextStyle(
-        fontSize: 12,
-        color: AdminDssTheme.textSecondary,
+        fontSize: 12.5,
+        color: AdminColors.textSecondary,
       ),
       helperText: helper,
       helperMaxLines: 3,
@@ -3096,15 +3156,15 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: AdminDssTheme.border),
+        borderSide: const BorderSide(color: AdminColors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: AdminDssTheme.border),
+        borderSide: const BorderSide(color: AdminColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: AdminDssTheme.primary, width: 1.5),
+        borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
       ),
     );
   }

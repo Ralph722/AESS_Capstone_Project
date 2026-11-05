@@ -24,6 +24,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 
@@ -916,87 +917,106 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   }
 
   Widget _buildToolbar() {
-    return DirectoryToolbarCard(
+    return AdminSaaSToolbar(
       searchController: _searchController,
       onSearchChanged: (v) => setState(() => _query = v.trim()),
       onClearSearch: () {
         _searchController.clear();
         setState(() => _query = '');
       },
+      searchHint: 'Search by rule, course, batch, or finding…',
+      searchWidth: 260,
+      filters: [
+        DirectoryFilterField<_DssStatusFilter>(
+          label: 'Status',
+          value: _statusFilter,
+          dense: true,
+          width: 135,
+          items: [
+            for (final f in _DssStatusFilter.values)
+              DropdownMenuItem(
+                value: f,
+                child: Text(
+                  _statusFilterLabel(f),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => _statusFilter = v);
+          },
+        ),
+        OutlinedButton.icon(
+          onPressed: _openMoreFiltersDialog,
+          icon: Icon(
+            Icons.tune_rounded,
+            size: 14,
+            color: _moreFiltersCount > 0
+                ? AdminColors.primary
+                : AdminColors.textSecondary,
+          ),
+          label: Text(
+            _moreFiltersCount > 0 ? 'More ($_moreFiltersCount)' : 'More',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight:
+                  _moreFiltersCount > 0 ? FontWeight.w700 : FontWeight.w500,
+              color: _moreFiltersCount > 0
+                  ? AdminColors.primary
+                  : AdminColors.textPrimary,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: _moreFiltersCount > 0
+                ? AdminColors.primary.withValues(alpha: 0.08)
+                : AdminColors.surface,
+            foregroundColor: _moreFiltersCount > 0
+                ? AdminColors.primary
+                : AdminColors.textPrimary,
+            side: BorderSide(
+              color: _moreFiltersCount > 0
+                  ? AdminColors.primary
+                  : AdminColors.border,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            minimumSize: const Size(0, DirectoryFilterField.controlHeight),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            ),
+          ),
+        ),
+      ],
+      sortControl: _buildSortControl(),
       isLoading: _loading || _evaluating,
       onRefresh: _load,
       refreshTooltip: 'Reload list',
       hasActiveFilters: _hasActiveFilters,
       onResetFilters: _resetFilters,
       activeFilterChips: _activeFilterChips(),
-      searchHint: 'Search by rule, course, batch, or finding…',
-      singleRowMinWidth: 720,
-      filters: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          DirectoryFilterField<_DssStatusFilter>(
-            label: 'Status',
-            value: _statusFilter,
-            width: 135,
-            items: [
-              for (final f in _DssStatusFilter.values)
-                DropdownMenuItem(
-                  value: f,
-                  child: Text(
-                    _statusFilterLabel(f),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: (v) {
-              if (v != null) setState(() => _statusFilter = v);
-            },
-          ),
-          OutlinedButton.icon(
-            onPressed: _openMoreFiltersDialog,
-            icon: Icon(
-              Icons.tune_rounded,
-              size: 15,
-              color: _moreFiltersCount > 0
-                  ? AdminColors.primary
-                  : AdminDirectoryTheme.textSecondary,
-            ),
-            label: Text(
-              _moreFiltersCount > 0 ? 'More ($_moreFiltersCount)' : 'More',
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight:
-                    _moreFiltersCount > 0 ? FontWeight.w700 : FontWeight.w600,
-                color: _moreFiltersCount > 0
-                    ? AdminColors.primary
-                    : AdminDirectoryTheme.textPrimary,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: _moreFiltersCount > 0
-                  ? AdminColors.primary.withValues(alpha: 0.08)
-                  : Colors.white,
-              foregroundColor: _moreFiltersCount > 0
-                  ? AdminColors.primary
-                  : AdminDirectoryTheme.textPrimary,
-              side: BorderSide(
-                color: _moreFiltersCount > 0
-                    ? AdminColors.primary
-                    : AdminDirectoryTheme.border,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 11),
-              minimumSize: const Size(0, DirectoryFilterField.controlHeight),
-              shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(AdminDirectoryTheme.radiusSm),
-              ),
+    );
+  }
+
+  Widget _buildSortControl() {
+    return DirectoryFilterField<_DssSort>(
+      label: 'Sort',
+      value: _sort,
+      dense: true,
+      width: 135,
+      items: [
+        for (final s in _DssSort.values)
+          DropdownMenuItem(
+            value: s,
+            child: Text(
+              _sortLabel(s),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-        ],
-      ),
+      ],
+      onChanged: (v) {
+        if (v != null) setState(() => _sort = v);
+      },
     );
   }
 }
@@ -1170,7 +1190,7 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
                       InkWell(
                         onTap: () => setState(() => _mineOnly = !_mineOnly),
                         borderRadius: BorderRadius.circular(
-                          AdminDirectoryTheme.radiusSm,
+                          AdminSurfaces.radiusSm,
                         ),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -1182,7 +1202,7 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
                                 ? AdminColors.primary.withValues(alpha: 0.05)
                                 : Colors.white,
                             borderRadius: BorderRadius.circular(
-                              AdminDirectoryTheme.radiusSm,
+                              AdminSurfaces.radiusSm,
                             ),
                             border: Border.all(
                               color: _mineOnly

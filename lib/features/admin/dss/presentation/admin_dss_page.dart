@@ -261,6 +261,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           _panel = _DssPanel.list;
       }
     });
+    if (index == 0) {
+      _load();
+    }
   }
 
   String get _lastEvaluatedLabel {
@@ -564,7 +567,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           countBadge: '${_openCount + _inProgressCount} open',
           actions: [
             _buildLastEvaluatedPill(),
-            _buildRefreshButton(),
             _buildReportsDropdown(filtered),
             _buildRerunButton(),
           ],
@@ -623,27 +625,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRefreshButton() {
-    return Tooltip(
-      message: 'Refresh insights data',
-      child: OutlinedButton.icon(
-        onPressed: _loading || _evaluating ? null : _load,
-        icon: _loading
-            ? const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AdminColors.primary,
-                ),
-              )
-            : const Icon(Icons.refresh_rounded, size: 15),
-        label: const Text('Refresh'),
-        style: dssOutlinedButtonStyle(),
       ),
     );
   }

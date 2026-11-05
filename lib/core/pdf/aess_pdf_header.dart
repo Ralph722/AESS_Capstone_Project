@@ -48,7 +48,10 @@ abstract final class AessPdfHeader {
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
         if (letterhead != null)
-          pw.Image(letterhead, fit: pw.BoxFit.fitWidth)
+          pw.AspectRatio(
+            aspectRatio: letterhead.width! / letterhead.height!,
+            child: pw.Image(letterhead, fit: pw.BoxFit.fill),
+          )
         else
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -60,7 +63,7 @@ abstract final class AessPdfHeader {
               pw.Text(secRegistration, style: AessPdfTheme.reportSubtitle),
             ],
           ),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 4),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -124,7 +127,7 @@ abstract final class AessPdfHeader {
             ),
           ),
         ],
-        pw.SizedBox(height: 6),
+        pw.SizedBox(height: 3),
         pw.Divider(
           color: AessPdfTheme.primaryNavy,
           thickness: 1.2,
@@ -136,7 +139,7 @@ abstract final class AessPdfHeader {
           thickness: 0.5,
           height: 0.5,
         ),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 4),
       ],
     );
   }

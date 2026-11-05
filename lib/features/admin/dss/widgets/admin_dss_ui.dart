@@ -78,6 +78,7 @@ class DssPageHeader extends StatelessWidget {
     super.key,
     required this.title,
     this.subtitle,
+    this.subtitleBelow = false,
     this.actions = const [],
     this.onBack,
     this.backTooltip = 'Back',
@@ -89,6 +90,7 @@ class DssPageHeader extends StatelessWidget {
 
   final String title;
   final String? subtitle;
+  final bool subtitleBelow;
   final List<Widget> actions;
   final VoidCallback? onBack;
   final String backTooltip;
@@ -127,12 +129,89 @@ class DssPageHeader extends StatelessWidget {
       );
     }
 
-    final header = AdminCompactHeader(
-      title: title,
-      subtitle: subtitle,
-      leading: leading,
-      actions: actions,
-    );
+    final Widget header;
+    if (subtitleBelow && subtitle != null && subtitle!.trim().isNotEmpty) {
+      header = LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 600;
+          final titleCol = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  color: AdminColors.textPrimary,
+                  height: 1.2,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle!,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: AdminColors.textSecondary,
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (leading != null) ...[
+                      leading,
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(child: titleCol),
+                  ],
+                ),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions,
+                  ),
+                ],
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (leading != null) ...[
+                leading,
+                const SizedBox(width: 8),
+              ],
+              Expanded(child: titleCol),
+              if (actions.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                ...actions,
+              ],
+            ],
+          );
+        },
+      );
+    } else {
+      header = AdminCompactHeader(
+        title: title,
+        subtitle: subtitle,
+        leading: leading,
+        actions: actions,
+      );
+    }
 
     if (!hasTabs) {
       return header;

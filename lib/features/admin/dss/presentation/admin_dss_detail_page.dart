@@ -1048,6 +1048,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           subtitle:
               flag.cohortLabel +
               (flag.surveyTitle.isEmpty ? '' : ' · ${flag.surveyTitle}'),
+          subtitleBelow: true,
           onBack: () => widget.onClose(),
           backTooltip: 'Back to findings',
           actions: [DssStatusChip(status: flag.status)],

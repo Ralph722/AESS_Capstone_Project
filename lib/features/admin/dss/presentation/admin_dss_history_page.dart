@@ -6,7 +6,6 @@ import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
@@ -121,12 +120,6 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                   _load();
                 },
               ),
-              OutlinedButton.icon(
-                onPressed: _loading ? null : _load,
-                icon: const Icon(Icons.refresh_rounded, size: 15),
-                label: const Text('Reload'),
-                style: AdminButtonStyles.outlined(),
-              ),
             ],
           ),
           const SizedBox(height: AdminDssTheme.space2),
@@ -153,13 +146,6 @@ class _AdminDssHistoryPanelState extends State<AdminDssHistoryPanel> {
                     setState(() => _lookbackDays = v);
                     _load();
                   },
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _load,
-                  icon: const Icon(Icons.refresh_rounded, size: 15),
-                  label: const Text('Reload'),
-                  style: AdminButtonStyles.outlined(),
                 ),
               ],
             ),

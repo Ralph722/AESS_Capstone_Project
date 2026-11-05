@@ -558,38 +558,45 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
     final filtered = _filtered;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
       children: [
-        AdminCompactHeader(
-          title: 'Program Insights',
-          subtitle: 'Work queue for tracer Findings and Watch items.',
-          countBadge: '${_openCount + _inProgressCount} open',
-          actions: [
-            _buildLastEvaluatedPill(),
-            _buildReportsDropdown(filtered),
-            _buildRerunButton(),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AdminCompactHeader(
+              title: 'Program Insights',
+              actions: [
+                _buildLastEvaluatedPill(),
+                _buildReportsDropdown(filtered),
+                _buildRerunButton(),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _buildSubnavRow(),
+            const SizedBox(height: 10),
+            Expanded(
+              child: switch (_panel) {
+                _DssPanel.history => AdminDssHistoryPanel(
+                    onClose: _closePanel,
+                    selectedSubnav: 1,
+                    onSubnavSelected: _onSubnavSelected,
+                    embedded: true,
+                  ),
+                _DssPanel.settings => AdminDssSettingsPanel(
+                    onClose: _closePanel,
+                    selectedSubnav: 2,
+                    onSubnavSelected: _onSubnavSelected,
+                    embedded: true,
+                  ),
+                _ => _buildFindingsBody(filtered),
+              },
+            ),
           ],
         ),
-        const SizedBox(height: 10),
-        _buildSubnavRow(),
-        const SizedBox(height: 10),
-        Expanded(
-          child: switch (_panel) {
-            _DssPanel.history => AdminDssHistoryPanel(
-                onClose: _closePanel,
-                selectedSubnav: 1,
-                onSubnavSelected: _onSubnavSelected,
-                embedded: true,
-              ),
-            _DssPanel.settings => AdminDssSettingsPanel(
-                onClose: _closePanel,
-                selectedSubnav: 2,
-                onSubnavSelected: _onSubnavSelected,
-                embedded: true,
-              ),
-            _ => _buildFindingsBody(filtered),
-          },
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: _buildFloatingHelpButton(),
         ),
       ],
     );
@@ -730,75 +737,72 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   }
 
   Widget _buildSubnavRow() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tabs = AdminSaaSTabs(
-          tabs: [
-            AdminSaaSTabSpec(
-              label: 'Findings',
-              icon: Icons.flag_outlined,
-              count: (_openCount + _inProgressCount) > 0
-                  ? (_openCount + _inProgressCount)
-                  : null,
-              isSelected: _subnavIndex == 0,
-              onTap: () => _onSubnavSelected(0),
-            ),
-            AdminSaaSTabSpec(
-              label: 'History',
-              icon: Icons.timeline_outlined,
-              isSelected: _subnavIndex == 1,
-              onTap: () => _onSubnavSelected(1),
-            ),
-            AdminSaaSTabSpec(
-              label: 'Rules',
-              icon: Icons.tune_rounded,
-              isSelected: _subnavIndex == 2,
-              onTap: () => _onSubnavSelected(2),
-            ),
-          ],
-        );
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: AdminSaaSTabs(
+        tabs: [
+          AdminSaaSTabSpec(
+            label: 'Findings',
+            icon: Icons.flag_outlined,
+            count: (_openCount + _inProgressCount) > 0
+                ? (_openCount + _inProgressCount)
+                : null,
+            isSelected: _subnavIndex == 0,
+            onTap: () => _onSubnavSelected(0),
+          ),
+          AdminSaaSTabSpec(
+            label: 'History',
+            icon: Icons.timeline_outlined,
+            isSelected: _subnavIndex == 1,
+            onTap: () => _onSubnavSelected(1),
+          ),
+          AdminSaaSTabSpec(
+            label: 'Rules',
+            icon: Icons.tune_rounded,
+            isSelected: _subnavIndex == 2,
+            onTap: () => _onSubnavSelected(2),
+          ),
+        ],
+      ),
+    );
+  }
 
-        final howItWorks = TextButton.icon(
-          onPressed: () => showDssExampleFindingPreview(context),
-          icon: const Icon(
-            Icons.help_outline_rounded,
-            size: 15,
-            color: AdminColors.textSecondary,
-          ),
-          label: const Text(
-            'How it works',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
-              color: AdminColors.textSecondary,
-            ),
-          ),
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        );
-
-        if (constraints.maxWidth < 640) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildFloatingHelpButton() {
+    return Material(
+      color: AdminColors.card,
+      elevation: 2,
+      shadowColor: const Color(0x1A000000),
+      shape: const StadiumBorder(
+        side: BorderSide(color: AdminColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => showDssExampleFindingPreview(context),
+        hoverColor: AdminColors.rowHover,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              tabs,
-              const SizedBox(height: 6),
-              Align(alignment: Alignment.centerLeft, child: howItWorks),
+              Icon(
+                Icons.help_outline_rounded,
+                size: 15,
+                color: AdminColors.textSecondary,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'How it works',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AdminColors.textSecondary,
+                  letterSpacing: -0.1,
+                ),
+              ),
             ],
-          );
-        }
-
-        return Row(
-          children: [
-            tabs,
-            const Spacer(),
-            howItWorks,
-          ],
-        );
-      },
+          ),
+        ),
+      ),
     );
   }
 

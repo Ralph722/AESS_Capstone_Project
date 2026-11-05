@@ -1677,24 +1677,44 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     const muted = TextStyle(
       fontSize: 12,
       height: 1.35,
-      color: AdminDssTheme.textMuted,
+      color: AdminColors.textMuted,
     );
     const secondary = TextStyle(
       fontSize: 12,
       height: 1.35,
-      color: AdminDssTheme.textSecondary,
+      color: AdminColors.textSecondary,
     );
 
     final children = <Widget>[
-      const Text(
-        'What alumni suggest',
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 13.5,
-          color: AdminDssTheme.textPrimary,
-        ),
+      Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: AdminColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              size: 15,
+              color: AdminColors.primary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'What alumni suggest',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: AdminColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
     ];
 
     if (s == null) {
@@ -1782,7 +1802,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 12.5,
-            color: AdminDssTheme.textPrimary,
+            color: AdminColors.textPrimary,
           ),
         ),
         const SizedBox(height: 6),
@@ -1793,7 +1813,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             for (final c in top)
               DssMetaChip(
                 label: '${c.key} (${c.value})',
-                color: AdminDssTheme.primary,
+                color: AdminColors.primary,
               ),
           ],
         ),
@@ -1820,7 +1840,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           fontSize: 12,
           height: 1.35,
           fontStyle: FontStyle.italic,
-          color: AdminDssTheme.textSecondary,
+          color: AdminColors.textSecondary,
         ),
       ),
     );
@@ -1828,14 +1848,22 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: AdminDssTheme.surface,
-        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-        border: Border.all(color: AdminDssTheme.border),
+        color: AdminColors.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 10),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
         dense: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(AdminSurfaces.radiusSm)),
+          side: BorderSide.none,
+        ),
+        collapsedShape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(AdminSurfaces.radiusSm)),
+          side: BorderSide.none,
+        ),
         title: Row(
           children: [
             Expanded(
@@ -1844,13 +1872,13 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 style: const TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: AdminDssTheme.textPrimary,
+                  color: AdminColors.textPrimary,
                 ),
               ),
             ),
             DssMetaChip(
               label: '${theme.count} mention${theme.count == 1 ? '' : 's'}',
-              color: AdminDssTheme.primary,
+              color: AdminColors.primary,
             ),
           ],
         ),
@@ -1865,7 +1893,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 '+${quotes.length - 12} more',
                 style: const TextStyle(
                   fontSize: 11.5,
-                  color: AdminDssTheme.textMuted,
+                  color: AdminColors.textMuted,
                 ),
               ),
             ),
@@ -2738,42 +2766,62 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             flag.status == DssFlagStatus.inProgress ||
             flag.status == DssFlagStatus.resolved);
 
-    Color verdictColor = AdminDssTheme.textSecondary;
+    Color verdictColor = AdminColors.textSecondary;
     if (verdict == DssImpactVerdict.improved) {
-      verdictColor = AdminDssTheme.success;
+      verdictColor = AdminColors.success;
     } else if (verdict == DssImpactVerdict.stillFlagged) {
-      verdictColor = AdminDssTheme.danger;
+      verdictColor = AdminColors.danger;
     } else if (verdict == DssImpactVerdict.insufficientData) {
-      verdictColor = AdminDssTheme.warning;
+      verdictColor = AdminColors.warning;
     }
 
     return DssSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'What happened',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
-              color: AdminDssTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.history_rounded,
+                  size: 15,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'What happened',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AdminColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           const Text(
             'Same-wave coverage re-check is not intervention success. '
             'Next-wave outcome is judged when the following CHED GTS wave closes. '
             'Check outcome and Decide are on the Action panel.',
-            style: TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
+            style: TextStyle(fontSize: 11.5, color: AdminColors.textSecondary),
           ),
           if (showOutcomeBlock) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             const Text(
               'Intervention outcome (next wave)',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w700,
-                color: AdminDssTheme.textSecondary,
+                color: AdminColors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
@@ -2788,7 +2836,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.35,
-                  color: AdminDssTheme.textSecondary,
+                  color: AdminColors.textSecondary,
                 ),
               ),
             if (_interventions.length > 1) ...[
@@ -2797,7 +2845,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 'Earlier interventions: ${_interventions.length - 1}',
                 style: const TextStyle(
                   fontSize: 11.5,
-                  color: AdminDssTheme.textMuted,
+                  color: AdminColors.textMuted,
                 ),
               ),
               for (final i in _interventions.skip(1).take(3))
@@ -2808,23 +2856,23 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                     '${i.decision == null ? '' : ' · ${i.decision!.label}'}',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: AdminDssTheme.textSecondary,
+                      color: AdminColors.textSecondary,
                     ),
                   ),
                 ),
             ],
           ],
           if (showRecheck) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Row(
               children: [
                 const Expanded(
                   child: Text(
                     'Coverage re-check (same wave)',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: AdminDssTheme.textSecondary,
+                      color: AdminColors.textPrimary,
                     ),
                   ),
                 ),
@@ -2833,43 +2881,57 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              followup == null
-                  ? 'No re-check yet. Re-check after more alumni answer this wave.'
-                  : 'Coverage re-check — ${verdict?.label ?? 'recorded'}'
-                        ' · Before ${DssImpact.formatMetric(flag.ruleId, baseline)}'
-                        ' → Now ${DssImpact.formatMetric(flag.ruleId, followup)}'
-                        '${flag.followupAt == null ? '' : ' · ${dayDf.format(flag.followupAt!.toLocal())}'}',
-              style: const TextStyle(
-                fontSize: 12.5,
-                height: 1.35,
-                color: AdminDssTheme.textSecondary,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AdminColors.surface.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                border: Border.all(color: AdminColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    followup == null
+                        ? 'No re-check yet. Re-check after more alumni answer this wave.'
+                        : 'Coverage re-check — ${verdict?.label ?? 'recorded'}'
+                              ' · Before ${DssImpact.formatMetric(flag.ruleId, baseline)}'
+                              ' → Now ${DssImpact.formatMetric(flag.ruleId, followup)}'
+                              '${flag.followupAt == null ? '' : ' · ${dayDf.format(flag.followupAt!.toLocal())}'}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.35,
+                      color: AdminColors.textSecondary,
+                    ),
+                  ),
+                  if (verdict != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      verdict.hint,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: AdminColors.textMuted,
+                      ),
+                    ),
+                  ],
+                  if (due != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      dueOverdue
+                          ? 'Verify due: ${dayDf.format(due.toLocal())} (overdue)'
+                          : 'Next verify by ${dayDf.format(due.toLocal())}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: dueOverdue
+                            ? AdminColors.warning
+                            : AdminColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            if (verdict != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                verdict.hint,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: AdminDssTheme.textMuted,
-                ),
-              ),
-            ],
-            if (due != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                dueOverdue
-                    ? 'Verify due: ${dayDf.format(due.toLocal())} (overdue)'
-                    : 'Next verify by ${dayDf.format(due.toLocal())}',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: dueOverdue
-                      ? AdminDssTheme.warning
-                      : AdminDssTheme.textMuted,
-                ),
-              ),
-            ],
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _rechecking || _saving ? null : _recheckImpact,
@@ -2884,25 +2946,39 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               style: dssOutlinedButtonStyle(),
             ),
           ],
-          const SizedBox(height: 12),
-          const Text(
-            'Action log',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AdminDssTheme.textSecondary,
-            ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Action log',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AdminColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (_notes.isNotEmpty)
+                Text(
+                  '${_notes.length} ${_notes.length == 1 ? 'entry' : 'entries'}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AdminColors.textMuted,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           const Text(
             'Tap a row to view the full entry.',
-            style: TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted),
+            style: TextStyle(fontSize: 11.5, color: AdminColors.textMuted),
           ),
           const SizedBox(height: 8),
           if (_notes.isEmpty)
             const Text(
               'No notes yet.',
-              style: TextStyle(color: AdminDssTheme.textMuted, fontSize: 12.5),
+              style: TextStyle(color: AdminColors.textMuted, fontSize: 12.5),
             )
           else
             Theme(
@@ -2926,11 +3002,11 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         : null;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AdminDssTheme.surface,
-        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-        border: Border.all(color: AdminDssTheme.border),
+        color: AdminColors.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2943,7 +3019,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: AdminDssTheme.textPrimary,
+                    color: AdminColors.textPrimary,
                   ),
                 ),
               ),
@@ -2959,7 +3035,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             '${i.createdByName.isEmpty ? '' : ' · ${i.createdByName}'}',
             style: const TextStyle(
               fontSize: 11.5,
-              color: AdminDssTheme.textMuted,
+              color: AdminColors.textMuted,
             ),
           ),
           if (i.description.isNotEmpty) ...[
@@ -2969,7 +3045,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               style: const TextStyle(
                 fontSize: 12.5,
                 height: 1.35,
-                color: AdminDssTheme.textSecondary,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],
@@ -2978,21 +3054,21 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             DssCopy.successTest(i),
             style: const TextStyle(
               fontSize: 12,
-              color: AdminDssTheme.textSecondary,
+              color: AdminColors.textSecondary,
             ),
           ),
           Text(
             DssCopy.outcomeBaseline(i),
             style: const TextStyle(
               fontSize: 12,
-              color: AdminDssTheme.textSecondary,
+              color: AdminColors.textSecondary,
             ),
           ),
           Text(
             DssCopy.outcomeFollowup(i),
             style: const TextStyle(
               fontSize: 12,
-              color: AdminDssTheme.textSecondary,
+              color: AdminColors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
@@ -3000,7 +3076,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             DssCopy.outcomeHint(i.outcomeStatus),
             style: const TextStyle(
               fontSize: 11.5,
-              color: AdminDssTheme.textMuted,
+              color: AdminColors.textMuted,
             ),
           ),
           if (preview?.previewStatus != null) ...[
@@ -3009,7 +3085,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               'Preview, not final: would be "${preview!.previewStatus!.label}".',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminDssTheme.info,
+                color: AdminColors.primary,
               ),
             ),
           ],
@@ -3022,7 +3098,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               style: const TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: AdminDssTheme.textPrimary,
+                color: AdminColors.textPrimary,
               ),
             ),
           ],
@@ -3032,16 +3108,16 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
   }
 
   Widget _actionLogTile(DssFlagNote n, DateFormat df) {
-    final typeColor = switch (n.eventType) {
-      DssNoteEventType.status => AdminDssTheme.info,
-      DssNoteEventType.impact => AdminDssTheme.warning,
-      DssNoteEventType.assign => AdminDssTheme.primary,
-      DssNoteEventType.announcement => AdminDssTheme.success,
-      DssNoteEventType.reopen => AdminDssTheme.danger,
-      DssNoteEventType.action => AdminDssTheme.navy,
-      DssNoteEventType.evidence => AdminDssTheme.success,
-      DssNoteEventType.outcome => AdminDssTheme.info,
-      DssNoteEventType.note => AdminDssTheme.textSecondary,
+    final (typeColor, typeIcon) = switch (n.eventType) {
+      DssNoteEventType.status => (AdminColors.primary, Icons.sync_alt_rounded),
+      DssNoteEventType.impact => (AdminColors.warning, Icons.trending_up_rounded),
+      DssNoteEventType.assign => (AdminColors.primary, Icons.person_outline_rounded),
+      DssNoteEventType.announcement => (AdminColors.success, Icons.campaign_outlined),
+      DssNoteEventType.reopen => (AdminColors.danger, Icons.replay_rounded),
+      DssNoteEventType.action => (AdminColors.primary, Icons.play_arrow_outlined),
+      DssNoteEventType.evidence => (AdminColors.success, Icons.verified_outlined),
+      DssNoteEventType.outcome => (AdminColors.primary, Icons.task_alt_rounded),
+      DssNoteEventType.note => (AdminColors.textSecondary, Icons.chat_bubble_outline_rounded),
     };
     final meta = n.metadata;
     final intervention = meta['intervention']?.toString();
@@ -3055,29 +3131,44 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: AdminDssTheme.surface,
-        borderRadius: BorderRadius.circular(AdminDssTheme.radiusSm),
-        border: Border.all(color: AdminDssTheme.border),
+        color: AdminColors.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.border),
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
         dense: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(AdminSurfaces.radiusSm)),
+          side: BorderSide.none,
+        ),
+        collapsedShape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(AdminSurfaces.radiusSm)),
+          side: BorderSide.none,
+        ),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: typeColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
+                color: typeColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
               ),
-              child: Text(
-                n.eventType.label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: typeColor,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(typeIcon, size: 12, color: typeColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    n.eventType.label,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: typeColor,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
@@ -3089,7 +3180,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 style: const TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: AdminDssTheme.textPrimary,
+                  color: AdminColors.textPrimary,
                 ),
               ),
             ),
@@ -3103,7 +3194,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             '${n.statusFrom != null && n.statusTo != null && n.statusFrom != n.statusTo ? ' · ${n.statusFrom} → ${n.statusTo}' : ''}',
             style: const TextStyle(
               fontSize: 11,
-              color: AdminDssTheme.textMuted,
+              color: AdminColors.textMuted,
             ),
           ),
         ),
@@ -3115,7 +3206,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               style: const TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
-                color: AdminDssTheme.textPrimary,
+                color: AdminColors.textPrimary,
               ),
             ),
           ),
@@ -3125,7 +3216,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               'Intervention: $intervention',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminDssTheme.textSecondary,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],
@@ -3135,7 +3226,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               'Details: $detail',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminDssTheme.textSecondary,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],
@@ -3146,7 +3237,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AdminDssTheme.textPrimary,
+                color: AdminColors.textPrimary,
               ),
             ),
           ],
@@ -3156,7 +3247,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               'Metric: ${baseline ?? '—'} → ${followup ?? '—'}',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminDssTheme.textSecondary,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],
@@ -3166,7 +3257,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               'Announcement: $announcementId',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminDssTheme.textSecondary,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],
@@ -3176,7 +3267,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               'Owner: $ownerLabel',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminDssTheme.textSecondary,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],

@@ -482,24 +482,13 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
           color: AdminColors.primary.withValues(alpha: 0.18),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Next: $next',
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: AdminColors.primary,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(
-            Icons.arrow_forward_rounded,
-            size: 12,
-            color: AdminColors.primary,
-          ),
-        ],
+      child: Text(
+        'Next: $next',
+        style: const TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: AdminColors.primary,
+        ),
       ),
     );
 

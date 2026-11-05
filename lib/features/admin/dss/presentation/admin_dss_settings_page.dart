@@ -319,6 +319,7 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
               Switch.adaptive(
                 value: rule.enabled,
                 onChanged: (v) => _toggle(rule, v),
+                activeTrackColor: AdminColors.primary,
               ),
             ],
           ),

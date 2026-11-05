@@ -7,42 +7,48 @@ import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/dss/widgets/admin_dss_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 InputDecoration _decoration(String label, {String? helper, String? error}) {
-  final radius = BorderRadius.circular(AdminDssTheme.radiusSm);
+  final radius = BorderRadius.circular(AdminSurfaces.radiusSm);
   return InputDecoration(
     isDense: true,
     labelText: label,
     helperText: helper,
     errorText: error,
     labelStyle: const TextStyle(
-      fontSize: 12,
-      color: AdminDssTheme.textSecondary,
+      fontSize: 12.5,
+      color: AdminColors.textSecondary,
     ),
     filled: true,
     fillColor: Colors.white,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     border: OutlineInputBorder(
       borderRadius: radius,
-      borderSide: const BorderSide(color: AdminDssTheme.border),
+      borderSide: const BorderSide(color: AdminColors.border),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: radius,
-      borderSide: const BorderSide(color: AdminDssTheme.border),
+      borderSide: const BorderSide(color: AdminColors.border),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: radius,
-      borderSide: const BorderSide(color: AdminDssTheme.primary, width: 1.5),
+      borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
     ),
   );
 }
 
 const _titleStyle = TextStyle(
   fontWeight: FontWeight.w700,
-  fontSize: 13.5,
-  color: AdminDssTheme.textPrimary,
+  fontSize: 14,
+  color: AdminColors.textPrimary,
+  letterSpacing: -0.2,
 );
-const _hintStyle = TextStyle(fontSize: 11.5, color: AdminDssTheme.textMuted);
+const _hintStyle = TextStyle(
+  fontSize: 12,
+  color: AdminColors.textSecondary,
+  height: 1.35,
+);
 final _dateFormat = DateFormat.yMMMd();
 
 DateTime _today() {
@@ -318,6 +324,21 @@ class _DssAccountabilityCardState extends State<DssAccountabilityCard> {
         children: [
           Row(
             children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.badge_outlined,
+                  size: 15,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
               const Text('Owner & schedule', style: _titleStyle),
               const SizedBox(width: 8),
               DssDueChip(flag: flag),
@@ -544,9 +565,28 @@ class DssProofCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.verified_outlined,
+                  size: 15,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
               const Text('Proof', style: _titleStyle),
               const SizedBox(width: 8),
-              DssMetaChip(label: '$total'),
+              if (total > 0)
+                DssMetaChip(
+                  label: '$total',
+                  color: AdminColors.success,
+                ),
               const Spacer(),
               if (canEdit)
                 OutlinedButton.icon(

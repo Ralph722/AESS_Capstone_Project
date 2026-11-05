@@ -827,13 +827,33 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Plan',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
-              color: AdminDssTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.assignment_outlined,
+                  size: 15,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Plan',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AdminColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
@@ -843,8 +863,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 : 'Outcome: ${undecided.outcomeStatus.label}. Edit inline; '
                       'Save plan when fields change.',
             style: const TextStyle(
-              fontSize: 11.5,
-              color: AdminDssTheme.textMuted,
+              fontSize: 12,
+              color: AdminColors.textSecondary,
+              height: 1.35,
             ),
           ),
           const SizedBox(height: 10),
@@ -875,26 +896,32 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             ),
           ],
           if (_hasOutcomes) ...[
-            const SizedBox(height: 8),
-            Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                key: ValueKey(
-                  'plan-details-${flag.id}-${undecided?.id ?? 'new'}',
-                ),
-                initiallyExpanded: _planDetailsExpanded,
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(bottom: 2),
-                onExpansionChanged: (open) =>
-                    setState(() => _planDetailsExpanded = open),
-                title: const Text(
-                  'Add plan details',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AdminDssTheme.textSecondary,
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: AdminColors.surface.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                border: Border.all(color: AdminColors.border),
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: ValueKey(
+                    'plan-details-${flag.id}-${undecided?.id ?? 'new'}',
                   ),
-                ),
+                  initiallyExpanded: _planDetailsExpanded,
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                  childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  onExpansionChanged: (open) =>
+                      setState(() => _planDetailsExpanded = open),
+                  title: const Text(
+                    'Add plan details',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AdminColors.textSecondary,
+                    ),
+                  ),
                 children: [
                   TextField(
                     controller: _planDescriptionCtrl,
@@ -977,6 +1004,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 ],
               ),
             ),
+          ),
             if (canEdit && _planDirty) ...[
               const SizedBox(height: 10),
               Align(
@@ -1958,12 +1986,28 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         children: [
           Row(
             children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AdminColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.low_priority_rounded,
+                  size: 16,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
               const Text(
                 'Priority',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
-                  color: AdminDssTheme.textPrimary,
+                  fontSize: 14,
+                  color: AdminColors.textPrimary,
+                  letterSpacing: -0.2,
                 ),
               ),
               const SizedBox(width: 8),
@@ -1976,63 +2020,71 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ),
             ],
           ),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(bottom: 2),
-              title: const Text(
-                'How this score was set',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AdminDssTheme.textMuted,
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: AdminColors.surface.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(color: AdminColors.border),
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                title: const Text(
+                  'How this score was set',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AdminColors.textSecondary,
+                  ),
                 ),
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Rule-based, not AI. Critical 7+, High 5–6, Medium 3–4, Low 0–2.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: AdminColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final r in p.reasons)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 28,
+                            child: Text(
+                              r.points == 0 ? '·' : '+${r.points}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: r.points == 0
+                                    ? AdminColors.textMuted
+                                    : AdminColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              r.text,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: AdminColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-              children: [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Rule-based, not AI. Critical 7+, High 5–6, Medium 3–4, Low 0–2.',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: AdminDssTheme.textMuted,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (final r in p.reasons)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 28,
-                          child: Text(
-                            r.points == 0 ? '·' : '+${r.points}',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: r.points == 0
-                                  ? AdminDssTheme.textMuted
-                                  : AdminDssTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            r.text,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: AdminDssTheme.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
             ),
           ),
         ],
@@ -2119,8 +2171,6 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               fontSize: 12,
               color: AdminColors.textSecondary,
               height: 1.35,
-            ),
-          ),
             ),
           ),
           ...children,

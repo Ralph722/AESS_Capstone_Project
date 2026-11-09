@@ -67,7 +67,7 @@ class DssEvaluationService {
       );
     }
 
-    onProgress?.call('Loading roster…');
+    onProgress?.call('Loading alumni list…');
     final members = await _members.getAllMembers();
     final active = members.where((m) => !m.isDeactivated).toList();
 
@@ -176,8 +176,14 @@ class DssEvaluationService {
         value = DssMetrics.relatedness(answers)?.alignedShare.rate;
       case 'UNDEREMPLOYMENT':
         value = DssMetrics.clerical(answers)?.rate;
+      case 'QUALIFICATION_MISMATCH':
+        value = DssMetrics.qualificationMismatch(answers)?.rate;
       case 'TIME_TO_JOB_LONG':
         value = DssMetrics.longTimeToFirstJob(answers)?.rate;
+      case 'PLACEMENT_CHANNEL_LOW':
+        value = DssMetrics.institutionalPlacement(answers)?.rate;
+      case 'SALARY_LOW_ENTRY':
+        value = DssMetrics.lowEntrySalary(answers)?.rate;
       case 'SALARY_STAGNATION':
         final salaryByCourse = <String, List<int>>{};
         for (final r in responses) {

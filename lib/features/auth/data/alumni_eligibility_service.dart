@@ -79,13 +79,13 @@ class AlumniEligibilityService {
         eligible: false,
         code: 'unavailable',
         message:
-            'Could not check the alumni roster right now. '
+            'Could not check the alumni list right now. '
             'Check your connection and try again.',
       );
     }
   }
 
-  /// Links the signed-in, email-verified account to its roster record.
+  /// Links the signed-in, email-verified account to its alumni list record.
   Future<void> linkRegistration({
     required String memberId,
     required String fullName,

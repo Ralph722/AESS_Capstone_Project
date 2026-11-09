@@ -17,7 +17,7 @@ class AlumniMemberDuplicateException implements Exception {
   String toString() => message;
 }
 
-/// Official alumni roster — Supabase only.
+/// Official alumni list — Supabase only.
 class AlumniMemberService {
   AlumniMemberService({SupabaseClient? supabase, SupabaseUserBridge? bridge})
     : _supabase = supabase ?? Supabase.instance.client,
@@ -132,7 +132,7 @@ class AlumniMemberService {
     );
   }
 
-  /// Student-id + course keys already on the roster (for bulk import).
+  /// Student-id + course keys already on the alumni list (for bulk import).
   Future<Set<String>> existingStudentCourseKeys() async {
     try {
       final rows = await _supabase
@@ -212,7 +212,7 @@ class AlumniMemberService {
         return m.copyWith(batchYear: filled);
       }).toList();
     } catch (_) {
-      // Filters still work from roster fields if users lookup fails.
+      // Filters still work from alumni list fields if users lookup fails.
       return members;
     }
   }
@@ -843,7 +843,7 @@ class AlumniMemberService {
   }
 
   /// Uses the users table as the avatar source of truth. This also covers
-  /// profiles uploaded before profile_image_url was mirrored to the roster.
+  /// profiles uploaded before profile_image_url was mirrored to the alumni list.
   ///
   /// Skips members that already have a non-data URL (storage URL preferred).
   Future<List<AlumniMember>> _hydrateProfileImages(

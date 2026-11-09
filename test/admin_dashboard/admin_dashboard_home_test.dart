@@ -262,7 +262,7 @@ void main() {
 
       expect(find.text('Alumni registered'), findsOneWidget);
       expect(find.text('38%'), findsOneWidget);
-      expect(find.text('3 of 8 on the roster'), findsOneWidget);
+      expect(find.text('3 of 8 on the alumni list'), findsOneWidget);
 
       expect(find.text('Tracer response'), findsOneWidget);
       expect(find.text('1 of 3 registered alumni'), findsOneWidget);
@@ -500,7 +500,7 @@ void main() {
       );
       expect(find.text('No activity yet'), findsOneWidget);
       expect(find.text('No activity recorded yet'), findsOneWidget);
-      expect(find.text('No alumni on the roster yet'), findsOneWidget);
+      expect(find.text('No alumni on the alumni list yet'), findsOneWidget);
       expect(find.text('Nothing due in the next 30 days'), findsOneWidget);
       expect(find.text('No tracer open'), findsOneWidget);
       expect(find.text('No employment information yet'), findsOneWidget);
@@ -561,7 +561,7 @@ void main() {
     final handle = tester.ensureSemantics();
     await _pumpContent(tester, _home(), content: _contentSizes['1440x900']!);
     expect(
-      find.bySemanticsLabel('Alumni registered, 38%, 3 of 8 on the roster'),
+      find.bySemanticsLabel('Alumni registered, 38%, 3 of 8 on the alumni list'),
       findsOneWidget,
     );
     expect(

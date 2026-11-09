@@ -36,8 +36,8 @@ class GtsListResponse {
   }
 }
 
-/// One alumnus in the list: a roster record, an off-roster responder, or
-/// both a roster record and their answer.
+/// One alumnus in the list: a alumni list record, an off-roster responder, or
+/// both a alumni list record and their answer.
 class GtsListRow {
   const GtsListRow({
     required this.status,
@@ -116,19 +116,19 @@ class GtsListTally {
 
   int count(GtsTracerStatus status) => counts[status]!;
 
-  /// Alumni on the active roster in scope.
+  /// Alumni on the alumni list in scope.
   int get total => [
     for (final s in GtsTracerStatus.values)
       if (s.onRoster) count(s),
   ].fold(0, (a, b) => a + b);
 
-  /// Roster alumni who submitted the tracer in scope.
+  /// Alumni list members who submitted the tracer in scope.
   int get answered => [
     for (final s in GtsTracerStatus.values)
       if (s.onRoster && s.answered) count(s),
   ].fold(0, (a, b) => a + b);
 
-  /// Roster alumni with any item 16 answer (the DSS and Tracer tab base).
+  /// Alumni list members with any item 16 answer (the DSS and Tracer tab base).
   int get answeredItem16 => _answeredItem16;
 
   /// Share of [total]; null when there is nobody, or for off-roster
@@ -136,7 +136,7 @@ class GtsListTally {
   double? share(GtsTracerStatus status) =>
       total == 0 || !status.onRoster ? null : count(status) / total;
 
-  /// Answered ÷ total (the Tracer tab "took tracer" share of the roster).
+  /// Answered ÷ total (the Tracer tab "took tracer" share of the alumni list).
   double? get responseRate => total == 0 ? null : answered / total;
 
   /// Employed ÷ answered item 16 (the Tracer tab employment rate).
@@ -188,9 +188,9 @@ class GtsAlumniListResult {
   String waveLabel(String surveyId) => waveLabels[surveyId] ?? surveyId;
 }
 
-/// Builds an alumni list: every alumnus on the active roster, with their
+/// Builds an alumni list: every alumnus on the alumni list, with their
 /// answer to the wave in scope (or their latest from any wave), and anyone
-/// who answered without an active roster record.
+/// who answered without an active alumni list record.
 abstract final class GtsAlumniList {
   /// [waveIds] are the CHED waves that may be used (published or closed);
   /// responses to other surveys are ignored.

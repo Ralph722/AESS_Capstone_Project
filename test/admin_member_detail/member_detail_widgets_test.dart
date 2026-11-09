@@ -107,7 +107,7 @@ void main() {
       );
       expect(find.text('Registered'), findsOneWidget);
       expect(find.text('Active (30d)'), findsOneWidget);
-      expect(find.text('Tracer 93%'), findsOneWidget);
+      expect(find.text('Profile 93%'), findsOneWidget);
       expect(find.text('Profile updated'), findsOneWidget);
       expect(find.text('12 activities'), findsOneWidget);
     });
@@ -205,7 +205,7 @@ void main() {
           missingLabels: ['Telephone', 'Employment Status'],
         ),
       );
-      expect(find.text('Tracer profile 87% complete'), findsOneWidget);
+      expect(find.text('Profile 87% complete'), findsOneWidget);
       expect(
         find.text('Missing: Telephone, Employment Status'),
         findsOneWidget,
@@ -218,7 +218,7 @@ void main() {
         const MemberDetailCompletenessBanner(percent: 90, missingLabels: []),
       );
       expect(
-        find.text('Some tracer profile fields are still missing.'),
+        find.text('Some profile fields are still missing.'),
         findsOneWidget,
       );
     });
@@ -300,11 +300,15 @@ void main() {
     test('readable action labels keep acronyms', () {
       expect(
         memberDetailActionLabel('UPDATE_ROSTER_MEMBER'),
-        'Update roster member',
+        'Update alumni list member',
       );
       expect(
         memberDetailActionLabel('EXPORT_CHED_GTS_PDF'),
         'Export CHED GTS PDF',
+      );
+      expect(
+        memberDetailActionLabel('EXPORT_INDIVIDUAL_INFO_PDF'),
+        'Export individual info PDF',
       );
       expect(memberDetailActionLabel('LOGIN'), 'Login');
       expect(memberDetailActionLabel(''), '');
@@ -323,7 +327,7 @@ void main() {
           limit: 100,
         ),
       );
-      expect(find.text('Update roster member'), findsOneWidget);
+      expect(find.text('Update alumni list member'), findsOneWidget);
       expect(find.text('Did UPDATE_ROSTER_MEMBER'), findsOneWidget);
       expect(find.text('FAILED'), findsOneWidget);
       expect(find.byTooltip('UPDATE_ROSTER_MEMBER'), findsOneWidget);
@@ -395,12 +399,12 @@ void main() {
         ),
       );
       expect(find.text('Profile updated'), findsOneWidget);
-      expect(find.text('Update roster member'), findsOneWidget);
+      expect(find.text('Update alumni list member'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(FilterChip, 'Tracer'));
       await tester.pumpAndSettle();
       expect(find.text('Profile updated'), findsOneWidget);
-      expect(find.text('Update roster member'), findsNothing);
+      expect(find.text('Update alumni list member'), findsNothing);
     });
 
     testWidgets('name changes render the old and new name', (tester) async {

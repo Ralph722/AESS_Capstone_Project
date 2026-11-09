@@ -12,6 +12,7 @@ class TracerCoverageSnapshot {
     required this.registeredNoTracer,
     required this.waveLabel,
     required this.definition,
+    this.scopedToWave = false,
   });
 
   final int rosterTotal;
@@ -26,6 +27,10 @@ class TracerCoverageSnapshot {
 
   final String waveLabel;
   final String definition;
+
+  /// True when the alumni-list side was limited to people already on the list
+  /// when the selected wave opened or was published.
+  final bool scopedToWave;
 
   double get registrationRate =>
       rosterTotal == 0 ? 0 : registered / rosterTotal;
@@ -47,22 +52,37 @@ class TracerCoverageSnapshot {
     waveLabel: 'All published tracers',
     definition:
         'Took tracer = submitted the selected CHED/tracer wave(s). '
-        'Registered = portal account linked to the roster.',
+        'Registered = portal account linked to the alumni list.',
   );
 }
 
 /// Builds coverage from cohort-filtered roster + submitter auth UIDs.
+///
+/// When [filters.surveyId] picks one wave, the alumni-list / registered steps
+/// only count members already on the list when that wave opened (or was
+/// published / created if no open date). “All published tracers” keeps the
+/// current alumni list.
 TracerCoverageSnapshot buildTracerCoverage({
   required List<AlumniMember> members,
   required Set<String> tracerSubmitterUserIds,
   required ReportsDashboardFilters filters,
   required List<Survey> surveys,
 }) {
-  final active = members.where((m) => !m.isDeactivated).toList(growable: false);
   final submitters = {
     for (final id in tracerSubmitterUserIds)
       if (id.trim().isNotEmpty) id.trim(),
   };
+
+  final wave = _selectedWave(filters.surveyId, surveys);
+  final cutoff = wave == null ? null : _waveRosterCutoff(wave);
+  final scopedToWave = cutoff != null;
+
+  final active = <AlumniMember>[
+    for (final m in members)
+      if (!m.isDeactivated &&
+          (cutoff == null || !m.createdAt.isAfter(cutoff)))
+        m,
+  ];
 
   var notRegistered = 0;
   var registered = 0;
@@ -81,6 +101,15 @@ TracerCoverageSnapshot buildTracerCoverage({
   }
 
   final waveLabel = _waveLabel(filters.surveyId, surveys);
+  final definition = cutoff == null
+      ? 'Took tracer = submitted $waveLabel. '
+          'Registered = portal account linked to the current alumni list. '
+          'Not registered = on the current alumni list only.'
+      : 'Took tracer = submitted $waveLabel. '
+          'Alumni list and Registered count only people already on the '
+          'list when that wave opened or was published '
+          '(${_formatCutoff(cutoff)}). '
+          'Not registered = on that list only.';
 
   return TracerCoverageSnapshot(
     rosterTotal: active.length,
@@ -89,11 +118,29 @@ TracerCoverageSnapshot buildTracerCoverage({
     tookTracer: took,
     registeredNoTracer: (registered - took).clamp(0, registered),
     waveLabel: waveLabel,
-    definition:
-        'Took tracer = submitted $waveLabel. '
-        'Registered = portal account linked to the roster. '
-        'Not registered = on roster only.',
+    scopedToWave: scopedToWave,
+    definition: definition,
   );
+}
+
+Survey? _selectedWave(String? surveyId, List<Survey> surveys) {
+  if (surveyId == null) return null;
+  for (final s in surveys) {
+    if (s.id == surveyId) return s;
+  }
+  return null;
+}
+
+/// Prefer open date (when alumni could answer), then first publish, then create.
+DateTime _waveRosterCutoff(Survey survey) =>
+    survey.openAt ?? survey.publishedAt ?? survey.createdAt;
+
+String _formatCutoff(DateTime cutoff) {
+  final local = cutoff.toLocal();
+  final y = local.year.toString().padLeft(4, '0');
+  final m = local.month.toString().padLeft(2, '0');
+  final d = local.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
 }
 
 String _waveLabel(String? surveyId, List<Survey> surveys) {

@@ -15,7 +15,7 @@ class DssWaveInput {
   final List<SurveyResponse> responses;
 }
 
-/// Roster size of one course × batch saved while a wave was open
+/// Alumni list size of one course × batch saved while a wave was open
 /// (`dss_wave_cohort_snapshots`), so later response rates use the roster of
 /// that time instead of today's.
 class DssCohortSnapshot {
@@ -59,7 +59,7 @@ class DssCohortSnapshot {
 
 typedef DssRosterCounts = ({int total, int registered});
 
-/// Active roster counts by course × batch ("Batch not recorded" when
+/// Alumni list counts by course × batch ("Batch not recorded" when
 /// missing), summed per course and for the institution. These are the
 /// response-rate denominators. Records without a course are left out, the
 /// same as their responses.
@@ -116,7 +116,7 @@ class DssRoster {
   DssRosterCounts course(String course) =>
       _byCourse[course] ?? (total: 0, registered: 0);
 
-  /// Every course × batch on the roster.
+  /// Every course × batch on the alumni list.
   Iterable<({String course, String batch, DssRosterCounts counts})>
   get groups => _byBatch.entries.map((e) {
     final i = e.key.indexOf('|');
@@ -190,7 +190,7 @@ class DssEvaluation {
   /// Group measures skipped because fewer than 5 alumni answered.
   final int notEnoughData;
 
-  /// Responses left out of every group (no roster record or no course).
+  /// Responses left out of every group (no alumni list record or no course).
   final int unclassified;
 
   String get message => describe(
@@ -241,7 +241,7 @@ class DssEvaluation {
     }
     if (unclassified > 0) {
       b.write(
-        ' $unclassified response(s) from alumni without a roster course '
+        ' $unclassified response(s) from alumni without an alumni list course '
         'were left out of group results.',
       );
     }
@@ -495,13 +495,13 @@ class DssEvaluator {
             'answered "${survey.title}". That is below the minimum of '
             '$minN responses needed before outcome findings '
             'are reliable'
-            '${eligible > sample.length ? ' (roster in this group: $eligible)' : ''}.';
+            '${eligible > sample.length ? ' (alumni list in this group: $eligible)' : ''}.';
         action =
             'Collect more tracer responses from this course/batch before acting on employment or curriculum findings.';
       case 'low_rate':
         title = 'Low survey response rate: $cohortText';
         body =
-            'Only $ratePct% of alumni on the roster for $cohortText '
+            'Only $ratePct% of alumni on the alumni list for $cohortText '
             'answered "${survey.title}" (${sample.length} of $eligible). '
             'Coverage is below the ${(rule.threshold * 100).toStringAsFixed(0)}% target.';
         action =
@@ -510,7 +510,7 @@ class DssEvaluator {
         title = 'Weak survey coverage: $cohortText';
         body =
             '$cohortText has weak coverage for '
-            '"${survey.title}": ${sample.length} of $eligible on the roster '
+            '"${survey.title}": ${sample.length} of $eligible on the alumni list '
             'answered ($ratePct%). '
             'Raise participation before trusting employment outcome flags.';
         action =
@@ -696,6 +696,28 @@ class DssEvaluator {
       );
     }
 
+    final mismatchProxy = DssMetrics.qualificationMismatch(answers);
+    if (mismatchProxy != null) {
+      maybeRaise(
+        'QUALIFICATION_MISMATCH',
+        mismatchProxy.rate,
+        mismatchProxy.total,
+        {
+          'questions': ['ched_24a', 'ched_30'],
+          'mismatch_clerical': mismatchProxy.hits,
+          'answered': mismatchProxy.total,
+          'first_job_column': DssMetrics.firstJobCol,
+          'note':
+              'Tracer proxy: Q24 No and Q30.1 Rank/Clerical. Not a CHED or '
+              'PSA certified underemployment definition.',
+        },
+        '${_pct1(mismatchProxy.rate)} of ${mismatchProxy.total} '
+            'respondents report a first job unrelated to their course and at '
+            'Rank/Clerical level ($cohortText).',
+        share: mismatchProxy,
+      );
+    }
+
     final longWait = DssMetrics.longTimeToFirstJob(answers);
     if (longWait != null) {
       final others = DssMetrics.timeToJobOthers(answers);
@@ -711,8 +733,61 @@ class DssEvaluator {
           if (others > 0) 'others_excluded': others,
         },
         '${_pct1(longWait.rate)} of ${longWait.total} '
-            'respondents took 1+ years to land a first job ($cohortText).',
+            'respondents took longer than 6 months to land a first job '
+            '($cohortText).',
         share: longWait,
+      );
+    }
+
+    final placement = DssMetrics.institutionalPlacement(answers);
+    if (placement != null) {
+      final others = answers
+          .map((a) => DssMetrics.single(a['ched_28']))
+          .whereType<String>()
+          .where((v) => v.startsWith('Others'))
+          .length;
+      maybeRaise(
+        'PLACEMENT_CHANNEL_LOW',
+        placement.rate,
+        placement.total,
+        {
+          'question': 'ched_28',
+          'institutional_count': placement.hits,
+          'answered': placement.total,
+          'channels': DssMetrics.institutionalPlacementChannels.toList(),
+          'breakdown': DssMetrics.counts(
+            answers
+                .map((a) => DssMetrics.single(a['ched_28']))
+                .whereType<String>()
+                .where((v) => !v.startsWith('Others')),
+          ),
+          if (others > 0) 'others_excluded': others,
+        },
+        '${_pct1(placement.rate)} of ${placement.total} '
+            'respondents found their first job through the school placement '
+            'office or a Job Fair/PESO ($cohortText).',
+        share: placement,
+      );
+    }
+
+    final lowSalary = DssMetrics.lowEntrySalary(answers);
+    if (lowSalary != null) {
+      maybeRaise(
+        'SALARY_LOW_ENTRY',
+        lowSalary.rate,
+        lowSalary.total,
+        {
+          'question': 'ched_31',
+          'low_count': lowSalary.hits,
+          'answered': lowSalary.total,
+          'brackets': DssMetrics.salaryBrackets
+              .take(DssMetrics.lowEntrySalaryMaxRank + 1)
+              .toList(),
+        },
+        '${_pct1(lowSalary.rate)} of ${lowSalary.total} '
+            'respondents started in the bottom two first-job salary brackets '
+            '($cohortText).',
+        share: lowSalary,
       );
     }
 
@@ -1114,7 +1189,7 @@ class _Group {
   final String label;
   final List<SurveyResponse> responses;
 
-  /// Whole active roster for the group (registered or not).
+  /// Whole alumni list for the group (registered or not).
   final int eligible;
   final int registered;
   final String rosterBasis;

@@ -13,6 +13,7 @@ import 'package:alumni_system/features/messages/application/message_thread_histo
 import 'package:alumni_system/features/messages/data/message_image_pipeline.dart';
 import 'package:alumni_system/features/messages/data/message_open_bus.dart';
 import 'package:alumni_system/features/messages/data/message_realtime.dart';
+import 'package:alumni_system/features/messages/application/admin_conversation_watch.dart';
 import 'package:alumni_system/features/messages/data/message_service.dart';
 import 'package:alumni_system/features/messages/models/message_filters.dart';
 import 'package:alumni_system/features/messages/widgets/admin_compose_picker.dart';
@@ -57,6 +58,11 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   String? _selectedUserId;
   String? _selectedUserDocId;
   String? _selectedUserName;
+  /// Conversation id currently bound to [_conversationSubscription].
+  /// Kept separate from [_selectedUserId] so switching alumni after selection
+  /// still tears down the previous watch (selection updates first).
+  String? _watchingUserId;
+  String? _watchingUserDocId;
   bool _isChatOpenOnMobile = false;
   String? _adminDocId;
   final ScrollController _messagesScrollController = ScrollController();
@@ -329,15 +335,21 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       return;
     }
 
-    final alreadyWatching = _conversationSubscription != null &&
-        _selectedUserId == userMessagingId;
+    // Compare against the watched id — not [_selectedUserId], which is already
+    // updated before this method runs on conversation switch.
+    final alreadyWatching = isAlreadyWatchingAdminConversation(
+      hasActiveSubscription: _conversationSubscription != null,
+      watchingMessagingId: _watchingUserId,
+      requestedMessagingId: userMessagingId,
+      watchingDocId: _watchingUserDocId,
+      requestedDocId: userDocId,
+    );
     if (alreadyWatching) {
       unawaited(_markSelectedConversationRead());
       return;
     }
 
-    _conversationSubscription?.cancel();
-    _conversationSubscription = null;
+    _stopConversationWatch(clearMessages: false);
 
     setState(() {
       _isLoadingMessages = true;
@@ -347,13 +359,21 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       _loadingOlder = false;
     });
 
+    _watchingUserId = userMessagingId;
+    _watchingUserDocId = userDocId;
+
     _conversationSubscription = _messageService
         .watchAdminConversation(userMessagingId, userDocId: userDocId)
         .listen(
       (filteredMessages) {
         if (!mounted) return;
-        if (_selectedUserId != userMessagingId &&
-            _selectedUserDocId != userDocId) {
+        // Drop late emits from a previous conversation after a switch.
+        if (!isAdminConversationEmitStillSelected(
+          selectedMessagingId: _selectedUserId,
+          emitMessagingId: userMessagingId,
+          selectedDocId: _selectedUserDocId,
+          emitDocId: userDocId,
+        )) {
           return;
         }
 
@@ -387,6 +407,20 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
         if (mounted) setState(() => _isLoadingMessages = false);
       },
     );
+  }
+
+  void _stopConversationWatch({bool clearMessages = true}) {
+    _conversationSubscription?.cancel();
+    _conversationSubscription = null;
+    _watchingUserId = null;
+    _watchingUserDocId = null;
+    if (clearMessages) {
+      _messages = [];
+      _olderById.clear();
+      _hasMoreHistory = true;
+      _loadingOlder = false;
+      _isLoadingMessages = false;
+    }
   }
 
   Future<void> _markSelectedConversationRead() async {
@@ -852,7 +886,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   @override
   void dispose() {
     _inboxSubscription?.cancel();
-    _conversationSubscription?.cancel();
+    _stopConversationWatch(clearMessages: false);
     _openConversationSubscription?.cancel();
     _messageController.dispose();
     _searchController.dispose();
@@ -964,8 +998,12 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
           name: _selectedUserName ?? 'Alumni',
           email: '',
         );
+    final threadKey = ValueKey<String>(
+      'admin-thread-${_selectedUserId ?? _selectedUserDocId ?? 'none'}',
+    );
 
     return Column(
+      key: threadKey,
       children: [
         AdminConversationHeader(
           profile: profile,
@@ -973,8 +1011,9 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
               ? () => setState(() {
                     _isChatOpenOnMobile = false;
                     _selectedUserId = null;
-                    _conversationSubscription?.cancel();
-                    _conversationSubscription = null;
+                    _selectedUserDocId = null;
+                    _selectedProfile = null;
+                    _stopConversationWatch();
                   })
               : null,
           showProfileToggle: !showBack,
@@ -1165,7 +1204,12 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                       : _buildThreadPane(showBack: false),
                 ),
                 if (showProfile)
-                  AdminAlumniProfilePanel(profile: _selectedProfile!),
+                  AdminAlumniProfilePanel(
+                    key: ValueKey<String>(
+                      'admin-profile-${_selectedProfile!.userId}',
+                    ),
+                    profile: _selectedProfile!,
+                  ),
               ],
             );
           },

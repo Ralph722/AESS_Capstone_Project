@@ -6,8 +6,9 @@ import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/features/admin/ched_gts_pdf_export/ched_gts_pdf_export.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
-import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
+import 'package:alumni_system/features/admin/roster/widgets/admin_alumni_directory_dialogs.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_response_detail_sheet.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
@@ -41,12 +42,13 @@ class _AdminAlumniMemberDetailPanelState
   final _detailService = AlumniDirectoryDetailService();
   final _surveyService = SurveyService();
   final _chedPdfExport = ChedGtsPdfPersonExportService();
+  final _individualInfoExport = IndividualInfoPersonExportService();
   late TabController _tabs;
   late AlumniMember _member;
 
   AlumniDirectoryDetail? _detail;
   bool _loading = false;
-  bool _exportingChedPdf = false;
+  bool _exportingReportPdf = false;
   String? _error;
   final Map<String, Future<Survey?>> _surveyFutures = {};
   final Map<String, Future<List<SurveyQuestion>>> _questionsFutures = {};
@@ -60,7 +62,6 @@ class _AdminAlumniMemberDetailPanelState
 
   // CHED accent, shared with the Surveys and Reports screens.
   static const _chedAccent = Color(0xFFC2410C);
-  static const _chedBorder = Color(0xFFFDBA74);
   static const _chedTint = Color(0xFFFFF7ED);
 
   @override
@@ -202,10 +203,6 @@ class _AdminAlumniMemberDetailPanelState
     );
   }
 
-  void _retryQuestions(String surveyId) {
-    setState(() => _questionsFutures.remove(surveyId));
-  }
-
   double? get _tracerCompletion => _detail?.tracer?.completionPercent;
 
   List<SurveyResponseWithMeta> get _chedWaves =>
@@ -213,16 +210,45 @@ class _AdminAlumniMemberDetailPanelState
 
   /// Export controls are shown for linked, registered members once loaded;
   /// they stay visible (disabled) during a refresh.
-  bool get _canShowChedPdfExport =>
+  bool get _canShowReportExport =>
       _error == null &&
       _detail != null &&
       _member.isRegisteredUser &&
       (_member.authUid?.isNotEmpty ?? false);
 
-  bool get _canOfferChedPdfExport => _canShowChedPdfExport && !_loading;
+  bool get _canOfferReportExport => _canShowReportExport && !_loading;
+
+  Future<void> _onDownloadReportsPressed({String? surveyId}) async {
+    if (!_canOfferReportExport || _exportingReportPdf) return;
+    if (!requireWebExport(context)) return;
+
+    final kind = await showAdminOptionPicker<DirectoryBulkReportKind>(
+      context: context,
+      title: 'Download Reports',
+      options: const [
+        AdminPickerOption(
+          value: DirectoryBulkReportKind.chedGtsPdf,
+          label: 'CHED GTS PDF',
+          icon: Icons.picture_as_pdf_outlined,
+        ),
+        AdminPickerOption(
+          value: DirectoryBulkReportKind.individualInfoSheet,
+          label: 'Individual Information Sheet',
+          icon: Icons.badge_outlined,
+        ),
+      ],
+    );
+    if (kind == null || !mounted) return;
+
+    if (kind == DirectoryBulkReportKind.individualInfoSheet) {
+      await _onExportIndividualInfoPressed(surveyId: surveyId);
+    } else {
+      await _onExportChedGtsPdfPressed(surveyId: surveyId);
+    }
+  }
 
   Future<void> _onExportChedGtsPdfPressed({String? surveyId}) async {
-    if (!_canOfferChedPdfExport || _exportingChedPdf) return;
+    if (!_canOfferReportExport || _exportingReportPdf) return;
     if (!requireWebExport(context)) return;
 
     final waves = _chedWaves;
@@ -272,6 +298,62 @@ class _AdminAlumniMemberDetailPanelState
     await _runChedPdfExport(surveyId: chosenSurveyId);
   }
 
+  Future<void> _onExportIndividualInfoPressed({String? surveyId}) async {
+    if (!_canOfferReportExport || _exportingReportPdf) return;
+    if (!requireWebExport(context)) return;
+
+    final waves = _chedWaves;
+    String? chosenSurveyId = surveyId;
+    var forceLiveOnly = false;
+
+    if (chosenSurveyId == null) {
+      if (waves.length >= 2) {
+        final picked = await showAdminOptionPicker<String>(
+          context: context,
+          title: 'Choose data source',
+          options: [
+            for (final wave in waves)
+              AdminPickerOption(
+                value: wave.response.surveyId,
+                label: _chedWaveLabel(wave),
+                icon: Icons.badge_outlined,
+              ),
+            AdminPickerOption(
+              value: '__live__',
+              label: 'Live profile only (no survey snapshot)',
+              icon: Icons.person_outline,
+            ),
+          ],
+        );
+        if (picked == null || !mounted) return;
+        if (picked == '__live__') {
+          forceLiveOnly = true;
+        } else {
+          chosenSurveyId = picked;
+        }
+      } else if (waves.length == 1) {
+        chosenSurveyId = waves.first.response.surveyId;
+      } else {
+        final proceed = await showAdminConfirmDialog(
+          context,
+          title: 'No CHED submission',
+          message:
+              'This alumni has no submitted CHED GTS response yet. '
+              'Export using their live profile data instead?',
+          confirmLabel: 'Export live profile',
+          icon: Icons.badge_outlined,
+        );
+        if (!proceed || !mounted) return;
+        forceLiveOnly = true;
+      }
+    }
+
+    await _runIndividualInfoExport(
+      surveyId: chosenSurveyId,
+      forceLiveOnly: forceLiveOnly,
+    );
+  }
+
   /// Ask Fillable vs Print-Ready; returns null if cancelled.
   Future<bool?> _pickChedPdfExportMode() {
     return showAdminOptionPicker<bool>(
@@ -306,7 +388,7 @@ class _AdminAlumniMemberDetailPanelState
     final flatten = await _pickChedPdfExportMode();
     if (flatten == null || !mounted) return;
 
-    setState(() => _exportingChedPdf = true);
+    setState(() => _exportingReportPdf = true);
     try {
       final result = await _chedPdfExport.buildOfficialPdf(
         member: _member,
@@ -369,7 +451,77 @@ class _AdminAlumniMemberDetailPanelState
         ),
       );
     } finally {
-      if (mounted) setState(() => _exportingChedPdf = false);
+      if (mounted) setState(() => _exportingReportPdf = false);
+    }
+  }
+
+  Future<void> _runIndividualInfoExport({
+    String? surveyId,
+    bool forceLiveOnly = false,
+  }) async {
+    setState(() => _exportingReportPdf = true);
+    try {
+      final result = await _individualInfoExport.buildPdf(
+        member: _member,
+        detail: forceLiveOnly
+            ? AlumniDirectoryDetail(
+                roster: _member,
+                tracer: _detail?.tracer,
+                profileImageUrl: _detail?.profileImageUrl,
+                activityCount: _detail?.activityCount ?? 0,
+                tracerResponses: const [],
+              )
+            : _detail,
+        surveyId: forceLiveOnly ? null : surveyId,
+        allowLiveFallback: true,
+      );
+
+      if (!mounted) return;
+      final downloaded = tryDownloadBytesOnWeb(
+        context,
+        bytes: result.bytes,
+        fileName: result.fileName,
+        mimeType: 'application/pdf',
+      );
+      if (!downloaded) return;
+
+      await _individualInfoExport.logExportSuccess(
+        member: _member,
+        result: result,
+      );
+
+      if (!mounted) return;
+      final sourceNote = switch (result.assembled.source) {
+        ChedGtsAnswerSource.submittedSnapshot => 'from submitted snapshot',
+        ChedGtsAnswerSource.merged => 'from snapshot + live profile gaps',
+        ChedGtsAnswerSource.liveProfileFallback => 'from live profile',
+        ChedGtsAnswerSource.empty => '',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Individual Information Sheet downloaded ($sourceNote)',
+          ),
+          backgroundColor: AdminColors.success,
+        ),
+      );
+    } catch (e) {
+      await _individualInfoExport.logExportFailure(
+        member: _member,
+        error: e,
+        surveyId: surveyId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Couldn't create the Individual Information Sheet. Try again.",
+          ),
+          backgroundColor: AdminColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _exportingReportPdf = false);
     }
   }
 
@@ -415,7 +567,7 @@ class _AdminAlumniMemberDetailPanelState
           onActivityTap: () => _tabs.animateTo(2),
           actions: [
             if (_member.hasProfileUpdates) _markReviewedButton(compact),
-            if (_canShowChedPdfExport) _headerExportButton(compact: compact),
+            if (_canShowReportExport) _headerExportButton(compact: compact),
             const SizedBox(width: 4),
             _refreshButton(),
           ],
@@ -462,18 +614,18 @@ class _AdminAlumniMemberDetailPanelState
 
   Widget _headerExportButton({required bool compact}) {
     final label = canExportFiles
-        ? 'Download CHED GTS PDF'
-        : 'CHED PDF (web only)';
-    final onPressed = _exportingChedPdf || _loading
+        ? 'Download Reports'
+        : 'Reports (web only)';
+    final onPressed = _exportingReportPdf || _loading
         ? null
-        : () => _onExportChedGtsPdfPressed();
-    final icon = _exportingChedPdf
+        : () => _onDownloadReportsPressed();
+    final icon = _exportingReportPdf
         ? const SizedBox(
             width: 16,
             height: 16,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
-        : const Icon(Icons.picture_as_pdf_outlined, size: 18);
+        : const Icon(Icons.download_outlined, size: 18);
 
     if (compact) {
       return IconButton(
@@ -500,7 +652,7 @@ class _AdminAlumniMemberDetailPanelState
   Widget _refreshButton() {
     return IconButton(
       tooltip: _loading ? 'Refreshing…' : 'Refresh',
-      onPressed: _exportingChedPdf || _loading ? null : _load,
+      onPressed: _exportingReportPdf || _loading ? null : _load,
       icon: _loading
           ? const SizedBox(
               width: 18,
@@ -597,7 +749,7 @@ class _AdminAlumniMemberDetailPanelState
     final changed = _unreviewedChangedFields;
 
     final general = MemberDetailSection(
-      title: 'A. General Information',
+      title: 'General Information',
       icon: Icons.badge_outlined,
       children: [
         MemberDetailInfoRow(
@@ -692,7 +844,7 @@ class _AdminAlumniMemberDetailPanelState
     );
 
     final education = MemberDetailSection(
-      title: 'B. Educational Background',
+      title: 'Educational Background',
       icon: Icons.school_outlined,
       children: [
         MemberDetailInfoRow(
@@ -743,19 +895,23 @@ class _AdminAlumniMemberDetailPanelState
     }
 
     String? snapshotCaption;
-    if (tracer.employmentUpdatedAt != null || tracer.employmentSource.isNotEmpty) {
+    if (tracer.employmentUpdatedAt != null ||
+        tracer.employmentSource.isNotEmpty) {
       final dateStr = tracer.employmentUpdatedAt != null
           ? DateFormat('MMM yyyy').format(tracer.employmentUpdatedAt!.toLocal())
           : null;
-      final sourceStr = tracer.employmentSource == 'ched_gts'
+      final source = tracer.employmentSource.trim();
+      final sourceStr = source == 'ched_gts'
           ? 'CHED GTS'
-          : (tracer.employmentSource == 'onboarding'
+          : (source == 'onboarding'
               ? 'onboarding'
-              : tracer.employmentSource);
+              : (source.isEmpty ? null : source));
+      // Onboarding / initial → Self-reported; tracer (CHED GTS) write-back → Updated.
+      final provenance = source == 'ched_gts' ? 'Updated' : 'Self-reported';
       final parts = <String>[
-        'Self-reported',
+        provenance,
         if (dateStr != null) 'as of $dateStr',
-        if (sourceStr.isNotEmpty) 'from $sourceStr',
+        if (sourceStr != null && sourceStr.isNotEmpty) 'from $sourceStr',
       ];
       snapshotCaption = parts.join(' · ');
     }
@@ -828,7 +984,7 @@ class _AdminAlumniMemberDetailPanelState
         right: [
           education,
           employment,
-          if (_rosterHasExtraFields()) _rosterSnapshotSection(),
+          _rosterSnapshotSection(),
         ],
       ),
     ]);
@@ -837,33 +993,17 @@ class _AdminAlumniMemberDetailPanelState
   static bool _sameEmail(String a, String b) =>
       a.trim().toLowerCase() == b.trim().toLowerCase();
 
-  bool _rosterHasExtraFields() {
-    final m = _member;
-    return (m.address != null && m.address!.isNotEmpty) ||
-        (m.gender != null && m.gender!.isNotEmpty) ||
-        m.effectiveBatchYear.isNotEmpty ||
-        m.contactNumber.isNotEmpty;
-  }
-
   Widget _rosterSnapshotSection() {
     final m = _member;
     return MemberDetailSection(
-      title: 'Official roster record',
+      title: 'Official alumni list record',
       icon: Icons.folder_shared_outlined,
       children: [
-        MemberDetailInfoRow(label: 'Roster name', value: m.fullName),
+        MemberDetailInfoRow(label: 'Name on list', value: m.fullName),
         MemberDetailInfoRow(label: 'Course', value: m.course),
         MemberDetailInfoRow(label: 'ID number', value: m.studentId),
-        if (m.effectiveBatchYear.isNotEmpty)
-          MemberDetailInfoRow(label: 'Batch', value: m.effectiveBatchYear),
-        if (m.contactNumber.isNotEmpty)
-          MemberDetailInfoRow(label: 'Contact', value: m.contactNumber),
-        if (m.address != null && m.address!.isNotEmpty)
-          MemberDetailInfoRow(label: 'Address', value: m.address!),
-        if (m.gender != null && m.gender!.isNotEmpty)
-          MemberDetailInfoRow(label: 'Gender', value: m.gender!),
         MemberDetailInfoRow(
-          label: 'Added to roster',
+          label: 'Added to alumni list',
           value: DateFormat.yMMMd().format(m.createdAt),
         ),
       ],
@@ -902,20 +1042,21 @@ class _AdminAlumniMemberDetailPanelState
     return answers.keys.any((k) => k.toString().startsWith('ched_'));
   }
 
+  /// Per-wave CHED GTS PDF only — no membership / individual-info option.
   Widget? _chedWaveExportButton(String surveyId) {
-    if (!_canShowChedPdfExport || !canExportFiles) return null;
+    if (!_canShowReportExport || !canExportFiles) return null;
     return TextButton.icon(
-      onPressed: _exportingChedPdf || _loading
+      onPressed: _exportingReportPdf || _loading
           ? null
           : () => _onExportChedGtsPdfPressed(surveyId: surveyId),
-      icon: _exportingChedPdf
+      icon: _exportingReportPdf
           ? const SizedBox(
               width: 14,
               height: 14,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(Icons.picture_as_pdf_outlined, size: 16),
-      label: const Text('Download PDF'),
+          : const Icon(Icons.download_outlined, size: 16),
+      label: const Text('Download Reports'),
       style: TextButton.styleFrom(
         foregroundColor: AdminColors.primary,
         visualDensity: VisualDensity.compact,
@@ -924,15 +1065,45 @@ class _AdminAlumniMemberDetailPanelState
     );
   }
 
-  Widget _readOnlyChedForm(Map<String, dynamic> answers) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      child: ChedGtsForm(
-        answers: answers,
-        onChanged: (_) {},
-        readOnly: true,
-        showIntro: false,
-      ),
+  Future<void> _openTracerResponseDetail(SurveyResponseWithMeta item) async {
+    final surveyId = item.response.surveyId;
+    final answers = item.response.answers;
+    final looksChed = _looksLikeChedGts(null, answers);
+
+    Survey? survey;
+    List<SurveyQuestion> questions = const [];
+    try {
+      survey = await _cachedSurvey(surveyId);
+      final isChed = _looksLikeChedGts(survey, answers);
+      if (!isChed) {
+        questions = await _cachedQuestions(surveyId);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Couldn't open this response. Try again."),
+          backgroundColor: AdminColors.danger,
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    final isChed = _looksLikeChedGts(survey, answers) || looksChed;
+    final submitted = item.response.submittedAt;
+    final submittedLabel = submitted != null
+        ? 'Submitted ${_submittedFormat.format(submitted)}'
+        : 'Submitted';
+
+    await showAdminSurveyResponseDetailSheet(
+      context: context,
+      alumniName: _member.fullName,
+      subtitle: '${item.surveyTitle} · $submittedLabel',
+      response: item.response,
+      isChedBuiltin: isChed,
+      questions: questions,
+      visibilityRules: survey?.visibilityRules ?? const {},
     );
   }
 
@@ -947,157 +1118,97 @@ class _AdminAlumniMemberDetailPanelState
         ? _chedWaveExportButton(item.response.surveyId)
         : null;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
+    final radius = BorderRadius.circular(AdminSurfaces.radiusMd);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
         color: AdminColors.card,
-        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
-        border: Border.all(color: isChed ? _chedBorder : AdminColors.border),
-        boxShadow: AdminSurfaces.cardShadow,
-      ),
-      clipBehavior: Clip.antiAlias,
-      // Stack (not IntrinsicHeight) so the accent bar can stretch when the
-      // ExpansionTile opens without fighting layout or borderRadius rules.
-      child: Stack(
-        children: [
-          if (isChed)
-            const Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: ColoredBox(color: _chedAccent, child: SizedBox(width: 4)),
-            ),
-          Padding(
-            padding: EdgeInsets.only(left: isChed ? 4 : 0),
-            child: Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                maintainState: false,
-                tilePadding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
-                childrenPadding: EdgeInsets.zero,
-                expandedAlignment: Alignment.topCenter,
-                expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-                shape: const Border(),
-                collapsedShape: const Border(),
-                leading: Container(
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: const BorderSide(color: AdminColors.border),
+        ),
+        child: InkWell(
+          borderRadius: radius,
+          onTap: () => _openTracerResponseDetail(item),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
                     color: isChed ? _chedTint : AdminColors.primaryTint,
-                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    borderRadius:
+                        BorderRadius.circular(AdminSurfaces.radiusSm),
                   ),
                   child: Icon(
-                    isChed ? Icons.school_outlined : Icons.assignment_outlined,
+                    isChed
+                        ? Icons.school_outlined
+                        : Icons.assignment_outlined,
                     size: 18,
                     color: isChed ? _chedAccent : AdminColors.primary,
                   ),
                 ),
-                title: Text(
-                  item.surveyTitle,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: AdminColors.textPrimary,
-                  ),
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(subtitle, style: AdminText.caption),
-                      if (isChed)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _chedTint,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: _chedBorder),
-                          ),
-                          child: const Text(
-                            'Official CHED',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _chedAccent,
-                            ),
-                          ),
+                      Text(
+                        item.surveyTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AdminColors.textPrimary,
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(subtitle, style: AdminText.caption),
+                          if (isChed)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _chedTint,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Official CHED',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: _chedAccent,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                trailing: exportBtn,
-                children: [
-                  const Divider(height: 1, color: AdminColors.border),
-                  Container(
-                    color: AdminColors.background,
-                    child: isChed
-                        ? _readOnlyChedForm(answers)
-                        : _surveySnapshotBody(item, answers),
+                if (exportBtn != null) exportBtn,
+                IconButton(
+                  tooltip: 'View responses',
+                  onPressed: () => _openTracerResponseDetail(item),
+                  icon: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AdminColors.textSecondary,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _surveySnapshotBody(
-    SurveyResponseWithMeta item,
-    Map<String, dynamic> answers,
-  ) {
-    final surveyId = item.response.surveyId;
-    return FutureBuilder<Survey?>(
-      future: _cachedSurvey(surveyId),
-      builder: (context, surveySnap) {
-        if (!surveySnap.hasData &&
-            surveySnap.connectionState != ConnectionState.done) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: AdminStateView.loading(compact: true),
-          );
-        }
-
-        if (_looksLikeChedGts(surveySnap.data, answers)) {
-          return _readOnlyChedForm(answers);
-        }
-
-        return FutureBuilder<List<SurveyQuestion>>(
-          future: _cachedQuestions(surveyId),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return AdminStateView.error(
-                compact: true,
-                title: "Couldn't load this survey's questions.",
-                details: snapshot.error.toString(),
-                onRetry: () => _retryQuestions(surveyId),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: AdminStateView.loading(compact: true),
-              );
-            }
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              child: MemberDetailAnswerList(
-                questions: snapshot.data!,
-                answers: answers,
-              ),
-            );
-          },
-        );
-      },
     );
   }
 

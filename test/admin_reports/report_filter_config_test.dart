@@ -38,21 +38,31 @@ void main() {
       expect(constrained.surveyType, 'Official CHED GTS');
     });
 
-    test('institutional GTS summary declares cohort and wave filters', () {
+    test('employment employability declares cohort and wave filters', () {
       final schema = ReportFilterSchemas.byCatalogId(
-        'downloads.institutional_gts_summary',
+        'downloads.employment_employability',
       )!;
       expect(schema.supports(ReportFilterKey.batchYear), isTrue);
       expect(schema.supports(ReportFilterKey.course), isTrue);
       expect(schema.supports(ReportFilterKey.surveyWaves), isTrue);
     });
 
-    test('program cohort comparison supports compare-by via surveyType', () {
+    test('career mobility and compliance master share wave/cohort filters', () {
+      for (final id in [
+        'career_mobility',
+        'ched_compliance_master',
+      ]) {
+        final schema = ReportFilterSchemas.forDownloadsPreset(id)!;
+        expect(schema.supports(ReportFilterKey.surveyWaves), isTrue, reason: id);
+        expect(schema.supports(ReportFilterKey.course), isTrue, reason: id);
+      }
+    });
+
+    test('compliance master supports compare-by via surveyType', () {
       final schema = ReportFilterSchemas.forDownloadsPreset(
-        'program_cohort_comparison',
+        'ched_compliance_master',
       )!;
       expect(schema.supports(ReportFilterKey.surveyType), isTrue);
-      expect(schema.supports(ReportFilterKey.surveyWaves), isTrue);
     });
   });
 }

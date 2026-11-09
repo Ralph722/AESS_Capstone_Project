@@ -43,7 +43,7 @@ void main() {
         AdminMetricRibbon(
           items: [
             const AdminMetricRibbonItem(
-              label: 'On roster',
+              label: 'On alumni list',
               value: '10',
               icon: Icons.groups_outlined,
             ),
@@ -58,7 +58,7 @@ void main() {
         ),
       );
 
-      expect(find.text('On roster'), findsOneWidget);
+      expect(find.text('On alumni list'), findsOneWidget);
       expect(find.text('10'), findsOneWidget);
       expect(find.text('Registered'), findsOneWidget);
       expect(find.text('6'), findsOneWidget);
@@ -75,13 +75,13 @@ void main() {
         tester,
         AdminMetricRibbon(
           items: const [
-            AdminMetricRibbonItem(label: 'On roster', value: '10'),
+            AdminMetricRibbonItem(label: 'On alumni list', value: '10'),
             AdminMetricRibbonItem(label: 'Registered', value: '6'),
           ],
         ),
       );
 
-      expect(find.text('On roster'), findsOneWidget);
+      expect(find.text('On alumni list'), findsOneWidget);
       expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsNothing);
     });
 
@@ -92,7 +92,7 @@ void main() {
           collapsible: true,
           items: const [
             AdminMetricRibbonItem(
-              label: 'On roster',
+              label: 'On alumni list',
               value: '10',
             ),
             AdminMetricRibbonItem(
@@ -103,7 +103,7 @@ void main() {
         ),
       );
 
-      expect(find.text('On roster'), findsOneWidget);
+      expect(find.text('On alumni list'), findsOneWidget);
 
       // Tap collapse icon
       await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
@@ -116,7 +116,7 @@ void main() {
       await tester.tap(find.text('Show metrics'));
       await tester.pumpAndSettle();
 
-      expect(find.text('On roster'), findsOneWidget);
+      expect(find.text('On alumni list'), findsOneWidget);
       expect(find.text('Registered'), findsOneWidget);
     });
   });

@@ -232,9 +232,9 @@ abstract final class ReportFilterSchemas {
         ReportFilterKey.tracerStatus,
       },
     ),
-    // Institutional GTS Downloads templates (Phase 5).
+    // Audience-focused Institutional GTS Downloads (T1–T5).
     ReportFilterSchema(
-      catalogId: 'downloads.institutional_gts_summary',
+      catalogId: 'downloads.employment_employability',
       supported: {
         ReportFilterKey.batchYear,
         ReportFilterKey.course,
@@ -242,10 +242,11 @@ abstract final class ReportFilterSchemas {
       },
       notes:
           'Select one or more Official CHED waves. Leave waves empty to include '
-          'all published/closed Official CHED waves with submissions.',
+          'all published/closed Official CHED waves with submissions. Course/'
+          'batch filters act as the program view for this pack.',
     ),
     ReportFilterSchema(
-      catalogId: 'downloads.graduate_employment',
+      catalogId: 'downloads.curriculum_competency',
       supported: {
         ReportFilterKey.batchYear,
         ReportFilterKey.course,
@@ -253,7 +254,7 @@ abstract final class ReportFilterSchemas {
       },
     ),
     ReportFilterSchema(
-      catalogId: 'downloads.curriculum_relevance',
+      catalogId: 'downloads.industry_placement',
       supported: {
         ReportFilterKey.batchYear,
         ReportFilterKey.course,
@@ -261,7 +262,7 @@ abstract final class ReportFilterSchemas {
       },
     ),
     ReportFilterSchema(
-      catalogId: 'downloads.first_job_salary',
+      catalogId: 'downloads.career_mobility',
       supported: {
         ReportFilterKey.batchYear,
         ReportFilterKey.course,
@@ -269,20 +270,17 @@ abstract final class ReportFilterSchemas {
       },
     ),
     ReportFilterSchema(
-      catalogId: 'downloads.educational_background',
+      catalogId: 'downloads.ched_compliance_master',
       supported: {
         ReportFilterKey.batchYear,
         ReportFilterKey.course,
         ReportFilterKey.surveyWaves,
+        ReportFilterKey.surveyType,
       },
-    ),
-    ReportFilterSchema(
-      catalogId: 'downloads.alumni_demographics',
-      supported: {
-        ReportFilterKey.batchYear,
-        ReportFilterKey.course,
-        ReportFilterKey.surveyWaves,
-      },
+      notes:
+          'Use Compare by to add a batch or program trend table to the pack. '
+          'Aggregatable choice items only. For wave-to-wave deltas use CHED '
+          'wave comparison; for filled forms use the survey export modal.',
     ),
     ReportFilterSchema(
       catalogId: 'downloads.gts_participation_quality',
@@ -294,18 +292,6 @@ abstract final class ReportFilterSchemas {
       notes:
           'Select Official CHED waves (empty = all with submissions). Cohort '
           'filters apply to submitted respondents; assigned remains wave totals.',
-    ),
-    ReportFilterSchema(
-      catalogId: 'downloads.program_cohort_comparison',
-      supported: {
-        ReportFilterKey.batchYear,
-        ReportFilterKey.course,
-        ReportFilterKey.surveyWaves,
-        ReportFilterKey.surveyType,
-      },
-      notes:
-          'Use Survey type to choose compare-by: course or batch. Leave waves '
-          'empty to include all Official CHED waves with submissions.',
     ),
   ];
 

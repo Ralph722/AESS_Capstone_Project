@@ -291,7 +291,7 @@ void main() {
         ],
       );
       final text = GtsListExportService.toCsv(r);
-      expect(text, contains('Answered – not on active roster'));
+      expect(text, contains('Answered – not on the alumni list'));
       expect(text, contains(GtsListTables.offRosterNote));
     });
 
@@ -335,7 +335,7 @@ void main() {
         'Tracer status: Untracked – not registered; Batch: 2024',
       );
       expect(about['Order'], 'Name (Z to A)');
-      expect(about['Alumni'], '1 on the active roster');
+      expect(about['Alumni'], '1 on the alumni list');
     });
   });
 

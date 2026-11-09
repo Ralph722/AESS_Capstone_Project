@@ -567,8 +567,8 @@ class CustomReportExportService {
       title: 'Executive KPIs',
       headers: const ['Metric', 'Value'],
       rows: [
-        ['Roster total', '${a.rosterTotal}'],
-        ['Registered on roster', '${a.registeredOnRoster}'],
+        ['Alumni list total', '${a.rosterTotal}'],
+        ['Registered on alumni list', '${a.registeredOnRoster}'],
         [
           'Registration rate',
           '${(a.registrationRate * 100).toStringAsFixed(1)}%',
@@ -661,7 +661,7 @@ class CustomReportExportService {
     }
     return CustomReportSectionData(
       id: CustomReportSectionId.alumniRoster,
-      title: 'Alumni roster',
+      title: 'Alumni list',
       headers: const [
         'Name',
         'Course',

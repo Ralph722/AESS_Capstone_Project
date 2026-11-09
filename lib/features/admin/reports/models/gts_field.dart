@@ -30,7 +30,7 @@ enum GtsFieldSource {
   /// A CHED GTS answer in `survey_responses.answers`.
   chedAnswer,
 
-  /// The alumni roster (`alumni_members`).
+  /// The alumni list (`alumni_members`).
   roster,
 
   /// The survey wave the response belongs to.

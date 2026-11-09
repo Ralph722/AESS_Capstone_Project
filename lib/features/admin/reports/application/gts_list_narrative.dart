@@ -18,12 +18,12 @@ abstract final class GtsListNarrative {
     final asOf = _asOf.format(result.generatedAt.toLocal());
     final buffer = StringBuffer()
       ..writeln(
-        'This report covers ${tally.total} alumni on the active roster. '
+        'This report covers ${tally.total} alumni on the alumni list. '
         'Answers are taken from ${GtsListTables.scope(result)}. '
         '${tally.answered} of these alumni submitted the tracer, a response '
         'rate of $rate. The response rate is calculated by dividing the '
         'number who submitted the tracer (${tally.answered}) by the number '
-        'of alumni on the active roster (${tally.total}).',
+        'of alumni on the alumni list (${tally.total}).',
       );
 
     for (final section in GtsListTables.sections(result)) {
@@ -31,11 +31,11 @@ abstract final class GtsListNarrative {
       final categories = [
         for (final line in section.lines)
           if (!line.isRate && !line.isTotal)
-            '${line.count} (${line.share.isEmpty ? 'outside the roster total' : line.share}) ${line.label}',
+            '${line.count} (${line.share.isEmpty ? 'outside the alumni list total' : line.share}) ${line.label}',
       ];
       if (section.title == 'Tracer status') {
         buffer.writeln(
-          'By tracer status, the roster is distributed as follows: '
+          'By tracer status, the alumni list is distributed as follows: '
           '${categories.join('; ')}.',
         );
         continue;
@@ -73,7 +73,7 @@ abstract final class GtsListNarrative {
     if (offRoster > 0) {
       buffer.writeln(
         '$offRoster ${offRoster == 1 ? 'graduate' : 'graduates'} submitted '
-        'the tracer without an active roster record. '
+        'the tracer without an active alumni list record. '
         '${offRoster == 1 ? 'This graduate is' : 'These graduates are'} '
         'listed separately and ${offRoster == 1 ? 'is' : 'are'} not included '
         'in the total or in the rates above.',

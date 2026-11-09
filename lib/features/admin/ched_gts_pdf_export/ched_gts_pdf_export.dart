@@ -12,3 +12,6 @@ export 'ched_gts_pdf_option_maps.dart';
 export 'ched_gts_pdf_person_export.dart';
 export 'ched_gts_pdf_template.dart';
 export 'ched_gts_pdf_text_fit.dart';
+export 'individual_info_batch_export.dart';
+export 'individual_info_person_export.dart';
+export 'individual_info_sheet_pdf.dart';

@@ -273,7 +273,7 @@ void main() {
       expect(find.text(GtsListTables.totalLabel), findsOneWidget);
       expect(find.text('3 of 5'), findsOneWidget);
       expect(
-        find.textContaining('Tracer 2026 · 5 alumni on the active roster'),
+        find.textContaining('Tracer 2026 · 5 alumni on the alumni list'),
         findsOneWidget,
       );
     });

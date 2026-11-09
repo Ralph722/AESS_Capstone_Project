@@ -15,23 +15,16 @@ class DssRerunDiff {
   final int becameFinding;
 
   bool get isEmpty =>
-      raised == 0 &&
-      movedToWatch == 0 &&
-      superseded == 0 &&
-      becameFinding == 0;
+      raised == 0 && movedToWatch == 0 && superseded == 0 && becameFinding == 0;
 
   /// Short banner text, or null when nothing changed.
   String? get bannerText {
     if (isEmpty) return null;
     final parts = <String>[
-      if (raised > 0)
-        '$raised new finding${raised == 1 ? '' : 's'}',
-      if (becameFinding > 0)
-        '$becameFinding moved to Open',
-      if (movedToWatch > 0)
-        '$movedToWatch moved to Watch',
-      if (superseded > 0)
-        '$superseded superseded',
+      if (raised > 0) '$raised new finding${raised == 1 ? '' : 's'}',
+      if (becameFinding > 0) '$becameFinding moved to Open',
+      if (movedToWatch > 0) '$movedToWatch moved to Watch',
+      if (superseded > 0) '$superseded superseded',
     ];
     return parts.join(' · ');
   }

@@ -342,7 +342,7 @@ void main() {
 
     // Step 2: the record collapses and the account fields appear.
     expect(find.bySemanticsLabel('Step 2 of 3: Account'), findsOneWidget);
-    expect(find.text('Verified on official alumni roster'), findsOneWidget);
+    expect(find.text('Verified on the official alumni list'), findsOneWidget);
     expect(find.text('Maria Santos'), findsOneWidget);
     expect(find.textContaining('ID 2019-12345'), findsOneWidget);
     expect(field('Full name'), findsNothing);

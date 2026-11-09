@@ -65,7 +65,7 @@ abstract final class GtsReportTemplates {
         templateKey: 'employment_by_year',
         title: 'Employment status by graduation year',
         description:
-            'Item 16 answers for each graduation year (batch) on the roster. '
+            'Item 16 answers for each graduation year (batch) on the alumni list. '
             '$_notEmployedNote',
         surveyIds: [],
         measure: 'ched_16',
@@ -82,7 +82,7 @@ abstract final class GtsReportTemplates {
         templateKey: 'employment_by_course',
         title: 'Employment status by course',
         description:
-            'Item 16 answers for each course on the roster. '
+            'Item 16 answers for each course on the alumni list. '
             '$_notEmployedNote',
         surveyIds: [],
         measure: 'ched_16',

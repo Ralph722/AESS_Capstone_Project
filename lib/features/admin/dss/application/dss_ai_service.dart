@@ -89,7 +89,7 @@ class DssAiService {
       if (evidence != null) 'Evidence: $evidence',
       if (flag.certainty != null && flag.isFinding)
         'Certainty: ${flag.certainty!.label}',
-      'Roster in group: ${flag.eligibleN ?? 'not available'}',
+      'Alumni list in group: ${flag.eligibleN ?? 'not available'}',
       'Fixed recommended action: ${DssCopy.displayRecommendedAction(flag)}',
       'Your reply must include the value '
           '"${requiredValueText(flag) ?? 'not shown'}" and the number of '

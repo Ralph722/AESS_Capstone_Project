@@ -36,7 +36,7 @@ class DssReportCardService {
     DssNoteEventType.outcome,
   };
 
-  /// Programs on the active roster, alphabetical.
+  /// Programs on the alumni list, alphabetical.
   Future<List<String>> courses() async {
     final members = await _members.getAllMembers();
     final set = <String>{

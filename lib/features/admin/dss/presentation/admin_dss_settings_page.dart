@@ -399,8 +399,9 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AdminSurfaces.radiusSm),
+                      borderRadius: BorderRadius.circular(
+                        AdminSurfaces.radiusSm,
+                      ),
                     ),
                   ),
                   child: const Text('Save'),

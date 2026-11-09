@@ -5,9 +5,9 @@ import 'package:alumni_system/features/admin/reports/models/report_catalog.dart'
 import 'package:alumni_system/features/admin/reports/models/report_filter_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_downloads_panel.dart';
 
-/// Phase 6: contract checks across catalog ↔ Downloads UI ↔ filters ↔ generators.
+/// Contract checks across catalog ↔ Downloads UI ↔ filters ↔ generators.
 void main() {
-  group('Phase 6 Downloads validation', () {
+  group('Audience Downloads validation', () {
     test('panel presets are available, filtered, and uniquely ordered', () {
       final panelIds = ReportsDownloadsPanel.presets.map((p) => p.id).toList();
       expect(panelIds.toSet().length, panelIds.length);
@@ -56,47 +56,35 @@ void main() {
       }
     });
 
-    test('program cohort comparison and T07 participation quality are wired',
-        () {
-      for (final id in [
-        InstitutionalChedTemplates.programCohortComparison,
-        InstitutionalChedTemplates.gtsParticipationQuality,
-      ]) {
-        expect(
-          InstitutionalChedTemplates.isInstitutionalChedPreset(id),
-          isTrue,
-          reason: id,
-        );
-        expect(
-          AessReportCatalog.byDownloadsPresetId(id)?.isAvailable,
-          isTrue,
-          reason: id,
-        );
-        expect(
-          ReportsDownloadsPanel.presets.any((p) => p.id == id),
-          isTrue,
-          reason: id,
-        );
-        expect(
-          ReportFilterSchemas.forDownloadsPreset(id),
-          isNotNull,
-          reason: id,
-        );
-      }
+    test('participation quality remains wired under comparisons', () {
+      const id = InstitutionalChedTemplates.gtsParticipationQuality;
+      expect(InstitutionalChedTemplates.isInstitutionalChedPreset(id), isTrue);
+      expect(AessReportCatalog.byDownloadsPresetId(id)?.isAvailable, isTrue);
+      expect(
+        ReportsDownloadsPanel.presets.any((p) => p.id == id),
+        isTrue,
+      );
+      expect(ReportFilterSchemas.forDownloadsPreset(id), isNotNull);
       expect(AessReportCatalog.planned, isEmpty);
     });
 
-    test('employment template is narrower than institutional summary', () {
-      final summary = InstitutionalChedTemplates.fieldsFor(
-        InstitutionalChedTemplates.institutionalSummary,
+    test('T1 employment pack is narrower than compliance master', () {
+      final compliance = InstitutionalChedTemplates.fieldsFor(
+        InstitutionalChedTemplates.chedComplianceMaster,
       );
       final employment = InstitutionalChedTemplates.fieldsFor(
-        InstitutionalChedTemplates.graduateEmployment,
+        InstitutionalChedTemplates.employmentEmployability,
       );
-      expect(employment.length, lessThan(summary.length));
+      expect(employment.length, lessThan(compliance.length));
       expect(
         employment.map((e) => e.questionId),
-        containsAll(['ched_16', 'ched_21']),
+        containsAll(['ched_16', 'ched_21', 'ched_29']),
+      );
+      expect(
+        InstitutionalChedTemplates.fieldsFor(
+          InstitutionalChedTemplates.curriculumCompetency,
+        ).map((e) => e.questionId),
+        contains('ched_15b'),
       );
     });
 

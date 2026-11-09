@@ -156,7 +156,7 @@ abstract final class GtsListColumns {
   /// Best available name for the Name column.
   ///
   /// Answered: submitted tracer name, else roster. Registered and not yet
-  /// answered: profile name, else roster. Not registered: roster name.
+  /// answered: profile name, else roster. Not registered: name on the alumni list.
   static String _nameCell(GtsListRow row) {
     final item = ChedGtsBuiltin.byId(GtsListConfig.sectionANameColumn);
     if (row.response != null) {
@@ -238,7 +238,7 @@ abstract final class GtsListColumns {
   /// Null when [column] is not a counted question for [row]: free text,
   /// a question the form did not show, or section B–D for someone who has
   /// not submitted. An empty list means the question was shown and left
-  /// blank. Only alumni on the active roster are counted by the tally;
+  /// blank. Only alumni on the alumni list are counted by the tally;
   /// this method still returns labels for an off-roster row so the cell
   /// and the tally use one reading of the answer.
   static List<String>? tallyCategories(GtsListColumn column, GtsListRow row) {
@@ -390,26 +390,26 @@ abstract final class GtsListColumns {
       group: alumniGroup,
       description:
           'Best available name for each alumnus: the name on the tracer '
-          'when they have answered, otherwise the profile or roster name.',
+          'when they have answered, otherwise the profile or name on the alumni list.',
       personal: true,
     ),
     GtsListColumn(
       key: GtsListConfig.batchColumn,
       header: 'Batch',
       group: alumniGroup,
-      description: 'Graduation year on the roster.',
+      description: 'Graduation year on the alumni list.',
     ),
     GtsListColumn(
       key: GtsListConfig.courseColumn,
       header: 'Course',
       group: alumniGroup,
-      description: 'Course on the roster.',
+      description: 'Course on the alumni list.',
     ),
     GtsListColumn(
       key: studentIdColumn,
       header: 'Student ID',
       group: alumniGroup,
-      description: 'Student ID on the roster.',
+      description: 'Student ID on the alumni list.',
       personal: true,
     ),
     GtsListColumn(

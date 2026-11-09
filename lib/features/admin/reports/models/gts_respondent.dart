@@ -21,9 +21,9 @@ class GtsRespondent {
   /// Roster graduation year (batch); empty when unknown.
   final String yearGraduated;
 
-  /// Linked to an active (not deactivated) roster record.
+  /// Linked to an active (not deactivated) alumni list record.
   final bool onActiveRoster;
 
-  /// Counted by the DSS: on the active roster with a course.
+  /// Counted by the DSS: on the alumni list with a course.
   bool get isRosterLinked => onActiveRoster && course.trim().isNotEmpty;
 }

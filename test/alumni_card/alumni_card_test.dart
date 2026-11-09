@@ -211,7 +211,7 @@ void main() {
       ),
     );
     await tester.pump(); // resolve token
-    expect(find.text('DIGITAL ID'), findsOneWidget);
+    expect(find.text('Lifetime Member'), findsOneWidget);
     expect(find.text('Juan Dela Cruz'), findsOneWidget);
     expect(find.text('SCAN TO VERIFY'), findsNothing);
 
@@ -219,14 +219,15 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('SCAN TO VERIFY'), findsOneWidget);
+    expect(find.text('USTP ALUMNI OFFICE'), findsOneWidget);
     expect(find.text('K7Q-4MZ'), findsOneWidget);
-    expect(find.textContaining('Non-transferable'), findsOneWidget);
+    expect(find.textContaining('Non-transferable'), findsNothing);
     expect(find.textContaining('Refreshes in'), findsWidgets);
 
     await tester.tap(find.byType(AlumniDigitalCard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('DIGITAL ID'), findsOneWidget);
+    expect(find.text('Lifetime Member'), findsOneWidget);
   });
 
   testWidgets('dialog shows unmatched status', (tester) async {
@@ -261,7 +262,7 @@ void main() {
       issueToken: () async => _token(),
     );
     expect(find.text('Juan Dela Cruz'), findsOneWidget);
-    expect(find.text('DIGITAL ID'), findsOneWidget);
+    expect(find.text('Lifetime Member'), findsOneWidget);
     expect(find.text('Tap the card to switch sides'), findsOneWidget);
     expect(find.text('Show back'), findsNothing);
     expect(find.text('Done'), findsNothing);
@@ -285,13 +286,13 @@ void main() {
       ),
     );
     expect(find.text('Saved copy · QR needs internet'), findsOneWidget);
-    expect(find.text('OFFLINE'), findsOneWidget);
     expect(find.text('Saved copy · not live'), findsOneWidget);
 
     await tester.tap(find.byType(AlumniDigitalCard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('OFFLINE COPY'), findsOneWidget);
+    expect(find.text('OFFLINE'), findsOneWidget);
     expect(find.text('QR needs internet'), findsOneWidget);
   });
 

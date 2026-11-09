@@ -57,13 +57,11 @@ class ReportsDownloadsPanel extends StatelessWidget {
   };
 
   static const _presetSections = <String, List<CustomReportSectionId>>{
-    'institutional_gts': <CustomReportSectionId>[],
-    'graduate_employment': <CustomReportSectionId>[],
-    'curriculum_relevance': <CustomReportSectionId>[],
-    'first_job_salary': <CustomReportSectionId>[],
-    'educational_background': <CustomReportSectionId>[],
-    'alumni_demographics': <CustomReportSectionId>[],
-    'program_cohort_comparison': <CustomReportSectionId>[],
+    'employment_employability': <CustomReportSectionId>[],
+    'curriculum_competency': <CustomReportSectionId>[],
+    'industry_placement': <CustomReportSectionId>[],
+    'career_mobility': <CustomReportSectionId>[],
+    'ched_compliance_master': <CustomReportSectionId>[],
     'gts_participation_quality': <CustomReportSectionId>[],
     'executive': [
       CustomReportSectionId.executiveKpis,
@@ -88,40 +86,36 @@ class ReportsDownloadsPanel extends StatelessWidget {
   /// Category → preset ids for the Downloads library layout.
   static const categoryPresetIds = <ReportCatalogCategory, List<String>>{
     ReportCatalogCategory.institutionalGts: [
-      'institutional_gts',
-      'graduate_employment',
-      'curriculum_relevance',
-      'first_job_salary',
-      'educational_background',
-      'alumni_demographics',
+      'employment_employability',
+      'curriculum_competency',
+      'industry_placement',
+      'career_mobility',
+      'ched_compliance_master',
     ],
     ReportCatalogCategory.comparisonsAndQuality: [
       'ched_wave_compare',
-      'program_cohort_comparison',
       'gts_participation_quality',
       'survey',
-      'ched',
     ],
     ReportCatalogCategory.operations: [
       'executive',
+      'ched',
       'tracer',
       'roster',
     ],
   };
 
   static const _presetOrder = <String>[
-    'institutional_gts',
-    'graduate_employment',
-    'curriculum_relevance',
-    'first_job_salary',
-    'educational_background',
-    'alumni_demographics',
+    'employment_employability',
+    'curriculum_competency',
+    'industry_placement',
+    'career_mobility',
+    'ched_compliance_master',
     'ched_wave_compare',
-    'program_cohort_comparison',
     'gts_participation_quality',
     'survey',
-    'ched',
     'executive',
+    'ched',
     'tracer',
     'roster',
   ];
@@ -251,7 +245,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
             child: Tooltip(
               message:
                   '${AessReportCatalog.downloadsIntro} '
-                  'Roster and employment extracts use these filters. '
+                  'Alumni list and employment extracts use these filters. '
                   'Change them on the Tracer or Survey tab.',
               waitDuration: const Duration(milliseconds: 500),
               child: Container(
@@ -327,7 +321,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
     final scopeText = (scope != null && scope.isNotEmpty)
         ? scope
         : filtered
-        ? 'Roster and employment rows use: $filterLabel. Other sections '
+        ? 'Alumni list and employment rows use: $filterLabel. Other sections '
               'cover the whole system.'
         : 'Whole system (batch and course filters do not apply). '
               '(${AessReportCatalog.institutionalScopeBadge})';

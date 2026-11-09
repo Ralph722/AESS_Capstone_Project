@@ -25,13 +25,11 @@ void main() {
 
     test('downloads presets map one-to-one to available catalog entries', () {
       const presetIds = [
-        'institutional_gts',
-        'graduate_employment',
-        'curriculum_relevance',
-        'first_job_salary',
-        'educational_background',
-        'alumni_demographics',
-        'program_cohort_comparison',
+        'employment_employability',
+        'curriculum_competency',
+        'industry_placement',
+        'career_mobility',
+        'ched_compliance_master',
         'gts_participation_quality',
         'executive',
         'ched',
@@ -85,19 +83,17 @@ void main() {
       );
       expect(
         AessReportCatalog.byDownloadsPresetId('roster')!.title,
-        'Active roster extract',
+        'Active alumni list extract',
       );
     });
 
-    test('institutional GTS template set is available in Downloads', () {
+    test('audience institutional GTS template set is available in Downloads', () {
       for (final id in [
-        'institutional_gts',
-        'graduate_employment',
-        'curriculum_relevance',
-        'first_job_salary',
-        'educational_background',
-        'alumni_demographics',
-        'program_cohort_comparison',
+        'employment_employability',
+        'curriculum_competency',
+        'industry_placement',
+        'career_mobility',
+        'ched_compliance_master',
         'gts_participation_quality',
       ]) {
         expect(
@@ -106,6 +102,14 @@ void main() {
           reason: id,
         );
       }
+      expect(
+        AessReportCatalog.byDownloadsPresetId('institutional_gts'),
+        isNull,
+      );
+      expect(
+        AessReportCatalog.byDownloadsPresetId('program_cohort_comparison'),
+        isNull,
+      );
       expect(AessReportCatalog.planned, isEmpty);
     });
 

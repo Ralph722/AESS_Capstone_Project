@@ -21,13 +21,14 @@ import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/web_file_upload.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/admin/ched_gts_pdf_export/ched_gts_pdf_export.dart';
 
-/// Official alumni roster — Phase 1 admin directory.
+/// Official alumni list — Phase 1 admin directory.
 class AdminAlumniDirectoryScreen extends StatefulWidget {
   const AdminAlumniDirectoryScreen({super.key});
 
@@ -61,7 +62,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
   /// Directory tab: 0 = all alumni, 1 = profile updates, 2 = deactivated.
   int _viewIndex = 0;
   AlumniMember? _selectedMember;
-  bool _exportingChedBatch = false;
+  bool _exportingReportsBatch = false;
   int _page = 0;
   int _pageSize = 25;
 
@@ -213,7 +214,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       _showSnack(
         _friendlyError(
           e,
-          "Couldn't load the roster. Check your connection and try Refresh.",
+          "Couldn't load the alumni list. Check your connection and try Refresh.",
         ),
         isError: true,
       );
@@ -265,16 +266,38 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     return technical ? fallback : text;
   }
 
-  Future<void> _exportChedGtsPdfBatch() async {
+  Future<void> _onDownloadReportsPressed() async {
     if (!requireWebExport(context)) return;
     if (_allMembers.isEmpty) {
-      _showSnack('No alumni on the roster to export', isError: true);
+      _showSnack('No alumni on the alumni list to export', isError: true);
       return;
     }
 
+    final kind = await showAdminOptionPicker<DirectoryBulkReportKind>(
+      context: context,
+      title: 'Download Reports',
+      options: const [
+        AdminPickerOption(
+          value: DirectoryBulkReportKind.chedGtsPdf,
+          label: 'CHED GTS PDFs',
+          icon: Icons.picture_as_pdf_outlined,
+        ),
+        AdminPickerOption(
+          value: DirectoryBulkReportKind.individualInfoSheet,
+          label: 'Individual Information Sheets',
+          icon: Icons.badge_outlined,
+        ),
+      ],
+    );
+    if (kind == null || !mounted) return;
+    await _exportReportsBatch(kind);
+  }
+
+  Future<void> _exportReportsBatch(DirectoryBulkReportKind kind) async {
     final choice = await showChedBulkExportDialog(
       context,
       members: _allMembers,
+      kind: kind,
     );
     if (choice == null || !mounted) return;
 
@@ -292,9 +315,10 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       return;
     }
 
+    final isChed = kind == DirectoryBulkReportKind.chedGtsPdf;
     final flattenFields = choice.flattenFields;
 
-    setState(() => _exportingChedBatch = true);
+    setState(() => _exportingReportsBatch = true);
     final progress = ValueNotifier<(int, int, String?)>((
       0,
       selected.length,
@@ -307,7 +331,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
         canPop: false,
         child: AlertDialog(
           shape: directoryAlertDialogShape,
-          title: directoryDialogTitle('Building CHED GTS ZIP'),
+          title: directoryDialogTitle(
+            isChed ? 'Building CHED GTS ZIP' : 'Building Individual Info ZIP',
+          ),
           content: ValueListenableBuilder<(int, int, String?)>(
             valueListenable: progress,
             builder: (_, value, __) {
@@ -339,50 +365,100 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       ),
     );
 
-    final batch = ChedGtsPdfBatchExportService();
     try {
-      final result = await batch.buildZip(
-        members: selected,
-        flatten: flattenFields,
-        onProgress: (done, total, name) {
-          progress.value = (done, total, name);
-        },
-      );
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      if (!mounted) return;
+      if (isChed) {
+        final batch = ChedGtsPdfBatchExportService();
+        final result = await batch.buildZip(
+          members: selected,
+          flatten: flattenFields,
+          onProgress: (done, total, name) {
+            progress.value = (done, total, name);
+          },
+        );
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
+        if (!mounted) return;
 
-      final downloaded = tryDownloadBytesOnWeb(
-        context,
-        bytes: result.zipBytes,
-        fileName: result.zipFileName,
-        mimeType: 'application/zip',
-      );
-      if (!downloaded) return;
+        final downloaded = tryDownloadBytesOnWeb(
+          context,
+          bytes: result.zipBytes,
+          fileName: result.zipFileName,
+          mimeType: 'application/zip',
+        );
+        if (!downloaded) return;
 
-      await batch.logBatchSuccess(
-        result: result,
-        selectedCount: selected.length,
-      );
+        await batch.logBatchSuccess(
+          result: result,
+          selectedCount: selected.length,
+        );
 
-      if (!mounted) return;
-      final skipped = result.failures.length;
-      _showSnack(
-        skipped == 0
-            ? 'Downloaded ZIP with ${result.successCount} CHED GTS PDF(s)'
-            : 'Downloaded ZIP with ${result.successCount} PDF(s); '
-                  '$skipped skipped/failed',
-      );
+        if (!mounted) return;
+        final skipped = result.failures.length;
+        _showSnack(
+          skipped == 0
+              ? 'Downloaded ZIP with ${result.successCount} CHED GTS PDF(s)'
+              : 'Downloaded ZIP with ${result.successCount} PDF(s); '
+                    '$skipped skipped/failed',
+        );
+      } else {
+        final batch = IndividualInfoBatchExportService();
+        final result = await batch.buildZip(
+          members: selected,
+          onProgress: (done, total, name) {
+            progress.value = (done, total, name);
+          },
+        );
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
+        if (!mounted) return;
+
+        final downloaded = tryDownloadBytesOnWeb(
+          context,
+          bytes: result.zipBytes,
+          fileName: result.zipFileName,
+          mimeType: 'application/zip',
+        );
+        if (!downloaded) return;
+
+        await batch.logBatchSuccess(
+          result: result,
+          selectedCount: selected.length,
+        );
+
+        if (!mounted) return;
+        final skipped = result.failures.length;
+        _showSnack(
+          skipped == 0
+              ? 'Downloaded ZIP with ${result.successCount} '
+                    'Individual Information Sheet(s)'
+              : 'Downloaded ZIP with ${result.successCount} PDF(s); '
+                    '$skipped skipped/failed',
+        );
+      }
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      await batch.logBatchFailure(error: e, selectedCount: selected.length);
+      if (isChed) {
+        await ChedGtsPdfBatchExportService().logBatchFailure(
+          error: e,
+          selectedCount: selected.length,
+        );
+      } else {
+        await IndividualInfoBatchExportService().logBatchFailure(
+          error: e,
+          selectedCount: selected.length,
+        );
+      }
       if (!mounted) return;
       _showSnack(
-        _friendlyError(e, 'CHED GTS export failed. Please try again.'),
+        _friendlyError(
+          e,
+          isChed
+              ? 'CHED GTS export failed. Please try again.'
+              : 'Individual Information export failed. Please try again.',
+        ),
         isError: true,
       );
     } finally {
       progress.dispose();
-      if (mounted) setState(() => _exportingChedBatch = false);
+      if (mounted) setState(() => _exportingReportsBatch = false);
     }
   }
 
@@ -422,12 +498,12 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
               action: 'CREATE_ROSTER_MEMBER',
               resource: 'AlumniMember',
               resourceId: created.id,
-              description: 'Added roster: ${created.fullName}',
+              description: 'Added to alumni list: ${created.fullName}',
               userRole: 'admin',
               module: 'alumni',
               targetLabel: created.fullName,
             );
-            successMessage = '${created.fullName} added to roster';
+            successMessage = '${created.fullName} added to the alumni list';
           } else {
             await _memberService.updateRosterMember(
               id: existing.id,
@@ -440,18 +516,18 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
               action: 'UPDATE_ROSTER_MEMBER',
               resource: 'AlumniMember',
               resourceId: existing.id,
-              description: 'Updated roster: ${input.fullName.trim()}',
+              description: 'Updated alumni list: ${input.fullName.trim()}',
               userRole: 'admin',
               module: 'alumni',
               targetLabel: input.fullName.trim(),
             );
-            successMessage = 'Roster entry updated';
+            successMessage = 'Alumni list entry updated';
           }
           return null;
         } catch (e) {
           return _friendlyError(
             e,
-            "Couldn't save the roster entry. Please try again.",
+            "Couldn't save the alumni list entry. Please try again.",
           );
         }
       },
@@ -525,7 +601,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       _showSnack(
         _friendlyError(
           e,
-          "Import failed. Check that the file is a valid Excel roster and try again.",
+          "Import failed. Check that the file is a valid Excel alumni list and try again.",
         ),
         isError: true,
       );
@@ -550,7 +626,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
         _showSnack('${member.fullName}\'s portal account was removed');
       } else {
         await _memberService.deleteMember(member.id);
-        _showSnack('${member.fullName} removed from roster');
+        _showSnack('${member.fullName} removed from the alumni list');
       }
       if (action == 'deactivate' || !registered) {
         await _auditService.logAction(
@@ -674,19 +750,27 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 style: AdminButtonStyles.outlined(),
               ),
               Tooltip(
-                message: 'Download CHED GTS PDFs as a ZIP',
+                message:
+                    'Download CHED GTS PDFs or Individual Information Sheets',
                 child: OutlinedButton.icon(
-                  onPressed: _isLoading || _exportingChedBatch || _allMembers.isEmpty
+                  onPressed:
+                      _isLoading ||
+                          _exportingReportsBatch ||
+                          _allMembers.isEmpty
                       ? null
-                      : _exportChedGtsPdfBatch,
-                  icon: _exportingChedBatch
+                      : _onDownloadReportsPressed,
+                  icon: _exportingReportsBatch
                       ? const SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.picture_as_pdf_outlined, size: 15),
-                  label: Text(_exportingChedBatch ? 'Exporting…' : 'Export CHED GTS'),
+                      : const Icon(Icons.download_outlined, size: 15),
+                  label: Text(
+                    _exportingReportsBatch
+                        ? 'Exporting…'
+                        : 'Download Reports',
+                  ),
                   style: AdminButtonStyles.outlined(),
                 ),
               ),
@@ -702,7 +786,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           AdminMetricRibbon(
             items: [
               AdminMetricRibbonItem(
-                label: 'On roster',
+                label: 'On alumni list',
                 value: '${_allMembers.length}',
                 icon: Icons.groups_outlined,
                 color: AdminColors.primary,
@@ -1080,7 +1164,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       if (_allMembers.isEmpty) {
         empty = AdminStateView.empty(
           icon: Icons.groups_outlined,
-          title: 'No alumni on the roster yet',
+          title: 'No alumni on the alumni list yet',
           message:
               'Add members one at a time or import an Excel file with columns: Full Name, Course, ID Number, and optionally Year Graduated.',
           primaryAction: AdminStateAction(

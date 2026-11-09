@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:alumni_system/core/constants/course_constants.dart';
+import 'package:alumni_system/features/admin/reports/application/institutional_ched_templates.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/features/admin/reports/models/report_catalog.dart';
 import 'package:alumni_system/features/admin/reports/models/report_filter_config.dart';
@@ -105,7 +106,10 @@ class _ReportsDownloadConfigDialogState
       _waveIds = {f.surveyId!};
     }
     _surveyType = f.surveyType ??
-        (widget.preset.id == 'program_cohort_comparison' ? 'course' : null);
+        (widget.preset.id ==
+                InstitutionalChedTemplates.chedComplianceMaster
+            ? 'batch'
+            : null);
     _registration = CustomReportRegistrationFilter.all;
     _tracer = CustomReportTracerFilter.all;
     _employment = CustomReportEmploymentFilter.all;
@@ -210,15 +214,19 @@ class _ReportsDownloadConfigDialogState
                 ),
               ],
               const SizedBox(height: 14),
-              if (widget.preset.id == 'program_cohort_comparison') ...[
+              if (widget.preset.id ==
+                  InstitutionalChedTemplates.chedComplianceMaster) ...[
                 DirectoryFilterField<String>(
                   label: 'Compare by',
-                  value: _surveyType == 'batch' ? 'batch' : 'course',
+                  value: _surveyType == 'course' ? 'course' : 'batch',
                   items: const [
-                    DropdownMenuItem(value: 'course', child: Text('Course / program')),
                     DropdownMenuItem(
                       value: 'batch',
                       child: Text('Graduation batch'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'course',
+                      child: Text('Course / program'),
                     ),
                   ],
                   onChanged: (v) {

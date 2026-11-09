@@ -346,7 +346,7 @@ void main() {
     expect(find.textContaining('"Share of all graduates"'), findsOneWidget);
     expect(changes, isEmpty);
 
-    await tester.tap(find.text('Count roster graduates only'));
+    await tester.tap(find.text('Count alumni list graduates only'));
     await tester.pumpAndSettle();
     expect(changes.last.population, GtsPopulation.rosterLinked);
     expect(changes.last.calculation, GtsCalculation.shareOfAllRespondents);

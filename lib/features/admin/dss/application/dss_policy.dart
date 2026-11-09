@@ -26,7 +26,7 @@ abstract final class DssPolicy {
   /// Outcome findings carry a coverage warning below this response rate.
   static const lowCoverageBelow = 0.30;
 
-  /// Batch label for roster records without a batch (course level only).
+  /// Batch label for alumni list records without a batch (course level only).
   static const batchNotRecorded = 'Batch not recorded';
 
   /// Lowest `min_n` Settings accepts. Data-quality rules use it as the
@@ -57,7 +57,7 @@ abstract final class DssPolicy {
   }
 
   /// Roster course and batch for [member]. Null when the respondent is not
-  /// linked to an active roster record or the record has no course: they
+  /// linked to an alumni list record or the record has no course: they
   /// never count toward a course, a batch or (for now) institution totals.
   static DssMemberGroup? groupOf(AlumniMember? member) {
     if (member == null) return null;

@@ -11,7 +11,7 @@ enum GtsTracerStatus {
   statusNotGiven('Answered, status not given'),
   untrackedRegistered('Untracked – registered, not yet answered'),
   untrackedNotRegistered('Untracked – not registered'),
-  offRoster('Answered – not on active roster');
+  offRoster('Answered – not on the alumni list');
 
   const GtsTracerStatus(this.label);
 
@@ -32,7 +32,7 @@ enum GtsTracerStatus {
   bool get untracked =>
       this == untrackedRegistered || this == untrackedNotRegistered;
 
-  /// Counted in the list's total alumni (the active roster in scope).
+  /// Counted in the list's total alumni (the alumni list in scope).
   bool get onRoster => this != offRoster;
 
   static GtsTracerStatus? byName(Object? raw) {
@@ -56,7 +56,7 @@ enum GtsListChart {
   donut,
 }
 
-/// An alumni list definition: one row per alumnus on the active roster.
+/// An alumni list definition: one row per alumnus on the alumni list.
 /// Holds column keys and filters only, never names or answers.
 class GtsListConfig {
   const GtsListConfig({

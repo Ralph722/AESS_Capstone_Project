@@ -303,7 +303,7 @@ class AdminDashboardHome extends StatelessWidget {
         value: _metric(_pct(m.rosterTotal == 0 ? null : m.registrationRate)),
         caption:
             _metricsStatus ??
-            '${m.registeredOnRoster} of ${m.rosterTotal} on the roster',
+            '${m.registeredOnRoster} of ${m.rosterTotal} on the alumni list',
         icon: Icons.how_to_reg_outlined,
         palette: AdminAccents.blue,
         dense: dense,
@@ -465,7 +465,7 @@ class AdminDashboardHome extends StatelessWidget {
       body = state;
     } else if (programs.isEmpty) {
       body = const AdminStateView.empty(
-        title: 'No alumni on the roster yet',
+        title: 'No alumni on the alumni list yet',
         icon: Icons.school_outlined,
         compact: true,
       );

@@ -186,7 +186,10 @@ Values below are the **defaults written by the migrations** (seed values plus Ph
 | `SEEKING_WORK_HIGH` | Many alumni looking for work | Outcome | Looking for work ÷ (employed + looking) | at least | 15% | 10 | Warning | **Off** (inserted switched off) |
 | `RELATEDNESS_LOW` | Jobs not aligned with course | Outcome | (Q24 "No" or Q32 "No") ÷ answered either | at least | 40% | 10 | Warning | On |
 | `UNDEREMPLOYMENT` | Underemployment (job level) | Outcome | Q30 "Rank or Clerical" ÷ employed with a job level | at least | 35% | 10 | Warning | On |
-| `TIME_TO_JOB_LONG` | Long time to first job | Outcome | Q29 1 to less than 4 years ÷ Q29 answers (excluding "Others") | at least | 40% | 10 | Warning | On |
+| `QUALIFICATION_MISMATCH` | Qualification mismatch (possible underemployment) | Outcome | Q24 "No" and Q30.1 Rank/Clerical ÷ answered both (tracer proxy, not CHED/PSA certified) | at least | 25% | 10 | Warning | On |
+| `TIME_TO_JOB_LONG` | Long time to first job | Outcome | Q29 longer than 6 months (7 to 11 months through 3 to less than 4 years) ÷ Q29 answers (excluding "Others") | at least | 40% | 10 | Warning | On |
+| `PLACEMENT_CHANNEL_LOW` | Low institutional placement channels | Outcome | Q28 school placement officer or Job Fair/PESO ÷ Q28 answers (excluding "Others") | less than (`lt`) | 10% | 10 | Warning | On |
+| `SALARY_LOW_ENTRY` | Low first-job salary brackets | Outcome | Q31 bottom two brackets ÷ Q31 answers | at least | 40% | 10 | Warning | On |
 | `SALARY_STAGNATION` | Salary below peer programs | Outcome | Other courses' median Q31 bracket − this group's median bracket | at least | 1.0 bracket | 10 | Info | On |
 | `RELATEDNESS_HIGH` | Strong course alignment | Opportunity | Aligned ÷ answered either (Q24/Q32) | at least | 75% | 10 | Info | On |
 | `UNEMPLOYMENT_TREND_UP` | Unemployment rising between waves | Trend | This wave's not-employed rate − previous wave's | at least | +10 percentage points | 10 (in **both** waves) | Warning | On |
@@ -256,7 +259,7 @@ All numbers are **hypothetical** and use default thresholds.
 | `SEEKING_WORK_HIGH` (if switched on) | 10 employed; 3 not employed citing "No job opportunity" | 3 ÷ (10 + 3) = 23.1% ≥ 15% | Finding (13 valid answers) |
 | `RELATEDNESS_LOW` | 14 answered Q24 or Q32; 6 said "No" to either | 6 ÷ 14 = 42.9% ≥ 40% | Finding |
 | `UNDEREMPLOYMENT` | 12 employed with a job level; 5 "Rank or Clerical" | 5 ÷ 12 = 41.7% ≥ 35% | Finding |
-| `TIME_TO_JOB_LONG` | 11 answered Q29 (not "Others"); 5 took 1 to less than 4 years | 5 ÷ 11 = 45.5% ≥ 40% | Finding |
+| `TIME_TO_JOB_LONG` | 11 answered Q29 (not "Others"); 5 took longer than 6 months | 5 ÷ 11 = 45.5% ≥ 40% | Finding |
 | `SALARY_STAGNATION` | Group median bracket rank 2 (P10,000–<P15,000); other courses' median 3.5 | 3.5 − 2 = 1.5 ≥ 1.0 | Finding (Info) |
 | `RELATEDNESS_HIGH` | 15 answered; 12 aligned | 12 ÷ 15 = 80% ≥ 75% | Opportunity finding (always Low priority) |
 | `UNEMPLOYMENT_TREND_UP` | Previous wave 2 of 10 (20%); this wave 5 of 14 (35.7%) | +15.7 points ≥ +10; valid answers = min(14, 10) = 10 | Finding (Limited evidence) |

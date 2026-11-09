@@ -66,15 +66,16 @@ class TracerTabStats {
   final _cache = <String, GtsReportResult>{};
 
   /// [measure] over the graduates in scope. [employedOnly] keeps graduates
-  /// who answered item 16 "Yes".
+  /// who answered item 16 "Yes". [gridColumn] scopes matrix fields (e.g. Q30).
   GtsReportResult run(
     String measure, {
     String? groupBy,
     bool employedOnly = false,
     int? topN,
     bool byCount = false,
+    String? gridColumn,
   }) => _cache.putIfAbsent(
-    [measure, groupBy, employedOnly, topN, byCount].join('|'),
+    [measure, groupBy, employedOnly, topN, byCount, gridColumn].join('|'),
     () => GtsReportEngine.run(
       GtsReportConfig(
         surveyIds: const [latestWave],
@@ -85,6 +86,7 @@ class TracerTabStats {
         topN: topN,
         sortBy: byCount ? GtsSortBy.count : GtsSortBy.natural,
         sortDescending: byCount,
+        gridColumn: gridColumn,
       ),
       _latest,
     ),

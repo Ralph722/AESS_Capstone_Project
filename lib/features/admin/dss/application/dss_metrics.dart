@@ -74,7 +74,9 @@ class DssNotEmployedReasons {
 /// Pure CHED GTS metric calculations shared by evaluation and impact
 /// re-checks, so both always use the same definitions.
 abstract final class DssMetrics {
+  /// Q29 durations treated as a delayed school-to-work transition (>6 months).
   static const longTimeToJob = {
+    '7 to 11 months',
     '1 year to less than 2 years',
     '2 years to less than 3 years',
     '3 years to less than 4 years',
@@ -84,6 +86,12 @@ abstract final class DssMetrics {
   static const currentJobCol = '30.2. Current or Present Job';
   static const firstJobCol = '30.1. First Job';
 
+  /// Q28 channels that count as institutional placement support.
+  static const institutionalPlacementChannels = {
+    "Arranged by school's job placement officer",
+    'Job Fair or Public Employment Service Office (PESO)',
+  };
+
   static const salaryBrackets = [
     'Below P5,000.00',
     'P5,000.00 to less than P10,000.00',
@@ -92,6 +100,9 @@ abstract final class DssMetrics {
     'P20,000.00 to less than P25,000.00',
     'P25,000.00 and above',
   ];
+
+  /// Bottom two Q31 brackets (Below ₱5k and ₱5k–<₱10k).
+  static const lowEntrySalaryMaxRank = 1;
 
   /// Salary bracket rank (higher = better). Unknown → -1.
   static int salaryRank(String? bracket) =>
@@ -241,7 +252,53 @@ abstract final class DssMetrics {
     return DssProportion(hits: hits, total: total);
   }
 
-  /// Q29: one year or longer to land a first job, among answers that state
+  /// Q24 = No and Q30.1 = Rank/Clerical among respondents who answered both.
+  /// Tracer proxy for qualification / occupational mismatch (not CHED/PSA
+  /// certified underemployment).
+  static DssProportion? qualificationMismatch(
+    Iterable<Map<String, dynamic>> answers,
+  ) {
+    var hits = 0;
+    var total = 0;
+    for (final a in answers) {
+      final related = single(a['ched_24a']);
+      final level = firstJobLevel(a['ched_30']);
+      if (related == null || level == null) continue;
+      total++;
+      if (related == ChedGtsBuiltin.no && level == clericalLevel) hits++;
+    }
+    if (total == 0) return null;
+    return DssProportion(hits: hits, total: total);
+  }
+
+  /// Q28: school placement officer or Job Fair/PESO among duration answers
+  /// (excluding "Others").
+  static DssProportion? institutionalPlacement(
+    Iterable<Map<String, dynamic>> answers,
+  ) {
+    final values = answers
+        .map((a) => single(a['ched_28']))
+        .whereType<String>()
+        .where((v) => !_isOthers(v))
+        .toList();
+    if (values.isEmpty) return null;
+    return DssProportion(
+      hits: values.where(institutionalPlacementChannels.contains).length,
+      total: values.length,
+    );
+  }
+
+  /// Q31: share in the bottom two first-job salary brackets.
+  static DssProportion? lowEntrySalary(Iterable<Map<String, dynamic>> answers) {
+    final ranks = salaryRanks(answers);
+    if (ranks.isEmpty) return null;
+    return DssProportion(
+      hits: ranks.where((r) => r <= lowEntrySalaryMaxRank).length,
+      total: ranks.length,
+    );
+  }
+
+  /// Q29: longer than 6 months to land a first job, among answers that state
   /// a duration.
   static DssProportion? longTimeToFirstJob(
     Iterable<Map<String, dynamic>> answers,
@@ -377,20 +434,25 @@ abstract final class DssMetrics {
     return s.isEmpty ? null : s;
   }
 
-  /// Prefer current job level; fall back to first job.
-  static String? jobLevel(dynamic raw) {
+  /// Job level ticked in one Q30 column, or null when that column is empty.
+  static String? jobLevelFromColumn(dynamic raw, String col) {
     if (raw is! Map) return null;
     final map = Map<String, dynamic>.from(raw);
-    String? fromCol(String col) {
-      for (final entry in map.entries) {
-        final cols = entry.value;
-        if (cols is Map && cols[col] == true) return entry.key.toString();
-      }
-      return null;
+    for (final entry in map.entries) {
+      final cols = entry.value;
+      if (cols is Map && cols[col] == true) return entry.key.toString();
     }
-
-    return fromCol(currentJobCol) ?? fromCol(firstJobCol);
+    return null;
   }
+
+  /// Prefer current job level; fall back to first job.
+  static String? jobLevel(dynamic raw) =>
+      jobLevelFromColumn(raw, currentJobCol) ??
+      jobLevelFromColumn(raw, firstJobCol);
+
+  /// First-job column only (Q30.1).
+  static String? firstJobLevel(dynamic raw) =>
+      jobLevelFromColumn(raw, firstJobCol);
 
   static Map<String, int> counts(Iterable<String> values) {
     final out = <String, int>{};

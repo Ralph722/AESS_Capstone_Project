@@ -52,7 +52,7 @@ void main() {
           home: Scaffold(
             body: StatefulBuilder(
               builder: (context, setState) => ReportsSegmentedToggle(
-                options: const ['Outcomes', 'Career path', 'Cohorts & waves'],
+                options: const ['Outcomes', 'Waves'],
                 selected: selected,
                 onChanged: (i) => setState(() => selected = i),
               ),
@@ -62,16 +62,17 @@ void main() {
       );
 
       expect(find.text('Outcomes'), findsOneWidget);
-      expect(find.text('Career path'), findsOneWidget);
-      expect(find.text('Cohorts & waves'), findsOneWidget);
+      expect(find.text('Waves'), findsOneWidget);
+      expect(find.text('Career path'), findsNothing);
+      expect(find.text('Cohorts & waves'), findsNothing);
 
-      await tester.tap(find.text('Career path'));
+      await tester.tap(find.text('Waves'));
       await tester.pumpAndSettle();
       expect(selected, 1);
 
-      await tester.tap(find.text('Cohorts & waves'));
+      await tester.tap(find.text('Outcomes'));
       await tester.pumpAndSettle();
-      expect(selected, 2);
+      expect(selected, 0);
     });
 
     testWidgets('ReportsStatCard renders metric value, pill badge, and breakdown rows', (tester) async {
@@ -132,15 +133,27 @@ void main() {
       );
 
       expect(find.text('Exports use: Batch 2024 · BSIT'), findsOneWidget);
-      expect(find.text('CHED GTS institutional summary'), findsOneWidget);
-      expect(find.text('Graduate employment report'), findsOneWidget);
-      expect(find.text('Curriculum relevance report'), findsOneWidget);
-      expect(find.text('First-job and salary report'), findsOneWidget);
-      expect(find.text('Program and cohort comparison'), findsOneWidget);
+      expect(
+        find.text('Institutional employment & employability overview'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Program curriculum & competency audit'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Industry linkages & economic placement'),
+        findsOneWidget,
+      );
+      expect(find.text('Career mobility & diagnostic'), findsOneWidget);
+      expect(
+        find.text('CHED compliance & accreditation master summary'),
+        findsOneWidget,
+      );
       expect(find.text('GTS participation and data quality'), findsOneWidget);
       expect(find.text('Portal executive snapshot'), findsOneWidget);
       expect(find.text('CHED wave comparison'), findsOneWidget);
-      expect(find.text('Active roster extract'), findsOneWidget);
+      expect(find.text('Active alumni list extract'), findsOneWidget);
       expect(find.text('INSTITUTIONAL GTS'), findsOneWidget);
       expect(find.text('COMPARISONS AND DATA QUALITY'), findsOneWidget);
       expect(find.text('OPERATIONS'), findsOneWidget);
@@ -151,10 +164,10 @@ void main() {
       expect(find.text('CSV'), findsWidgets);
       expect(find.text('Print'), findsWidgets);
 
-      // Tap PDF on first card (Institutional GTS summary).
+      // Tap PDF on first card (employment & employability overview).
       await tester.tap(find.text('PDF').first);
       await tester.pump();
-      expect(downloads.first, 'institutional_gts:pdf:false');
+      expect(downloads.first, 'employment_employability:pdf:false');
     });
 
     testWidgets(
@@ -180,7 +193,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('CHED GTS institutional summary'), findsOneWidget);
+      expect(
+        find.text('Institutional employment & employability overview'),
+        findsOneWidget,
+      );
       expect(find.text('GTS participation and data quality'), findsOneWidget);
     });
 

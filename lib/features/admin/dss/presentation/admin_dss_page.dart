@@ -152,10 +152,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           ? '${result.message} · $banner'
           : result.message;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
     } catch (e) {
       if (!mounted) return;
@@ -285,26 +282,29 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       _mineOnly;
 
   Future<void> _openMoreFiltersDialog() async {
-    final result = await showDialog<({
-      String rule,
-      DssPriority? priority,
-      _DssSort sort,
-      _DssDueFilter due,
-      String office,
-      bool mineOnly,
-    })>(
-      context: context,
-      builder: (_) => _MoreFiltersDialog(
-        initialRule: _ruleFilter,
-        initialPriority: _priorityFilter,
-        initialSort: _sort,
-        initialDue: _dueFilter,
-        initialOffice: _officeFilter,
-        initialMineOnly: _mineOnly,
-        rules: _rules,
-        offices: _offices,
-      ),
-    );
+    final result =
+        await showDialog<
+          ({
+            String rule,
+            DssPriority? priority,
+            _DssSort sort,
+            _DssDueFilter due,
+            String office,
+            bool mineOnly,
+          })
+        >(
+          context: context,
+          builder: (_) => _MoreFiltersDialog(
+            initialRule: _ruleFilter,
+            initialPriority: _priorityFilter,
+            initialSort: _sort,
+            initialDue: _dueFilter,
+            initialOffice: _officeFilter,
+            initialMineOnly: _mineOnly,
+            rules: _rules,
+            offices: _offices,
+          ),
+        );
     if (result != null && mounted) {
       setState(() {
         _ruleFilter = result.rule;
@@ -577,28 +577,24 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             Expanded(
               child: switch (_panel) {
                 _DssPanel.history => AdminDssHistoryPanel(
-                    onClose: _closePanel,
-                    selectedSubnav: 1,
-                    onSubnavSelected: _onSubnavSelected,
-                    embedded: true,
-                  ),
+                  onClose: _closePanel,
+                  selectedSubnav: 1,
+                  onSubnavSelected: _onSubnavSelected,
+                  embedded: true,
+                ),
                 _DssPanel.settings => AdminDssSettingsPanel(
-                    onClose: _closePanel,
-                    selectedSubnav: 2,
-                    onSubnavSelected: _onSubnavSelected,
-                    embedded: true,
-                  ),
+                  onClose: _closePanel,
+                  selectedSubnav: 2,
+                  onSubnavSelected: _onSubnavSelected,
+                  embedded: true,
+                ),
                 _ => _buildFindingsBody(filtered),
               },
             ),
           ],
         ),
         if (_panel == _DssPanel.list)
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: _buildFloatingHelpButton(),
-          ),
+          Positioned(bottom: 16, right: 16, child: _buildFloatingHelpButton()),
       ],
     );
   }
@@ -661,7 +657,11 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           enabled: filtered.isNotEmpty,
           child: const Row(
             children: [
-              Icon(Icons.table_chart_outlined, size: 16, color: AdminColors.textSecondary),
+              Icon(
+                Icons.table_chart_outlined,
+                size: 16,
+                color: AdminColors.textSecondary,
+              ),
               SizedBox(width: 8),
               Text('Export CSV', style: TextStyle(fontSize: 13)),
             ],
@@ -672,7 +672,11 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           enabled: !_buildingReport,
           child: Row(
             children: [
-              const Icon(Icons.picture_as_pdf_outlined, size: 16, color: AdminColors.textSecondary),
+              const Icon(
+                Icons.picture_as_pdf_outlined,
+                size: 16,
+                color: AdminColors.textSecondary,
+              ),
               const SizedBox(width: 8),
               Text(
                 _buildingReport ? 'Building report…' : 'Report card PDF',
@@ -773,9 +777,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       color: AdminColors.card,
       elevation: 2,
       shadowColor: const Color(0x1A000000),
-      shape: const StadiumBorder(
-        side: BorderSide(color: AdminColors.border),
-      ),
+      shape: const StadiumBorder(side: BorderSide(color: AdminColors.border)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => showDssExampleFindingPreview(context),
@@ -832,9 +834,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
               loadingSkeleton: const PortalCardListSkeleton(),
               isEmpty: filtered.isEmpty,
               empty: DirectoryEmptyState(
-                title: _flags.isEmpty
-                    ? 'No findings yet'
-                    : 'No matches',
+                title: _flags.isEmpty ? 'No findings yet' : 'No matches',
                 subtitle: _flags.isEmpty
                     ? 'Need a published CHED GTS with responses — then Re-run analysis.'
                     : 'Try a different search or clear filters.',
@@ -939,18 +939,15 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             _buildPriorityFilter(),
             _buildDueFilter(),
           ],
-          if (showAllInline) ...[
-            _buildOfficeFilter(),
-            _buildScopeFilter(),
-          ],
+          if (showAllInline) ...[_buildOfficeFilter(), _buildScopeFilter()],
           if (!showAllInline)
             _buildMoreButton(
               exceedingCount: showPartialInline
                   ? (_officeFilter.isNotEmpty ? 1 : 0) + (_mineOnly ? 1 : 0)
                   : (_priorityFilter != null ? 1 : 0) +
-                      (_dueFilter != _DssDueFilter.all ? 1 : 0) +
-                      (_officeFilter.isNotEmpty ? 1 : 0) +
-                      (_mineOnly ? 1 : 0),
+                        (_dueFilter != _DssDueFilter.all ? 1 : 0) +
+                        (_officeFilter.isNotEmpty ? 1 : 0) +
+                        (_mineOnly ? 1 : 0),
             ),
         ];
 
@@ -1069,11 +1066,7 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         for (final o in _offices)
           DropdownMenuItem(
             value: o,
-            child: Text(
-              o,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(o, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
       ],
       onChanged: (v) {
@@ -1119,8 +1112,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         backgroundColor: hasActive
             ? AdminColors.primary.withValues(alpha: 0.08)
             : AdminColors.surface,
-        foregroundColor:
-            hasActive ? AdminColors.primary : AdminColors.textPrimary,
+        foregroundColor: hasActive
+            ? AdminColors.primary
+            : AdminColors.textPrimary,
         side: BorderSide(
           color: hasActive ? AdminColors.primary : AdminColors.border,
         ),
@@ -1466,7 +1460,8 @@ class _ReportCardPickerState extends State<_ReportCardPicker> {
             children: [
               AdminModalHeader(
                 title: 'Report Card PDF',
-                subtitle: 'Download manuscript-ready program and institution briefs.',
+                subtitle:
+                    'Download manuscript-ready program and institution briefs.',
                 icon: Icons.picture_as_pdf_outlined,
                 onClose: () => Navigator.of(context).pop(),
               ),
@@ -1488,7 +1483,7 @@ class _ReportCardPickerState extends State<_ReportCardPicker> {
                   }
                   final courses = snap.data ?? const [];
                   if (courses.isEmpty) {
-                    return const Text('No programs on the roster yet.');
+                    return const Text('No programs on the alumni list yet.');
                   }
                   return Column(
                     mainAxisSize: MainAxisSize.min,

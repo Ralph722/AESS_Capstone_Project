@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
@@ -18,6 +20,8 @@ const double kAlumniCardMaxWidth = 380;
 
 /// Digital alumni card (front = identity, back = verify QR).
 ///
+/// Visuals follow the physical-ID mockup: white faces, gold/navy accents,
+/// alumni mark on the front, gold verify band on the back.
 /// Side changes use a soft crossfade + scale, not a 3D flip.
 class AlumniDigitalCard extends StatefulWidget {
   const AlumniDigitalCard({
@@ -48,9 +52,8 @@ class AlumniDigitalCard extends StatefulWidget {
 }
 
 class AlumniDigitalCardState extends State<AlumniDigitalCard>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late final AnimationController _swap;
-  late final AnimationController _badgePulse;
   late bool _showBack;
   late DateTime _now;
   Timer? _clock;
@@ -71,10 +74,6 @@ class AlumniDigitalCardState extends State<AlumniDigitalCard>
       duration: const Duration(milliseconds: 380),
       value: _showBack ? 1 : 0,
     );
-    _badgePulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    );
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() => _now = DateTime.now());
@@ -91,18 +90,6 @@ class AlumniDigitalCardState extends State<AlumniDigitalCard>
 
   bool get _canMintTokens =>
       !widget.offline && widget.tokensEnabled && _showBack;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    if (reduceMotion || widget.offline) {
-      _badgePulse.stop();
-      _badgePulse.value = 0;
-    } else if (!_badgePulse.isAnimating) {
-      _badgePulse.repeat(reverse: true);
-    }
-  }
 
   @override
   void didUpdateWidget(covariant AlumniDigitalCard oldWidget) {
@@ -124,7 +111,6 @@ class AlumniDigitalCardState extends State<AlumniDigitalCard>
   @override
   void dispose() {
     _clock?.cancel();
-    _badgePulse.dispose();
     _swap.dispose();
     super.dispose();
   }
@@ -238,9 +224,7 @@ class AlumniDigitalCardState extends State<AlumniDigitalCard>
                               child: _CardFront(
                                 data: widget.data,
                                 now: _now,
-                                badgePulse: _badgePulse,
                                 offline: widget.offline,
-                                reduceMotion: reduceMotion,
                               ),
                             ),
                           ),
@@ -278,16 +262,12 @@ class _CardFront extends StatelessWidget {
   const _CardFront({
     required this.data,
     required this.now,
-    required this.badgePulse,
     required this.offline,
-    required this.reduceMotion,
   });
 
   final AlumniCardData data;
   final DateTime now;
-  final Animation<double> badgePulse;
   final bool offline;
-  final bool reduceMotion;
 
   @override
   Widget build(BuildContext context) {
@@ -295,16 +275,11 @@ class _CardFront extends StatelessWidget {
     final fs = alumniCardFontSize;
     return Container(
       decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        gradient: const RadialGradient(
-          center: Alignment(1.1, -1.0),
-          radius: 1.35,
-          colors: [Color(0xFF2E2B86), PortalTheme.navy, Color(0xFF121040)],
-          stops: [0, 0.55, 1],
-        ),
         boxShadow: [
           BoxShadow(
-            color: PortalTheme.navy.withValues(alpha: 0.35),
+            color: PortalTheme.navy.withValues(alpha: 0.22),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -313,107 +288,15 @@ class _CardFront extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          Positioned(
-            right: -40,
-            bottom: -70,
-            child: ExcludeSemantics(
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: PortalTheme.gold.withValues(alpha: 0.18),
-                    width: 10,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const Positioned.fill(child: _FrontDecor()),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Semantics(
-                      image: true,
-                      label: 'USTP logo',
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: PortalTheme.gold,
-                            width: 1.5,
-                          ),
-                          color: Colors.white,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: Image.asset(
-                            'assets/images/ustp_logo_light.png',
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.school_rounded,
-                              color: PortalTheme.navy,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'USTP ALUMNI',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: fs(context, 11),
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                          Text(
-                            'Alumni Engagement and Support System',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: fs(context, 8.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: offline
-                            ? const Color(0xFF94A3B8)
-                            : PortalTheme.gold,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        offline ? 'OFFLINE' : 'DIGITAL ID',
-                        style: TextStyle(
-                          color: PortalTheme.navy,
-                          fontWeight: FontWeight.w800,
-                          fontSize: fs(context, 8.5),
-                          letterSpacing: 0.6,
-                        ),
-                      ),
-                    ),
-                  ],
+                const Align(
+                  alignment: Alignment.topRight,
+                  child: _AlumniMark(),
                 ),
                 const Spacer(),
                 Row(
@@ -430,7 +313,7 @@ class _CardFront extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white,
+                              color: PortalTheme.navy,
                               fontWeight: FontWeight.w800,
                               fontSize: fs(context, 17),
                               height: 1.15,
@@ -443,7 +326,7 @@ class _CardFront extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.92),
+                                color: PortalTheme.textSecondary,
                                 fontSize: fs(context, 11),
                               ),
                             ),
@@ -454,7 +337,7 @@ class _CardFront extends StatelessWidget {
                             runSpacing: 4,
                             children: [
                               _Meta(
-                                label: 'Student ID',
+                                label: 'ID Number',
                                 value: data.studentId.isEmpty
                                     ? '—'
                                     : data.studentId,
@@ -473,22 +356,20 @@ class _CardFront extends StatelessWidget {
                   ],
                 ),
                 const Spacer(),
-                // Badge keeps its intrinsic pill width; Flexible+FittedBox only
-                // shrinks it if the row is too narrow (avoids footer overflow).
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Flexible(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: _VerifiedBadge(
-                            offline: offline,
-                            pulse: badgePulse,
-                            reduceMotion: reduceMotion,
-                          ),
+                    Expanded(
+                      child: Text(
+                        offline
+                            ? 'Saved copy · not live'
+                            : 'Lifetime Member',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: PortalTheme.navy,
+                          fontWeight: FontWeight.w700,
+                          fontSize: fs(context, 9.5),
                         ),
                       ),
                     ),
@@ -496,7 +377,7 @@ class _CardFront extends StatelessWidget {
                     Text(
                       clock,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: PortalTheme.textMuted,
                         fontSize: fs(context, 9.5),
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
@@ -512,61 +393,147 @@ class _CardFront extends StatelessWidget {
   }
 }
 
-/// Status chip with a soft green pulse when the card is live/verified.
-class _VerifiedBadge extends StatelessWidget {
-  const _VerifiedBadge({
-    required this.offline,
-    required this.pulse,
-    required this.reduceMotion,
-  });
-
-  final bool offline;
-  final Animation<double> pulse;
-  final bool reduceMotion;
+/// Physical-ID decorative shapes (navy + gold) on the white front face.
+class _FrontDecor extends StatelessWidget {
+  const _FrontDecor();
 
   @override
   Widget build(BuildContext context) {
-    final label = offline ? 'Saved copy · not live' : 'Verified active alumnus';
-    final fs = alumniCardFontSize;
-    final offlineDot = const Color(0xFFCBD5E1);
-    final liveDot = const Color(0xFF4ADE80);
-    // Dot carries status color; label stays neutral white on the navy card.
-    const textColor = Color(0xFFF8FAFC);
+    return IgnorePointer(
+      child: ExcludeSemantics(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final h = constraints.maxHeight;
+            return Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned(
+                  left: w * 0.026,
+                  top: h * 0.052,
+                  child: _DecorDisc(
+                    size: w * 0.108,
+                    color: PortalTheme.gold,
+                  ),
+                ),
+                Positioned(
+                  left: w * 0.082,
+                  top: h * 0.034,
+                  child: _DecorDisc(
+                    size: w * 0.068,
+                    color: PortalTheme.navy,
+                  ),
+                ),
+                Positioned(
+                  left: w * 0.35,
+                  top: -h * 0.32,
+                  child: Transform.rotate(
+                    angle: -19 * math.pi / 180,
+                    child: Container(
+                      width: w * 0.36,
+                      height: w * 0.36,
+                      decoration: BoxDecoration(
+                        color: PortalTheme.navy,
+                        borderRadius: BorderRadius.circular(w * 0.08),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: -w * 0.14,
+                  bottom: -h * 0.48,
+                  child: _DecorDisc(
+                    size: w * 0.58,
+                    color: PortalTheme.gold,
+                  ),
+                ),
+                Positioned(
+                  right: -w * 0.10,
+                  bottom: -h * 0.07,
+                  child: Transform.rotate(
+                    angle: 50 * math.pi / 180,
+                    child: Container(
+                      width: w * 0.18,
+                      height: w * 0.18 / 0.9,
+                      decoration: BoxDecoration(
+                        color: PortalTheme.gold,
+                        borderRadius: BorderRadius.circular(w * 0.04),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
-    Widget mark({required Color dot, double scale = 1}) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Transform.scale(
-            scale: scale,
-            child: Icon(Icons.circle, size: 6, color: dot),
+class _DecorDisc extends StatelessWidget {
+  const _DecorDisc({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+}
+
+class _AlumniMark extends StatelessWidget {
+  const _AlumniMark();
+
+  static const _size = 54.0;
+  static const _radius = 3.0;
+  static const _border = 2.0;
+  static const _pad = 3.0;
+
+  @override
+  Widget build(BuildContext context) {
+    // Outer box draws the gold frame; inner ClipRRect crops the scaled SVG
+    // so the border is never clipped (Clip.hardEdge on the same Container
+    // was eating the stroke on web).
+    return Semantics(
+      image: true,
+      label: 'USTP Alumni Association mark',
+      child: Container(
+        width: _size,
+        height: _size,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(_radius),
+          border: Border.all(color: PortalTheme.gold, width: _border),
+        ),
+        padding: const EdgeInsets.all(_pad),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(
+            math.max(0, _radius - _border / 2),
           ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.w700,
-              fontSize: fs(context, 9.5),
+          child: ColoredBox(
+            color: Colors.transparent,
+            child: Transform.scale(
+              scale: 1.55,
+              child: SvgPicture.asset(
+                'assets/ALUMNI.svg',
+                fit: BoxFit.contain,
+                allowDrawingOutsideViewBox: true,
+                placeholderBuilder: (_) => const Icon(
+                  Icons.groups_rounded,
+                  color: PortalTheme.navy,
+                  size: 22,
+                ),
+              ),
             ),
           ),
-        ],
-      );
-    }
-
-    if (offline || reduceMotion) {
-      return mark(dot: offline ? offlineDot : liveDot);
-    }
-
-    return AnimatedBuilder(
-      animation: pulse,
-      builder: (context, _) {
-        final t = Curves.easeInOut.transform(pulse.value);
-        return mark(
-          dot: Color.lerp(liveDot, const Color(0xFF86EFAC), t)!,
-          scale: 1.0 + t * 0.35,
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -593,16 +560,12 @@ class _CardBack extends StatelessWidget {
     final secs = remaining.inSeconds.clamp(0, 60);
     final countdown =
         'Refreshes in ${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}';
-    final bandRight = offline
-        ? 'Offline'
-        : token == null
-        ? (failed ? 'Unavailable' : 'Loading…')
-        : countdown;
+    final bandRight = offline ? 'OFFLINE' : 'USTP ALUMNI OFFICE';
     final fs = alumniCardFontSize;
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFBFAF6),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: PortalTheme.borderStrong),
         boxShadow: [
@@ -618,14 +581,14 @@ class _CardBack extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            color: PortalTheme.navy,
+            color: PortalTheme.gold,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
                 Text(
                   offline ? 'OFFLINE COPY' : 'SCAN TO VERIFY',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: PortalTheme.navy,
                     fontWeight: FontWeight.w700,
                     fontSize: fs(context, 10),
                     letterSpacing: 0.5,
@@ -635,10 +598,10 @@ class _CardBack extends StatelessWidget {
                 Text(
                   bandRight,
                   style: TextStyle(
-                    color: PortalTheme.gold,
+                    color: PortalTheme.navy,
                     fontWeight: FontWeight.w700,
                     fontSize: fs(context, 10),
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                    letterSpacing: 0.5,
                   ),
                 ),
               ],
@@ -754,22 +717,6 @@ class _CardBack extends StatelessWidget {
                         ),
                         _BackRow(label: 'Member since', value: since),
                         _BackRow(label: 'Campus', value: data.campus),
-                        const Spacer(),
-                        Text(
-                          offline
-                              ? 'Offline copy. Identity only — staff cannot '
-                                    'verify the QR until you are back online.'
-                              : 'Non-transferable. Valid only while shown live '
-                                    'in the app. Staff may ask for a government '
-                                    'ID. Report misuse to the USTP Alumni Office.',
-                          style: TextStyle(
-                            color: PortalTheme.textMuted.withValues(
-                              alpha: 0.95,
-                            ),
-                            fontSize: fs(context, 8.2),
-                            height: 1.35,
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -806,7 +753,7 @@ class _Photo extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF5B6BD6), Color(0xFF2B2F8F)],
+            colors: [Color(0xFF5B6BD6), Color(0xFF1A1851)],
           ),
           image: provider == null
               ? null
@@ -848,14 +795,14 @@ class _Meta extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: PortalTheme.textMuted,
               fontSize: alumniCardFontSize(context, 8.5),
             ),
           ),
           Text(
             value,
             style: TextStyle(
-              color: Colors.white,
+              color: PortalTheme.navy,
               fontWeight: FontWeight.w700,
               fontSize: alumniCardFontSize(context, 11),
             ),
@@ -878,31 +825,39 @@ class _BackRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Semantics(
         label: '$label $value',
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: PortalTheme.textMuted,
-                fontSize: alumniCardFontSize(context, 9),
-              ),
+        child: Container(
+          padding: const EdgeInsets.only(bottom: 3),
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                value,
-                textAlign: TextAlign.right,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
                 style: TextStyle(
-                  color: PortalTheme.navy,
-                  fontWeight: FontWeight.w700,
-                  fontSize: alumniCardFontSize(context, 10),
+                  color: PortalTheme.textMuted,
+                  fontSize: alumniCardFontSize(context, 9),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: PortalTheme.navy,
+                    fontWeight: FontWeight.w700,
+                    fontSize: alumniCardFontSize(context, 10),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

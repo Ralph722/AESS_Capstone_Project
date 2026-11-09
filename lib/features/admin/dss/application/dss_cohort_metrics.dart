@@ -121,7 +121,7 @@ class DssCohortMetric {
 /// Dart reference for `dss_cohort_metrics`. The SQL function and this code
 /// must produce the same rows; parity tests compare them.
 abstract final class DssCohortMetrics {
-  static const metricVersion = 2;
+  static const metricVersion = 3;
 
   static const metricKeys = [
     'response_rate',
@@ -130,11 +130,14 @@ abstract final class DssCohortMetrics {
     'unrelated_or_irrelevant_rate',
     'related_and_relevant_rate',
     'clerical_among_employed_rate',
+    'qualification_mismatch_rate',
     'long_time_to_first_job_rate',
+    'institutional_placement_channel_rate',
+    'low_entry_salary_rate',
     'salary_peer_gap',
   ];
 
-  /// Every group and metric of [survey]. [roster] is the active roster,
+  /// Every group and metric of [survey]. [roster] is the alumni list,
   /// [snapshots] the saved roster counts of this wave.
   static List<DssCohortMetric> compute({
     required Survey survey,
@@ -276,9 +279,24 @@ abstract final class DssCohortMetrics {
       );
       out.add(
         shareRow(
+          'qualification_mismatch_rate',
+          DssMetrics.qualificationMismatch(answers),
+        ),
+      );
+      out.add(
+        shareRow(
           'long_time_to_first_job_rate',
           DssMetrics.longTimeToFirstJob(answers),
         ),
+      );
+      out.add(
+        shareRow(
+          'institutional_placement_channel_rate',
+          DssMetrics.institutionalPlacement(answers),
+        ),
+      );
+      out.add(
+        shareRow('low_entry_salary_rate', DssMetrics.lowEntrySalary(answers)),
       );
       if (level != DssCohortLevel.institution) {
         final ranks = DssMetrics.salaryRanks(answers);

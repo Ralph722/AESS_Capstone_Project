@@ -152,7 +152,7 @@ abstract final class AessReportCatalog {
           'Full answer spreadsheet for alumni who submitted this survey',
       definition:
           'Downloads a spreadsheet of alumni who already submitted this '
-          'survey, with roster fields and their answers side by side.',
+          'survey, with alumni list fields and their answers side by side.',
       surface: ReportCatalogSurface.surveyExportModal,
       scope: ReportScopeKind.surveySpecific,
       privacy: ReportPrivacyClass.confidentialIdentifiable,
@@ -352,7 +352,7 @@ abstract final class AessReportCatalog {
       bestFor: 'Quick portal health checks for administrators.',
       limitation:
           'Not a graduate outcomes report. For CHED findings across cohorts, '
-          'use Downloads “CHED GTS institutional summary” or Builder.',
+          'use Downloads audience GTS templates or Builder.',
     ),
     AessReportCatalogEntry(
       id: 'downloads.ched_portfolio_pack',
@@ -385,8 +385,9 @@ abstract final class AessReportCatalog {
           'Broad CHED-oriented office packets alongside dedicated institutional '
           'GTS templates.',
       limitation:
-          'Overlaps the portal snapshot and participation pack. Prefer '
-          'institutional GTS templates when you need wave-scoped outcomes.',
+          'Overlaps the portal snapshot and participation pack. Prefer the '
+          'audience Institutional GTS templates when you need wave-scoped '
+          'outcomes.',
     ),
     AessReportCatalogEntry(
       id: 'downloads.ched_wave_comparison',
@@ -424,7 +425,7 @@ abstract final class AessReportCatalog {
       id: 'downloads.alumni_employment_records',
       title: 'Alumni employment records extract',
       subtitle:
-          'Latest employment records for registered alumni (roster source)',
+          'Latest employment records for registered alumni (alumni list source)',
       definition:
           'Identifiable employment table built from stored employment records '
           'for registered alumni. This is an operational extract, not a CHED '
@@ -448,7 +449,7 @@ abstract final class AessReportCatalog {
       limitation:
           'Not wave-scoped CHED answers. For graduate employment findings from '
           'tracer responses, use survey “CHED outcomes summary” or Downloads '
-          '“Graduate employment report”.',
+          '“Institutional employment & employability overview”.',
     ),
     AessReportCatalogEntry(
       id: 'downloads.survey_participation',
@@ -479,11 +480,11 @@ abstract final class AessReportCatalog {
     ),
     AessReportCatalogEntry(
       id: 'downloads.active_roster_extract',
-      title: 'Active roster extract',
+      title: 'Active alumni list extract',
       subtitle:
-          'Active alumni roster with registration and tracer completion status',
+          'Active alumni list with registration and tracer completion status',
       definition:
-          'Export of the active alumni roster with registration and tracer '
+          'Export of the active alumni list with registration and tracer '
           'completion status for administrative use.',
       surface: ReportCatalogSurface.downloadsLibrary,
       scope: ReportScopeKind.institutional,
@@ -492,7 +493,7 @@ abstract final class AessReportCatalog {
       status: ReportCatalogStatus.available,
       downloadsPresetId: 'roster',
       icon: Icons.groups_outlined,
-      fileNameStem: 'AESS_Active_Roster_Extract',
+      fileNameStem: 'AESS_Active_Alumni_List_Extract',
       scopeNote: 'Honours batch and course filters from Reports filters.',
       includeItems: [
         'Name, course, school ID, batch, email',
@@ -501,139 +502,164 @@ abstract final class AessReportCatalog {
         'Date added',
       ],
       bestFor: 'Directory extracts and registration follow-up.',
-      limitation: 'Active roster only; no employment answer columns.',
+      limitation: 'Active alumni list only; no employment answer columns.',
     ),
 
-    // —— Institutional GTS Downloads templates (Phase 5) ——
+    // —— Audience-focused Institutional GTS Downloads (T1–T5) ——
     AessReportCatalogEntry(
-      id: 'downloads.institutional_gts_summary',
-      title: 'CHED GTS institutional summary',
+      id: 'downloads.employment_employability',
+      title: 'Institutional employment & employability overview',
       subtitle:
-          'Consolidated graduate outcomes for the selected institutional scope',
+          'Strategic employment metrics for board, president, and academic '
+          'leadership',
       definition:
-          'Concise overview of graduate outcomes for selected cohorts and/or '
-          'Official CHED waves: response rate, employment, relatedness, '
-          'curriculum relevance, time to first job, and salary bands.',
+          'High-level employability pack: response rate, present employment, '
+          'employment status, first-job relatedness, and time to first job. '
+          'Filter by course/batch for program views.',
       surface: ReportCatalogSurface.downloadsLibrary,
       scope: ReportScopeKind.institutional,
       privacy: ReportPrivacyClass.aggregated,
       category: ReportCatalogCategory.institutionalGts,
       status: ReportCatalogStatus.available,
-      downloadsPresetId: 'institutional_gts',
+      downloadsPresetId: 'employment_employability',
       icon: Icons.account_balance_outlined,
-      fileNameStem: 'AESS_Institutional_GTS_Summary',
+      fileNameStem: 'AESS_Employment_Employability_Overview',
       scopeNote: 'Selected Official CHED waves, batches, and courses only.',
       includeItems: [
         'Response rate for the selected scope',
-        'Employment status and related CHED outcome distributions',
-        'First-job relatedness, time to first job, salary bands',
-        'Curriculum relevance',
+        'Present employment (Q16) and employment status (Q18)',
+        'Place of work — local vs abroad (Q21)',
+        'First-job flag (Q22) and course relatedness (Q24)',
+        'Time to land first job (Q29)',
+      ],
+      bestFor: 'Board of Trustees, University President, VP for Academic Affairs.',
+      limitation:
+          'Degree table (Q12) is not aggregated here; use course/batch filters '
+          'for program scope. Not a substitute for a single-wave outcomes export.',
+    ),
+    AessReportCatalogEntry(
+      id: 'downloads.curriculum_competency',
+      title: 'Program curriculum & competency audit',
+      subtitle:
+          'Curriculum relevance, competencies, and advance-studies reasons for '
+          'deans and curriculum committees',
+      definition:
+          'Program-quality view from Official CHED answers: advance-studies '
+          'reasons, first-job relatedness, curriculum relevance, and '
+          'competencies graduates found useful.',
+      surface: ReportCatalogSurface.downloadsLibrary,
+      scope: ReportScopeKind.institutional,
+      privacy: ReportPrivacyClass.aggregated,
+      category: ReportCatalogCategory.institutionalGts,
+      status: ReportCatalogStatus.available,
+      downloadsPresetId: 'curriculum_competency',
+      icon: Icons.school_outlined,
+      fileNameStem: 'AESS_Curriculum_Competency_Audit',
+      scopeNote: 'Selected Official CHED waves, batches, and courses only.',
+      includeItems: [
+        'Reason for advance studies (Q15b)',
+        'First-job relatedness (Q24)',
+        'Curriculum relevance (Q32)',
+        'Useful competencies (Q33)',
+      ],
+      bestFor: 'Deans, department chairs, and curriculum review committees.',
+      limitation:
+          'Q15b covers reasons among those who answered advance-studies, not a '
+          'full enrollment rate. Course-reason matrix (Q14) and open curriculum '
+          'suggestions (Q34) are not auto-summarized yet; use the single-survey '
+          'Excel pack for qualitative review.',
+    ),
+    AessReportCatalogEntry(
+      id: 'downloads.industry_placement',
+      title: 'Industry linkages & economic placement',
+      subtitle:
+          'Hiring sectors, work location, job channels, and salary bands',
+      definition:
+          'Labor-market outcomes for placement offices: industry sector, local '
+          'vs abroad, how the first job was found, and initial earnings bands. '
+          'Salary bands are never averaged by midpoint.',
+      surface: ReportCatalogSurface.downloadsLibrary,
+      scope: ReportScopeKind.institutional,
+      privacy: ReportPrivacyClass.aggregated,
+      category: ReportCatalogCategory.institutionalGts,
+      status: ReportCatalogStatus.available,
+      downloadsPresetId: 'industry_placement',
+      icon: Icons.business_center_outlined,
+      fileNameStem: 'AESS_Industry_Economic_Placement',
+      scopeNote: 'Selected Official CHED waves, batches, and courses only.',
+      includeItems: [
+        'Line of business / industry (Q20)',
+        'Place of work (Q21)',
+        'How first job was found (Q28)',
+        'Initial gross monthly earnings (Q31)',
       ],
       bestFor:
-          'University administrators, research office, and CHED coordination.',
+          'Career center directors, placement officers, and industry partnership '
+          'coordinators.',
       limitation:
-          'Aggregated Official CHED answers only. Not a substitute for the '
-          'survey-specific outcomes export of a single wave.',
+          'Job-level matrix (Q30) is not charted in this version; use the CHED '
+          'Excel pack on a single survey for that detail.',
     ),
     AessReportCatalogEntry(
-      id: 'downloads.graduate_employment',
-      title: 'Graduate employment report',
-      subtitle: 'Employment status and characteristics from CHED GTS answers',
-      definition:
-          'Employment conditions from Official CHED answers: presently employed, '
-          'reasons not employed, employment status, line of business, and place '
-          'of work.',
-      surface: ReportCatalogSurface.downloadsLibrary,
-      scope: ReportScopeKind.institutional,
-      privacy: ReportPrivacyClass.aggregated,
-      category: ReportCatalogCategory.institutionalGts,
-      status: ReportCatalogStatus.available,
-      downloadsPresetId: 'graduate_employment',
-      icon: Icons.work_outline,
-      fileNameStem: 'AESS_Graduate_Employment_Report',
-      scopeNote: 'Selected Official CHED waves, batches, and courses only.',
-      limitation:
-          'Free-text occupation and job-level matrix fields are not charted in '
-          'this version; use the CHED Excel pack on a single survey for those.',
-    ),
-    AessReportCatalogEntry(
-      id: 'downloads.curriculum_relevance',
-      title: 'Curriculum relevance report',
+      id: 'downloads.career_mobility',
+      title: 'Career mobility & diagnostic',
       subtitle:
-          'Course relatedness, curriculum relevance, and useful competencies',
+          'Unemployment causes, job acceptance/retention drivers, and tenure',
       definition:
-          'How graduates evaluate college education relative to work: first-job '
-          'relatedness, curriculum relevance, and useful competencies.',
+          'Diagnostic pack for counseling and alumni support: reasons not '
+          'employed, reasons for staying or accepting a job, reasons for '
+          'changing jobs, and length of stay in the first job.',
       surface: ReportCatalogSurface.downloadsLibrary,
       scope: ReportScopeKind.institutional,
       privacy: ReportPrivacyClass.aggregated,
       category: ReportCatalogCategory.institutionalGts,
       status: ReportCatalogStatus.available,
-      downloadsPresetId: 'curriculum_relevance',
-      icon: Icons.school_outlined,
-      fileNameStem: 'AESS_Curriculum_Relevance_Report',
+      downloadsPresetId: 'career_mobility',
+      icon: Icons.timeline_outlined,
+      fileNameStem: 'AESS_Career_Mobility_Diagnostic',
       scopeNote: 'Selected Official CHED waves, batches, and courses only.',
-      limitation:
-          'Open curriculum suggestions (item 34) are not auto-summarized; export '
-          'single-survey responses for qualitative review.',
+      includeItems: [
+        'Reasons not employed (Q17)',
+        'Reasons for staying on the job (Q23)',
+        'Reasons for accepting the job (Q25)',
+        'Reasons for changing jobs (Q26)',
+        'Length of stay in first job (Q27)',
+      ],
+      bestFor: 'Guidance counselors, Alumni Office, and Student Affairs.',
     ),
     AessReportCatalogEntry(
-      id: 'downloads.first_job_salary',
-      title: 'First-job and salary report',
+      id: 'downloads.ched_compliance_master',
+      title: 'CHED compliance & accreditation master summary',
       subtitle:
-          'First-job transition, job-finding, duration, and salary bands',
+          'Audit-ready itemized choice summaries across CHED GTS sections',
       definition:
-          'First-job experiences and initial gross monthly earnings bands from '
-          'Official CHED answers. Salary bands are never averaged by midpoint.',
+          'Compliance-oriented rollup of aggregatable CHED choice items '
+          '(demographics, advance-studies reason, and employment Part D '
+          'indicators) with counts and percentages for accreditation packets.',
       surface: ReportCatalogSurface.downloadsLibrary,
       scope: ReportScopeKind.institutional,
       privacy: ReportPrivacyClass.aggregated,
       category: ReportCatalogCategory.institutionalGts,
       status: ReportCatalogStatus.available,
-      downloadsPresetId: 'first_job_salary',
-      icon: Icons.trending_up_outlined,
-      fileNameStem: 'AESS_First_Job_Salary_Report',
+      downloadsPresetId: 'ched_compliance_master',
+      icon: Icons.verified_outlined,
+      fileNameStem: 'AESS_CHED_Compliance_Master_Summary',
       scopeNote: 'Selected Official CHED waves, batches, and courses only.',
-    ),
-    AessReportCatalogEntry(
-      id: 'downloads.educational_background',
-      title: 'Educational background report',
-      subtitle: 'Advance-studies reasons from Official CHED answers',
-      definition:
-          'Aggregated reasons for pursuing advance studies (item 15b). Matrix '
-          'and training-table items remain available in the single-survey Excel '
-          'pack.',
-      surface: ReportCatalogSurface.downloadsLibrary,
-      scope: ReportScopeKind.institutional,
-      privacy: ReportPrivacyClass.aggregated,
-      category: ReportCatalogCategory.institutionalGts,
-      status: ReportCatalogStatus.available,
-      downloadsPresetId: 'educational_background',
-      icon: Icons.menu_book_outlined,
-      fileNameStem: 'AESS_Educational_Background_Report',
-      scopeNote: 'Selected Official CHED waves, batches, and courses only.',
+      includeItems: [
+        'Demographics (Q6, Q7, Q9–Q11)',
+        'Advance-studies reason (Q15b)',
+        'Employment and first-job choice items (Q16–Q33 where aggregatable)',
+        'Response rate for the selected scope',
+        'Batch or program comparison table (employment, relatedness, curriculum)',
+      ],
+      bestFor:
+          'Accreditation teams (ALCUCOA, AACCUP, PAASCU) and quality assurance '
+          'officers.',
       limitation:
-          'Item 14 (UG vs graduate reason matrix) and training tables are not '
-          'yet aggregated here.',
-    ),
-    AessReportCatalogEntry(
-      id: 'downloads.alumni_demographics',
-      title: 'Alumni demographics report',
-      subtitle:
-          'Aggregated civil status, sex, and geographic distribution of '
-          'respondents',
-      definition:
-          'Aggregated demographic and geographic profile of responding alumni. '
-          'Contact details are excluded.',
-      surface: ReportCatalogSurface.downloadsLibrary,
-      scope: ReportScopeKind.institutional,
-      privacy: ReportPrivacyClass.aggregated,
-      category: ReportCatalogCategory.institutionalGts,
-      status: ReportCatalogStatus.available,
-      downloadsPresetId: 'alumni_demographics',
-      icon: Icons.public_outlined,
-      fileNameStem: 'AESS_Alumni_Demographics_Report',
-      scopeNote: 'Selected Official CHED waves, batches, and courses only.',
+          'Personal fields (Q1–Q5, Q8), tables (Q12, Q13, Q15a), matrices '
+          '(Q14, Q30), occupation text (Q19), and open suggestions (Q34) are '
+          'not in this rollup. For wave-to-wave deltas use CHED wave comparison; '
+          'for filled forms use the survey fillable PDF / Excel pack.',
     ),
     AessReportCatalogEntry(
       id: 'downloads.gts_participation_quality',
@@ -657,26 +683,6 @@ abstract final class AessReportCatalog {
           'Assigned counts are wave assignment totals. Cohort filters apply to '
           'submitted respondents used for missing-answer rates. Skip-logic '
           'items can legitimately show high missing rates.',
-    ),
-    AessReportCatalogEntry(
-      id: 'downloads.program_cohort_comparison',
-      title: 'Program and cohort comparison',
-      subtitle:
-          'Compare employment and relatedness across programs or batches',
-      definition:
-          'Side-by-side graduate outcomes by program or graduation cohort '
-          'within a selected Official CHED scope, with answered denominators.',
-      surface: ReportCatalogSurface.downloadsLibrary,
-      scope: ReportScopeKind.institutional,
-      privacy: ReportPrivacyClass.aggregated,
-      category: ReportCatalogCategory.comparisonsAndQuality,
-      status: ReportCatalogStatus.available,
-      downloadsPresetId: 'program_cohort_comparison',
-      icon: Icons.table_chart_outlined,
-      fileNameStem: 'AESS_Program_Cohort_Comparison',
-      scopeNote:
-          'Choose compare-by course or batch in the configure dialog, then '
-          'optional waves and cohort filters.',
     ),
   ];
 

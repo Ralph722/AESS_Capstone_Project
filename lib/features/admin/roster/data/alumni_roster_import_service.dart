@@ -41,7 +41,7 @@ class AlumniRosterImportService {
 
   final AlumniMemberService _memberService;
 
-  /// Parses roster rows from an `.xlsx` workbook (ZIP + XML).
+  /// Parses alumni list rows from an `.xlsx` workbook (ZIP + XML).
   ///
   /// Uses a direct ZIP/XML reader so files from Excel, LibreOffice, WPS, etc.
   /// work even when relationship paths use a leading `/` (breaks `excel` 3.0).

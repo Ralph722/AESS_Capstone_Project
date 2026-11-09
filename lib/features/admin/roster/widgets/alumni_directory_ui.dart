@@ -78,7 +78,7 @@ class DirectoryPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return AdminPageHeader(
       title: 'Alumni Directory',
-      subtitle: 'Official roster used to validate alumni registration.',
+      subtitle: 'Official alumni list used to validate alumni registration.',
       titleFontSize: AdminDensity.titleFontSize,
       titleColor: AdminDirectoryTheme.textPrimary,
       subtitleColor: AdminDirectoryTheme.textSecondary,
@@ -119,7 +119,8 @@ class _HeaderActions extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Tooltip(
-          message: 'Download CHED GTS PDFs as a ZIP',
+          message:
+              'Download CHED GTS PDFs or Individual Information Sheets',
           child: OutlinedButton.icon(
             onPressed: isLoading || isExporting || !canExport ? null : onExport,
             icon: isExporting
@@ -128,8 +129,8 @@ class _HeaderActions extends StatelessWidget {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.picture_as_pdf_outlined, size: 17),
-            label: Text(isExporting ? 'Exporting…' : 'Export CHED GTS'),
+                : const Icon(Icons.download_outlined, size: 17),
+            label: Text(isExporting ? 'Exporting…' : 'Download Reports'),
             style: AdminButtonStyles.outlined(),
           ),
         ),
@@ -342,7 +343,7 @@ class DirectoryToolbarCard extends StatelessWidget {
     required this.filters,
     this.activeFilterChips = const [],
     this.searchHint = 'Search by name, ID number, course, or email…',
-    this.refreshTooltip = 'Refresh roster',
+    this.refreshTooltip = 'Refresh alumni list',
     this.singleRowMinWidth,
   });
 
@@ -2148,7 +2149,7 @@ class _MemberMenu extends StatelessWidget {
           value: 'edit',
           child: ListTile(
             leading: Icon(Icons.edit_outlined, color: AdminDirectoryTheme.navy),
-            title: Text('Edit roster entry'),
+            title: Text('Edit alumni list entry'),
             contentPadding: EdgeInsets.zero,
             dense: true,
           ),
@@ -2923,7 +2924,7 @@ class MemberDetailPanelHeader extends StatelessWidget {
         ),
       if (percent != null)
         MemberDetailChip(
-          label: 'Tracer $percent%',
+          label: 'Profile $percent%',
           bg: percent >= 100 ? AdminColors.successBg : AdminColors.warningBg,
           fg: percent >= 100 ? AdminColors.success : AdminColors.warning,
           icon: percent >= 100 ? Icons.task_alt : Icons.pending_outlined,
@@ -3200,9 +3201,9 @@ class MemberDetailCompletenessBanner extends StatelessWidget {
     return MemberDetailNotice(
       icon: Icons.info_outline,
       warning: true,
-      title: 'Tracer profile $rounded% complete',
+      title: 'Profile $rounded% complete',
       message: missingLabels.isEmpty
-          ? 'Some tracer profile fields are still missing.'
+          ? 'Some profile fields are still missing.'
           : 'Missing: ${missingLabels.join(', ')}',
     );
   }
@@ -3265,7 +3266,7 @@ class MemberDetailColumns extends StatelessWidget {
 const _activityAcronyms = {'CHED', 'GTS', 'PDF', 'DSS', 'FCM', 'SMS', 'ID'};
 
 /// Readable form of an audit action code: `UPDATE_ROSTER_MEMBER` →
-/// "Update roster member". Known acronyms stay upper case.
+/// "Update alumni list member". Known acronyms stay upper case.
 String memberDetailActionLabel(String action) {
   final words = action
       .trim()
@@ -3278,6 +3279,8 @@ String memberDetailActionLabel(String action) {
     final upper = words[i].toUpperCase();
     if (_activityAcronyms.contains(upper)) {
       out.add(upper);
+    } else if (upper == 'ROSTER') {
+      out.add(i == 0 ? 'Alumni list' : 'alumni list');
     } else {
       final lower = words[i].toLowerCase();
       out.add(

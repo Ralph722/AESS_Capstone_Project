@@ -9,7 +9,7 @@ import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 
-/// Alumni, registration and tracer response for one program on the roster.
+/// Alumni, registration and tracer response for one program on the alumni list.
 class DashboardProgramStat {
   const DashboardProgramStat({
     required this.program,

@@ -307,10 +307,10 @@ void main() {
       );
       expect(find.text('Alumni Directory'), findsOneWidget);
       expect(
-        find.text('Official roster used to validate alumni registration.'),
+        find.text('Official alumni list used to validate alumni registration.'),
         findsOneWidget,
       );
-      await tester.tap(find.text('Export CHED GTS'));
+      await tester.tap(find.text('Download Reports'));
       await tester.tap(find.text('Add Alumni'));
       expect(exported, isTrue);
       expect(added, isTrue);
@@ -328,7 +328,7 @@ void main() {
       );
       final button = tester.widget<OutlinedButton>(
         find.ancestor(
-          of: find.text('Export CHED GTS'),
+          of: find.text('Download Reports'),
           matching: find.byWidgetPredicate((w) => w is OutlinedButton),
         ),
       );

@@ -78,7 +78,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return AuthShell(
       showBackButton: false,
       title: 'Create your account',
-      subtitle: 'Registration is verified against the official alumni roster.',
+      subtitle: 'Registration is verified against the official alumni list.',
       form: AutofillGroup(
         child: Form(
           key: _formKey,
@@ -511,7 +511,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         'not_found' => ('No matching alumni record', Icons.search_off_rounded),
         'unavailable' => (
-          'Couldn’t check the roster',
+          'Couldn’t check the alumni list',
           Icons.cloud_off_outlined,
         ),
         _ => ('Check your details', Icons.error_outline),
@@ -647,7 +647,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  /// Links the now signed-in, email-verified account to its roster record.
+  /// Links the now signed-in, email-verified account to its alumni list record.
   Future<void> _completeRegistration() async {
     if (_rosterMemberId == null) {
       _showError('Please verify alumni status again.');
@@ -840,7 +840,7 @@ class _VerifiedRecordCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Verified on official alumni roster',
+                  'Verified on the official alumni list',
                   style: PortalTheme.caption.copyWith(
                     color: PortalTheme.success,
                     fontWeight: FontWeight.w700,

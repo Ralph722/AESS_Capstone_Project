@@ -67,7 +67,10 @@ IconData dssRuleIcon(String ruleId) => switch (ruleId) {
   'RELATEDNESS_LOW' => Icons.school_outlined,
   'RELATEDNESS_HIGH' => Icons.emoji_events_outlined,
   'UNDEREMPLOYMENT' => Icons.trending_down,
+  'QUALIFICATION_MISMATCH' => Icons.compare_arrows_outlined,
   'TIME_TO_JOB_LONG' => Icons.schedule_outlined,
+  'PLACEMENT_CHANNEL_LOW' => Icons.handshake_outlined,
+  'SALARY_LOW_ENTRY' => Icons.money_off_outlined,
   'SALARY_STAGNATION' => Icons.payments_outlined,
   'UNEMPLOYMENT_TREND_UP' => Icons.trending_up,
   _ => Icons.lightbulb_outline,
@@ -169,20 +172,13 @@ class DssPageHeader extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (leading != null) ...[
-                      leading,
-                      const SizedBox(width: 8),
-                    ],
+                    if (leading != null) ...[leading, const SizedBox(width: 8)],
                     Expanded(child: titleCol),
                   ],
                 ),
                 if (actions.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: actions,
-                  ),
+                  Wrap(spacing: 8, runSpacing: 8, children: actions),
                 ],
               ],
             );
@@ -191,10 +187,7 @@ class DssPageHeader extends StatelessWidget {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (leading != null) ...[
-                leading,
-                const SizedBox(width: 8),
-              ],
+              if (leading != null) ...[leading, const SizedBox(width: 8)],
               Expanded(child: titleCol),
               if (actions.isNotEmpty) ...[
                 const SizedBox(width: 12),
@@ -258,21 +251,11 @@ class DssPageHeader extends StatelessWidget {
             if (constraints.maxWidth < 640) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  tabs,
-                  const SizedBox(height: 8),
-                  trailingSubnav!,
-                ],
+                children: [tabs, const SizedBox(height: 8), trailingSubnav!],
               );
             }
 
-            return Row(
-              children: [
-                tabs,
-                const Spacer(),
-                trailingSubnav!,
-              ],
-            );
+            return Row(children: [tabs, const Spacer(), trailingSubnav!]);
           },
         ),
       ],
@@ -288,17 +271,17 @@ class DssStatusChip extends StatelessWidget {
   static String? glossary(DssFlagStatus status) => switch (status) {
     DssFlagStatus.watch =>
       'Watch — too few answers for a finding yet. Re-run analysis '
-      'promotes it once enough alumni answer; until then you can dismiss '
-      'it or add notes.',
+          'promotes it once enough alumni answer; until then you can dismiss '
+          'it or add notes.',
     DssFlagStatus.superseded =>
       'Superseded — a newer CHED GTS wave checked the same finding. '
-      'This row is history and can no longer change.',
+          'This row is history and can no longer change.',
     DssFlagStatus.open => 'Open — not started. Next step is Start.',
     DssFlagStatus.inProgress =>
       'In progress — work under way. Act, add proof, then Resolve.',
     DssFlagStatus.resolved =>
       'Resolved — closed with an intervention. Outcome is judged from '
-      'the next CHED GTS wave.',
+          'the next CHED GTS wave.',
     DssFlagStatus.dismissed =>
       'Dismissed — closed without action. Reopen if the issue returns.',
   };
@@ -557,9 +540,7 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
       decoration: BoxDecoration(
         color: AdminColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-        border: Border.all(
-          color: AdminColors.primary.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: AdminColors.primary.withValues(alpha: 0.18)),
       ),
       child: Text(
         'Next: $next',
@@ -610,8 +591,9 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
                         height: 38,
                         decoration: BoxDecoration(
                           color: AdminColors.primary.withValues(alpha: 0.08),
-                          borderRadius:
-                              BorderRadius.circular(AdminSurfaces.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AdminSurfaces.radiusSm,
+                          ),
                           border: Border.all(
                             color: AdminColors.primary.withValues(alpha: 0.16),
                           ),
@@ -728,8 +710,7 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 6,
-                                  crossAxisAlignment:
-                                      WrapCrossAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   alignment: WrapAlignment.spaceBetween,
                                   children: [
                                     if (urgencyChips.isNotEmpty)
@@ -1178,7 +1159,11 @@ class DssHowThisWorksStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.school_outlined, size: 18, color: AdminDssTheme.primary),
+              const Icon(
+                Icons.school_outlined,
+                size: 18,
+                color: AdminDssTheme.primary,
+              ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -1282,10 +1267,7 @@ DssFlag dssExampleFinding() {
         'This is a labelled example only. It is not a real finding and is '
         'never saved to the database.',
     recommendedAction: 'Start → choose a Plan → act → add Proof → Resolve.',
-    evidence: const {
-      'valid_answers': 24,
-      'evidence_strength': 'limited',
-    },
+    evidence: const {'valid_answers': 24, 'evidence_strength': 'limited'},
     ruleName: 'High not-employed rate',
     severity: DssSeverity.warning,
     ruleCategory: DssRuleCategory.outcome,

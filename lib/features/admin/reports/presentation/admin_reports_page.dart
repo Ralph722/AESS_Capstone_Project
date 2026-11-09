@@ -26,7 +26,6 @@ import 'package:alumni_system/features/surveys/models/survey_reports_aggregate.d
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_field_dictionary.dart';
-import 'package:alumni_system/features/admin/reports/application/gts_report_engine.dart';
 import 'package:alumni_system/features/admin/reports/application/institutional_ched_templates.dart';
 import 'package:alumni_system/features/admin/reports/application/report_file_names.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_coverage.dart';
@@ -130,8 +129,17 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   /// Overview action center: 0 = needs attention, 1 = insights.
   int _overviewActionView = 0;
 
-  /// Tracer view: 0 = outcomes, 1 = career path, 2 = cohorts & waves.
-  int _tracerView = 0;
+  /// Tracer topic: 0 School-to-work, 1 Curriculum, 2 Placement, 3 Studies,
+  /// 4 Waves (cross-wave compare).
+  int _tracerTopic = 0;
+
+  bool get _tracerWavesMode => _tracerTopic == 4;
+
+  /// Job level card (Q30): 0 = first job, 1 = present job.
+  int _jobLevelTab = 0;
+
+  /// Retention / mobility card: 0 stay (Q23), 1 accept (Q25), 2 change (Q26).
+  int _mobilityTab = 0;
 
   /// Measured height of the cohort filter block (varies when it wraps).
   double _filterBlockHeight = 0;
@@ -217,18 +225,29 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     _tabController = TabController(length: _tabLabels.length, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging || !mounted) return;
-      final id = _dashboardFilters.surveyId;
-      if (id != null && _tabController.index == 1) {
-        Survey? survey;
-        for (final s in _surveys) {
-          if (s.id == id) {
-            survey = s;
-            break;
+      if (_tabController.index == 1) {
+        final id = _dashboardFilters.surveyId;
+        if (id != null) {
+          Survey? survey;
+          for (final s in _surveys) {
+            if (s.id == id) {
+              survey = s;
+              break;
+            }
+          }
+          if (survey != null && !survey.isChedGtsBuiltin) {
+            _dashboardFilters = _dashboardFilters.copyWith(clearSurvey: true);
           }
         }
-        if (survey != null && !survey.isChedGtsBuiltin) {
-          _dashboardFilters = _dashboardFilters.copyWith(clearSurvey: true);
+        if (_tracerWavesMode) {
+          _dashboardFilters = ReportsDashboardFilters(
+            batchYear: _dashboardFilters.batchYear,
+            course: _dashboardFilters.course,
+          );
+        } else {
+          _ensureTracerOutcomesWaveSelected();
         }
+        unawaited(_ensureSelectedWaveSample(_dashboardFilters.surveyId));
       }
       setState(() {});
     });
@@ -388,9 +407,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         if (!_insightsAreAi) {
           _insightCards = _buildPlaceholderInsights(analytics, adjustedSurveys);
         }
+        if (_tabController.index == 1 && !_tracerWavesMode) {
+          _ensureTracerOutcomesWaveSelected();
+        }
       });
 
       unawaited(_refreshSurveyReportExtras(surveys));
+      if (_tabController.index == 1) {
+        unawaited(_ensureSelectedWaveSample(_dashboardFilters.surveyId));
+      }
     } catch (e) {
       if (!mounted) return;
       if (!silent) {
@@ -848,6 +873,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                           allWavesLabel: tabIndex == 1
                               ? 'All published tracers'
                               : 'All published surveys',
+                          showWaveFilter:
+                              tabIndex != 1 || !_tracerWavesMode,
+                          includeAllWavesOption: tabIndex != 1,
                           onChanged: (next) {
                             setState(() => _dashboardFilters = next);
                             unawaited(_ensureSelectedWaveSample(next.surveyId));
@@ -1104,7 +1132,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return [
       ReportsStatCard(
-        label: 'Alumni roster',
+        label: 'Alumni list',
         value: '${a.rosterTotal}',
         icon: Icons.groups_outlined,
         accent: AdminReportsTheme.primary,
@@ -1121,11 +1149,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ],
         details: ReportsDetailsButton.compose(
           definition:
-              'Active alumni on the roster, and how many already have a '
+              'Active alumni on the alumni list, and how many already have a '
               'portal account.',
           calculation:
               '${a.registeredOnRoster} registered out of ${a.rosterTotal} on '
-              'the active roster. "This month" counts roster records added '
+              'the alumni list. "This month" counts alumni list records added '
               'since the 1st.',
           scope: scope,
         ),
@@ -1156,7 +1184,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               'alumni submitted a tracer wave.',
           scope: scope,
           limitation:
-              '"Profile complete" is the roster profile flag, not a tracer '
+              '"Profile complete" is the alumni list profile flag, not a tracer '
               'submission.',
         ),
         onTap: () => _selectTab(1),
@@ -1223,15 +1251,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final labels = [for (final m in _monthWindow()) _monthLabel(m)];
     final empty = roster.cumulative.every((v) => v == 0);
     return ReportsBentoCard(
-      title: 'Roster & registration trend',
+      title: 'Alumni list & registration trend',
       caption: 'Cumulative alumni, last 12 months',
       details: ReportsDetailsButton.compose(
         definition:
-            'Cumulative roster vs registered alumni by the month the roster '
+            'Cumulative alumni list vs registered alumni by the month the alumni list '
             'record was added.',
         scope: 'System-wide.',
         limitation:
-            'Registered alumni are plotted by roster record date, not by '
+            'Registered alumni are plotted by alumni list record date, not by '
             'account sign-up date.',
       ),
       trailing: empty
@@ -1241,7 +1269,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               children: [
                 ReportsLegendDot(
                   color: AdminReportsTheme.primary,
-                  label: 'Roster',
+                  label: 'Alumni list',
                 ),
                 ReportsLegendDot(
                   color: AdminReportsTheme.gold,
@@ -1252,14 +1280,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             ),
       child: empty
           ? const ReportsChartEmptyState(
-              message: 'No roster timestamps available yet',
+              message: 'No alumni list timestamps available yet',
               icon: Icons.show_chart_outlined,
             )
           : ReportsTrendChart(
               labels: labels,
               series: [
                 ReportsTrendSeries(
-                  label: 'Roster',
+                  label: 'Alumni list',
                   color: AdminReportsTheme.primary,
                   values: roster.cumulative,
                 ),
@@ -1295,9 +1323,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     ];
     return ReportsBentoCard(
       title: 'Alumni by program',
-      caption: '${courses.length} programs on the roster',
+      caption: '${courses.length} programs on the alumni list',
       details: ReportsDetailsButton.compose(
-        definition: 'Active roster alumni grouped by their program (course).',
+        definition: 'Active alumni list members grouped by their program (course).',
         calculation:
             'Top $maxSlices programs by headcount; the rest are grouped as '
             '"Other programs".',
@@ -1305,7 +1333,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       ),
       child: entries.isEmpty
           ? const ReportsChartEmptyState(
-              message: 'No roster alumni yet',
+              message: 'No alumni on the list yet',
               icon: Icons.donut_large_outlined,
             )
           : ReportsDonutBreakdown(
@@ -1322,12 +1350,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   ) {
     return ReportsBentoCard(
       title: 'Engagement funnel',
-      caption: 'Share of the roster at each step',
+      caption: 'Share of the alumni list at each step',
       details: ReportsDetailsButton.compose(
         definition:
-            'How far roster alumni have moved: registered a portal account, '
+            'How far alumni list members have moved: registered a portal account, '
             'submitted a tracer wave, and completed their profile.',
-        calculation: 'Each step is shown as a share of the full roster.',
+        calculation: 'Each step is shown as a share of the full alumni list.',
         scope: 'System-wide.',
         limitation:
             '"Took tracer" and "Profile complete" are tracked separately, so '
@@ -1335,13 +1363,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       ),
       child: a.rosterTotal == 0
           ? const ReportsChartEmptyState(
-              message: 'No roster alumni yet',
+              message: 'No alumni on the list yet',
               icon: Icons.filter_alt_outlined,
             )
           : ReportsFunnelBars(
               steps: [
                 ReportsFunnelStep(
-                  label: 'Roster',
+                  label: 'Alumni list',
                   value: a.rosterTotal,
                   color: AdminReportsTheme.primary,
                 ),
@@ -1406,13 +1434,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       title: 'Alumni by batch year',
       caption: 'Most recent ${batches.length} batches',
       details: ReportsDetailsButton.compose(
-        definition: 'Active roster alumni grouped by batch (graduation) year.',
+        definition: 'Active alumni list members grouped by batch (graduation) year.',
         calculation: 'The largest batch is highlighted in gold.',
         scope: 'System-wide, latest 8 batch years.',
       ),
       child: batches.isEmpty
           ? const ReportsChartEmptyState(
-              message: 'No batch years on the roster yet',
+              message: 'No batch years on the alumni list yet',
             )
           : ReportsColumnChart(
               labels: [for (final b in batches) b.key],
@@ -1556,7 +1584,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   static const double _viewBarHeight = 36;
 
-  /// Tracer: filtered KPI strip plus three switchable bento views.
+  static const _tracerTopicLabels = [
+    'School-to-work',
+    'Curriculum',
+    'Placement',
+    'Studies',
+    'Waves',
+  ];
+
+  /// Tracer: KPI strip plus topic / Waves bento views.
   Widget _buildTracerTab(AdminReportsAnalytics a, {double? fitHeight}) {
     final coverage = _coverageFor(a);
     final gridFit = fitHeight == null
@@ -1573,13 +1609,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: ReportsSegmentedToggle(
-                    options: const [
-                      'Outcomes',
-                      'Career path',
-                      'Cohorts & waves',
-                    ],
-                    selected: _tracerView,
-                    onChanged: (i) => setState(() => _tracerView = i),
+                    options: _tracerTopicLabels,
+                    selected: _tracerTopic,
+                    onChanged: _onTracerTopicChanged,
                   ),
                 ),
               ),
@@ -1592,14 +1624,45 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ReportsBentoGrid(
           fitHeight: gridFit,
           kpis: _tracerKpis(a, coverage),
-          rows: switch (_tracerView) {
-            1 => _tracerCareerRows(a),
-            2 => _tracerCohortRows(a),
-            _ => _tracerOutcomeRows(a, coverage),
-          },
+          rows: _tracerWavesMode
+              ? _tracerWavesRows(a)
+              : _tracerTopicRows(a),
         ),
       ],
     );
+  }
+
+  void _onTracerTopicChanged(int i) {
+    setState(() {
+      _tracerTopic = i;
+      if (_tracerWavesMode) {
+        // Waves compares all published tracers; keep batch/course only.
+        _dashboardFilters = ReportsDashboardFilters(
+          batchYear: _dashboardFilters.batchYear,
+          course: _dashboardFilters.course,
+        );
+      } else {
+        _ensureTracerOutcomesWaveSelected();
+      }
+    });
+    unawaited(_ensureSelectedWaveSample(_dashboardFilters.surveyId));
+  }
+
+  /// Outcomes always scopes to one concrete published tracer.
+  void _ensureTracerOutcomesWaveSelected() {
+    if (_dashboardFilters.surveyId != null) {
+      final stillThere = _surveys.any(
+        (s) =>
+            s.id == _dashboardFilters.surveyId &&
+            s.isChedGtsBuiltin &&
+            !s.archived,
+      );
+      if (stillThere) return;
+    }
+    final tracers = reportsFilterSurveyOptions(_surveys, tracerOnly: true);
+    if (tracers.isEmpty) return;
+    // Newest first; preserve batch/course when auto-picking a wave.
+    _dashboardFilters = _dashboardFilters.copyWith(surveyId: tracers.first.id);
   }
 
   String _tracerScope(AdminReportsAnalytics a) {
@@ -1620,13 +1683,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       n > 0 && n < 5 ? 'Small sample · n = $n $noun' : 'n = $n $noun';
 
   static const _chedAnswerScope =
-      'Tracer answers of graduates linked to the alumni roster with a course '
+      'Tracer answers of graduates linked to the alumni list with a course '
       '(the graduates Program Insights counts), within the filters you '
       'selected.';
 
-  static const _tracerCountingNote =
-      'With every tracer in scope, each graduate counts once, from their '
-      'latest answer. Groups with fewer than 5 answers are hidden.';
+  String get _tracerCountingNote => _tracerWavesMode
+      ? 'Each graduate is counted once per wave shown. Groups with fewer '
+            'than 5 answers are hidden.'
+      : 'Counts are for the selected tracer wave. Groups with fewer than 5 '
+            'answers are hidden.';
 
   static const _notEnoughData =
       'Not enough data: fewer than 5 answers in this filter.';
@@ -1653,11 +1718,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   /// [measure]'s answer counts in the current filter. Questionnaire order
   /// (zero bins kept, an unused "Others" dropped), or largest first with
   /// [byCount]. [answered] is the share base; [small] hides the numbers.
+  /// [gridColumn] scopes matrix measures such as job level (Q30).
   _TracerCounts _tracerCounts(
     String measure, {
     bool employedOnly = false,
     bool byCount = false,
     int? topN,
+    String? gridColumn,
   }) {
     final a = _analytics;
     if (a == null) {
@@ -1668,6 +1735,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       employedOnly: employedOnly,
       byCount: byCount,
       topN: topN,
+      gridColumn: gridColumn,
     );
     final row = result.total;
     return (
@@ -1682,25 +1750,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  static String _chedShortLabel(String option) {
-    const short = {
-      'Less than a month': '<1 mo',
-      '1 to 6 months': '1–6 mo',
-      '7 to 11 months': '7–11 mo',
-      '1 year to less than 2 years': '1–2 yr',
-      '2 years to less than 3 years': '2–3 yr',
-      '3 years to less than 4 years': '3–4 yr',
-      ChedGtsBuiltin.othersSpecify: 'Other',
-      'Below P5,000.00': '<5k',
-      'P5,000.00 to less than P10,000.00': '5–10k',
-      'P10,000.00 to less than P15,000.00': '10–15k',
-      'P15,000.00 to less than P20,000.00': '15–20k',
-      'P20,000.00 to less than P25,000.00': '20–25k',
-      'P25,000.00 and above': '25k+',
-    };
-    return short[option] ??
-        (option.length > 8 ? '${option.substring(0, 7)}…' : option);
-  }
+  static const _jobLevelFirstCol = '30.1. First Job';
+  static const _jobLevelPresentCol = '30.2. Current or Present Job';
 
   /// Top [maxSlices] entries as donut slices, remainder grouped as "Other".
   List<ReportsDonutEntry> _donutEntries(
@@ -1807,47 +1858,68 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final ched = _chedEmploymentStatusCounts(a);
     final answered = ched?.answered ?? 0;
     final employed = ched?.employed ?? 0;
-    final takeRate = coverage.tracerTakeRateAmongRegistered;
-    final takeStatus = coverage.registered == 0
-        ? ReportsKpiStatus.neutral
-        : reportsKpiStatusFromRate(takeRate);
     final hidden = answered == 0 || (ched?.small ?? false);
     final employmentRate = hidden ? 0.0 : employed / answered;
     final employmentStatus = hidden
         ? ReportsKpiStatus.neutral
         : reportsKpiStatusFromRate(employmentRate);
 
+    final traced = coverage.tookTracer;
+    final assigned = _tracerAssignedForKpi(a);
+    // Prefer survey assignments for a single wave; fall back to registered
+    // when comparing all waves (assignment sums would double-count people).
+    final usesAssignments = !_tracerWavesMode && assigned > 0;
+    final denom = usesAssignments ? assigned : coverage.registered;
+    final responseRate = denom == 0 ? 0.0 : traced / denom;
+    final responseStatus = denom == 0
+        ? ReportsKpiStatus.neutral
+        : reportsKpiStatusFromRate(responseRate);
+    final pending = usesAssignments
+        ? (assigned - traced).clamp(0, assigned)
+        : coverage.registeredNoTracer;
+
     return [
       ReportsStatCard(
-        label: 'Tracer responses',
-        value: '${coverage.tookTracer}',
+        label: 'Total traced',
+        value: denom == 0 ? '$traced' : '$traced / $denom',
         icon: Icons.assignment_turned_in_outlined,
         accent: AdminReportsTheme.primary,
-        pillLabel: coverage.registered == 0
+        pillLabel: denom == 0
             ? 'No data'
-            : '${_pct(takeRate)} of registered',
-        pillColor: reportsStatusColor(takeStatus),
+            : '${_pct(responseRate)} response rate',
+        pillColor: reportsStatusColor(responseStatus),
         rows: [
           ReportsStatRow(
-            'Registered, no tracer',
-            '${coverage.registeredNoTracer}',
+            usesAssignments ? 'Assigned' : 'Registered',
+            '$denom',
           ),
-          ReportsStatRow('Not registered', '${coverage.notRegistered}'),
           ReportsStatRow(
-            'Share of roster',
+            usesAssignments ? 'Pending assignments' : 'Registered, no tracer',
+            '$pending',
+          ),
+          ReportsStatRow(
+            'Share of alumni list',
             _pct(coverage.tracerTakeRateAmongRoster),
           ),
         ],
         details: ReportsDetailsButton.compose(
-          definition: coverage.definition,
-          calculation:
-              '${coverage.tookTracer} of ${coverage.registered} registered '
-              'alumni (${coverage.rosterTotal} on the roster) submitted a '
-              'tracer.',
+          definition:
+              'Completed tracer submissions in the current filter, shown '
+              'against ${usesAssignments ? 'wave assignments' : 'registered alumni'}.',
+          calculation: usesAssignments
+              ? '$traced submitted ÷ $assigned assigned '
+                  '(${_pct(responseRate)} response rate).'
+              : '$traced of $denom registered alumni '
+                  '(${_pct(responseRate)} response rate). '
+                  'Waves mode uses registered alumni as the base so people '
+                  'are not double-counted across waves.',
           scope: coverage.waveLabel,
-          limitation:
-              '“Took tracer” means submitted the wave — not the same as '
-              '“Profile complete” on Overview.',
+          limitation: coverage.scopedToWave
+              ? 'Alumni list is as of this wave’s open/publish date, not '
+                  'today’s full list. “Traced” means submitted the wave — '
+                  'not the same as “Profile complete” on Overview.'
+              : '“Traced” means submitted the wave — not the same as '
+                  '“Profile complete” on Overview.',
         ),
       ),
       ReportsStatCard(
@@ -1862,17 +1934,17 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             : reportsKpiStatusLabel(employmentStatus),
         pillColor: reportsStatusColor(employmentStatus),
         rows: [
-          ReportsStatRow('Employed', hidden ? '—' : '$employed'),
+          ReportsStatRow('Employed (Yes)', hidden ? '—' : '$employed'),
           ReportsStatRow(
-            'Not employed',
+            'Not / never employed',
             hidden ? '—' : '${ched?.notEmployed ?? 0}',
           ),
-          ReportsStatRow('Tracer waves', '${ched?.waveCount ?? 0}'),
+          ReportsStatRow('Answered item 16', hidden ? '—' : '$answered'),
         ],
         details: ReportsDetailsButton.compose(
           definition:
-              'Share of graduates who said they are currently employed on '
-              'the tracer.',
+              'Share of graduates who said they are currently employed '
+              '(item 16) on the tracer.',
           calculation:
               'Employed means "Yes". Not employed means "No" or "Never '
               'employed", so 100% minus this rate is the Program Insights '
@@ -1882,7 +1954,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       _yesShareKpi(
-        label: 'Degree aligned',
+        label: 'Degree alignment',
         icon: Icons.school_outlined,
         accent: ReportsBentoPalette.at(1),
         share: _chedYesShare('ched_24a'),
@@ -1890,13 +1962,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         noLabel: 'Not aligned',
         definition:
             'Share of graduates whose first job relates to the course they '
-            'took in college.',
+            'took in college (item 24 / field of study alignment).',
         askedOf:
             'Item 24 is only asked of employed graduates whose current job '
             'is their first job (item 22 = Yes).',
       ),
       _yesShareKpi(
-        label: 'Curriculum relevant',
+        label: 'Curriculum relevance',
         icon: Icons.menu_book_outlined,
         accent: ReportsBentoPalette.at(4),
         share: _chedYesShare('ched_32'),
@@ -1904,10 +1976,20 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         noLabel: 'Not relevant',
         definition:
             'Share of graduates who felt their college curriculum was '
-            'relevant to their first job.',
+            'relevant to their first job (item 32).',
         askedOf: 'Item 32 is only asked of employed graduates (item 16 = Yes).',
       ),
     ];
+  }
+
+  /// Assignment count for the selected tracer wave, or 0 when none / Waves mode.
+  int _tracerAssignedForKpi(AdminReportsAnalytics a) {
+    final surveyId = _dashboardFilters.surveyId;
+    if (surveyId == null) return 0;
+    for (final s in a.surveys) {
+      if (s.id == surveyId) return a.assignmentCount(s);
+    }
+    return 0;
   }
 
   Widget _yesShareKpi({
@@ -1953,24 +2035,170 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  // ── Tracer · Outcomes ──
+  // ── Tracer · Outcomes (single wave, topic tabs) ──
 
-  List<ReportsBentoRow> _tracerOutcomeRows(
-    AdminReportsAnalytics a,
-    TracerCoverageSnapshot coverage,
-  ) {
+  List<ReportsBentoRow> _tracerTopicRows(AdminReportsAnalytics a) {
+    return switch (_tracerTopic) {
+      1 => _tracerCurriculumRows(),
+      2 => _tracerPlacementRows(a),
+      3 => _tracerStudiesRows(),
+      4 => _tracerWavesRows(a),
+      _ => _tracerSchoolToWorkRows(),
+    };
+  }
+
+  List<ReportsBentoRow> _tracerSchoolToWorkRows() {
     return [
       ReportsBentoRow(
-        flex: const [5, 4, 3],
+        flex: const [4, 4, 4],
         naturalHeight: 300,
         children: [
-          _tracerRateByWaveCard(a),
-          _tracerStatusCard(a),
-          _tracerCoverageCard(coverage),
+          _bentoDistributionCard(
+            title: 'Time to first job',
+            details: _chedDetails(
+              'How long it took graduates to land their first job '
+              '(item 29) on this tracer wave.',
+            ),
+            data: _tracerCounts('ched_29'),
+            emptyMessage: 'No time-to-first-job answers yet',
+            emptyIcon: Icons.schedule_outlined,
+            color: AdminReportsTheme.primary,
+          ),
+          _bentoDistributionCard(
+            title: 'First job after college',
+            details: _chedDetails(
+              'Whether the present job is the graduate’s first job after '
+              'college (item 22).',
+            ),
+            data: _tracerCounts('ched_22', employedOnly: true),
+            emptyMessage: _noChedEmployedDetails,
+            emptyIcon: Icons.work_history_outlined,
+            color: AdminReportsTheme.gold,
+            noun: 'employed graduates',
+          ),
+          _bentoDistributionCard(
+            title: 'Duration in first job',
+            details: _chedDetails(
+              'How long graduates stayed in their first job (item 27) on '
+              'this tracer wave.',
+            ),
+            data: _tracerCounts('ched_27', employedOnly: true),
+            emptyMessage: _noChedEmployedDetails,
+            emptyIcon: Icons.timelapse_outlined,
+            color: ReportsBentoPalette.at(2),
+            noun: 'employed graduates',
+          ),
         ],
       ),
       ReportsBentoRow(
-        flex: const [5, 4, 3],
+        flex: const [6, 6],
+        naturalHeight: 300,
+        children: [
+          _tracerJobLevelCard(),
+          _bentoDistributionCard(
+            title: 'Job search channels',
+            details: ReportsDetailsButton.compose(
+              definition:
+                  'How graduates found their first job (item 28) among '
+                  'those currently employed on this wave.',
+              scope: _employedOnlyScope,
+              limitation: _tracerCountingNote,
+            ),
+            data: _tracerCounts('ched_28', employedOnly: true, byCount: true),
+            emptyMessage: _noChedEmployedDetails,
+            emptyIcon: Icons.travel_explore_outlined,
+            color: ReportsBentoPalette.at(4),
+            noun: 'employed graduates',
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<ReportsBentoRow> _tracerCurriculumRows() {
+    return [
+      ReportsBentoRow(
+        flex: const [5, 7],
+        naturalHeight: 320,
+        children: [
+          _bentoDistributionCard(
+            title: 'Curriculum relevance',
+            details: _chedDetails(
+              'Whether graduates felt the college curriculum was relevant '
+              'to their first job (item 32).',
+            ),
+            data: _tracerCounts('ched_32', employedOnly: true),
+            emptyMessage: _noChedEmployedDetails,
+            emptyIcon: Icons.menu_book_outlined,
+            color: AdminReportsTheme.primary,
+            noun: 'employed graduates',
+          ),
+          _bentoDistributionCard(
+            title: 'Useful competencies',
+            details: ReportsDetailsButton.compose(
+              definition:
+                  'Competencies from college that graduates found useful '
+                  'in their first job (item 33). Graduates may select more '
+                  'than one.',
+              scope:
+                  'Asked when curriculum was marked relevant (item 32 = Yes), '
+                  'among employed graduates in the selected filters.',
+              limitation: _tracerCountingNote,
+            ),
+            data: _tracerCounts('ched_33', byCount: true),
+            emptyMessage: 'No competency answers yet',
+            emptyIcon: Icons.psychology_outlined,
+            color: ReportsBentoPalette.at(1),
+          ),
+        ],
+      ),
+      ReportsBentoRow(
+        flex: const [12],
+        naturalHeight: 280,
+        children: [
+          _bentoDistributionCard(
+            title: 'First job related to course',
+            details: _chedDetails(
+              'Whether the first job related to the course taken in college '
+              '(item 24).',
+            ),
+            data: _tracerCounts('ched_24a'),
+            emptyMessage: 'No course-relatedness answers yet',
+            emptyIcon: Icons.school_outlined,
+            color: ReportsBentoPalette.at(4),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<ReportsBentoRow> _tracerPlacementRows(AdminReportsAnalytics a) {
+    return [
+      ReportsBentoRow(
+        flex: const [4, 4, 4],
+        naturalHeight: 300,
+        children: [
+          _tracerStatusCard(a),
+          _tracerEmploymentTypeCard(),
+          _bentoDistributionCard(
+            title: 'Place of work',
+            details: ReportsDetailsButton.compose(
+              definition:
+                  'Where employed graduates work: local or abroad (item 21) '
+                  'on this tracer wave.',
+              scope: _employedOnlyScope,
+              limitation: _tracerCountingNote,
+            ),
+            data: _tracerCounts('ched_21', employedOnly: true),
+            emptyMessage: _noChedEmployedDetails,
+            emptyIcon: Icons.place_outlined,
+            color: ReportsBentoPalette.at(4),
+            noun: 'employed graduates',
+          ),
+        ],
+      ),
+      ReportsBentoRow(
+        flex: const [4, 4, 4],
         naturalHeight: 300,
         children: [
           _bentoDistributionCard(
@@ -1978,7 +2206,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             details: ReportsDetailsButton.compose(
               definition:
                   'Top 10 industries or sectors (item 20) reported by '
-                  'currently employed graduates.',
+                  'currently employed graduates on this tracer wave.',
               scope: _employedOnlyScope,
               limitation: _tracerCountingNote,
             ),
@@ -1993,13 +2221,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             color: AdminReportsTheme.primary,
             noun: 'employed graduates',
           ),
-          _tracerEmploymentTypeCard(),
           _bentoDistributionCard(
-            title: 'Initial monthly earning (employed)',
+            title: 'Initial monthly earning',
             details: ReportsDetailsButton.compose(
               definition:
                   'Initial gross monthly earning in the first job (item 31), '
-                  'among graduates who are currently employed.',
+                  'among graduates who are currently employed on this wave.',
               scope: _employedOnlyScope,
               limitation: _tracerCountingNote,
             ),
@@ -2009,25 +2236,201 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             color: ReportsBentoPalette.at(1),
             noun: 'employed graduates',
           ),
+          _bentoDistributionCard(
+            title: 'Reasons not employed',
+            details: _chedDetails(
+              'Reasons graduates gave for not being employed yet (item 17) '
+              'on this tracer wave.',
+            ),
+            data: _tracerCounts('ched_17', byCount: true),
+            emptyMessage: 'No not-employed reason answers yet',
+            emptyIcon: Icons.person_off_outlined,
+            color: AdminReportsTheme.gold,
+          ),
+        ],
+      ),
+      ReportsBentoRow(
+        flex: const [12],
+        naturalHeight: 300,
+        children: [_tracerMobilityCard()],
+      ),
+      ReportsBentoRow(
+        flex: const [6, 6],
+        naturalHeight: 280,
+        children: [
+          _tracerGroupRateCard(a, byBatch: true),
+          _tracerGroupRateCard(a, byBatch: false),
         ],
       ),
     ];
   }
 
+  List<ReportsBentoRow> _tracerStudiesRows() {
+    return [
+      ReportsBentoRow(
+        flex: const [12],
+        naturalHeight: 320,
+        children: [
+          _bentoDistributionCard(
+            title: 'Reasons for advanced studies',
+            details: ReportsDetailsButton.compose(
+              definition:
+                  'Reasons graduates gave for pursuing advance studies '
+                  '(item 15b) on this tracer wave.',
+              scope: _chedAnswerScope,
+              limitation:
+                  '$_tracerCountingNote Professional exam tables (item 13) '
+                  'and training lists (item 15a) are available from the '
+                  'survey Excel pack, not as charts here.',
+            ),
+            data: _tracerCounts('ched_15b', byCount: true),
+            emptyMessage: 'No further-studies responses yet',
+            emptyIcon: Icons.menu_book_outlined,
+            color: ReportsBentoPalette.at(1),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  Widget _tracerMobilityCard() {
+    const specs = <(String, String, String)>[
+      (
+        'Reasons for staying',
+        'ched_23',
+        'Reasons employed graduates gave for staying on the job (item 23).',
+      ),
+      (
+        'Reasons for accepting',
+        'ched_24b',
+        'Reasons graduates gave for accepting the job (item 25).',
+      ),
+      (
+        'Reasons for changing',
+        'ched_25',
+        'Reasons graduates gave for changing jobs (item 26).',
+      ),
+    ];
+    final spec = specs[_mobilityTab.clamp(0, specs.length - 1)];
+    final data = _tracerCounts(spec.$2, byCount: true);
+    final answered = data.answered;
+    return ReportsBentoCard(
+      title: 'Retention & job change reasons',
+      caption: answered == 0 || data.small
+          ? null
+          : 'n = $answered graduates',
+      details: ReportsDetailsButton.compose(
+        definition: spec.$3,
+        scope: _chedAnswerScope,
+        limitation: _tracerCountingNote,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ReportsSegmentedToggle(
+              options: const ['Stay', 'Accept', 'Change'],
+              selected: _mobilityTab,
+              onChanged: (i) => setState(() => _mobilityTab = i),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: answered == 0
+                ? ReportsChartEmptyState(
+                    message: 'No ${spec.$1.toLowerCase()} answers yet',
+                    icon: Icons.swap_horiz_outlined,
+                  )
+                : data.small
+                ? const ReportsChartEmptyState(
+                    message: _notEnoughData,
+                    icon: Icons.swap_horiz_outlined,
+                  )
+                : ReportsProgressList(
+                    items: [
+                      for (final e in data.entries)
+                        if (e.value > 0)
+                          ReportsProgressItem(
+                            label: e.key,
+                            detail: '${e.value}',
+                            fraction: e.value / answered,
+                            color: AdminReportsTheme.primary,
+                          ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tracerJobLevelCard() {
+    final column =
+        _jobLevelTab == 0 ? _jobLevelFirstCol : _jobLevelPresentCol;
+    final data = _tracerCounts(
+      'ched_30',
+      employedOnly: true,
+      gridColumn: column,
+    );
+    final answered = data.answered;
+    return ReportsBentoCard(
+      title: 'Job level position',
+      caption: answered == 0 || data.small
+          ? null
+          : 'n = $answered employed graduates',
+      details: ReportsDetailsButton.compose(
+        definition:
+            'Job level on the first job versus the current or present job '
+            '(item 30). Each graduate ticks one level per column.',
+        scope: _employedOnlyScope,
+        limitation: _tracerCountingNote,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ReportsSegmentedToggle(
+              options: const ['First job', 'Present job'],
+              selected: _jobLevelTab,
+              onChanged: (i) => setState(() => _jobLevelTab = i),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: answered == 0
+                ? const ReportsChartEmptyState(
+                    message: _noChedEmployedDetails,
+                    icon: Icons.stairs_outlined,
+                  )
+                : data.small
+                ? const ReportsChartEmptyState(
+                    message: _notEnoughData,
+                    icon: Icons.stairs_outlined,
+                  )
+                : ReportsProgressList(
+                    items: [
+                      for (final e in data.entries)
+                        if (e.value > 0)
+                          ReportsProgressItem(
+                            label: e.key,
+                            detail: '${e.value}',
+                            fraction: e.value / answered,
+                            color: AdminReportsTheme.primary,
+                          ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _tracerRateByWaveCard(AdminReportsAnalytics a) {
-    final waveScoped = _dashboardFilters.surveyId != null;
-    final points = waveScoped
-        ? const <_WaveEmploymentRatePoint>[]
-        : _employmentRateByWavePoints(a);
+    final points = _employmentRateByWavePoints(a);
     final Widget child;
-    if (waveScoped) {
-      child = const ReportsChartEmptyState(
-        message:
-            'Choose "All published tracers" in the filters to compare '
-            'waves.',
-        icon: Icons.show_chart_outlined,
-      );
-    } else if (points.length < 2) {
+    if (points.length < 2) {
       child = ReportsChartEmptyState(
         message: points.isEmpty
             ? 'No published tracer waves with employment answers yet'
@@ -2055,13 +2458,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     }
     return ReportsBentoCard(
       title: 'Employment rate by tracer wave',
-      caption: waveScoped
-          ? 'One wave selected'
-          : '${points.length} waves in chronological order',
+      caption: '${points.length} waves in chronological order',
       details: ReportsDetailsButton.compose(
         definition:
             'Share of graduates who said they are currently employed, shown '
-            'for each published tracer.',
+            'for each published tracer. Optional batch and course filters '
+            'apply across every wave.',
         calculation:
             'Employed answers divided by total employment answers on that '
             'tracer.',
@@ -2075,17 +2477,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   Widget _tracerStatusCard(AdminReportsAnalytics a) {
     final ched = _chedEmploymentStatusCounts(a);
-    final waveScoped = _dashboardFilters.surveyId != null;
     final employed = ched?.employed ?? a.employedCount;
     final notEmployed = ched?.notEmployed ?? a.unemployedCount;
     final total = employed + notEmployed;
     final details = ched != null
         ? ReportsDetailsButton.compose(
-            definition: waveScoped
-                ? 'Share of graduates on this tracer who said they are '
-                      'currently employed.'
-                : 'Share of graduates who said they are currently employed. '
-                      'Latest answer counted per person.',
+            definition:
+                'Share of graduates on this tracer wave who said they are '
+                'currently employed.',
             calculation:
                 'Employed means "Yes". Not employed means "No" or "Never '
                 'employed".',
@@ -2114,14 +2513,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           ? ReportsChartEmptyState(
               message: ched == null
                   ? 'No employment submissions yet'
-                  : (waveScoped
-                        ? 'No presently-employed answers on this tracer wave '
-                              'yet'
-                        : 'No presently-employed answers across tracer waves '
-                              'yet'),
+                  : 'No presently-employed answers on this tracer wave yet',
               icon: Icons.work_outline,
             )
           : ReportsDonutBreakdown(
+              pie: true,
               entries: [
                 ReportsDonutEntry(
                   label: 'Employed',
@@ -2133,84 +2529,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                   value: notEmployed,
                   color: AdminReportsTheme.gold,
                 ),
-              ],
-              centerValue: _pct(employed / total),
-              centerLabel: 'Employed',
-            ),
-    );
-  }
-
-  Widget _tracerCoverageCard(TracerCoverageSnapshot coverage) {
-    final open = widget.onOpenAdminMenu;
-    return ReportsBentoCard(
-      title: 'Coverage funnel',
-      caption:
-          '${_pct(coverage.tracerTakeRateAmongRegistered)} of registered took '
-          'a tracer',
-      details: ReportsDetailsButton.compose(
-        definition: coverage.definition,
-        calculation:
-            'Registered take-rate '
-            '${_pct(coverage.tracerTakeRateAmongRegistered)} · roster '
-            'take-rate ${_pct(coverage.tracerTakeRateAmongRoster)}.',
-        scope: coverage.waveLabel,
-        limitation:
-            '“Took tracer” means submitted the wave — not the same as '
-            '“Profile complete” on Overview.',
-      ),
-      child: coverage.rosterTotal == 0
-          ? const ReportsChartEmptyState(
-              message:
-                  'No roster alumni in this filter yet. Clear batch/course or '
-                  'add roster rows.',
-              icon: Icons.groups_outlined,
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: ReportsFunnelBars(
-                    steps: [
-                      ReportsFunnelStep(
-                        label: 'Roster',
-                        value: coverage.rosterTotal,
-                        color: AdminReportsTheme.primary,
-                      ),
-                      ReportsFunnelStep(
-                        label: 'Registered',
-                        value: coverage.registered,
-                        color: ReportsBentoPalette.at(1),
-                      ),
-                      ReportsFunnelStep(
-                        label: 'Took tracer',
-                        value: coverage.tookTracer,
-                        color: AdminReportsTheme.success,
-                      ),
-                    ],
-                  ),
-                ),
-                if (open != null &&
-                    (coverage.notRegistered > 0 ||
-                        coverage.registeredNoTracer > 0)) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 2,
-                    children: [
-                      if (coverage.notRegistered > 0)
-                        _bentoLink(
-                          'Follow up ${coverage.notRegistered} unregistered',
-                          () => open(2),
-                        ),
-                      if (coverage.registeredNoTracer > 0)
-                        _bentoLink(
-                          'Remind ${coverage.registeredNoTracer} without '
-                          'tracer',
-                          () => open(10),
-                        ),
-                    ],
-                  ),
-                ],
               ],
             ),
     );
@@ -2243,9 +2561,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               icon: Icons.badge_outlined,
             )
           : ReportsDonutBreakdown(
+              pie: true,
               entries: _donutEntries(types.entries),
-              centerValue: reportsCompactNumber(total),
-              centerLabel: 'Employed',
             ),
     );
   }
@@ -2284,218 +2601,36 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  // ── Tracer · Career path ──
+  // ── Tracer · Waves (compare all published tracers) ──
 
-  List<ReportsBentoRow> _tracerCareerRows(AdminReportsAnalytics a) {
+  List<ReportsBentoRow> _tracerWavesRows(AdminReportsAnalytics a) {
     return [
       ReportsBentoRow(
-        flex: const [4, 4, 4],
-        naturalHeight: 280,
+        flex: const [5, 7],
+        naturalHeight: 300,
         children: [
-          _chedColumnCard(
-            title: 'Time to first job',
-            questionId: 'ched_29',
-            definition: 'How long it took graduates to land their first job.',
-            emptyMessage: 'No time-to-first-job answers yet',
-          ),
-          _chedColumnCard(
-            title: 'Initial monthly earning',
-            questionId: 'ched_31',
-            definition:
-                'Reported initial gross monthly earnings in the first job.',
-            emptyMessage: 'No initial earning answers yet',
-          ),
-          _chedDonutCard(
-            title: 'Present employment status',
-            questionId: 'ched_18',
-            definition: 'How graduates describe their current job status.',
-            emptyMessage: 'No present employment status answers yet',
-          ),
-        ],
-      ),
-      ReportsBentoRow(
-        flex: const [3, 3, 3, 3],
-        naturalHeight: 280,
-        children: [
-          _bentoDistributionCard(
-            title: 'Reasons not employed',
-            details: _chedDetails(
-              'Reasons graduates gave for not being employed yet.',
-            ),
-            data: _tracerCounts('ched_17', byCount: true),
-            emptyMessage: 'No not-employed reason answers yet',
-            emptyIcon: Icons.person_off_outlined,
-            color: AdminReportsTheme.gold,
-          ),
-          _bentoDistributionCard(
-            title: 'Further studies',
-            details: ReportsDetailsButton.compose(
-              definition:
-                  'Reasons graduates gave for pursuing further studies.',
-              scope: _chedAnswerScope,
-              limitation: _tracerCountingNote,
-            ),
-            data: _tracerCounts('ched_15b', byCount: true),
-            emptyMessage: 'No further-studies responses yet',
-            emptyIcon: Icons.menu_book_outlined,
-            color: ReportsBentoPalette.at(1),
-          ),
-          _bentoDistributionCard(
-            title: 'Graduate location',
-            details: ReportsDetailsButton.compose(
-              definition:
-                  'Where employed graduates work: local or abroad (item 21).',
-              scope: _employedOnlyScope,
-              limitation: _tracerCountingNote,
-            ),
-            data: _tracerCounts('ched_21', employedOnly: true),
-            emptyMessage: _noChedEmployedDetails,
-            emptyIcon: Icons.place_outlined,
-            color: ReportsBentoPalette.at(4),
-            noun: 'employed graduates',
-          ),
-          _careerAlignmentCard(),
-        ],
-      ),
-    ];
-  }
-
-  Widget _chedColumnCard({
-    required String title,
-    required String questionId,
-    required String definition,
-    required String emptyMessage,
-  }) {
-    final data = _tracerCounts(questionId);
-    final entries = data.entries;
-    final total = data.answered;
-    return ReportsBentoCard(
-      title: title,
-      caption: total == 0 || data.small ? null : 'n = $total answers',
-      details: _chedDetails(definition),
-      child: total == 0
-          ? ReportsChartEmptyState(message: emptyMessage)
-          : data.small
-          ? const ReportsChartEmptyState(message: _notEnoughData)
-          : ReportsColumnChart(
-              labels: [for (final e in entries) _chedShortLabel(e.key)],
-              tooltipLabels: [for (final e in entries) e.key],
-              values: [for (final e in entries) e.value],
-            ),
-    );
-  }
-
-  Widget _chedDonutCard({
-    required String title,
-    required String questionId,
-    required String definition,
-    required String emptyMessage,
-  }) {
-    final data = _tracerCounts(questionId);
-    final total = data.answered;
-    return ReportsBentoCard(
-      title: title,
-      caption: total == 0 || data.small ? null : 'n = $total answers',
-      details: _chedDetails(definition),
-      child: total == 0
-          ? ReportsChartEmptyState(
-              message: emptyMessage,
-              icon: Icons.donut_large_outlined,
-            )
-          : data.small
-          ? const ReportsChartEmptyState(
-              message: _notEnoughData,
-              icon: Icons.donut_large_outlined,
-            )
-          : ReportsDonutBreakdown(
-              entries: _donutEntries(data.entries),
-              centerValue: reportsCompactNumber(total),
-              centerLabel: 'Answers',
-            ),
-    );
-  }
-
-  Widget _careerAlignmentCard() {
-    const questions = [
-      ('Place of work', 'ched_21'),
-      ('First job after college', 'ched_22'),
-      ('First job related to degree', 'ched_24a'),
-      ('Curriculum relevant to first job', 'ched_32'),
-    ];
-    final colors = [
-      AdminReportsTheme.primary,
-      AdminReportsTheme.gold,
-      ReportsBentoPalette.at(2),
-      ReportsBentoPalette.at(4),
-      ReportsBentoPalette.at(6),
-    ];
-    final items = [
-      for (final (label, id) in questions)
-        if (_tracerCounts(id) case final data)
-          ReportsSplitItem(
-            label: data.small && data.answered > 0
-                ? '$label (not enough data)'
-                : label,
-            entries: [
-              if (!data.small)
-                for (final (i, e) in data.entries.indexed)
-                  ReportsDonutEntry(
-                    label: e.key,
-                    value: e.value,
-                    color: colors[i % colors.length],
-                  ),
-            ],
-          ),
-    ];
-    return ReportsBentoCard(
-      title: 'Career alignment',
-      caption: 'Yes / no and local / abroad splits',
-      details: _chedDetails(
-        'Place of work, whether this is the first job after college, whether '
-        'it relates to the degree, and whether the curriculum was relevant.',
-      ),
-      child: items.every((i) => i.total == 0)
-          ? const ReportsChartEmptyState(
-              message: 'No career alignment answers yet',
-              icon: Icons.alt_route_outlined,
-            )
-          : ReportsSplitBars(items: items),
-    );
-  }
-
-  // ── Tracer · Cohorts & waves ──
-
-  List<ReportsBentoRow> _tracerCohortRows(AdminReportsAnalytics a) {
-    return [
-      ReportsBentoRow(
-        flex: const [4, 4, 4],
-        naturalHeight: 280,
-        children: [
+          _tracerRateByWaveCard(a),
           _tracerWaveBarsCard(a),
-          _tracerGroupRateCard(a, byBatch: true),
-          _tracerGroupRateCard(a, byBatch: false),
         ],
       ),
       ReportsBentoRow(
-        flex: const [7, 5],
+        flex: const [12],
         naturalHeight: 320,
-        children: [_tracerCourseTableCard(a), _tracerLongitudinalCard(a)],
+        children: [_tracerLongitudinalCard(a)],
       ),
     ];
   }
 
   Widget _tracerWaveBarsCard(AdminReportsAnalytics a) {
-    final waveScoped = _dashboardFilters.surveyId != null;
-    final points = waveScoped
-        ? const <_WaveEmploymentRatePoint>[]
-        : _employmentRateByWavePoints(a);
+    final points = _employmentRateByWavePoints(a);
     return ReportsBentoCard(
       title: 'By published tracer',
       caption: points.isEmpty ? null : 'Tap a bar to list respondents',
       details: ReportsDetailsButton.compose(
         definition:
             'Compares each published tracer: how many answered, and how many '
-            'said they are employed.',
+            'said they are employed. Optional batch and course filters apply '
+            'across every wave.',
         calculation:
             'The rate is employed ÷ answers. Tap a bar to see who answered.',
       ),
@@ -2514,14 +2649,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 ),
               ],
             ),
-      child: waveScoped
-          ? const ReportsChartEmptyState(
-              message:
-                  'Choose "All published tracers" in the filters to '
-                  'compare waves.',
-              icon: Icons.compare_arrows_outlined,
-            )
-          : points.isEmpty
+      child: points.isEmpty
           ? const ReportsChartEmptyState(
               message: 'No tracer waves with employment answers yet',
               icon: Icons.compare_arrows_outlined,
@@ -2572,8 +2700,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       details: ReportsDetailsButton.compose(
         definition: byBatch
             ? 'Employment answers grouped by the graduation year on the '
-                  'roster.'
-            : 'Employment answers grouped by the course on the roster.',
+                  'alumni list.'
+            : 'Employment answers grouped by the course on the alumni list.',
         calculation:
             'Employed ("Yes" on item 16) ÷ graduates who answered, per '
             'group. Tap a row to see who answered.',
@@ -2622,52 +2750,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  Widget _tracerCourseTableCard(AdminReportsAnalytics a) {
-    final stats = _courseStats(a);
-    return ReportsBentoCard(
-      title: 'Course comparison',
-      caption: '${stats.length} courses in this filter',
-      details: ReportsDetailsButton.compose(
-        definition:
-            'Per-course roster size, registration, tracer profile completion, '
-            'and employment rate.',
-        calculation:
-            'Employment rate is item 16 "Yes" ÷ graduates who answered, per '
-            'course, counted like the rest of the Tracer tab. Courses with '
-            'no answers show "no data"; fewer than 5 show "not enough data".',
-        scope: 'Roster alumni within the batch and course filters.',
-      ),
-      child: stats.isEmpty
-          ? const ReportsChartEmptyState(
-              message: 'No roster data yet — import alumni to compare courses',
-              icon: Icons.menu_book_outlined,
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _courseTableHeader(),
-                const SizedBox(height: 6),
-                Expanded(
-                  child: ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: stats.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 6),
-                    itemBuilder: (context, i) => _courseRow(stats[i], true),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-
   Widget _tracerLongitudinalCard(AdminReportsAnalytics a) {
     final rows = _longitudinalRows(a);
     return ReportsBentoCard(
       title: 'Same alumni across waves',
       caption: '${rows.length} alumni answered 2+ waves',
       details: ReportsDetailsButton.compose(
-        definition: 'Lists graduates who answered at least two tracer surveys.',
+        definition:
+            'Lists graduates who answered at least two tracer surveys. '
+            'Optional batch and course filters still apply.',
         calculation:
             'Each chip is that person\'s employment answer on that tracer.',
         scope: _tracerScope(a),
@@ -3534,10 +3625,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         _AttentionItem(
           icon: Icons.person_off_outlined,
           color: _navy,
-          title: '${a.unclaimedRoster} roster alumni not registered',
+          title: '${a.unclaimedRoster} alumni list members not registered',
           subtitle:
               '${a.registeredOnRoster}/${a.rosterTotal} have portal accounts',
-          actionLabel: 'Roster',
+          actionLabel: 'Alumni directory',
           onAction: () {
             final open = widget.onOpenAdminMenu;
             if (open != null) open(2);
@@ -3858,292 +3949,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     return list;
   }
 
-  // —— Phase 7: Course analytics ——
-
-  /// Per-course roster stats, with the item-16 employment rate per course
-  /// from the Tracer tab's counting ([TracerTabStats]).
-  List<_CourseStat> _courseStats(AdminReportsAnalytics a) {
-    final byCourse = <String, List<AlumniMember>>{};
-    for (final m in a.activeRoster) {
-      final course = m.course.trim().isEmpty ? 'Unknown' : m.course.trim();
-      byCourse.putIfAbsent(course, () => []).add(m);
-    }
-
-    final employment = <String, GtsReportRow>{
-      for (final row
-          in _tracerStats(
-            a,
-          ).run('ched_16', groupBy: GtsFieldDictionary.course).rows)
-        row.groupValues.first: row,
-    };
-
-    final stats = [
-      for (final e in byCourse.entries)
-        if (employment[e.key] case final row)
-          _CourseStat(
-            course: e.key,
-            total: e.value.length,
-            registered: e.value.where((m) => m.isRegisteredUser).length,
-            tracerComplete: e.value
-                .where((m) => m.tracerProfileComplete)
-                .length,
-            employmentSubmissions: row == null || row.isSmall
-                ? 0
-                : row.answered,
-            employed: row == null || row.isSmall ? 0 : TracerTabStats.yes(row),
-            employmentHidden: row != null && row.answered > 0 && row.isSmall,
-          ),
-    ]..sort((x, y) => y.total.compareTo(x.total));
-    return stats;
-  }
-
-  Widget _courseTableHeader() {
-    const style = TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      color: AdminReportsTheme.textSecondary,
-      letterSpacing: 0.4,
-    );
-
-    Widget head(int flex, String label, String tooltip) => Expanded(
-      flex: flex,
-      child: Tooltip(
-        message: tooltip,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(label, style: style),
-        ),
-      ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          head(3, 'COURSE', 'Course recorded on the alumni roster.'),
-          head(2, 'ALUMNI', 'Active roster entries for this course.'),
-          head(3, 'REGISTERED', 'Portal accounts ÷ roster entries.'),
-          head(
-            3,
-            'TRACER COMPLETE',
-            'Complete tracer profiles ÷ registered members.',
-          ),
-          head(
-            3,
-            'EMPLOYMENT RATE',
-            'Item 16 "Yes" ÷ graduates of this course who answered.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _courseRow(_CourseStat s, bool wide) {
-    return ReportsHoverSurface(
-      borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
-      semanticLabel:
-          '${s.course}: ${s.total} alumni, '
-          '${s.registered} registered, ${s.tracerComplete} tracer complete',
-      child: _courseRowBody(s, wide),
-    );
-  }
-
-  Widget _courseRowBody(_CourseStat s, bool wide) {
-    final card = BoxDecoration(
-      color: AdminReportsTheme.surface,
-      borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
-      border: Border.all(color: AdminReportsTheme.border),
-    );
-
-    if (!wide) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: card,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    s.course,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: AdminReportsTheme.textPrimary,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${s.total} alumni',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AdminReportsTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _courseStatBar(
-              'Registered',
-              s.registrationRate,
-              '${s.registered}/${s.total}',
-              _navy,
-            ),
-            const SizedBox(height: 8),
-            _courseStatBar(
-              'Tracer complete',
-              s.tracerRate,
-              '${s.tracerComplete}/${s.registered}',
-              Colors.teal,
-              showDash: s.registered == 0,
-            ),
-            const SizedBox(height: 8),
-            _courseStatBar(
-              'Employment',
-              s.employmentRate,
-              '${s.employed}/${s.employmentSubmissions}',
-              Colors.green,
-              showDash: s.employmentSubmissions == 0,
-              dashLabel: s.employmentHidden ? 'not enough data' : 'no data',
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: card,
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Text(
-              s.course,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AdminReportsTheme.textPrimary,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              s.total.toString(),
-              style: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: AdminReportsTheme.textPrimary,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: _courseStatBar(
-                null,
-                s.registrationRate,
-                '${s.registered}/${s.total}',
-                _navy,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: _courseStatBar(
-                null,
-                s.tracerRate,
-                '${s.tracerComplete}/${s.registered}',
-                Colors.teal,
-                showDash: s.registered == 0,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: _courseStatBar(
-              null,
-              s.employmentRate,
-              '${s.employed}/${s.employmentSubmissions}',
-              Colors.green,
-              showDash: s.employmentSubmissions == 0,
-              dashLabel: s.employmentHidden ? 'not enough data' : 'no data',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _courseStatBar(
-    String? label,
-    double rate,
-    String counts,
-    Color color, {
-    bool showDash = false,
-    String dashLabel = 'no data',
-  }) {
-    final percentText = showDash ? '—' : '${(rate * 100).toStringAsFixed(0)}%';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            if (label != null) ...[
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AdminReportsTheme.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-            Text(
-              percentText,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: showDash ? AdminReportsTheme.textMuted : color,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                showDash ? dashLabel : counts,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AdminReportsTheme.textMuted,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: showDash ? 0 : rate.clamp(0.0, 1.0),
-            minHeight: 6,
-            backgroundColor: AdminReportsTheme.border.withValues(alpha: 0.6),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-          ),
-        ),
-      ],
-    );
-  }
-
   String _displayNameForUid(AdminReportsAnalytics a, String uid) {
     final key = uid.trim();
     for (final m in a.activeRoster) {
@@ -4341,14 +4146,18 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     AdminReportsAnalytics a, {
     required CustomReportFormat format,
   }) async {
-    final waveScoped = _dashboardFilters.surveyId != null;
-    final title = waveScoped
-        ? 'Tracer filtered view'
-        : 'Tracer comparison (filtered)';
+    final wavesView = _tracerWavesMode;
+    final title = wavesView
+        ? 'Tracer waves comparison (filtered)'
+        : 'Tracer outcomes (filtered)';
     final preset = ReportsDownloadPreset(
       id: 'tracer_view',
       title: title,
-      description: 'Export of the current Tracer tab filters.',
+      description: wavesView
+          ? 'Export of cross-wave Tracer comparison with current batch/course '
+                'filters.'
+          : 'Export of the selected tracer wave with current batch/course '
+                'filters.',
       icon: Icons.filter_alt_outlined,
       sections: const [
         CustomReportSectionId.executiveKpis,
@@ -4400,16 +4209,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       await _downloadInstitutionalChedOutcomeReport(
         a,
         presetId: preset.id,
-        format: activeFormat,
-        printPreview: activePrint,
-        filters: selection,
-      );
-      return;
-    }
-
-    if (preset.id == InstitutionalChedTemplates.programCohortComparison) {
-      await _downloadProgramCohortComparison(
-        a,
         format: activeFormat,
         printPreview: activePrint,
         filters: selection,
@@ -4622,12 +4421,30 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         courseFilter: filters.course,
         fields: InstitutionalChedTemplates.fieldsFor(presetId),
         reportTitle: title,
-        sectionTwoTitle: 'Indicator distributions',
+        sectionTwoTitle: InstitutionalChedTemplates.sectionTwoTitle(presetId),
       );
       final stem = InstitutionalChedTemplates.fileStem(presetId);
 
+      // T5 compliance pack always includes a batch/program comparison section.
+      final InstitutionalCohortComparisonReport? cohort =
+          presetId == InstitutionalChedTemplates.chedComplianceMaster
+              ? InstitutionalCohortComparisonService.build(
+                  waves: scope.waves,
+                  responsesBySurveyId: scope.responsesBySurveyId,
+                  memberByAuth: scope.memberByAuth,
+                  dimension: filters.surveyType == 'course'
+                      ? InstitutionalCompareDimension.course
+                      : InstitutionalCompareDimension.batch,
+                  batchFilter: filters.batchYear,
+                  courseFilter: filters.course,
+                )
+              : null;
+
       if (printPreview || format == CustomReportFormat.pdf) {
-        final bytes = await InstitutionalGtsSummaryService.toPdf(summary);
+        final bytes = await InstitutionalGtsSummaryService.toPdf(
+          summary,
+          cohortComparison: cohort,
+        );
         if (!mounted) return;
         if (printPreview) {
           await Printing.layoutPdf(onLayout: (_) async => bytes, name: title);
@@ -4647,7 +4464,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           mimeType: 'application/pdf',
         );
       } else if (format == CustomReportFormat.excel) {
-        final bytes = InstitutionalGtsSummaryService.toExcel(summary);
+        final bytes = InstitutionalGtsSummaryService.toExcel(
+          summary,
+          cohortComparison: cohort,
+        );
         if (!mounted) return;
         tryDownloadBytesOnWeb(
           context,
@@ -4663,101 +4483,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           mimeType: format.mimeType,
         );
       } else {
-        final bytes = InstitutionalGtsSummaryService.toCsvBytes(summary);
-        if (!mounted) return;
-        tryDownloadBytesOnWeb(
-          context,
-          bytes: bytes,
-          fileName: ReportFileNames.dated(
-            stem: stem,
-            extension: 'csv',
-            cohortScope: ReportFileNames.cohortScopeLabel(
-              batchYear: filters.batchYear,
-              course: filters.course,
-            ),
-          ),
-          mimeType: format.mimeType,
+        final bytes = InstitutionalGtsSummaryService.toCsvBytes(
+          summary,
+          cohortComparison: cohort,
         );
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Downloaded $title (${format.label}).')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
-    } finally {
-      if (mounted) setState(() => _downloadBusy = false);
-    }
-  }
-
-  Future<void> _downloadProgramCohortComparison(
-    AdminReportsAnalytics a, {
-    required CustomReportFormat format,
-    required bool printPreview,
-    required ReportFilterSelection filters,
-  }) async {
-    setState(() => _downloadBusy = true);
-    try {
-      final scope = await _loadInstitutionalChedScope(a, filters);
-      if (scope == null || !mounted) return;
-
-      final dimension = filters.surveyType == 'batch'
-          ? InstitutionalCompareDimension.batch
-          : InstitutionalCompareDimension.course;
-      final report = InstitutionalCohortComparisonService.build(
-        waves: scope.waves,
-        responsesBySurveyId: scope.responsesBySurveyId,
-        memberByAuth: scope.memberByAuth,
-        dimension: dimension,
-        batchFilter: filters.batchYear,
-        courseFilter: filters.course,
-      );
-      const title = 'Program and Cohort Comparison';
-      const stem = 'AESS_Program_Cohort_Comparison';
-
-      if (printPreview || format == CustomReportFormat.pdf) {
-        final bytes = await InstitutionalCohortComparisonService.toPdf(report);
-        if (!mounted) return;
-        if (printPreview) {
-          await Printing.layoutPdf(onLayout: (_) async => bytes, name: title);
-          return;
-        }
-        tryDownloadBytesOnWeb(
-          context,
-          bytes: bytes,
-          fileName: ReportFileNames.dated(
-            stem: stem,
-            extension: 'pdf',
-            cohortScope: ReportFileNames.cohortScopeLabel(
-              batchYear: filters.batchYear,
-              course: filters.course,
-            ),
-          ),
-          mimeType: 'application/pdf',
-        );
-      } else if (format == CustomReportFormat.excel) {
-        final bytes = InstitutionalCohortComparisonService.toExcel(report);
-        if (!mounted) return;
-        tryDownloadBytesOnWeb(
-          context,
-          bytes: bytes,
-          fileName: ReportFileNames.dated(
-            stem: stem,
-            extension: 'xlsx',
-            cohortScope: ReportFileNames.cohortScopeLabel(
-              batchYear: filters.batchYear,
-              course: filters.course,
-            ),
-          ),
-          mimeType: format.mimeType,
-        );
-      } else {
-        final bytes = InstitutionalCohortComparisonService.toCsvBytes(report);
         if (!mounted) return;
         tryDownloadBytesOnWeb(
           context,
@@ -5005,33 +4734,6 @@ class _AttentionItem {
   final String subtitle;
   final String actionLabel;
   final VoidCallback onAction;
-}
-
-/// Per-course roster + outcome stats for the course comparison table.
-class _CourseStat {
-  const _CourseStat({
-    required this.course,
-    required this.total,
-    required this.registered,
-    required this.tracerComplete,
-    required this.employmentSubmissions,
-    required this.employed,
-    this.employmentHidden = false,
-  });
-
-  final String course;
-  final int total;
-  final int registered;
-  final int tracerComplete;
-  /// Item 16 answers; 0 when hidden as too few ([employmentHidden]).
-  final int employmentSubmissions;
-  final int employed;
-  final bool employmentHidden;
-
-  double get registrationRate => total == 0 ? 0 : registered / total;
-  double get tracerRate => registered == 0 ? 0 : tracerComplete / registered;
-  double get employmentRate =>
-      employmentSubmissions == 0 ? 0 : employed / employmentSubmissions;
 }
 
 /// Reports its child's laid-out height after each build.

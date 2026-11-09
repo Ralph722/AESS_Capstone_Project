@@ -250,7 +250,7 @@ void main() {
         },
       );
       expect(DssCopy.coverageNote(f), contains('20%'));
-      expect(DssCopy.rosterBasisNote(f), contains("today's roster"));
+      expect(DssCopy.rosterBasisNote(f), contains("today's alumni list"));
     });
   });
 }

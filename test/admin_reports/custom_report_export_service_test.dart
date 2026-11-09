@@ -522,7 +522,7 @@ void main() {
       expect(csv, contains('SECTION,Executive KPIs'));
       expect(csv, contains('SECTION,Survey summary'));
       expect(csv, contains('Wave 1'));
-      expect(csv, contains('Roster total'));
+      expect(csv, contains('Alumni list total'));
     });
 
     test('builds survey participation and question sections from pack', () {

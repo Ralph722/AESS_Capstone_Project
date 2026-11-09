@@ -35,7 +35,7 @@ abstract final class GtsReportTables {
   static String populationLabel(GtsPopulation p) => switch (p) {
     GtsPopulation.allRespondents => 'All respondents',
     GtsPopulation.rosterLinked =>
-      'Graduates on the active roster with a course (same as the DSS)',
+      'Graduates on the alumni list with a course (same as the DSS)',
   };
 
   static String title(GtsReportResult r) {

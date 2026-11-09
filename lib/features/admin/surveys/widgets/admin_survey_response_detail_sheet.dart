@@ -37,7 +37,7 @@ Future<void> showAdminSurveyResponseDetailSheet({
   if (adminIsWideSurface(context)) {
     return showAdminSidePanel<void>(
       context: context,
-      width: 560,
+      width: 580,
       backgroundColor: AdminSurveyTheme.background,
       child: Builder(builder: workspace),
     );
@@ -120,7 +120,7 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
           _DetailSection(
             id: s.name,
             title: _chedSectionTitle(s),
-            shortLabel: s.name.toUpperCase(),
+            shortLabel: _chedSectionShort(s),
           ),
       ];
     }
@@ -137,10 +137,14 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
           id: key,
           title: key == '__general__'
               ? 'General information'
-              : (q.sectionLabel.isEmpty ? key : q.sectionLabel),
+              : _displaySectionTitle(
+                  q.sectionLabel.isEmpty ? key : q.sectionLabel,
+                ),
           shortLabel: key == '__general__'
               ? 'General'
-              : _shortSectionLabel(q.sectionLabel.isEmpty ? key : q.sectionLabel),
+              : _shortSectionLabel(
+                  q.sectionLabel.isEmpty ? key : q.sectionLabel,
+                ),
         ),
       );
     }
@@ -157,17 +161,40 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
     return map.values.toList();
   }
 
-  static String _chedSectionTitle(ChedGtsSection s) {
-    final item = ChedGtsBuiltin.items.firstWhere((i) => i.section == s);
-    return item.sectionTitle;
+  static String _chedSectionTitle(ChedGtsSection s) => switch (s) {
+        ChedGtsSection.a => 'General Information',
+        ChedGtsSection.b => 'Educational Background',
+        ChedGtsSection.c => 'Training / Advance Studies',
+        ChedGtsSection.d => 'Employment Data',
+      };
+
+  static String _chedSectionShort(ChedGtsSection s) => switch (s) {
+        ChedGtsSection.a => 'General',
+        ChedGtsSection.b => 'Education',
+        ChedGtsSection.c => 'Training',
+        ChedGtsSection.d => 'Employment',
+      };
+
+  /// Strip CHED-style "A. " prefixes and soften ALL-CAPS titles.
+  static String _displaySectionTitle(String title) {
+    var t = title.trim().replaceFirst(RegExp(r'^[A-D]\.\s*'), '').trim();
+    if (t.isEmpty) return title.trim();
+    if (t == t.toUpperCase() && RegExp(r'[A-Z]').hasMatch(t)) {
+      t = t
+          .toLowerCase()
+          .split(RegExp(r'\s+'))
+          .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+          .join(' ');
+    }
+    return t;
   }
 
   static String _shortSectionLabel(String title) {
-    final t = title.trim();
-    if (t.length <= 18) return t;
-    final letter = RegExp(r'^([A-D])\.').firstMatch(t);
-    if (letter != null) return letter.group(1)!;
-    return '${t.substring(0, 16)}…';
+    final t = _displaySectionTitle(title);
+    if (t.length <= 16) return t;
+    final words = t.split(RegExp(r'\s+'));
+    if (words.isNotEmpty && words.first.length <= 16) return words.first;
+    return '${t.substring(0, 14)}…';
   }
 
   bool _isAnswerEmpty(dynamic value) => isSurveyAnswerEmpty(value);
@@ -198,6 +225,51 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
     ];
   }
 
+  int _answeredCountForActive() {
+    if (widget.isChedBuiltin) {
+      final section = ChedGtsSection.values.firstWhere(
+        (s) => s.name == _activeSectionId,
+        orElse: () => ChedGtsSection.a,
+      );
+      final answers = widget.response.answers;
+      final visible = ChedGtsVisibility.visibleItemIds(answers);
+      var answered = 0;
+      for (final item in ChedGtsBuiltin.items) {
+        if (item.section != section) continue;
+        if (!visible.contains(item.id)) continue;
+        if (item.isOthersSpecify) continue;
+        if (!_isAnswerEmpty(answers[item.id])) answered++;
+      }
+      return answered;
+    }
+    final qs = _questionsInActiveSection(_visibleQuestions);
+    final answers = widget.response.answers;
+    return qs.where((q) => !_isAnswerEmpty(answers[q.id])).length;
+  }
+
+  int _visibleCountForActive() {
+    if (widget.isChedBuiltin) {
+      final section = ChedGtsSection.values.firstWhere(
+        (s) => s.name == _activeSectionId,
+        orElse: () => ChedGtsSection.a,
+      );
+      final answers = widget.response.answers;
+      final visible = ChedGtsVisibility.visibleItemIds(answers);
+      return ChedGtsBuiltin.items
+          .where(
+            (i) =>
+                i.section == section &&
+                visible.contains(i.id) &&
+                !i.isOthersSpecify,
+          )
+          .length;
+    }
+    if (_activeSectionId == '__answers__') {
+      return widget.response.answers.length;
+    }
+    return _questionsInActiveSection(_visibleQuestions).length;
+  }
+
   @override
   Widget build(BuildContext context) {
     final sections = _sections;
@@ -206,64 +278,39 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
       _activeSectionId = sections.first.id;
     }
     final unanswered = _unansweredLabelsForActive();
+    final activeTitle = sections
+        .firstWhere(
+          (s) => s.id == _activeSectionId,
+          orElse: () => sections.isEmpty
+              ? const _DetailSection(
+                  id: '',
+                  title: 'Responses',
+                  shortLabel: 'All',
+                )
+              : sections.first,
+        )
+        .title;
+    final visibleCount = _visibleCountForActive();
+    final answeredCount = _answeredCountForActive();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.alumniName.trim().isEmpty
-                          ? 'Alumni response'
-                          : widget.alumniName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AdminText.sectionTitle.copyWith(fontSize: 16),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      (widget.subtitle?.trim().isNotEmpty ?? false)
-                          ? widget.subtitle!.trim()
-                          : 'Response details',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AdminText.caption.copyWith(height: 1.35),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.onViewTimeline != null)
-                IconButton(
-                  tooltip: 'View timeline',
-                  onPressed: widget.onViewTimeline,
-                  icon: const Icon(
-                    Icons.timeline_outlined,
-                    color: AdminSurveyTheme.textSecondary,
-                  ),
-                ),
-              IconButton(
-                tooltip: 'Close',
-                onPressed: widget.onClose,
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
+        _DetailHeader(
+          alumniName: widget.alumniName,
+          subtitle: widget.subtitle,
+          isChed: widget.isChedBuiltin,
+          onClose: widget.onClose,
+          onViewTimeline: widget.onViewTimeline,
         ),
         Material(
           color: AdminSurveyTheme.card,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
             decoration: const BoxDecoration(
               border: Border(
                 bottom: BorderSide(color: AdminSurveyTheme.border),
-                top: BorderSide(color: AdminSurveyTheme.border),
               ),
             ),
             child: SingleChildScrollView(
@@ -271,7 +318,7 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
               child: Row(
                 children: [
                   for (var i = 0; i < sections.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
+                    if (i > 0) const SizedBox(width: 8),
                     _SectionNavChip(
                       label: sections[i].shortLabel,
                       selected: sections[i].id == _activeSectionId,
@@ -287,35 +334,33 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
         ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
             children: [
-              Text(
-                sections
-                    .firstWhere(
-                      (s) => s.id == _activeSectionId,
-                      orElse: () => sections.first,
-                    )
-                    .title,
-                style: AdminText.sectionTitle,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      activeTitle,
+                      style: AdminText.sectionTitle.copyWith(fontSize: 15),
+                    ),
+                  ),
+                  if (visibleCount > 0)
+                    _SectionStatusChip(
+                      answered: answeredCount,
+                      total: visibleCount,
+                      complete: unanswered.isEmpty,
+                    ),
+                ],
               ),
-              const SizedBox(height: 8),
               if (unanswered.isNotEmpty) ...[
+                const SizedBox(height: 10),
                 _UnansweredStrip(
                   key: ValueKey('unanswered-$_activeSectionId'),
                   prompts: unanswered,
                 ),
-                const SizedBox(height: 12),
-              ] else
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'All visible items in this section have answers.',
-                    style: AdminText.caption.copyWith(
-                      color: AdminColors.success,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+              ],
+              const SizedBox(height: 12),
               if (widget.isChedBuiltin)
                 _buildChedSectionBody()
               else
@@ -341,15 +386,18 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final item in items) ...[
-          _AnswerBlock(
-            prompt: item.prompt,
-            value: _formatValue(answers[item.id]),
-            unanswered: _isAnswerEmpty(answers[item.id]),
-            requiredField: item.required,
-          ),
-          const SizedBox(height: 10),
-        ],
+        _AnswerGroup(
+          children: [
+            for (final item in items)
+              _AnswerRow(
+                prompt: item.prompt,
+                value: _formatValue(answers[item.id]),
+                unanswered: _isAnswerEmpty(answers[item.id]),
+                requiredField: item.required,
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -363,6 +411,10 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
             ),
             label: Text(
               _showOfficialForm ? 'Hide official form' : 'Show official form',
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: AdminSurveyTheme.textSecondary,
+              visualDensity: VisualDensity.compact,
             ),
           ),
         ),
@@ -384,16 +436,14 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
   Widget _buildClassicSectionBody() {
     final answers = widget.response.answers;
     if (_activeSectionId == '__answers__') {
-      return Column(
+      return _AnswerGroup(
         children: [
-          for (final e in answers.entries) ...[
-            _AnswerBlock(
+          for (final e in answers.entries)
+            _AnswerRow(
               prompt: e.key,
               value: _formatValue(e.value),
               unanswered: _isAnswerEmpty(e.value),
             ),
-            const SizedBox(height: 10),
-          ],
         ],
       );
     }
@@ -403,25 +453,27 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
     if (qs.isEmpty) {
       final hadQuestions =
           _questionsInActiveSection(widget.questions).isNotEmpty;
-      return Text(
-        hadQuestions
-            ? 'No questions in this section were shown to this alumnus.'
-            : 'No questions in this section.',
-        style: AdminText.caption,
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text(
+          hadQuestions
+              ? 'No questions in this section were shown to this alumnus.'
+              : 'No questions in this section.',
+          style: AdminText.caption,
+          textAlign: TextAlign.center,
+        ),
       );
     }
 
-    return Column(
+    return _AnswerGroup(
       children: [
-        for (final q in qs) ...[
-          _AnswerBlock(
+        for (final q in qs)
+          _AnswerRow(
             prompt: q.prompt,
             value: _formatValue(answers[q.id]),
             unanswered: _isAnswerEmpty(answers[q.id]),
             requiredField: q.required,
           ),
-          const SizedBox(height: 10),
-        ],
       ],
     );
   }
@@ -429,6 +481,137 @@ class _ResponseDetailWorkspaceState extends State<_ResponseDetailWorkspace> {
   String _formatValue(dynamic value) {
     final text = formatSurveyAnswerValue(value);
     return text.isEmpty ? 'No answer' : text;
+  }
+}
+
+class _DetailHeader extends StatelessWidget {
+  const _DetailHeader({
+    required this.alumniName,
+    required this.subtitle,
+    required this.isChed,
+    required this.onClose,
+    this.onViewTimeline,
+  });
+
+  final String alumniName;
+  final String? subtitle;
+  final bool isChed;
+  final VoidCallback onClose;
+  final VoidCallback? onViewTimeline;
+
+  @override
+  Widget build(BuildContext context) {
+    final name =
+        alumniName.trim().isEmpty ? 'Alumni response' : alumniName.trim();
+    final sub = (subtitle?.trim().isNotEmpty ?? false)
+        ? subtitle!.trim()
+        : 'Response details';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 8, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AdminText.sectionTitle.copyWith(fontSize: 17),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  sub,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AdminText.caption.copyWith(height: 1.35),
+                ),
+                if (isChed) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFDBA74)),
+                    ),
+                    child: const Text(
+                      'Official CHED GTS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFC2410C),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (onViewTimeline != null)
+            IconButton(
+              tooltip: 'View timeline',
+              onPressed: onViewTimeline,
+              icon: const Icon(
+                Icons.timeline_outlined,
+                color: AdminSurveyTheme.textSecondary,
+              ),
+            ),
+          IconButton(
+            tooltip: 'Close',
+            onPressed: onClose,
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionStatusChip extends StatelessWidget {
+  const _SectionStatusChip({
+    required this.answered,
+    required this.total,
+    required this.complete,
+  });
+
+  final int answered;
+  final int total;
+  final bool complete;
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        complete ? AdminColors.success : AdminSurveyTheme.textSecondary;
+    final bg = complete
+        ? AdminColors.success.withValues(alpha: 0.1)
+        : AdminSurveyTheme.surface;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: complete
+              ? AdminColors.success.withValues(alpha: 0.25)
+              : AdminSurveyTheme.border,
+        ),
+      ),
+      child: Text(
+        complete ? 'Complete · $total' : '$answered of $total answered',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
   }
 }
 
@@ -556,16 +739,17 @@ class _SectionNavChip extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
           hoverColor: AdminSurveyTheme.infoBg.withValues(alpha: 0.7),
           focusColor: AdminSurveyTheme.infoBg,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color:
-                  selected ? AdminSurveyTheme.infoBg : AdminSurveyTheme.surface,
-              borderRadius: BorderRadius.circular(999),
+              color: selected
+                  ? AdminSurveyTheme.infoBg
+                  : AdminSurveyTheme.surface,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
               border: Border.all(
                 color: selected
                     ? AdminSurveyTheme.primary.withValues(alpha: 0.35)
@@ -589,8 +773,43 @@ class _SectionNavChip extends StatelessWidget {
   }
 }
 
-class _AnswerBlock extends StatelessWidget {
-  const _AnswerBlock({
+class _AnswerGroup extends StatelessWidget {
+  const _AnswerGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AdminSurveyTheme.card,
+        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusMd),
+        border: Border.all(color: AdminSurveyTheme.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              const Divider(
+                height: 1,
+                thickness: 1,
+                color: AdminSurveyTheme.border,
+              ),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AnswerRow extends StatelessWidget {
+  const _AnswerRow({
     required this.prompt,
     required this.value,
     required this.unanswered,
@@ -604,64 +823,58 @@ class _AnswerBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: unanswered
-            ? AdminSurveyTheme.warningBg.withValues(alpha: 0.55)
-            : AdminSurveyTheme.card,
-        borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusMd),
-        border: Border.all(
-          color: unanswered
-              ? AdminSurveyTheme.warning.withValues(alpha: 0.35)
-              : AdminSurveyTheme.border,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  prompt,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AdminSurveyTheme.textPrimary,
-                    height: 1.35,
-                  ),
-                ),
-              ),
-              if (requiredField)
-                const Padding(
-                  padding: EdgeInsets.only(left: 6),
+    return ColoredBox(
+      color: unanswered
+          ? AdminSurveyTheme.warningBg.withValues(alpha: 0.45)
+          : AdminSurveyTheme.card,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
                   child: Text(
-                    'Required',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                    prompt,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                       color: AdminSurveyTheme.textMuted,
+                      height: 1.3,
                     ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              fontStyle: unanswered ? FontStyle.italic : FontStyle.normal,
-              color: unanswered
-                  ? AdminSurveyTheme.warning
-                  : AdminSurveyTheme.textSecondary,
+                if (unanswered && requiredField)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8),
+                    child: Text(
+                      'Required',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AdminSurveyTheme.warning,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                fontWeight: unanswered ? FontWeight.w500 : FontWeight.w600,
+                fontStyle: unanswered ? FontStyle.italic : FontStyle.normal,
+                color: unanswered
+                    ? AdminSurveyTheme.warning
+                    : AdminSurveyTheme.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,6 @@
 import 'package:alumni_system/core/utils/calendar_date.dart';
 
-/// Official alumni roster entry (`alumni_members/{id}`).
+/// Official alumni list entry (`alumni_members/{id}`).
 class AlumniMember {
   final String id;
   final String fullName;
@@ -233,7 +233,7 @@ enum AlumniDirectorySort {
   lastActiveNewest,
 }
 
-/// Which slice of the roster the directory list shows (tab selection).
+/// Which slice of the alumni list the directory list shows (tab selection).
 enum AlumniDirectoryView {
   /// Everyone except deactivated members.
   all,

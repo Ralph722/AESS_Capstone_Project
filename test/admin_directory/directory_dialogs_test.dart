@@ -62,7 +62,7 @@ void main() {
       expect(find.text('Enter the full name.'), findsOneWidget);
       expect(find.text('Enter the ID number.'), findsOneWidget);
       expect(submitted, 0);
-      expect(find.text('Add to official roster'), findsOneWidget);
+      expect(find.text('Add to the alumni list'), findsOneWidget);
     });
 
     testWidgets('invalid year is caught before saving', (tester) async {
@@ -152,7 +152,7 @@ void main() {
 
       completer.complete(null);
       await tester.pumpAndSettle();
-      expect(find.text('Add to official roster'), findsNothing);
+      expect(find.text('Add to the alumni list'), findsNothing);
       expect(results, [true]);
     });
 
@@ -165,7 +165,7 @@ void main() {
           onSubmit: (_) async => null,
         ),
       );
-      expect(find.text('Edit roster entry'), findsOneWidget);
+      expect(find.text('Edit alumni list entry'), findsOneWidget);
       expect(find.text('Juan Santos'), findsOneWidget);
       expect(find.text('2023304878'), findsOneWidget);
       expect(find.text('2024'), findsOneWidget);
@@ -230,7 +230,7 @@ void main() {
         (context) =>
             showRosterRemoveDialog(context, member: _member(registered: false)),
       );
-      expect(find.text('Delete roster entry?'), findsOneWidget);
+      expect(find.text('Delete alumni list entry?'), findsOneWidget);
       expect(find.text('Deactivate'), findsNothing);
       expect(find.text('Delete'), findsOneWidget);
       await tester.tap(find.text('Cancel'));

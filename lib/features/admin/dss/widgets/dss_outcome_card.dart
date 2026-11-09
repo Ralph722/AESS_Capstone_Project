@@ -54,7 +54,10 @@ Color dssOutcomeColor(DssOutcomeStatus status) => switch (status) {
     'RELATEDNESS_LOW' => 'unrelated_or_irrelevant_rate',
     'RELATEDNESS_HIGH' => 'related_and_relevant_rate',
     'UNDEREMPLOYMENT' => 'clerical_among_employed_rate',
+    'QUALIFICATION_MISMATCH' => 'qualification_mismatch_rate',
     'TIME_TO_JOB_LONG' => 'long_time_to_first_job_rate',
+    'PLACEMENT_CHANNEL_LOW' => 'institutional_placement_channel_rate',
+    'SALARY_LOW_ENTRY' => 'low_entry_salary_rate',
     'SALARY_STAGNATION' => 'salary_peer_gap',
     _ => 'unemployment_rate',
   };

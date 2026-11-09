@@ -11,6 +11,7 @@ import 'package:alumni_system/core/utils/csv_safe.dart';
 import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/ched_wave_comparison.dart';
 import 'package:alumni_system/features/admin/reports/application/report_metrics.dart';
+import 'package:alumni_system/features/admin/reports/data/institutional_cohort_comparison_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_ched_outcomes_summary_service.dart';
 import 'package:alumni_system/features/surveys/data/survey_report_analytics.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -149,9 +150,24 @@ abstract final class InstitutionalGtsSummaryService {
     );
   }
 
-  static Future<Uint8List> toPdf(InstitutionalGtsSummary summary) async {
+  static Future<Uint8List> toPdf(
+    InstitutionalGtsSummary summary, {
+    InstitutionalCohortComparisonReport? cohortComparison,
+  }) async {
     await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
+    _addSummaryPages(doc, summary);
+    if (cohortComparison != null) {
+      InstitutionalCohortComparisonService.addPages(
+        doc,
+        cohortComparison,
+        sectionTitle: '3. Cohort / batch comparative analysis',
+      );
+    }
+    return doc.save();
+  }
+
+  static void _addSummaryPages(pw.Document doc, InstitutionalGtsSummary summary) {
     final stamp = DateFormat.yMMMMEEEEd().add_jm().format(summary.generatedAt);
     final rate = summary.responseRate;
 
@@ -266,17 +282,22 @@ abstract final class InstitutionalGtsSummaryService {
         },
       ),
     );
-
-    return doc.save();
   }
 
-  static Uint8List toExcel(InstitutionalGtsSummary summary) {
+  static Uint8List toExcel(
+    InstitutionalGtsSummary summary, {
+    InstitutionalCohortComparisonReport? cohortComparison,
+  }) {
     const summarySheet = 'Summary';
     const outcomesSheet = 'Outcomes';
     final book = Excel.createExcel();
     final def = book.getDefaultSheet();
     if (def != null && def != summarySheet) {
-      book[def].appendRow(['Institutional GTS sheets: $summarySheet, $outcomesSheet']);
+      book[def].appendRow([
+        cohortComparison == null
+            ? 'Institutional GTS sheets: $summarySheet, $outcomesSheet'
+            : 'Institutional GTS sheets: $summarySheet, $outcomesSheet, Comparison',
+      ]);
     }
 
     final cover = book[summarySheet];
@@ -315,13 +336,24 @@ abstract final class InstitutionalGtsSummaryService {
         ]);
       }
     }
+
+    if (cohortComparison != null) {
+      InstitutionalCohortComparisonService.writeExcelSheet(
+        book,
+        cohortComparison,
+      );
+    }
+
     book.setDefaultSheet(summarySheet);
     final encoded = book.save();
     if (encoded == null) throw StateError('Excel encode returned null');
     return Uint8List.fromList(encoded);
   }
 
-  static Uint8List toCsvBytes(InstitutionalGtsSummary summary) {
+  static Uint8List toCsvBytes(
+    InstitutionalGtsSummary summary, {
+    InstitutionalCohortComparisonReport? cohortComparison,
+  }) {
     final buf = StringBuffer();
     buf.writeln('section,key,value');
     buf.writeln('Coverage,scope,${CsvSafe.cell(summary.scopeLabel)}');
@@ -338,6 +370,9 @@ abstract final class InstitutionalGtsSummaryService {
           '${row.count} (${row.percent.toStringAsFixed(1)}% of ${field.answeredCount})',
         );
       }
+    }
+    if (cohortComparison != null) {
+      InstitutionalCohortComparisonService.writeCsvSection(buf, cohortComparison);
     }
     return Uint8List.fromList(utf8.encode('\uFEFF${buf.toString()}'));
   }

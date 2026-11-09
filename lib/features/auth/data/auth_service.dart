@@ -698,12 +698,12 @@ class AuthService {
           .eq('id', userId)
           .maybeSingle();
 
-      // Accounts not linked to an active roster row cannot read their own
+      // Accounts not linked to an alumni list row cannot read their own
       // users row, so this also covers unfinished registrations.
       if (existing == null) {
         await _supabase.auth.signOut();
         throw Exception(
-          'This account is not linked to the AESS alumni roster. '
+          'This account is not linked to the AESS alumni list. '
           'Finish registration from the Register page, or contact the alumni office.',
         );
       }

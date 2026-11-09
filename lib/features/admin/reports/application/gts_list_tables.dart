@@ -66,7 +66,7 @@ abstract final class GtsListTables {
       'Employment rate (answered Yes ÷ answered this question)';
   static const answeredQuestionLabel = 'Answered this question';
   static const offRosterNote =
-      'Graduates who answered without an active roster record are listed '
+      'Graduates who answered without an active alumni list record are listed '
       'last and are not counted in the total.';
 
   static String title(GtsAlumniListResult result) {
@@ -85,13 +85,13 @@ abstract final class GtsListTables {
       value == null ? '–' : '${(value * 100).toStringAsFixed(1)}%';
 
   static const _rosterShareNote =
-      'Shares are of alumni on the active roster.';
+      'Shares are of alumni on the alumni list.';
   static const _questionShareNote =
-      'Shares are of alumni on the active roster who answered this '
+      'Shares are of alumni on the alumni list who answered this '
       'question. Alumni who were not asked it are left out.';
   static const _multiShareNote =
       'Alumni may select more than one answer, so shares can add up to '
-      'more than 100%. Each share is of alumni on the active roster who '
+      'more than 100%. Each share is of alumni on the alumni list who '
       'answered this question.';
 
   /// Tally blocks for [rows], using only the columns in [config].
@@ -379,7 +379,7 @@ abstract final class GtsListTables {
       ('Report', title(result)),
       if (c.description.trim().isNotEmpty) ('Description', c.description),
       ('Answers from', scope(result)),
-      ('Alumni', '${result.tally.total} on the active roster'),
+      ('Alumni', '${result.tally.total} on the alumni list'),
       ('Filters', filters(c)),
       (
         'Order',

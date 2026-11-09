@@ -502,18 +502,25 @@ class ReportsDonutEntry {
   final Color color;
 }
 
-/// Donut with a centred total and a legend (count + share) beside it.
+/// Breakdown chart with a legend (count + share) beside it.
+///
+/// Defaults to a donut with optional centre label; set [pie] for a filled
+/// pie with no centre hole or centre text.
 class ReportsDonutBreakdown extends StatelessWidget {
   const ReportsDonutBreakdown({
     super.key,
     required this.entries,
-    required this.centerValue,
-    required this.centerLabel,
+    this.centerValue = '',
+    this.centerLabel = '',
+    this.pie = false,
   });
 
   final List<ReportsDonutEntry> entries;
   final String centerValue;
   final String centerLabel;
+
+  /// When true, draw a filled pie (no hole / no centre label).
+  final bool pie;
 
   @override
   Widget build(BuildContext context) {
@@ -522,12 +529,21 @@ class ReportsDonutBreakdown extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final side = constraints.maxWidth >= 260;
-        final size = side
-            ? math.min(constraints.maxHeight, constraints.maxWidth * 0.46)
+        final side = constraints.maxWidth >= 220;
+        // Match chart size across equal-height cards. Cap so the legend keeps
+        // room when the card is only as wide as its content needs.
+        const legendReserve = 200.0;
+        const maxChart = 132.0;
+        final double size = side
+            ? math.min(
+                math.min(constraints.maxHeight * 0.68, maxChart),
+                math.max(88.0, constraints.maxWidth - legendReserve),
+              )
             : math.min(constraints.maxHeight, constraints.maxWidth);
 
-        final donut = SizedBox(
+        final showCenter = !pie &&
+            (centerValue.isNotEmpty || centerLabel.isNotEmpty);
+        final chart = SizedBox(
           width: size,
           height: size,
           child: Stack(
@@ -535,9 +551,9 @@ class ReportsDonutBreakdown extends StatelessWidget {
             children: [
               PieChart(
                 PieChartData(
-                  sectionsSpace: 2,
+                  sectionsSpace: pie ? 1 : 2,
                   startDegreeOffset: -90,
-                  centerSpaceRadius: size * 0.30,
+                  centerSpaceRadius: pie ? 0 : size * 0.30,
                   pieTouchData: PieTouchData(enabled: false),
                   sections: [
                     for (final e in visible)
@@ -545,60 +561,65 @@ class ReportsDonutBreakdown extends StatelessWidget {
                         color: e.color,
                         value: e.value.toDouble(),
                         showTitle: false,
-                        radius: size * 0.16,
+                        radius: pie ? size * 0.46 : size * 0.16,
                       ),
                   ],
                 ),
                 swapAnimationDuration: Duration.zero,
               ),
-              SizedBox(
-                width: size * 0.52,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        centerValue,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AdminReportsTheme.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        centerLabel,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: AdminReportsTheme.textMuted,
-                        ),
-                      ),
-                    ],
+              if (showCenter)
+                SizedBox(
+                  width: size * 0.52,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (centerValue.isNotEmpty)
+                          Text(
+                            centerValue,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: AdminReportsTheme.textPrimary,
+                            ),
+                          ),
+                        if (centerLabel.isNotEmpty)
+                          Text(
+                            centerLabel,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: AdminReportsTheme.textMuted,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         );
 
-        if (!side) return Center(child: donut);
+        if (!side) return Center(child: chart);
 
+        // Legend packs tightly beside the chart; leftover card width stays
+        // empty on the right instead of stretching label↔count gaps.
         return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            donut,
-            const SizedBox(width: 14),
-            Expanded(
-              child: Center(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < visible.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 7),
-                        _legendRow(visible[i], total),
-                      ],
+            chart,
+            const SizedBox(width: 10),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < visible.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 7),
+                      _legendRow(visible[i], total),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -611,25 +632,33 @@ class ReportsDonutBreakdown extends StatelessWidget {
   Widget _legendRow(ReportsDonutEntry e, int total) {
     final pct = total == 0 ? 0 : e.value / total * 100;
     return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: e.color, shape: BoxShape.circle),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: e.color, shape: BoxShape.circle),
+          ),
         ),
         const SizedBox(width: 7),
-        Expanded(
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 148),
           child: Text(
             e.label,
-            maxLines: 1,
+            maxLines: 2,
+            softWrap: true,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12,
+              height: 1.25,
               color: AdminReportsTheme.textSecondary,
             ),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 10),
         Text(
           '${e.value}',
           style: const TextStyle(
@@ -638,15 +667,12 @@ class ReportsDonutBreakdown extends StatelessWidget {
             color: AdminReportsTheme.textPrimary,
           ),
         ),
-        SizedBox(
-          width: 40,
-          child: Text(
-            '${pct.toStringAsFixed(0)}%',
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AdminReportsTheme.textMuted,
-            ),
+        const SizedBox(width: 6),
+        Text(
+          '${pct.toStringAsFixed(0)}%',
+          style: const TextStyle(
+            fontSize: 11,
+            color: AdminReportsTheme.textMuted,
           ),
         ),
       ],

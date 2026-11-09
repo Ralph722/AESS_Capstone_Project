@@ -37,7 +37,7 @@ typedef GtsListResponseLoader =
 typedef GtsListProfileLoader =
     Future<Map<String, TracerProfile>> Function(List<String> userIds);
 
-/// Alumni list builder: one row per alumnus on the active roster with the
+/// Alumni list builder: one row per alumnus on the alumni list with the
 /// columns the admin picks, and the tracer-status tally underneath.
 class GtsAlumniListPanel extends StatefulWidget {
   const GtsAlumniListPanel({
@@ -68,7 +68,7 @@ class GtsAlumniListPanel extends StatefulWidget {
   /// CHED GTS waves that can have responses, newest first.
   final List<Survey> waves;
 
-  /// Every roster record; deactivated records are left out of the list.
+  /// Every alumni list record; deactivated records are left out of the list.
   final List<AlumniMember> roster;
 
   /// Defaults to [GtsListDataService.loadResponses].
@@ -907,7 +907,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     void Function(String value, bool on) onChanged,
   ) {
     if (choices.isEmpty) {
-      return const Text('None recorded on the roster.', style: _muted);
+      return const Text('None recorded on the alumni list.', style: _muted);
     }
     final picked = {for (final s in selected) s.trim().toLowerCase()};
     return Wrap(
@@ -1558,7 +1558,7 @@ class GtsAlumniListPreview extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           '${GtsListTables.scope(result)} · ${tally.total} alumni on the '
-          'active roster${filtered ? ' (filtered)' : ''}',
+          'alumni list${filtered ? ' (filtered)' : ''}',
           style: const TextStyle(
             fontSize: 12,
             color: AdminColors.textMuted,

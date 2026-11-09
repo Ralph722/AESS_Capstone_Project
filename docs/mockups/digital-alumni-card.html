@@ -96,9 +96,10 @@
 <div class="page">
   <h1>Digital alumni card — physical background mockup</h1>
   <p class="lede">
-    Front background mapped from the physical alumni ID, recolored to USTP
-    navy (<code>#1A1851</code>) and gold. Content keeps digital-card fields so
-    you can compare the new look in context.
+    Front and back card faces use flat white. Back header band is USTP gold
+    (<code>#FCB315</code>); decorative shapes on the front stay navy/gold.
+    Content keeps digital-card fields so you can compare the look in context.
+    Mockup only — does not change the live Flutter digital ID.
   </p>
 
   <div class="grid">
@@ -115,7 +116,7 @@
 #adc-root .flipper{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
 #adc-root .scene[aria-pressed="true"] .flipper{transform:rotateY(180deg)}
 #adc-root .face{position:absolute;inset:0;border-radius:14px;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;text-align:left;box-shadow:0 12px 28px rgba(15,23,42,.22)}
-#adc-root .front{background:#ffffff;color:var(--navy);padding:0;display:flex;flex-direction:column}
+#adc-root .front{background:#fff;color:var(--navy);padding:0;display:flex;flex-direction:column}
 /* —— Physical ID background (shapes only) —— */
 #adc-root .bg{position:absolute;inset:0;pointer-events:none;z-index:0}
 #adc-root .bg .tl-yellow{
@@ -178,12 +179,11 @@
 #adc-root .meta div{font-size:clamp(7.5px,2.2vw,9.5px);color:#64748B}
 #adc-root .meta strong{display:block;font-size:clamp(9px,2.7vw,12px);color:var(--navy);font-weight:700;letter-spacing:.02em}
 #adc-root .bot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}
-#adc-root .status{display:flex;align-items:center;gap:5px;background:rgba(22,163,74,.12);border:1px solid rgba(74,222,128,.45);color:#166534;font-size:clamp(7.5px,2.2vw,9.5px);font-weight:700;padding:3px 8px;border-radius:999px}
-#adc-root .dot{width:6px;height:6px;border-radius:50%;background:#4ade80}
+#adc-root .status{font-size:clamp(7.5px,2.2vw,9.5px);font-weight:700;color:var(--navy)}
 #adc-root .clock{font-size:clamp(7.5px,2.2vw,9.5px);color:#64748B;font-variant-numeric:tabular-nums;text-align:right}
-#adc-root .back{transform:rotateY(180deg);background:#FBFAF6;color:var(--ink);display:flex;flex-direction:column}
-#adc-root .band{background:var(--navy);color:#fff;padding:3% 4.6%;display:flex;justify-content:space-between;align-items:center;font-size:clamp(7.5px,2.3vw,10px);font-weight:700;letter-spacing:.05em}
-#adc-root .band span:last-child{color:var(--gold)}
+#adc-root .back{transform:rotateY(180deg);background:#fff;color:var(--ink);display:flex;flex-direction:column}
+#adc-root .band{background:var(--gold);color:var(--navy);padding:3% 4.6%;display:flex;justify-content:space-between;align-items:center;font-size:clamp(7.5px,2.3vw,10px);font-weight:700;letter-spacing:.05em}
+#adc-root .band span:last-child{color:var(--navy)}
 #adc-root .bbody{flex:1;display:flex;gap:4.5%;padding:3.6% 4.6% 2.6%}
 #adc-root .qrcol{width:32%;display:flex;flex-direction:column;align-items:center;gap:3px;flex:none}
 #adc-root .qr{width:100%;aspect-ratio:1;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:6%}
@@ -194,7 +194,6 @@
 #adc-root .row{display:flex;justify-content:space-between;gap:6px;border-bottom:1px dashed #E2E8F0;padding-bottom:3px}
 #adc-root .row span{font-size:clamp(7px,2.1vw,9px);color:var(--muted)}
 #adc-root .row b{font-size:clamp(7.5px,2.3vw,10px);font-weight:700;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#adc-root .terms{font-size:clamp(6.3px,1.85vw,8.2px);color:var(--muted);line-height:1.35;margin-top:auto}
 #adc-root .actions{display:flex;gap:10px}
 #adc-root .btn{flex:1;height:42px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
 #adc-root .btn.primary{background:var(--navy);color:#fff;border:0}
@@ -243,7 +242,7 @@
               </div>
             </div>
             <div class="bot">
-              <span class="status"><span class="dot"></span>Verified active alumnus</span>
+              <span class="status">Active Member</span>
               <span class="clock" id="adc-clock">Oct 16, 2026 · 1:26:45 AM</span>
             </div>
           </div>
@@ -262,7 +261,6 @@
               <div class="row"><span>Member since</span><b>Sep 2026</b></div>
               <div class="row"><span>Card issued</span><b>Oct 16, 2026</b></div>
               <div class="row"><span>Campus</span><b>USTP Cagayan de Oro</b></div>
-              <p class="terms">Non-transferable. Valid only while shown live in the AESS app. Staff may ask for a government ID. If found misused, report to the USTP Alumni Office.</p>
             </div>
           </div>
         </div>

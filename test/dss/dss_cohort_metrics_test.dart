@@ -220,9 +220,18 @@ void main() {
       '2/3 v=0.6667 n=6 e=8 s=insufficient',
     );
     expect(
+      r('qualification_mismatch_rate'),
+      '0/1 v=0.0000 n=6 e=8 s=insufficient',
+    );
+    expect(
       r('long_time_to_first_job_rate'),
       '2/3 v=0.6667 n=6 e=8 s=insufficient',
     );
+    expect(
+      r('institutional_placement_channel_rate'),
+      '0/0 v=null n=6 e=8 s=insufficient',
+    );
+    expect(r('low_entry_salary_rate'), '2/4 v=0.5000 n=6 e=8 s=insufficient');
     expect(r('salary_peer_gap'), 'null/4 v=3.5000 n=6 e=8 s=insufficient');
     final u = rows['batch|P14T|2099|unemployment_rate']!;
     expect(u.nonResponse, 0);

@@ -1138,13 +1138,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       outcomeReady: outcomeReady,
     );
 
-    final children = <Widget>[
-      DssStageStrip(
-        flag: flag,
-        hasUndecidedIntervention: hasUndecided,
-        outcomeReady: outcomeReady,
-      ),
-    ];
+    // Stage strip removed: Action panel already shows the next step.
+    final children = <Widget>[];
 
     void ensureGap() {
       if (children.isNotEmpty && children.last is! SizedBox) {
@@ -1162,7 +1157,6 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       push(_statusPanel(flag), nextStep: badgeTarget == _NextBadgeTarget.panel);
     }
     push(_findingCard(flag, playbook));
-    if (flag.isActive) push(_priorityCard(flag));
     if (_showInterventionSection(flag)) {
       push(
         KeyedSubtree(key: _planKey, child: _interventionCard(flag)),
@@ -1370,8 +1364,25 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     final headline = DssCopy.displayHeadline(flag);
     final showHeadline =
         flag.ruleId != 'DATA_QUALITY_LOW' && !_isNearDuplicate(headline, why);
+    final evidenceBanner = _evidenceBanner(flag);
+    final priority = flag.isActive
+        ? DssPriorityCalc.of(flag, now: DateTime.now())
+        : null;
+    final title = DssCopy.displayTitle(flag);
+    final metricLabel = DssCopy.metricLabel(flag);
+    // Avoid repeating the page title inside the metric chip.
+    final metricKey = _isNearDuplicate(metricLabel, title) ? 'Share' : metricLabel;
 
     final detailLines = <Widget>[
+      Text(
+        DssCopy.thresholdLabel(flag),
+        style: const TextStyle(
+          fontSize: 12,
+          height: 1.35,
+          fontWeight: FontWeight.w600,
+          color: AdminDssTheme.textPrimary,
+        ),
+      ),
       if (showHeadline)
         Text(
           headline,
@@ -1439,6 +1450,36 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           DssCopy.confidenceLabel(flag),
           style: const TextStyle(fontSize: 12, color: AdminDssTheme.textMuted),
         ),
+      if (priority != null) ...[
+        Text(
+          priority.level == DssPriority.watch
+              ? 'Priority: ${priority.level.label}'
+              : 'Priority: ${priority.level.label} · score ${priority.score}',
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            fontWeight: FontWeight.w600,
+            color: AdminDssTheme.textPrimary,
+          ),
+        ),
+        const Text(
+          'Rule-based, not AI. Critical 7+, High 5–6, Medium 3–4, Low 0–2.',
+          style: TextStyle(
+            fontSize: 11.5,
+            height: 1.35,
+            color: AdminColors.textSecondary,
+          ),
+        ),
+        for (final r in priority.reasons)
+          Text(
+            r.points == 0 ? '· ${r.text}' : '+${r.points} ${r.text}',
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: AdminDssTheme.textSecondary,
+            ),
+          ),
+      ],
     ];
 
     return DssSurfaceCard(
@@ -1462,20 +1503,30 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'What we found',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: AdminColors.textPrimary,
-                  letterSpacing: -0.2,
+              const Expanded(
+                child: Text(
+                  'What we found',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AdminColors.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
+              if (priority != null)
+                DssMetaChip(
+                  label: priority.level == DssPriority.watch
+                      ? priority.level.label
+                      : '${priority.level.label} · ${priority.score}',
+                  icon: Icons.low_priority,
+                  color: dssPriorityColor(priority.level),
+                ),
             ],
           ),
           const SizedBox(height: 8),
-          if (_evidenceBanner(flag) case final banner?) ...[
-            banner,
+          if (evidenceBanner != null) ...[
+            evidenceBanner,
             const SizedBox(height: 8),
           ],
           Text(
@@ -1492,9 +1543,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _kv(DssCopy.metricLabel(flag), DssCopy.metricValueLabel(flag)),
+              _kv(metricKey, DssCopy.metricValueLabel(flag)),
               if (DssCopy.trendLabel(flag) case final trend?)
-                _kv('Not employed', trend),
+                _kv('Change', trend),
               _kv('Answers', DssCopy.responsesLabel(flag)),
               _kv('Group', DssCopy.rosterLabel(flag)),
               if (flag.cohortLevel != DssCohortLevel.batch)
@@ -1503,20 +1554,13 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
                   icon: Icons.merge_type,
                   color: AdminDssTheme.info,
                 ),
-              DssEvidenceChip(flag: flag),
-              if (flag.certainty != null && flag.isFinding)
-                DssCertaintyChip(flag: flag),
+              // Banner already carries evidence; only chip when there is no banner
+              // and the strength is weaker than "strong".
+              if (evidenceBanner == null &&
+                  flag.evidenceStrength != null &&
+                  flag.evidenceStrength != DssEvidenceStrength.strong)
+                DssEvidenceChip(flag: flag),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            DssCopy.thresholdLabel(flag),
-            style: const TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-              color: AdminDssTheme.textPrimary,
-            ),
           ),
           if (detailLines.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -2006,120 +2050,6 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     );
   }
 
-  Widget _priorityCard(DssFlag flag) {
-    final p = DssPriorityCalc.of(flag, now: DateTime.now());
-    return DssSurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: AdminColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.low_priority_rounded,
-                  size: 16,
-                  color: AdminColors.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Priority',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: AdminColors.textPrimary,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(width: 8),
-              DssMetaChip(
-                label: p.level == DssPriority.watch
-                    ? p.level.label
-                    : '${p.level.label} · score ${p.score}',
-                icon: Icons.low_priority,
-                color: dssPriorityColor(p.level),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AdminColors.surface.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-              border: Border.all(color: AdminColors.border),
-            ),
-            child: Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-                childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                title: const Text(
-                  'How this score was set',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AdminColors.textSecondary,
-                  ),
-                ),
-                children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Rule-based, not AI. Critical 7+, High 5–6, Medium 3–4, Low 0–2.',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: AdminColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  for (final r in p.reasons)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 28,
-                            child: Text(
-                              r.points == 0 ? '·' : '+${r.points}',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: r.points == 0
-                                    ? AdminColors.textMuted
-                                    : AdminColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              r.text,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: AdminColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   static bool _canAct(DssFlag flag) =>
       flag.status != DssFlagStatus.watch &&
       flag.status != DssFlagStatus.superseded;
@@ -2233,7 +2163,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
 
   Widget _watchCard(DssFlag flag) {
     return _statusCardShell(
-      title: 'Watch item',
+      title: 'Needs more responses',
       body:
           'Too few valid answers for a finding. Re-run analysis makes it a '
           'finding once enough alumni answer; until then you can dismiss it '
@@ -2358,23 +2288,27 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             const SizedBox(height: 10),
             _panelOutcomeSummary(_undecidedIntervention!),
           ],
-          const SizedBox(height: 10),
-          TextField(
-            controller: _noteCtrl,
-            minLines: 3,
-            maxLines: 5,
-            style: const TextStyle(fontSize: 13),
-            onChanged: (_) => setState(() {}),
-            decoration: _fieldDecoration(
-              closed ? 'Admin note' : 'Admin note (required to resolve)',
-            ).copyWith(alignLabelWithHint: true),
-          ),
+          // Note is for Resolve / follow-up — hide until work has started.
+          if (started) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _noteCtrl,
+              minLines: 3,
+              maxLines: 5,
+              style: const TextStyle(fontSize: 13),
+              onChanged: (_) => setState(() {}),
+              decoration: _fieldDecoration(
+                closed ? 'Admin note' : 'Admin note (required to resolve)',
+              ).copyWith(alignLabelWithHint: true),
+            ),
+          ],
           const SizedBox(height: 12),
           ..._actionPrimaryButtons(
             flag: flag,
             next: next,
             canResolve: canResolve,
             hasProof: hasProof,
+            showAddNote: started,
           ),
         ],
       ),
@@ -2454,6 +2388,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     required DssNextAction next,
     required bool canResolve,
     required bool hasProof,
+    bool showAddNote = true,
   }) {
     final closed = flag.status.isClosed;
     final primary = switch (next.kind) {
@@ -2510,11 +2445,12 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               style: dssOutlinedButtonStyle(),
               child: const Text('Dismiss'),
             ),
-          OutlinedButton(
-            onPressed: _saving ? null : _addNoteOnly,
-            style: dssOutlinedButtonStyle(),
-            child: const Text('Add note'),
-          ),
+          if (showAddNote)
+            OutlinedButton(
+              onPressed: _saving ? null : _addNoteOnly,
+              style: dssOutlinedButtonStyle(),
+              child: const Text('Add note'),
+            ),
         ],
       ),
       if (next.kind == DssNextActionKind.resolve && !canResolve) ...[
@@ -2579,6 +2515,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
   }) {
     final showOutcomeSteps =
         flag.status == DssFlagStatus.resolved || hasUndecided;
+    // Before Start, later steps are preview-only (no chevron / scroll).
     final steps = <({
       int n,
       String label,
@@ -2598,23 +2535,27 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         label: 'Owner (admin, office or person)',
         done: assigned,
         current: false, // recommended — not required to Resolve
-        onTap: _hasAccountability ? () => _scrollTo(_ownerKey) : null,
+        onTap: started && _hasAccountability
+            ? () => _scrollTo(_ownerKey)
+            : null,
       ),
       (
         n: 3,
         label: 'Plan',
         done: intervention,
         current: started && !intervention && !resolved,
-        onTap: () => _scrollTo(_planKey),
+        onTap: started ? () => _scrollTo(_planKey) : null,
       ),
       (
         n: 4,
         label: 'Proof',
         done: proof,
         current: started && intervention && !proof && !resolved,
-        onTap: () => _scrollTo(
-          _hasAccountability ? _proofKey : _actKey,
-        ),
+        onTap: started
+            ? () => _scrollTo(
+                _hasAccountability ? _proofKey : _actKey,
+              )
+            : null,
       ),
       (
         n: 5,

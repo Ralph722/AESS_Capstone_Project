@@ -66,17 +66,17 @@ class AdminReportsAnalytics {
   double get tracerCompletionRate =>
       registeredOnRoster == 0 ? 0 : tracerCompleteCount / registeredOnRoster;
 
-  /// Registered roster rows without a complete demographics tracer profile.
+  /// Registered alumni list rows without a complete demographics tracer profile.
   int get registeredWithoutTracerComplete =>
       (registeredOnRoster - tracerCompleteCount).clamp(0, registeredOnRoster);
 
   /// Employed ÷ submissions with employment data (deduped registered alumni).
   ///
   /// Definition (shown under KPIs): employed among alumni who submitted
-  /// employment data — not among the full roster.
+  /// employment data — not among the full alumni list.
   static const employmentRateDefinition =
       'Employment rate is the share of employed alumni among those who '
-      'submitted employment information — not among the entire roster.';
+      'submitted employment information — not among the entire alumni list.';
 
   double get employmentRateAmongSubmissions =>
       reportEmploymentCount == 0 ? 0 : employedCount / reportEmploymentCount;

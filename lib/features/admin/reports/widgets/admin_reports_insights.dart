@@ -86,7 +86,7 @@ class ReportsInsightCardData {
     ReportsInsightAction.openAlumniTracer,
   ),
   ReportsInsightKind.recommendations => (
-    'Open roster',
+    'Open alumni directory',
     ReportsInsightAction.openRosterModule,
   ),
   ReportsInsightKind.participation => (
@@ -123,7 +123,7 @@ List<ReportsInsightCardData> buildHeuristicReportInsights(
       icon: Icons.auto_awesome_outlined,
       isPlaceholder: true,
       body:
-          'Portfolio snapshot: $regPct% of roster registered, $tracerPct% tracer-complete '
+          'Portfolio snapshot: $regPct% of alumni list registered, $tracerPct% tracer-complete '
           'among registered alumni, $surveyPct% survey completion, and $empPct% employed '
           'among employment submissions. Tap Generate AI insights for a narrative brief.',
     ),
@@ -212,8 +212,8 @@ Return exactly 6 short sections with these headings (plain text, no markdown fen
 Keep each section to 2–4 sentences. Be practical. Do not invent numbers.
 
 METRICS:
-- Roster total: ${a.rosterTotal}
-- Registered on roster: ${a.registeredOnRoster}
+- Alumni list total: ${a.rosterTotal}
+- Registered on alumni list: ${a.registeredOnRoster}
 - Registration rate: ${(a.registrationRate * 100).toStringAsFixed(1)}%
 - Tracer complete: ${a.tracerCompleteCount}
 - Tracer completion rate (of registered): ${(a.tracerCompletionRate * 100).toStringAsFixed(1)}%

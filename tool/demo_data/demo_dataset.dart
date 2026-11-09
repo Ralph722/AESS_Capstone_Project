@@ -632,8 +632,9 @@ class DemoDataset {
   )!.matrixRows[1];
   static final _salaries = ChedGtsBuiltin.byId('ched_31')!.options;
   static final _durations = ChedGtsBuiltin.byId('ched_29')!.options;
-  static final _shortWaits = _durations.sublist(0, 3);
-  static final _longWaits = _durations.sublist(3, 6);
+  // Delayed transition = longer than 6 months (matches DssMetrics.longTimeToJob).
+  static final _shortWaits = _durations.sublist(0, 2);
+  static final _longWaits = _durations.sublist(2, 6);
   static final _stays = [_durations[1], _durations[2], _durations[3]];
   static final _foundVia = ChedGtsBuiltin.byId(
     'ched_28',

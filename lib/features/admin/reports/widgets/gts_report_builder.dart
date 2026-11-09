@@ -739,9 +739,9 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
               const SizedBox(height: 10),
               _olderSetting(
                 'This saved report counts every response, including people who '
-                    'are not on the active roster. This older setting is kept so '
+                    'are not on the alumni list. This older setting is kept so '
                     'its numbers do not change.',
-                'Count roster graduates only',
+                'Count alumni list graduates only',
                 () => _update(
                   _config.copyWith(population: GtsPopulation.rosterLinked),
                 ),
@@ -1711,7 +1711,7 @@ class _QuestionPickerDialog extends StatefulWidget {
 }
 
 class _QuestionPickerDialogState extends State<_QuestionPickerDialog> {
-  static const _rosterSection = 'Graduate details (roster)';
+  static const _rosterSection = 'Graduate details (alumni list)';
 
   final _search = TextEditingController();
 

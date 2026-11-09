@@ -164,6 +164,16 @@ abstract final class InstitutionalCohortComparisonService {
   static Future<Uint8List> toPdf(InstitutionalCohortComparisonReport report) async {
     await AessPdfHeader.ensureLoaded();
     final doc = pw.Document();
+    addPages(doc, report);
+    return doc.save();
+  }
+
+  /// Appends the comparison table as a landscape section of [doc].
+  static void addPages(
+    pw.Document doc,
+    InstitutionalCohortComparisonReport report, {
+    String sectionTitle = '1. Comparison table',
+  }) {
     final stamp = DateFormat.yMMMMEEEEd().add_jm().format(report.generatedAt);
     doc.addPage(
       pw.MultiPage(
@@ -178,7 +188,7 @@ abstract final class InstitutionalCohortComparisonService {
         footer: (ctx) => AessPdfFooter.build(ctx),
         build: (ctx) => [
           AessPdfTable.sectionHeading(
-            '1. Comparison table',
+            sectionTitle,
             subtitle:
                 'Rates use answered denominators only. Groups with small n should '
                 'be treated as directional. Waves: ${report.waveTitles.join('; ')}',
@@ -223,7 +233,6 @@ abstract final class InstitutionalCohortComparisonService {
         ],
       ),
     );
-    return doc.save();
   }
 
   static Uint8List toExcel(InstitutionalCohortComparisonReport report) {
@@ -233,6 +242,19 @@ abstract final class InstitutionalCohortComparisonService {
     if (def != null && def != sheetName) {
       book[def].appendRow(['Comparison is on the "$sheetName" sheet.']);
     }
+    writeExcelSheet(book, report);
+    book.setDefaultSheet(sheetName);
+    final encoded = book.save();
+    if (encoded == null) throw StateError('Excel encode returned null');
+    return Uint8List.fromList(encoded);
+  }
+
+  /// Writes/overwrites the Comparison sheet on an existing workbook.
+  static void writeExcelSheet(
+    Excel book,
+    InstitutionalCohortComparisonReport report,
+  ) {
+    const sheetName = 'Comparison';
     final sheet = book[sheetName];
     sheet.appendRow(['Program and Cohort Comparison']);
     sheet.appendRow(['Scope', report.scopeLabel]);
@@ -266,10 +288,6 @@ abstract final class InstitutionalCohortComparisonService {
         r.curriculumRate.percent,
       ]);
     }
-    book.setDefaultSheet(sheetName);
-    final encoded = book.save();
-    if (encoded == null) throw StateError('Excel encode returned null');
-    return Uint8List.fromList(encoded);
   }
 
   static Uint8List toCsvBytes(InstitutionalCohortComparisonReport report) {
@@ -297,6 +315,23 @@ abstract final class InstitutionalCohortComparisonService {
       );
     }
     return Uint8List.fromList(utf8.encode('\uFEFF${buf.toString()}'));
+  }
+
+  /// Appends comparison rows into a multi-section (section,key,value) CSV.
+  static void writeCsvSection(
+    StringBuffer buf,
+    InstitutionalCohortComparisonReport report,
+  ) {
+    buf.writeln('Comparison,scope,${CsvSafe.cell(report.scopeLabel)}');
+    for (final r in report.rows) {
+      buf.writeln(
+        'Comparison,${CsvSafe.cell(r.label)},'
+        'respondents=${r.respondents}; '
+        'employed=${r.employmentRate.percent.toStringAsFixed(1)}% (n=${r.answeredEmployment}); '
+        'related=${r.relatedRate.percent.toStringAsFixed(1)}% (n=${r.answeredRelated}); '
+        'curriculum=${r.curriculumRate.percent.toStringAsFixed(1)}% (n=${r.answeredCurriculum})',
+      );
+    }
   }
 }
 

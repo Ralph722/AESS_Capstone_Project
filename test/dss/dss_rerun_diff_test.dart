@@ -27,10 +27,7 @@ DssFlag _flag(String id, DssFlagStatus status) {
 void main() {
   group('dssRerunDiff', () {
     test('empty when nothing changed', () {
-      final before = {
-        'a': DssFlagStatus.open,
-        'b': DssFlagStatus.inProgress,
-      };
+      final before = {'a': DssFlagStatus.open, 'b': DssFlagStatus.inProgress};
       final after = [
         _flag('a', DssFlagStatus.open),
         _flag('b', DssFlagStatus.inProgress),

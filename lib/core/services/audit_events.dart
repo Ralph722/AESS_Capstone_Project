@@ -44,6 +44,9 @@ abstract final class AuditActions {
   static const exportSurvey = 'EXPORT_SURVEY';
   static const exportChedGtsPdf = 'EXPORT_CHED_GTS_PDF';
   static const exportChedGtsPdfBatch = 'EXPORT_CHED_GTS_PDF_BATCH';
+  static const exportIndividualInfoPdf = 'EXPORT_INDIVIDUAL_INFO_PDF';
+  static const exportIndividualInfoPdfBatch =
+      'EXPORT_INDIVIDUAL_INFO_PDF_BATCH';
 
   // Events
   static const createEvent = 'CREATE_EVENT';

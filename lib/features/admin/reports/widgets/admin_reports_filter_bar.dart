@@ -21,6 +21,8 @@ class ReportsCohortFilterBar extends StatelessWidget {
     required this.onChanged,
     this.waveLabel = 'Survey wave',
     this.allWavesLabel = 'All published waves',
+    this.showWaveFilter = true,
+    this.includeAllWavesOption = true,
   });
 
   final ReportsDashboardFilters filters;
@@ -29,6 +31,12 @@ class ReportsCohortFilterBar extends StatelessWidget {
   final ValueChanged<ReportsDashboardFilters> onChanged;
   final String waveLabel;
   final String allWavesLabel;
+
+  /// When false, only Batch and Course are shown (wave comparison views).
+  final bool showWaveFilter;
+
+  /// When false, the wave dropdown lists individual waves only (no “All…”).
+  final bool includeAllWavesOption;
 
   Survey? get _selectedSurvey {
     final id = filters.surveyId;
@@ -43,7 +51,7 @@ class ReportsCohortFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final hint = reportsAudienceHint(_selectedSurvey);
     final activeCount = [
-      filters.surveyId,
+      if (showWaveFilter && includeAllWavesOption) filters.surveyId,
       filters.batchYear,
       filters.course,
     ].where((v) => v != null).length;
@@ -58,7 +66,7 @@ class ReportsCohortFilterBar extends StatelessWidget {
         ),
       if (active)
         OutlinedButton.icon(
-          onPressed: () => onChanged(ReportsDashboardFilters.empty),
+          onPressed: _resetFilters,
           icon: const Icon(Icons.filter_alt_off_outlined, size: 13),
           label: const Text('Reset'),
           style: OutlinedButton.styleFrom(
@@ -107,11 +115,13 @@ class ReportsCohortFilterBar extends StatelessWidget {
                       child: _leading(activeCount),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(flex: 3, child: fields[0]),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 2, child: fields[1]),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 3, child: fields[2]),
+                    for (var i = 0; i < fields.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 10),
+                      Expanded(
+                        flex: i == 0 && showWaveFilter ? 3 : (i == 1 ? 2 : 3),
+                        child: fields[i],
+                      ),
+                    ],
                     if (actions.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       ...actions,
@@ -159,6 +169,16 @@ class ReportsCohortFilterBar extends StatelessWidget {
     );
   }
 
+  void _resetFilters() {
+    if (showWaveFilter && !includeAllWavesOption) {
+      onChanged(
+        ReportsDashboardFilters(surveyId: filters.surveyId),
+      );
+      return;
+    }
+    onChanged(ReportsDashboardFilters.empty);
+  }
+
   Widget _buildActiveChips() {
     return Wrap(
       spacing: 6,
@@ -173,7 +193,9 @@ class ReportsCohortFilterBar extends StatelessWidget {
             color: AdminColors.textMuted,
           ),
         ),
-        if (filters.surveyId != null)
+        if (showWaveFilter &&
+            includeAllWavesOption &&
+            filters.surveyId != null)
           DirectoryActiveFilterChip(
             icon: Icons.waves_outlined,
             label: _selectedSurvey != null
@@ -240,37 +262,40 @@ class ReportsCohortFilterBar extends StatelessWidget {
 
   List<Widget> _fields() {
     return [
-      DirectoryFilterField<String?>(
-        label: waveLabel,
-        value: filters.surveyId,
-        minWidth: 160,
-        items: [
-          DropdownMenuItem(value: null, child: Text(allWavesLabel)),
-          for (final s in surveys)
-            DropdownMenuItem(
-              value: s.id,
-              child: Text(
-                reportsSurveyFilterLabel(s),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+      if (showWaveFilter)
+        DirectoryFilterField<String?>(
+          label: waveLabel,
+          value: filters.surveyId,
+          minWidth: 160,
+          items: [
+            if (includeAllWavesOption)
+              DropdownMenuItem(value: null, child: Text(allWavesLabel)),
+            for (final s in surveys)
+              DropdownMenuItem(
+                value: s.id,
+                child: Text(
+                  reportsSurveyFilterLabel(s),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-        ],
-        onChanged: (id) {
-          if (id == null) {
-            onChanged(ReportsDashboardFilters.empty);
-            return;
-          }
-          Survey? selected;
-          for (final s in surveys) {
-            if (s.id == id) {
-              selected = s;
-              break;
+          ],
+          onChanged: (id) {
+            if (id == null) {
+              if (!includeAllWavesOption) return;
+              onChanged(ReportsDashboardFilters.empty);
+              return;
             }
-          }
-          onChanged(filtersPrefillFromSurvey(filters, selected));
-        },
-      ),
+            Survey? selected;
+            for (final s in surveys) {
+              if (s.id == id) {
+                selected = s;
+                break;
+              }
+            }
+            onChanged(filtersPrefillFromSurvey(filters, selected));
+          },
+        ),
       DirectoryFilterField<String?>(
         label: 'Batch',
         value: filters.batchYear,

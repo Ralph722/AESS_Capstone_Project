@@ -38,7 +38,22 @@ List<DssRule> _rules({int outcomeMin = 10}) => [
   _rule('UNEMPLOYMENT_HIGH', DssRuleCategory.outcome, 'gte', 0.25, outcomeMin),
   _rule('RELATEDNESS_LOW', DssRuleCategory.outcome, 'gte', 0.40, outcomeMin),
   _rule('UNDEREMPLOYMENT', DssRuleCategory.outcome, 'gte', 0.35, outcomeMin),
+  _rule(
+    'QUALIFICATION_MISMATCH',
+    DssRuleCategory.outcome,
+    'gte',
+    0.25,
+    outcomeMin,
+  ),
   _rule('TIME_TO_JOB_LONG', DssRuleCategory.outcome, 'gte', 0.40, outcomeMin),
+  _rule(
+    'PLACEMENT_CHANNEL_LOW',
+    DssRuleCategory.outcome,
+    'lt',
+    0.10,
+    outcomeMin,
+  ),
+  _rule('SALARY_LOW_ENTRY', DssRuleCategory.outcome, 'gte', 0.40, outcomeMin),
   _rule('SALARY_STAGNATION', DssRuleCategory.outcome, 'gte', 1.0, outcomeMin),
   _rule(
     'RELATEDNESS_HIGH',

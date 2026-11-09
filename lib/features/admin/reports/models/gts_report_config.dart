@@ -23,7 +23,7 @@ enum GtsPopulation {
   /// Every submitted response in the selected wave(s).
   allRespondents,
 
-  /// Only respondents linked to an active roster record with a course,
+  /// Only respondents linked to an alumni list record with a course,
   /// the same population the DSS uses.
   rosterLinked,
 }

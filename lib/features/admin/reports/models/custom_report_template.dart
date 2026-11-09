@@ -49,7 +49,7 @@ enum CustomReportSectionId {
 extension CustomReportSectionIdX on CustomReportSectionId {
   String get label => switch (this) {
         CustomReportSectionId.executiveKpis => 'Executive KPIs',
-        CustomReportSectionId.alumniRoster => 'Alumni roster',
+        CustomReportSectionId.alumniRoster => 'Alumni list',
         CustomReportSectionId.employmentRecords => 'Employment records',
         CustomReportSectionId.surveySummary => 'Survey summary',
         CustomReportSectionId.surveyParticipation =>
@@ -66,7 +66,7 @@ extension CustomReportSectionIdX on CustomReportSectionId {
         CustomReportSectionId.executiveKpis =>
           'Portfolio snapshot: registration, tracer, employment, and survey KPIs.',
         CustomReportSectionId.alumniRoster =>
-          'Active roster rows with course, batch, registration status, and date added.',
+          'Active alumni list rows with course, batch, registration status, and date added.',
         CustomReportSectionId.employmentRecords =>
           'Deduped employment submissions for registered alumni.',
         CustomReportSectionId.surveySummary =>

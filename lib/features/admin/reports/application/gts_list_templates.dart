@@ -42,7 +42,7 @@ abstract final class GtsListTemplates {
         templateKey: 'list_employment_status',
         title: 'Employment status of all alumni',
         description:
-            'Every alumnus on the active roster with their answer to item 16 '
+            'Every alumnus on the alumni list with their answer to item 16 '
             '(presently employed). Untracked alumni are listed too.',
         columns: [_batch, _name, _course, 'ched_16', _status],
       ),
@@ -57,7 +57,7 @@ abstract final class GtsListTemplates {
         description:
             'Alumni who have not answered the tracer. Registered alumni '
             'include their section A email and mobile number. Alumni who '
-            'are not registered show their roster name, course, and '
+            'are not registered show their name on the alumni list, course, and '
             'student ID only.',
         columns: [
           _name,

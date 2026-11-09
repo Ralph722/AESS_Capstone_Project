@@ -28,13 +28,13 @@ abstract final class DssCopy {
       final rate = (flag.metricValue * 100).toStringAsFixed(0);
       if (answered == 0 && eligible > 0) {
         return 'No alumni in $cohort have answered $survey yet, although '
-            '$eligible ${eligible == 1 ? 'is' : 'are'} on the roster.';
+            '$eligible ${eligible == 1 ? 'is' : 'are'} on the alumni list.';
       }
       return switch (reason) {
         'sparse' =>
           '$answered alumni in $cohort answered $survey. '
               'That is too few responses to reliably judge employment outcomes yet'
-              '${eligible > answered ? ' (roster size in this group: $eligible)' : ''}.',
+              '${eligible > answered ? ' (alumni list size in this group: $eligible)' : ''}.',
         'low_rate' =>
           'Only $rate% of alumni in $cohort answered $survey '
               '($answered of $eligible). Response coverage is below the target.',
@@ -153,7 +153,7 @@ abstract final class DssCopy {
         'sparse' => const [
           DssPlaybookStep(
             step:
-                'Check how many alumni in this course/batch are on the roster and assigned to the survey.',
+                'Check how many alumni in this course/batch are on the alumni list and assigned to the survey.',
           ),
           DssPlaybookStep(
             step:
@@ -190,7 +190,10 @@ abstract final class DssCopy {
     'RELATEDNESS_LOW' => 'Course / curriculum mismatch',
     'RELATEDNESS_HIGH' => 'Course / curriculum alignment',
     'UNDEREMPLOYMENT' => 'Rank / clerical roles',
-    'TIME_TO_JOB_LONG' => 'Took 1+ years to first job',
+    'QUALIFICATION_MISMATCH' => 'Qualification mismatch (first job)',
+    'TIME_TO_JOB_LONG' => 'Took longer than 6 months to first job',
+    'PLACEMENT_CHANNEL_LOW' => 'School / PESO placement channel',
+    'SALARY_LOW_ENTRY' => 'Low first-job salary brackets',
     'SALARY_STAGNATION' => 'Salary gap vs peers',
     'UNEMPLOYMENT_TREND_UP' => 'Change in not employed vs previous wave',
     _ => 'Measured value',
@@ -333,14 +336,14 @@ abstract final class DssCopy {
     DssEvidenceStrength.strong || null => null,
   };
 
-  /// Warns when few people on the roster answered at all.
+  /// Warns when few people on the alumni list answered at all.
   static String? coverageNote(DssFlag flag) {
     if (!flag.coverageWarning) return null;
     final rate = flag.groupResponseRate;
     final pct = rate == null ? '' : ' (${(rate * 100).toStringAsFixed(0)}%)';
     return 'Low coverage$pct: fewer than '
         '${(DssPolicy.lowCoverageBelow * 100).toStringAsFixed(0)}% of this '
-        'group\'s roster answered, so the result may not represent everyone.';
+        'group\'s alumni list answered, so the result may not represent everyone.';
   }
 
   /// Q17 reasons of the not-employed respondents behind the flag.
@@ -371,20 +374,20 @@ abstract final class DssCopy {
 
   /// Which roster the response rate was measured against.
   static String? rosterBasisNote(DssFlag flag) => switch (flag.rosterBasis) {
-    'open_wave' => 'Roster counted while this wave is open.',
-    'snapshot' => 'Roster as saved while this wave was open.',
+    'open_wave' => 'Alumni list counted while this wave is open.',
+    'snapshot' => 'Alumni list as saved while this wave was open.',
     'current' =>
-      'This closed wave has no saved roster, so today\'s roster is used. '
+      'This closed wave has no saved alumni list snapshot, so today\'s alumni list is used. '
           'The rate may differ from what it was when the wave closed.',
     _ => null,
   };
 
-  /// Whole active roster for the group (registered or not); this is the
+  /// Whole alumni list for the group (registered or not); this is the
   /// response-rate denominator.
   static String rosterLabel(DssFlag flag) {
     final e = flag.eligibleN;
-    if (e == null) return 'Roster size unavailable';
-    final base = e == 1 ? '1 on roster' : '$e on roster';
+    if (e == null) return 'Alumni list size unavailable';
+    final base = e == 1 ? '1 on alumni list' : '$e on alumni list';
     final registered = flag.evidence['registered_roster'];
     if (registered is num) return '$base (${registered.toInt()} registered)';
     return base;
@@ -432,7 +435,7 @@ abstract final class DssCopy {
   /// from the dashboard or the directory.
   static String sourceLabel(DssFlag flag) => switch (flag.ruleId) {
     'DATA_QUALITY_LOW' =>
-      'Response rate = CHED GTS submissions ÷ everyone on the roster for this group, registered or not.',
+      'Response rate = CHED GTS submissions ÷ everyone on the alumni list for this group, registered or not.',
     'UNEMPLOYMENT_HIGH' =>
       'Based on CHED GTS answers (Q16 "Are you presently employed?"), counting only alumni who answered Q16. "No" and "Never Employed" both count, including alumni in further study or not looking for work.',
     'SEEKING_WORK_HIGH' =>
@@ -441,8 +444,14 @@ abstract final class DssCopy {
       'Based on CHED GTS answers (Q24 first job related to course, Q32 curriculum relevant).',
     'UNDEREMPLOYMENT' =>
       'Based on CHED GTS answers (Q30 job level) from presently employed respondents.',
+    'QUALIFICATION_MISMATCH' =>
+      'Based on CHED GTS answers (Q24 first job related to course = No and Q30.1 Rank/Clerical). This is a tracer-based qualification-mismatch proxy, not a CHED or PSA certified underemployment definition.',
     'TIME_TO_JOB_LONG' =>
-      'Based on CHED GTS answers (Q29 time to land first job). "Others" answers have no time period, so they are not counted.',
+      'Based on CHED GTS answers (Q29 time to land first job). Counts longer than 6 months (7 to 11 months through 3 to less than 4 years). "Others" answers have no time period, so they are not counted.',
+    'PLACEMENT_CHANNEL_LOW' =>
+      'Based on CHED GTS answers (Q28 how first job was found). Institutional channels = school placement officer or Job Fair/PESO. "Others" answers are not counted.',
+    'SALARY_LOW_ENTRY' =>
+      'Based on CHED GTS answers (Q31 first-job salary). Bottom two brackets = Below ₱5,000 and ₱5,000 to less than ₱10,000.',
     'SALARY_STAGNATION' =>
       'Based on CHED GTS answers (Q31 first-job salary), compared with the other courses in the same wave.',
     'UNEMPLOYMENT_TREND_UP' =>
@@ -467,7 +476,7 @@ abstract final class DssCopy {
       'DATA_QUALITY_LOW' => const [
         'Survey reminder campaign',
         'Announcement to non-respondents',
-        'Roster / survey assignment cleanup',
+        'Alumni list / survey assignment cleanup',
         'Extended survey window / follow-up',
       ],
       'UNEMPLOYMENT_HIGH' => const [
@@ -499,11 +508,29 @@ abstract final class DssCopy {
         'Industry mentoring',
         'Curriculum pathway review',
       ],
+      'QUALIFICATION_MISMATCH' => const [
+        'Curriculum pathway review',
+        'Career counseling session',
+        'Industry mentoring',
+        'Upskilling / certification workshop',
+      ],
       'TIME_TO_JOB_LONG' => const [
         'OJT / internship partnership',
         'Earlier career counseling for current students',
         'Job fair / Career Center outreach',
         'Employer partnership review',
+      ],
+      'PLACEMENT_CHANNEL_LOW' => const [
+        'Campus recruitment calendar review',
+        'PESO / job-fair partnership',
+        'Employer partnership review',
+        'Career Center placement outreach',
+      ],
+      'SALARY_LOW_ENTRY' => const [
+        'Employer partnership review',
+        'Industry alignment workshop',
+        'Curriculum salary-pathway review',
+        'Career counseling session',
       ],
       'SALARY_STAGNATION' => const [
         'Employer partnership review',
@@ -588,8 +615,9 @@ abstract final class DssCopy {
     if (rule.ruleId == 'SALARY_STAGNATION') {
       return 'Bracket gap vs the other programs in the wave';
     }
-    if (rule.ruleId == 'DATA_QUALITY_LOW') {
-      return 'Flag when response rate is below this %';
+    if (rule.ruleId == 'DATA_QUALITY_LOW' ||
+        rule.ruleId == 'PLACEMENT_CHANNEL_LOW') {
+      return 'Flag when the measured % falls below this value';
     }
     if (rule.category == DssRuleCategory.trend) {
       return 'Flag when the share rises by this many points vs the previous wave';
@@ -620,7 +648,10 @@ abstract final class DssCopy {
     'unrelated_or_irrelevant_rate' => 'Course / curriculum mismatch',
     'related_and_relevant_rate' => 'Course / curriculum alignment',
     'clerical_among_employed_rate' => 'Rank / clerical roles',
-    'long_time_to_first_job_rate' => 'Took 1+ years to first job',
+    'qualification_mismatch_rate' => 'Qualification mismatch (first job)',
+    'long_time_to_first_job_rate' => 'Took longer than 6 months to first job',
+    'institutional_placement_channel_rate' => 'School / PESO placement channel',
+    'low_entry_salary_rate' => 'Low first-job salary brackets',
     'salary_peer_gap' => 'Salary gap vs peers',
     _ => 'Measured value',
   };

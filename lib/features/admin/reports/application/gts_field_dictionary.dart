@@ -47,7 +47,7 @@ abstract final class GtsFieldDictionary {
       valueClass: GtsValueClass.categorical,
       source: GtsFieldSource.roster,
       factColumn: 'course',
-      factNote: '"Unknown" when the roster has no course.',
+      factNote: '"Unknown" when the alumni list has no course.',
     ),
     GtsField(
       key: yearGraduated,
@@ -55,7 +55,7 @@ abstract final class GtsFieldDictionary {
       valueClass: GtsValueClass.year,
       source: GtsFieldSource.roster,
       factColumn: 'year_graduated',
-      factNote: '"Unknown" when the roster has no graduation year.',
+      factNote: '"Unknown" when the alumni list has no graduation year.',
     ),
     GtsField(
       key: wave,

@@ -45,14 +45,27 @@ final directoryAlertDialogShape = RoundedRectangleBorder(
   borderRadius: BorderRadius.circular(AdminSurfaces.radiusLg),
 );
 
-/// Result from the CHED bulk export confirmation dialog.
+/// Which directory ZIP report the admin chose under Download Reports.
+enum DirectoryBulkReportKind {
+  /// Official CHED GTS fillable / print-ready PDFs.
+  chedGtsPdf,
+
+  /// Section A + Q12 Individual Information Sheets.
+  individualInfoSheet,
+}
+
+/// Result from the directory bulk export confirmation dialog.
 class ChedBulkExportChoice {
   const ChedBulkExportChoice({
     required this.members,
-    required this.flattenFields,
+    required this.kind,
+    this.flattenFields = true,
   });
 
   final List<AlumniMember> members;
+  final DirectoryBulkReportKind kind;
+
+  /// Only used for [DirectoryBulkReportKind.chedGtsPdf].
   final bool flattenFields;
 }
 
@@ -101,7 +114,7 @@ Future<void> showAlumniAddChooserDialog(
                           Text('Add alumni', style: _dialogTitleStyle),
                           SizedBox(height: 2),
                           Text(
-                            'Choose how you want to add to the roster.',
+                            'Choose how you want to add to the alumni list.',
                             style: TextStyle(
                               fontSize: 12.5,
                               color: AdminDirectoryTheme.textSecondary,
@@ -246,22 +259,27 @@ class _ChooserOptionCardState extends State<_ChooserOptionCard> {
   }
 }
 
-/// Opens the filtered CHED GTS ZIP export dialog. Returns null if cancelled.
+/// Opens the filtered directory ZIP export dialog. Returns null if cancelled.
 Future<ChedBulkExportChoice?> showChedBulkExportDialog(
   BuildContext context, {
   required List<AlumniMember> members,
+  DirectoryBulkReportKind kind = DirectoryBulkReportKind.chedGtsPdf,
 }) {
   return showDialog<ChedBulkExportChoice>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => _ChedBulkExportDialog(members: members),
+    builder: (ctx) => _ChedBulkExportDialog(members: members, kind: kind),
   );
 }
 
 class _ChedBulkExportDialog extends StatefulWidget {
-  const _ChedBulkExportDialog({required this.members});
+  const _ChedBulkExportDialog({
+    required this.members,
+    required this.kind,
+  });
 
   final List<AlumniMember> members;
+  final DirectoryBulkReportKind kind;
 
   @override
   State<_ChedBulkExportDialog> createState() => _ChedBulkExportDialogState();
@@ -271,6 +289,8 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
   String? _course;
   String? _batch;
   bool _flattenFields = true;
+
+  bool get _isChed => widget.kind == DirectoryBulkReportKind.chedGtsPdf;
 
   List<String> get _batchOptions {
     final years =
@@ -351,19 +371,24 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Export official CHED GTS PDFs',
+                          _isChed
+                              ? 'Export official CHED GTS PDFs'
+                              : 'Export Individual Information Sheets',
                           style: _dialogTitleStyle,
                         ),
-                        SizedBox(height: 3),
+                        const SizedBox(height: 3),
                         Text(
-                          'Build a ZIP of filled official forms. Members without '
-                          'a registered account or CHED records are skipped.',
-                          style: TextStyle(
+                          _isChed
+                              ? 'Build a ZIP of filled official forms. Members '
+                                  'without a registered account are skipped.'
+                              : 'Build a ZIP of Section A + Q12 information '
+                                  'sheets. Only registered alumni are included.',
+                          style: const TextStyle(
                             fontSize: 12.5,
                             height: 1.4,
                             color: AdminDirectoryTheme.textSecondary,
@@ -425,29 +450,31 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
                 overCap: overCap,
                 warnLarge: warnLarge,
               ),
-              const SizedBox(height: 8),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _flattenFields,
-                onChanged: (v) => setState(() => _flattenFields = v == true),
-                title: const Text(
-                  'Print-Ready PDF (flatten fields)',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: AdminDirectoryTheme.textPrimary,
+              if (_isChed) ...[
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _flattenFields,
+                  onChanged: (v) => setState(() => _flattenFields = v == true),
+                  title: const Text(
+                    'Print-Ready PDF (flatten fields)',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: AdminDirectoryTheme.textPrimary,
+                    ),
                   ),
-                ),
-                subtitle: const Text(
-                  'Recommended for printing and archival. Uncheck for editable Fillable PDFs.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AdminDirectoryTheme.textSecondary,
+                  subtitle: const Text(
+                    'Recommended for printing and archival. Uncheck for editable Fillable PDFs.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AdminDirectoryTheme.textSecondary,
+                    ),
                   ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  activeColor: AdminDirectoryTheme.primary,
                 ),
-                controlAffinity: ListTileControlAffinity.leading,
-                activeColor: AdminDirectoryTheme.primary,
-              ),
+              ],
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -465,7 +492,8 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
                             context,
                             ChedBulkExportChoice(
                               members: eligible,
-                              flattenFields: _flattenFields,
+                              kind: widget.kind,
+                              flattenFields: _isChed ? _flattenFields : false,
                             ),
                           ),
                     icon: const Icon(Icons.folder_zip_outlined, size: 18),
@@ -616,7 +644,7 @@ class _StatPill extends StatelessWidget {
   }
 }
 
-/// Values typed into the roster entry dialog (normalized by the service).
+/// Values typed into the alumni list entry dialog (normalized by the service).
 class RosterEntryInput {
   const RosterEntryInput({
     required this.fullName,
@@ -631,7 +659,7 @@ class RosterEntryInput {
   final String yearGraduated;
 }
 
-/// Add or edit one roster entry. [onSubmit] saves and returns null on success
+/// Add or edit one alumni list entry. [onSubmit] saves and returns null on success
 /// or a message to show inside the dialog, which then stays open with the
 /// typed values. Resolves to true once saved.
 Future<bool> showRosterEntryDialog(
@@ -787,7 +815,9 @@ class _RosterEntryDialogState extends State<RosterEntryDialog> {
                   child: Semantics(
                     header: true,
                     child: Text(
-                      _isEdit ? 'Edit roster entry' : 'Add to official roster',
+                      _isEdit
+                          ? 'Edit alumni list entry'
+                          : 'Add to the alumni list',
                       style: _dialogTitleStyle,
                     ),
                   ),
@@ -961,7 +991,7 @@ class RosterRemoveDialog extends StatelessWidget {
                   child: Text(
                     registered
                         ? 'Remove registered alumni?'
-                        : 'Delete roster entry?',
+                        : 'Delete alumni list entry?',
                     style: _dialogTitleStyle,
                   ),
                 ),
@@ -975,9 +1005,9 @@ class RosterRemoveDialog extends StatelessWidget {
                       'Remove account also erases their personal details '
                       '(name, email, contact info, photo) from the portal. '
                       'Their tracer answers stay in the statistics without '
-                      'identifying details, and the roster entry stays deactivated. '
+                      'identifying details, and the alumni list entry stays deactivated. '
                       'This cannot be undone.'
-                : 'Remove ${member.fullName} from the official roster? '
+                : 'Remove ${member.fullName} from the alumni list? '
                       'They will not be able to register.',
             style: _dialogMessageStyle,
           ),

@@ -49,7 +49,7 @@ class DssProgramSnapshot {
 
   final int responses;
 
-  /// Whole active roster for the group (current roster).
+  /// Whole alumni list for the group (current roster).
   final int roster;
   final DssProportion? notEmployed;
 
@@ -193,7 +193,7 @@ abstract final class DssReportCardPdf {
         footer: (ctx) => AessPdfFooter.build(
           ctx,
           customNotice:
-              'Based on submitted CHED GTS responses from alumni linked to a roster course. 95% MOE. For authorized academic and administrative evaluation.',
+              'Based on submitted CHED GTS responses from alumni linked to an alumni list course. 95% MOE. For authorized academic and administrative evaluation.',
         ),
         build: (ctx) => [
           _heading(

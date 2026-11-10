@@ -386,7 +386,9 @@ void main() {
       expect(find.text('Resolve'), findsNothing);
     });
 
-    testWidgets('failed follow-up: four decisions', (tester) async {
+    testWidgets('failed follow-up: continue and modify (escalate hidden)', (
+      tester,
+    ) async {
       final calls = <DssOutcomeDecision>[];
       await _pumpCard(
         tester,
@@ -407,16 +409,16 @@ void main() {
         'Decide: Resolve',
         'Decide: Continue',
         'Decide: Modify',
-        'Decide: Escalate',
       ]) {
         expect(find.text(label), findsOneWidget);
       }
+      expect(find.text('Decide: Escalate'), findsNothing);
       expect(find.text('Edit plan'), findsNothing);
       await tester.tap(find.text('Decide: Continue'));
-      await tester.tap(find.text('Decide: Escalate'));
+      await tester.tap(find.text('Decide: Modify'));
       expect(calls, [
         DssOutcomeDecision.continueWork,
-        DssOutcomeDecision.escalate,
+        DssOutcomeDecision.modify,
       ]);
     });
 

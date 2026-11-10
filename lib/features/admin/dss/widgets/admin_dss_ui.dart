@@ -1132,6 +1132,14 @@ class DssInsightBanner extends StatelessWidget {
 /// SharedPreferences key for the dismissible How-this-works strip (Phase 6).
 const kDssHowThisWorksDismissedKey = 'dss_how_this_works_dismissed_v1';
 
+/// Owner & schedule card + checklist step. Off for single-admin portals;
+/// set true later if multiple admin accounts need handoff.
+const kDssShowOwnerSchedule = false;
+
+/// Escalate outcome decision (hand off to another office). Off for
+/// single-admin portals; Continue / Modify / Resolve stay available.
+const kDssShowEscalateDecision = false;
+
 /// Four-step primer shown on first visit to Findings.
 class DssHowThisWorksStrip extends StatelessWidget {
   const DssHowThisWorksStrip({

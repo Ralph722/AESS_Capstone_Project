@@ -261,7 +261,6 @@ class AdminDashboardHome extends StatelessWidget {
       title: greeting(_now, adminName),
       subtitle: "Here's what's happening across the alumni portal today.",
       actions: [
-        _DashboardDateChip(date: _now),
         Builder(
           builder: (context) => OutlinedButton.icon(
             onPressed: () => showAlumniCardVerifyDialog(context),
@@ -283,7 +282,7 @@ class AdminDashboardHome extends StatelessWidget {
             ),
           ),
         ),
-        DashboardLiveIndicator(updatedAt: lastUpdated),
+        _DashboardDateChip(date: _now, lastUpdated: lastUpdated),
       ],
     );
   }
@@ -293,10 +292,6 @@ class AdminDashboardHome extends StatelessWidget {
     final i = insights;
     final insightsStatus = _insightsStatus;
     final findingsAttention = _insightsPill(i) != null;
-    final findingsTotal = (i?.findingsOpen ?? 0) + (i?.findingsInProgress ?? 0);
-    final findingsRatio = findingsTotal == 0
-        ? 0.0
-        : (i?.findingsOpen ?? 0) / findingsTotal;
     final cards = [
       AdminKpiCard(
         label: 'Alumni registered',
@@ -307,10 +302,6 @@ class AdminDashboardHome extends StatelessWidget {
         icon: Icons.how_to_reg_outlined,
         palette: AdminAccents.blue,
         dense: dense,
-        chart: _KpiProgress(
-          value: m.rosterTotal == 0 ? null : m.registrationRate,
-          color: AdminColors.primary,
-        ),
         onTap: () => onMenuSelected(2),
       ),
       AdminKpiCard(
@@ -323,7 +314,6 @@ class AdminDashboardHome extends StatelessWidget {
         icon: Icons.school_outlined,
         palette: AdminAccents.midBlue,
         dense: dense,
-        chart: _KpiProgress(value: i?.tracerRate, color: AdminColors.secondary),
         onTap: () => onMenuSelected(9),
       ),
       AdminKpiCard(
@@ -338,10 +328,6 @@ class AdminDashboardHome extends StatelessWidget {
         icon: Icons.work_outline,
         palette: AdminAccents.blue,
         dense: dense,
-        chart: _KpiProgress(
-          value: i?.employmentRate,
-          color: AdminColors.primary,
-        ),
         onTap: () => onMenuSelected(9),
       ),
       AdminKpiCard(
@@ -356,12 +342,6 @@ class AdminDashboardHome extends StatelessWidget {
         icon: Icons.lightbulb_outline,
         palette: findingsAttention ? AdminAccents.gold : AdminAccents.midBlue,
         dense: dense,
-        chart: _KpiProgress(
-          value: findingsTotal == 0 ? null : findingsRatio,
-          color: findingsAttention
-              ? AdminColors.warning
-              : AdminColors.secondary,
-        ),
         onTap: () => onMenuSelected(15),
       ),
     ];
@@ -500,7 +480,6 @@ class AdminDashboardHome extends StatelessWidget {
       title: 'Programs at a glance',
       icon: Icons.account_tree_outlined,
       accent: AdminAccents.blue,
-      count: state == null && programs.isNotEmpty ? programs.length : null,
       trailing: DashboardViewAllButton(
         onPressed: () => onMenuSelected(9),
         semanticsLabel: 'View program figures in Reports',
@@ -707,7 +686,6 @@ class AdminDashboardHome extends StatelessWidget {
       title: 'Recent activity',
       icon: Icons.history,
       accent: AdminAccents.blue,
-      count: recentActivity.isEmpty ? null : recentActivity.length,
       trailing: DashboardViewAllButton(
         onPressed: () => onMenuSelected(7),
         semanticsLabel: 'View all activity',
@@ -782,7 +760,6 @@ class AdminDashboardHome extends StatelessWidget {
       title: 'Upcoming & deadlines',
       icon: Icons.event_note_outlined,
       accent: AdminAccents.midBlue,
-      count: items.isEmpty ? null : items.length,
       trailing: Text('Next $agendaWindowDays days', style: AdminText.caption),
       child: body,
     );
@@ -837,15 +814,23 @@ class AdminDashboardHome extends StatelessWidget {
 
   Widget _agendaRow(DashboardAgendaItem item) {
     final dateLabel = DateFormat('MMM d').format(item.date);
+    final kindLabel = _agendaKindLabel(item.kind);
+    final rawDetail = item.detail.trim();
     final detail = item.overdue
-        ? 'Overdue since $dateLabel · ${item.detail}'
-        : item.detail;
+        ? 'Overdue since $dateLabel · $rawDetail'
+        : rawDetail;
+    // Kind chip already names the type; skip a subtitle that only repeats it.
+    final showDetail =
+        detail.isNotEmpty &&
+        (item.overdue || detail.toLowerCase() != kindLabel.toLowerCase());
     final accent = agendaAccent(item.kind);
     final fg = item.overdue ? AdminColors.danger : accent.onTint;
     final bg = item.overdue ? AdminColors.dangerBg : accent.tint;
     return Semantics(
       button: true,
-      label: '${item.title}, $detail, $dateLabel',
+      label: showDetail
+          ? '${item.title}, $detail, $dateLabel'
+          : '${item.title}, $kindLabel, $dateLabel',
       excludeSemantics: true,
       child: InkWell(
         onTap: () => onMenuSelected(item.menuIndex),
@@ -925,7 +910,7 @@ class AdminDashboardHome extends StatelessWidget {
                               Icon(_agendaIcon(item.kind), size: 10, color: fg),
                               const SizedBox(width: 3),
                               Text(
-                                _agendaKindLabel(item.kind),
+                                kindLabel,
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w700,
@@ -937,19 +922,21 @@ class AdminDashboardHome extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            detail,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AdminText.caption.copyWith(
-                              color: item.overdue
-                                  ? AdminColors.danger
-                                  : AdminColors.textSecondary,
+                        if (showDetail) ...[
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              detail,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AdminText.caption.copyWith(
+                                color: item.overdue
+                                    ? AdminColors.danger
+                                    : AdminColors.textSecondary,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ],
@@ -1045,27 +1032,6 @@ class AdminDashboardHome extends StatelessWidget {
     }
     if (days == 1) return 'Yesterday';
     return DateFormat('MMM d').format(timestamp);
-  }
-}
-
-/// Thin proportional rail under a KPI value.
-class _KpiProgress extends StatelessWidget {
-  const _KpiProgress({this.value, required this.color});
-
-  final double? value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: LinearProgressIndicator(
-        value: (value ?? 0).clamp(0.0, 1.0),
-        minHeight: 4,
-        color: color,
-        backgroundColor: AdminColors.surface,
-      ),
-    );
   }
 }
 
@@ -1165,14 +1131,19 @@ class _PanelScrollListState extends State<_PanelScrollList> {
 
 /// Compact date pill shown next to the header actions.
 class _DashboardDateChip extends StatelessWidget {
-  const _DashboardDateChip({required this.date});
+  const _DashboardDateChip({required this.date, this.lastUpdated});
 
   final DateTime date;
+  final DateTime? lastUpdated;
 
   @override
   Widget build(BuildContext context) {
+    final dateLabel = DateFormat('EEEE, MMMM d, y').format(date);
+    final message = lastUpdated == null
+        ? dateLabel
+        : '$dateLabel · Updated ${DateFormat('h:mm a').format(lastUpdated!)}';
     return Tooltip(
-      message: DateFormat('EEEE, MMMM d, y').format(date),
+      message: message,
       child: Container(
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 10),

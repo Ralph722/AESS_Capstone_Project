@@ -3178,6 +3178,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     final label = _totalBadgeCount > 0
         ? 'Notifications, $_totalBadgeCount unread or needing attention'
         : 'Notifications';
+    final open = _notificationsOpen;
     return CompositedTransformTarget(
       link: _notificationLink,
       child: Stack(
@@ -3188,35 +3189,40 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
             child: Semantics(
               button: true,
               label: label,
-              expanded: _notificationsOpen,
-              child: InkWell(
-                onTap: _toggleNotifications,
-                borderRadius: BorderRadius.circular(8),
-                hoverColor: _navy.withValues(alpha: 0.05),
-                focusColor: _navy.withValues(alpha: 0.08),
-                child: Ink(
-                  width: _AdminChrome.controlHeight,
-                  height: _AdminChrome.controlHeight,
-                  decoration: BoxDecoration(
-                    color: _notificationsOpen
-                        ? _navy.withValues(alpha: 0.08)
-                        : _AdminChrome.surface,
-                    borderRadius: BorderRadius.circular(
-                      _AdminChrome.controlRadius,
-                    ),
-                    border: Border.all(
-                      color: _notificationsOpen
-                          ? _navy.withValues(alpha: 0.3)
-                          : _AdminChrome.border,
-                    ),
+              expanded: open,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _toggleNotifications,
+                  borderRadius: BorderRadius.circular(
+                    _AdminChrome.controlRadius,
                   ),
-                  child: Center(
-                    child: Icon(
-                      _notificationsOpen
-                          ? Icons.notifications
-                          : Icons.notifications_outlined,
-                      color: _navy,
-                      size: 19,
+                  hoverColor: _navy.withValues(alpha: 0.05),
+                  focusColor: _navy.withValues(alpha: 0.08),
+                  child: Ink(
+                    width: _AdminChrome.controlHeight,
+                    height: _AdminChrome.controlHeight,
+                    decoration: BoxDecoration(
+                      color: open
+                          ? _navy.withValues(alpha: 0.08)
+                          : _AdminChrome.surface,
+                      borderRadius: BorderRadius.circular(
+                        _AdminChrome.controlRadius,
+                      ),
+                      border: Border.all(
+                        color: open
+                            ? _navy.withValues(alpha: 0.3)
+                            : _AdminChrome.border,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        open
+                            ? Icons.notifications
+                            : Icons.notifications_outlined,
+                        color: _navy,
+                        size: 19,
+                      ),
                     ),
                   ),
                 ),
@@ -3281,7 +3287,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
         itemBuilder: (_) => _profileMenuItems(profile),
         child: Semantics(
           button: true,
-          label: 'Account menu for ${profile.name}, Administrator',
+          label: 'Account menu for ${profile.name}',
           child: ExcludeSemantics(
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
@@ -3289,12 +3295,14 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
               onExit: (_) => setState(() => _accountHovered = false),
               child: Container(
                 height: _AdminChrome.controlHeight,
-                padding: EdgeInsets.fromLTRB(showIdentity ? 12 : 3, 3, 3, 3),
+                padding: EdgeInsets.fromLTRB(3, 3, showIdentity ? 12 : 3, 3),
                 decoration: BoxDecoration(
                   color: (_accountHovered || _accountMenuOpen)
                       ? _navy.withValues(alpha: 0.05)
                       : AdminColors.card,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(
+                    _AdminChrome.controlRadius,
+                  ),
                   border: Border.all(
                     color: _accountMenuOpen
                         ? _navy.withValues(alpha: 0.3)
@@ -3304,39 +3312,24 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    AdminProfileAvatar(profile: profile, size: 32),
                     if (showIdentity) ...[
+                      const SizedBox(width: 10),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 160),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              profile.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AdminColors.textPrimary,
-                                height: 1.2,
-                              ),
-                            ),
-                            const Text(
-                              'Administrator',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AdminColors.textSecondary,
-                                height: 1.2,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          profile.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AdminColors.textPrimary,
+                            height: 1.2,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
                     ],
-                    AdminProfileAvatar(profile: profile, size: 32),
                   ],
                 ),
               ),

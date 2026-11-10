@@ -292,10 +292,10 @@ class DssOutcomeCard extends StatelessWidget {
                 style: dssFilledButtonStyle(background: AdminDssTheme.success),
                 child: const Text('Decide: Resolve'),
               ),
-              for (final d in const [
+              for (final d in [
                 DssOutcomeDecision.continueWork,
                 DssOutcomeDecision.modify,
-                DssOutcomeDecision.escalate,
+                if (kDssShowEscalateDecision) DssOutcomeDecision.escalate,
               ])
                 OutlinedButton(
                   onPressed: busy ? null : () => onDecide(i, d),

@@ -221,8 +221,8 @@ class DashboardEngagementTrendChart extends StatelessWidget {
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            curveSmoothness: 0.22,
-            preventCurveOverShooting: true,
+            curveSmoothness: 0.38,
+            preventCurveOverShooting: false,
             color: _line,
             barWidth: 2.5,
             isStrokeCapRound: true,

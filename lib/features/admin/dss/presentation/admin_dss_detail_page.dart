@@ -1163,7 +1163,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
         nextStep: badgeTarget == _NextBadgeTarget.plan,
       );
     }
-    if (_hasAccountability && flag.status != DssFlagStatus.watch) {
+    if (_hasAccountability &&
+        kDssShowOwnerSchedule &&
+        flag.status != DssFlagStatus.watch) {
       push(
         KeyedSubtree(
           key: _ownerKey,
@@ -1181,6 +1183,8 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           ),
         ),
       );
+    }
+    if (_hasAccountability && flag.status != DssFlagStatus.watch) {
       final otherProof = _intervention == 'Other'
           ? _interventionDetailCtrl.text.trim()
           : '';
@@ -2490,10 +2494,11 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
               ),
             ),
             for (final d in DssOutcomeDecision.values)
-              ListTile(
-                title: Text(d.label),
-                onTap: () => Navigator.pop(ctx, d),
-              ),
+              if (d != DssOutcomeDecision.escalate || kDssShowEscalateDecision)
+                ListTile(
+                  title: Text(d.label),
+                  onTap: () => Navigator.pop(ctx, d),
+                ),
           ],
         ),
       ),
@@ -2516,6 +2521,9 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
     final showOutcomeSteps =
         flag.status == DssFlagStatus.resolved || hasUndecided;
     // Before Start, later steps are preview-only (no chevron / scroll).
+    // Owner is optional and hidden when [kDssShowOwnerSchedule] is false
+    // (single-admin portals); numbering stays a straight required path.
+    var n = 1;
     final steps = <({
       int n,
       String label,
@@ -2524,30 +2532,31 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       VoidCallback? onTap,
     })>[
       (
-        n: 1,
+        n: n++,
         label: 'Start',
         done: started,
         current: flag.status == DssFlagStatus.open,
         onTap: null,
       ),
+      if (kDssShowOwnerSchedule)
+        (
+          n: n++,
+          label: 'Owner (admin, office or person)',
+          done: assigned,
+          current: false, // recommended — not required to Resolve
+          onTap: started && _hasAccountability
+              ? () => _scrollTo(_ownerKey)
+              : null,
+        ),
       (
-        n: 2,
-        label: 'Owner (admin, office or person)',
-        done: assigned,
-        current: false, // recommended — not required to Resolve
-        onTap: started && _hasAccountability
-            ? () => _scrollTo(_ownerKey)
-            : null,
-      ),
-      (
-        n: 3,
+        n: n++,
         label: 'Plan',
         done: intervention,
         current: started && !intervention && !resolved,
         onTap: started ? () => _scrollTo(_planKey) : null,
       ),
       (
-        n: 4,
+        n: n++,
         label: 'Proof',
         done: proof,
         current: started && intervention && !proof && !resolved,
@@ -2558,7 +2567,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
             : null,
       ),
       (
-        n: 5,
+        n: n++,
         label: 'Resolve',
         done: resolved,
         current:
@@ -2570,7 +2579,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
       ),
       if (showOutcomeSteps) ...[
         (
-          n: 6,
+          n: n++,
           label: 'Outcome',
           done: outcomeReady,
           current:
@@ -2580,7 +2589,7 @@ class _AdminDssDetailPanelState extends State<AdminDssDetailPanel> {
           onTap: () => _scrollTo(_timelineKey),
         ),
         (
-          n: 7,
+          n: n++,
           label: 'Decide',
           done: false,
           current:

@@ -153,17 +153,10 @@ class DashboardViewAllButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'View all',
-            semanticsLabel: semanticsLabel,
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 2),
-          const Icon(Icons.arrow_forward_rounded, size: 14),
-        ],
+      child: Text(
+        'View all',
+        semanticsLabel: semanticsLabel,
+        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
       ),
     );
   }

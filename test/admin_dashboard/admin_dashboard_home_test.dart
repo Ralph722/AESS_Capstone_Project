@@ -506,7 +506,7 @@ void main() {
       expect(find.text('No employment information yet'), findsOneWidget);
     });
 
-    testWidgets('header shows a Live badge instead of a Refresh button', (
+    testWidgets('header shows date chip instead of Live or Refresh', (
       tester,
     ) async {
       await _pumpContent(
@@ -516,20 +516,11 @@ void main() {
       );
       expect(find.text('Refresh'), findsNothing);
       expect(find.byIcon(Icons.refresh_rounded), findsNothing);
-      expect(find.text('Live'), findsOneWidget);
-      expect(find.byType(DashboardLiveIndicator), findsOneWidget);
+      expect(find.text('Live'), findsNothing);
+      expect(find.byType(DashboardLiveIndicator), findsNothing);
+      expect(find.text('Verify card'), findsOneWidget);
+      expect(find.byIcon(Icons.calendar_today_outlined), findsOneWidget);
     });
-  });
-
-  test('Live badge tooltip says when figures last updated', () {
-    expect(
-      DashboardLiveIndicator.message(null),
-      'Figures update automatically.',
-    );
-    expect(
-      DashboardLiveIndicator.message(DateTime(2026, 10, 15, 22, 42)),
-      'Figures update automatically. Last updated 10:42 PM.',
-    );
   });
 
   test('bottom row height: 45% clamped to 200–260, at most half', () {

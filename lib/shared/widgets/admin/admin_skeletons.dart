@@ -510,6 +510,89 @@ class AdminForumListSkeleton extends StatelessWidget {
   }
 }
 
+/// Admin Job Postings list skeleton mirroring [AdminJobCard] zones.
+class AdminJobsListSkeleton extends StatelessWidget {
+  const AdminJobsListSkeleton({super.key, this.count = 5});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerScope(
+      child: ListView.separated(
+        padding: const EdgeInsets.only(bottom: 16),
+        itemCount: count,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          return Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: AdminSurfaces.card(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 900;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Skeleton(
+                      width: 40,
+                      height: 40,
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FractionallySizedBox(
+                            widthFactor: 0.52,
+                            child: Skeleton(height: 14),
+                          ),
+                          SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Skeleton(width: 58, height: 18),
+                              SizedBox(width: 6),
+                              Skeleton(width: 68, height: 18),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          FractionallySizedBox(
+                            widthFactor: 0.48,
+                            child: Skeleton(height: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (wide) ...[
+                      const SizedBox(width: 24),
+                      const SizedBox(
+                        width: 205,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Skeleton(width: 126, height: 10),
+                            SizedBox(height: 8),
+                            Skeleton(width: 136, height: 13),
+                            SizedBox(height: 6),
+                            Skeleton(width: 108, height: 11),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 32),
+                    ],
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 /// Reports & analytics full-page load (Column — safe inside [SingleChildScrollView]).
 class AdminReportsSkeleton extends StatelessWidget {
   const AdminReportsSkeleton({super.key});

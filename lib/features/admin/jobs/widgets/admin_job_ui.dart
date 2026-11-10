@@ -11,10 +11,14 @@ import 'package:alumni_system/features/jobs/models/job_interest_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/jobs/widgets/job_ui.dart';
 import 'package:alumni_system/features/messages/data/message_open_bus.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_badge.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Jobs admin chrome — aliases Directory tokens (no second color system).
@@ -50,7 +54,154 @@ ButtonStyle jobFilledButtonStyle({Color? background}) =>
 
 ButtonStyle jobOutlinedButtonStyle() => AdminButtonStyles.outlined();
 
-/// Compact survey-style row card for Job Postings list.
+/// Maps technical exceptions to concise admin-facing copy.
+String jobFriendlyError(Object error, String fallback) {
+  var text = '$error';
+  while (text.startsWith('Exception: ')) {
+    text = text.substring('Exception: '.length);
+  }
+  text = text.trim();
+  final technical =
+      text.isEmpty ||
+      text.startsWith('Error ') ||
+      text.contains('Exception') ||
+      text.contains('Postgrest') ||
+      text.contains('SocketException') ||
+      text.length > 160;
+  return technical ? fallback : text;
+}
+
+/// Job moderation popup menu item with leading icon and consistent destructive tone.
+PopupMenuItem<String> adminJobMenuItem({
+  required String value,
+  required String label,
+  required IconData icon,
+  bool destructive = false,
+  bool enabled = true,
+  String? note,
+}) {
+  final Color textColor;
+  final Color iconColor;
+  if (!enabled) {
+    textColor = AdminColors.textMuted;
+    iconColor = AdminColors.textMuted;
+  } else if (destructive) {
+    textColor = AdminColors.danger;
+    iconColor = AdminColors.danger;
+  } else {
+    textColor = AdminColors.textPrimary;
+    iconColor = AdminColors.primary;
+  }
+  return PopupMenuItem<String>(
+    value: value,
+    enabled: enabled,
+    height: note == null ? 40 : 52,
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: iconColor),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                ),
+              ),
+              if (note != null)
+                Text(
+                  note,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AdminColors.textSecondary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Brand-aligned Admin status & metadata badges for job postings.
+class AdminJobStatusBadges extends StatelessWidget {
+  const AdminJobStatusBadges({super.key, required this.job});
+
+  final JobPosting job;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = job.status.toLowerCase();
+    final deadlineHint = jobDeadlineHint(job.applicationDeadline);
+
+    final AdminBadge statusBadge;
+    switch (normalized) {
+      case 'active':
+        statusBadge = const AdminBadge.success(
+          label: 'Active',
+          icon: Icons.check_circle_outline,
+          dense: true,
+        );
+      case 'expired':
+        statusBadge = const AdminBadge.danger(
+          label: 'Expired',
+          icon: Icons.event_busy_outlined,
+          dense: true,
+        );
+      case 'archived':
+        statusBadge = const AdminBadge.neutral(
+          label: 'Archived',
+          icon: Icons.archive_outlined,
+          dense: true,
+        );
+      default:
+        statusBadge = AdminBadge.info(
+          label: job.status.trim().isEmpty ? 'Open' : job.status.trim(),
+          icon: Icons.work_outline,
+          dense: true,
+        );
+    }
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        statusBadge,
+        AdminBadge.info(
+          label: job.category.trim().isEmpty ? 'Others' : job.category.trim(),
+          icon: Icons.category_outlined,
+          dense: true,
+        ),
+        if (job.isRemote)
+          const AdminBadge.neutral(
+            label: 'Remote',
+            icon: Icons.laptop_mac_outlined,
+            dense: true,
+          ),
+        if (normalized == 'active' && deadlineHint != null)
+          deadlineHint == 'Application closed'
+              ? AdminBadge.danger(
+                  label: deadlineHint,
+                  icon: Icons.schedule_rounded,
+                  dense: true,
+                )
+              : AdminBadge.warning(
+                  label: deadlineHint,
+                  icon: Icons.schedule_rounded,
+                  dense: true,
+                ),
+      ],
+    );
+  }
+}
+
+/// Multi-zone SaaS row card for Job Postings list.
 class AdminJobCard extends StatefulWidget {
   const AdminJobCard({
     super.key,
@@ -61,7 +212,10 @@ class AdminJobCard extends StatefulWidget {
     required this.onToggleArchive,
     required this.onDelete,
     this.onShare,
+    this.busy = false,
   });
+
+  static const double zoneLayoutMinWidth = 900.0;
 
   final JobPosting job;
   final VoidCallback onEdit;
@@ -70,6 +224,7 @@ class AdminJobCard extends StatefulWidget {
   final VoidCallback onToggleArchive;
   final VoidCallback onDelete;
   final VoidCallback? onShare;
+  final bool busy;
 
   @override
   State<AdminJobCard> createState() => _AdminJobCardState();
@@ -78,130 +233,275 @@ class AdminJobCard extends StatefulWidget {
 class _AdminJobCardState extends State<AdminJobCard> {
   bool _hovered = false;
 
+  static const _zoneLabel = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.3,
+    color: AdminColors.textSecondary,
+  );
+  static const _zoneValue = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: AdminColors.textPrimary,
+  );
+  static const _secondary = TextStyle(
+    fontSize: 12,
+    height: 1.35,
+    color: AdminColors.textSecondary,
+  );
+
+  String _metaLine(JobPosting job) {
+    final salary = formatJobSalaryPhp(job.salaryRange);
+    return [
+      if (job.companyName.trim().isNotEmpty) job.companyName.trim(),
+      if (job.jobType.trim().isNotEmpty) job.jobType.trim(),
+      if (job.isRemote)
+        'Remote'
+      else if (job.location.trim().isNotEmpty)
+        job.location.trim(),
+      if (salary.isNotEmpty) salary,
+    ].join(' · ');
+  }
+
+  String _engagementLine(JobPosting job) {
+    final views = '${job.views} ${job.views == 1 ? 'view' : 'views'}';
+    final interest = '${job.interestedCount} interested';
+    return '$views · $interest';
+  }
+
+  String _deadlineLine(JobPosting job) {
+    final fmt = DateFormat.yMMMd();
+    return 'Deadline ${fmt.format(job.applicationDeadline)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final job = widget.job;
-    final fmt = DateFormat.yMMMd();
-    final metaParts = <String>[
-      if (job.companyName.isNotEmpty) job.companyName,
-      if (job.jobType.isNotEmpty) job.jobType,
-      if (job.isRemote) 'Remote' else if (job.location.isNotEmpty) job.location,
-      'Deadline ${fmt.format(job.applicationDeadline)}',
-    ];
-    final metaLine = metaParts.join(' · ');
+    final title = job.jobTitle.trim().isEmpty ? 'Untitled job' : job.jobTitle.trim();
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        margin: const EdgeInsets.only(bottom: AdminJobTheme.listItemGap),
-        decoration: AdminJobTheme.surfaceCard(hovered: _hovered),
+        margin: const EdgeInsets.only(bottom: AdminDensity.listItemGap),
+        decoration: BoxDecoration(
+          color: _hovered ? AdminColors.rowHover : AdminColors.card,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+          border: Border.all(color: AdminColors.border),
+          boxShadow: AdminSurfaces.cardShadow,
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: widget.onDetails,
-            borderRadius: BorderRadius.circular(AdminJobTheme.radiusMd),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AdminDensity.space3,
-                vertical: AdminDensity.cardPadding,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  JobCompanyLogo(job: job, size: 32, radius: 8),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          job.jobTitle.isEmpty ? 'Untitled job' : job.jobTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: AdminJobTheme.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            JobStatusBadge(status: job.status),
-                            JobCategoryBadge(category: job.category),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          metaLine,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.35,
-                            color: AdminJobTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    tooltip: 'Job actions',
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'details':
-                          widget.onDetails();
-                        case 'interested':
-                          widget.onInterested();
-                        case 'share':
-                          widget.onShare?.call();
-                        case 'edit':
-                          widget.onEdit();
-                        case 'archive':
-                          widget.onToggleArchive();
-                        case 'delete':
-                          widget.onDelete();
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: 'details',
-                        child: Text('Details'),
-                      ),
-                      PopupMenuItem(
-                        value: 'interested',
-                        child: Text('Interested (${job.interestedCount})'),
-                      ),
-                      if (widget.onShare != null && job.isActiveForAlumni)
-                        const PopupMenuItem(
-                          value: 'share',
-                          child: Text('Share link…'),
-                        ),
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(
-                        value: 'archive',
-                        child: Text(
-                          job.status == 'archived' ? 'Activate' : 'Archive',
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete'),
-                      ),
-                    ],
-                    icon: const Icon(
-                      Icons.more_vert,
-                      color: AdminJobTheme.textMuted,
-                    ),
-                  ),
-                ],
+          type: MaterialType.transparency,
+          child: Semantics(
+            button: true,
+            label: 'Open details for $title',
+            child: InkWell(
+              onTap: widget.onDetails,
+              child: LayoutBuilder(
+                builder: (context, constraints) =>
+                    constraints.maxWidth >= AdminJobCard.zoneLayoutMinWidth
+                        ? _buildZones(job, title)
+                        : _buildStacked(job, title),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildZones(JobPosting job, String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          ExcludeSemantics(child: JobCompanyLogo(job: job, size: 40, radius: 8)),
+          const SizedBox(width: 12),
+          Expanded(child: _buildIdentity(job, title)),
+          const SizedBox(width: 24),
+          SizedBox(width: 205, child: _buildEngagementZone(job)),
+          const SizedBox(width: 8),
+          _buildMenu(job),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStacked(JobPosting job, String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(child: JobCompanyLogo(job: job, size: 36, radius: 8)),
+          const SizedBox(width: 10),
+          Expanded(child: _buildIdentity(job, title, showCompactStats: true)),
+          _buildMenu(job),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentity(
+    JobPosting job,
+    String title, {
+    bool showCompactStats = false,
+  }) {
+    final meta = _metaLine(job);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: title,
+          waitDuration: const Duration(milliseconds: 600),
+          child: Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              letterSpacing: -0.2,
+              height: 1.3,
+              color: AdminColors.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 5),
+        AdminJobStatusBadges(job: job),
+        if (meta.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Text(
+            meta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _secondary,
+          ),
+        ],
+        if (showCompactStats) ...[
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 10,
+            runSpacing: 2,
+            children: [
+              _metaItem(Icons.visibility_outlined, _engagementLine(job)),
+              _metaItem(Icons.event_outlined, _deadlineLine(job)),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEngagementZone(JobPosting job) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('ENGAGEMENT & DEADLINE', style: _zoneLabel),
+        const SizedBox(height: 4),
+        Text(
+          _engagementLine(job),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _zoneValue,
+        ),
+        const SizedBox(height: 4),
+        _metaItem(Icons.event_outlined, _deadlineLine(job)),
+      ],
+    );
+  }
+
+  Widget _metaItem(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: AdminColors.textSecondary),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _secondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenu(JobPosting job) {
+    if (widget.busy) {
+      return const Padding(
+        padding: EdgeInsets.all(10),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return PopupMenuButton<String>(
+      tooltip: 'Job actions',
+      onSelected: (value) {
+        switch (value) {
+          case 'details':
+            widget.onDetails();
+          case 'interested':
+            widget.onInterested();
+          case 'share':
+            widget.onShare?.call();
+          case 'edit':
+            widget.onEdit();
+          case 'archive':
+            widget.onToggleArchive();
+          case 'delete':
+            widget.onDelete();
+        }
+      },
+      itemBuilder: (_) => [
+        adminJobMenuItem(
+          value: 'details',
+          label: 'View details',
+          icon: Icons.open_in_new_rounded,
+        ),
+        adminJobMenuItem(
+          value: 'interested',
+          label: 'Interested (${job.interestedCount})',
+          icon: Icons.star_outline,
+        ),
+        if (widget.onShare != null && job.isActiveForAlumni)
+          adminJobMenuItem(
+            value: 'share',
+            label: 'Share link…',
+            icon: Icons.share_outlined,
+          ),
+        const PopupMenuDivider(height: 8),
+        adminJobMenuItem(
+          value: 'edit',
+          label: 'Edit',
+          icon: Icons.edit_outlined,
+        ),
+        adminJobMenuItem(
+          value: 'archive',
+          label: job.status == 'archived' ? 'Activate' : 'Archive',
+          icon: job.status == 'archived'
+              ? Icons.unarchive_outlined
+              : Icons.archive_outlined,
+        ),
+        const PopupMenuDivider(height: 8),
+        adminJobMenuItem(
+          value: 'delete',
+          label: 'Delete',
+          icon: Icons.delete_outline_rounded,
+          destructive: true,
+        ),
+      ],
+      icon: const Icon(Icons.more_vert, color: AdminColors.textSecondary),
     );
   }
 }
@@ -281,69 +581,22 @@ class _JobInsightsDialogBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 8, 0),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AdminJobTheme.infoBg,
-                  borderRadius: BorderRadius.circular(AdminJobTheme.radiusSm),
-                ),
-                child: const Icon(
-                  Icons.insights_outlined,
-                  size: 20,
-                  color: AdminJobTheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Quick insights',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: AdminJobTheme.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Snapshot of engagement across all job postings',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: AdminJobTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                style: AdminDensity.iconButtonStyle(
-                  foregroundColor: AdminJobTheme.textMuted,
-                ),
-                icon: const Icon(Icons.close),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(20, 14, 12, 10),
+          child: AdminModalHeader(
+            title: 'Quick insights',
+            subtitle: 'Snapshot of engagement across all job postings',
+            icon: Icons.insights_outlined,
+            onClose: () => Navigator.pop(context),
           ),
         ),
-        const SizedBox(height: 8),
-        const Divider(height: 1),
+        const Divider(height: 1, color: AdminColors.border),
         Expanded(
           child: jobCount == 0
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'No jobs yet — insights will appear after you post openings.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AdminJobTheme.textSecondary),
-                    ),
-                  ),
+              ? const AdminStateView.empty(
+                  compact: true,
+                  icon: Icons.insights_outlined,
+                  title: 'No job postings yet',
+                  message: 'Insights will appear after you post openings.',
                 )
               : ListView(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -604,7 +857,7 @@ class _JobInsightsDialogBody extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 11.5,
-                      color: AdminJobTheme.textMuted,
+                      color: AdminColors.textSecondary,
                     ),
                   ),
               ],
@@ -616,7 +869,7 @@ class _JobInsightsDialogBody extends StatelessWidget {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AdminJobTheme.textSecondary,
+              color: AdminColors.textSecondary,
             ),
           ),
         ],
@@ -628,9 +881,9 @@ class _JobInsightsDialogBody extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AdminJobTheme.surface,
+        color: AdminColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AdminJobTheme.border),
+        border: Border.all(color: AdminColors.border),
       ),
       child: Text.rich(
         TextSpan(
@@ -639,7 +892,7 @@ class _JobInsightsDialogBody extends StatelessWidget {
               text: label,
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminJobTheme.textPrimary,
+                color: AdminColors.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -647,7 +900,7 @@ class _JobInsightsDialogBody extends StatelessWidget {
               text: '  $count',
               style: const TextStyle(
                 fontSize: 12,
-                color: AdminJobTheme.textMuted,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],
@@ -659,7 +912,7 @@ class _JobInsightsDialogBody extends StatelessWidget {
   Widget _emptyHint(String text) {
     return Text(
       text,
-      style: const TextStyle(fontSize: 12.5, color: AdminJobTheme.textMuted),
+      style: const TextStyle(fontSize: 12.5, color: AdminColors.textSecondary),
     );
   }
 }
@@ -729,16 +982,7 @@ class _JobDetailsPanel extends StatelessWidget {
                         ),
                       ],
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          JobStatusBadge(status: job.status),
-                          JobCategoryBadge(category: job.category),
-                          if (job.isRemote)
-                            const JobCategoryBadge(category: 'Remote'),
-                        ],
-                      ),
+                      AdminJobStatusBadges(job: job),
                     ],
                   ),
                 ),
@@ -746,14 +990,14 @@ class _JobDetailsPanel extends StatelessWidget {
                   tooltip: 'Close',
                   onPressed: () => Navigator.pop(context),
                   style: AdminDensity.iconButtonStyle(
-                    foregroundColor: AdminJobTheme.textMuted,
+                    foregroundColor: AdminColors.textSecondary,
                   ),
                   icon: const Icon(Icons.close),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: AdminColors.border),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
@@ -823,7 +1067,7 @@ class _JobDetailsPanel extends StatelessWidget {
                       _detailRow(
                         icon: Icons.payments_outlined,
                         label: 'Salary',
-                        value: job.salaryRange,
+                        value: formatJobSalaryPhp(job.salaryRange),
                       ),
                       _detailRow(
                         icon: Icons.event_outlined,
@@ -1304,7 +1548,7 @@ class _InterestedPanelState extends State<_InterestedPanel> {
                         '${rows.length != total ? ' · ${rows.length} shown' : ''}',
                         style: const TextStyle(
                           fontSize: 11.5,
-                          color: AdminJobTheme.textMuted,
+                          color: AdminColors.textSecondary,
                         ),
                       ),
                     ],
@@ -1314,7 +1558,7 @@ class _InterestedPanelState extends State<_InterestedPanel> {
                   tooltip: 'Export CSV',
                   onPressed: total == 0 ? null : () => widget.onExportCsv(),
                   style: AdminDensity.iconButtonStyle(
-                    foregroundColor: AdminJobTheme.textSecondary,
+                    foregroundColor: AdminColors.textSecondary,
                   ),
                   icon: const Icon(Icons.download_outlined),
                 ),
@@ -1322,7 +1566,7 @@ class _InterestedPanelState extends State<_InterestedPanel> {
                   tooltip: 'Close',
                   onPressed: () => Navigator.pop(context),
                   style: AdminDensity.iconButtonStyle(
-                    foregroundColor: AdminJobTheme.textMuted,
+                    foregroundColor: AdminColors.textSecondary,
                   ),
                   icon: const Icon(Icons.close),
                 ),
@@ -1385,6 +1629,7 @@ class _InterestedPanelState extends State<_InterestedPanel> {
                   width: 128,
                   child: DirectoryFilterField<String>(
                     label: 'Sort',
+                    dense: true,
                     value: _sort,
                     items: const [
                       DropdownMenuItem(value: 'newest', child: Text('Newest')),
@@ -1396,45 +1641,18 @@ class _InterestedPanelState extends State<_InterestedPanel> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: AdminColors.border),
           Expanded(
             child: rows.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            total == 0 ? Icons.star_border : Icons.search_off,
-                            size: 40,
-                            color: AdminJobTheme.textMuted,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            total == 0
-                                ? 'No interested alumni yet'
-                                : 'No matches',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: AdminJobTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            total == 0
-                                ? 'Alumni who mark this job as Interested will appear here.'
-                                : 'Try a different search or sort.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: AdminJobTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                ? AdminStateView.empty(
+                    compact: true,
+                    icon: total == 0 ? Icons.star_border : Icons.search_off,
+                    title: total == 0
+                        ? 'No interested alumni yet'
+                        : 'No matches',
+                    message: total == 0
+                        ? 'Alumni who mark this job as Interested will appear here.'
+                        : 'Try a different search or sort.',
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
@@ -1627,13 +1845,13 @@ class _InterestedAlumniCardState extends State<_InterestedAlumniCard> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: AdminJobTheme.textMuted),
+          Icon(icon, size: 12, color: AdminColors.textSecondary),
           const SizedBox(width: 4),
           Text(
             label,
             style: const TextStyle(
               fontSize: 11.5,
-              color: AdminJobTheme.textSecondary,
+              color: AdminColors.textSecondary,
             ),
           ),
         ],

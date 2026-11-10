@@ -11,8 +11,10 @@ import 'package:alumni_system/features/jobs/data/job_service.dart';
 import 'package:alumni_system/features/jobs/models/job_category_constants.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_form_layout.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 
 class AddJobDialog extends StatefulWidget {
@@ -20,7 +22,16 @@ class AddJobDialog extends StatefulWidget {
   final Function(JobPosting)? onJobAdded;
   final Function(JobPosting)? onJobUpdated;
 
-  const AddJobDialog({super.key, this.job, this.onJobAdded, this.onJobUpdated});
+  /// Optional override for widget tests.
+  final JobService? service;
+
+  const AddJobDialog({
+    super.key,
+    this.job,
+    this.onJobAdded,
+    this.onJobUpdated,
+    this.service,
+  });
 
   @override
   State<AddJobDialog> createState() => _AddJobDialogState();
@@ -216,6 +227,22 @@ class _AddJobDialogState extends State<AddJobDialog> {
     return null;
   }
 
+  String _friendlyError(Object error, String fallback) {
+    var text = '$error';
+    while (text.startsWith('Exception: ')) {
+      text = text.substring('Exception: '.length);
+    }
+    text = text.trim();
+    final technical =
+        text.isEmpty ||
+        text.startsWith('Error ') ||
+        text.contains('Exception') ||
+        text.contains('Postgrest') ||
+        text.contains('SocketException') ||
+        text.length > 160;
+    return technical ? fallback : text;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _saving) return;
     setState(() => _saving = true);
@@ -278,7 +305,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
       );
 
       // Alumni notices come from the jobs table trigger (notify_job_changes).
-      final service = JobService();
+      final service = widget.service ?? JobService();
       if (_isEditing) {
         await service.updateJobPosting(posting);
         widget.onJobUpdated?.call(posting);
@@ -288,18 +315,25 @@ class _AddJobDialogState extends State<AddJobDialog> {
       }
 
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isEditing ? 'Job updated' : 'Job posted')),
-      );
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(_isEditing ? 'Job updated' : 'Job posted')),
+        );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving job: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              _friendlyError(e, 'Could not save this job posting.'),
+            ),
+            backgroundColor: AdminColors.danger,
+          ),
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -662,17 +696,22 @@ class _AddJobDialogState extends State<AddJobDialog> {
           ),
           AdminFormActionsBar(
             actions: [
-              TextButton(
+              OutlinedButton(
                 onPressed: _saving ? null : () => Navigator.pop(context),
+                style: AdminButtonStyles.outlined(),
                 child: const Text('Cancel'),
               ),
               FilledButton(
                 onPressed: _saving ? null : _submit,
+                style: AdminButtonStyles.filled(),
                 child: _saving
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : Text(_isEditing ? 'Update job' : 'Post job'),
               ),
@@ -694,11 +733,15 @@ class _AddJobDialogState extends State<AddJobDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.panorama_outlined, color: Color(0xFF64748B), size: 28),
+            Icon(
+              Icons.panorama_outlined,
+              color: AdminColors.textSecondary,
+              size: 28,
+            ),
             SizedBox(height: 6),
             Text(
               'No cover photo',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+              style: TextStyle(color: AdminColors.textSecondary, fontSize: 12),
             ),
           ],
         ),
@@ -710,9 +753,9 @@ class _AddJobDialogState extends State<AddJobDialog> {
         aspectRatio: 16 / 9,
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: AdminColors.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(color: AdminColors.border),
           ),
           clipBehavior: Clip.antiAlias,
           child: child,
@@ -728,15 +771,15 @@ class _AddJobDialogState extends State<AddJobDialog> {
     } else if (_companyLogoUrl.isNotEmpty) {
       child = AppImage.widget(_companyLogoUrl, fit: BoxFit.cover);
     } else {
-      child = const Icon(Icons.business_rounded, color: Color(0xFF090A4F));
+      child = const Icon(Icons.business_rounded, color: AdminColors.primary);
     }
     return Container(
       width: 64,
       height: 64,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: AdminColors.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AdminColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,

@@ -13,8 +13,10 @@ import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
 import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
 import 'package:alumni_system/features/forum/widgets/forum_rich_text_controller.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
@@ -414,19 +416,23 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.asSidePanel) _panelHeader() else const SizedBox.shrink(),
           if (widget.asSidePanel) ...[
-            TabBar(
-              controller: _tabs,
-              labelColor: ForumTheme.navy,
-              unselectedLabelColor: ForumTheme.textSecondary,
-              indicatorColor: ForumTheme.navy,
-              tabs: const [
-                Tab(text: 'Write'),
-                Tab(text: 'Preview'),
-              ],
+            _panelHeader(),
+            const Divider(height: 1, color: AdminColors.border),
+            Container(
+              color: AdminColors.card,
+              child: TabBar(
+                controller: _tabs,
+                labelColor: AdminColors.primary,
+                unselectedLabelColor: AdminColors.textSecondary,
+                indicatorColor: AdminColors.primary,
+                dividerColor: AdminColors.border,
+                tabs: const [
+                  Tab(text: 'Write'),
+                  Tab(text: 'Preview'),
+                ],
+              ),
             ),
-            const Divider(height: 1),
           ],
           Expanded(
             child: TabBarView(
@@ -440,7 +446,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     );
 
     if (widget.asSidePanel) {
-      return ColoredBox(color: Colors.white, child: body);
+      return ColoredBox(color: AdminColors.card, child: body);
     }
 
     return PopScope(
@@ -483,20 +489,26 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   }
 
   Widget _panelHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+    return Container(
+      color: AdminColors.card,
+      padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
-              color: ForumTheme.announcementBg,
-              borderRadius: BorderRadius.circular(8),
+              color: AdminColors.infoBg,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(
+                color: AdminColors.primary.withValues(alpha: 0.16),
+              ),
             ),
-            child: const Icon(
-              Icons.campaign_outlined,
-              color: ForumTheme.announcement,
+            child: Icon(
+              _asAnnouncement
+                  ? Icons.campaign_outlined
+                  : Icons.forum_outlined,
+              color: AdminColors.primary,
               size: 20,
             ),
           ),
@@ -510,7 +522,8 @@ class _ForumComposerPageState extends State<ForumComposerPage>
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: ForumTheme.textPrimary,
+                    letterSpacing: -0.2,
+                    color: AdminColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -520,7 +533,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
                       : 'Start a moderated discussion',
                   style: const TextStyle(
                     fontSize: 12.5,
-                    color: ForumTheme.textSecondary,
+                    color: AdminColors.textSecondary,
                   ),
                 ),
               ],
@@ -530,9 +543,9 @@ class _ForumComposerPageState extends State<ForumComposerPage>
             tooltip: 'Close',
             onPressed: _busy ? null : _close,
             style: AdminDensity.iconButtonStyle(
-              foregroundColor: ForumTheme.textMuted,
+              foregroundColor: AdminColors.textSecondary,
             ),
-            icon: const Icon(Icons.close),
+            icon: const Icon(Icons.close_rounded, size: 19),
           ),
         ],
       ),
@@ -540,49 +553,51 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   }
 
   Widget _panelFooter() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: Row(
-            children: [
-              TextButton(
-                onPressed: _busy ? null : _close,
-                child: const Text('Cancel'),
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: _busy ? null : _submit,
-                icon: _busy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+    return Container(
+      color: AdminColors.card,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Divider(height: 1, color: AdminColors.border),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+            child: Row(
+              children: [
+                OutlinedButton(
+                  onPressed: _busy ? null : _close,
+                  style: AdminButtonStyles.outlined(),
+                  child: const Text('Cancel'),
+                ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _submit,
+                  style: AdminButtonStyles.filled(),
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          _isEditing
+                              ? Icons.save_outlined
+                              : Icons.send_outlined,
+                          size: 17,
                         ),
-                      )
-                    : Icon(
-                        _isEditing ? Icons.save_outlined : Icons.send_outlined,
-                        size: 17,
-                      ),
-                label: Text(
-                  _checkingContent
-                      ? 'Checking…'
-                      : (_isEditing ? 'Save' : 'Post'),
+                  label: Text(
+                    _checkingContent
+                        ? 'Checking…'
+                        : (_isEditing ? 'Save' : 'Post'),
+                  ),
                 ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: ForumTheme.navy,
-                  minimumSize: const Size(0, AdminDensity.buttonHeight),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

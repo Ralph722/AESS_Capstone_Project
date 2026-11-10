@@ -13,6 +13,9 @@ import 'package:alumni_system/features/forum/presentation/forum_composer_page.da
 import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
 import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_composer.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
@@ -30,6 +33,7 @@ class ForumTopicScreen extends StatefulWidget {
     this.embedded = false,
     this.onClose,
     this.onChanged,
+    this.service,
   });
 
   final String topicId;
@@ -39,12 +43,15 @@ class ForumTopicScreen extends StatefulWidget {
   final VoidCallback? onClose;
   final VoidCallback? onChanged;
 
+  /// Optional override for tests.
+  final ForumService? service;
+
   @override
   State<ForumTopicScreen> createState() => _ForumTopicScreenState();
 }
 
 class _ForumTopicScreenState extends State<ForumTopicScreen> {
-  final _forumService = ForumService();
+  late final ForumService _forumService = widget.service ?? ForumService();
   final _moderationService = ForumContentModerationService();
   final _bookmarkService = ForumBookmarkService();
   final _authService = AuthService();
@@ -564,7 +571,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         children: [
           _buildEmbeddedHeader(),
           Expanded(
-            child: ColoredBox(color: ForumTheme.pageBg, child: body),
+            child: ColoredBox(color: AdminColors.background, child: body),
           ),
         ],
       );
@@ -591,25 +598,96 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
   Widget _buildEmbeddedHeader() {
     final title = _topic?.title.trim().isNotEmpty == true
-        ? _topic!.title
+        ? _topic!.title.trim()
         : 'Discussion';
-    return PortalAppBar(
-      primary: false,
-      title: title,
-      subtitle: 'Forum discussion',
-      leading: IconButton(
-        tooltip: 'Back to forum list',
-        onPressed: widget.onClose,
-        icon: const Icon(Icons.arrow_back_rounded),
-      ),
-      automaticallyImplyLeading: false,
-      actions: [
-        PortalHeaderAction(
-          icon: Icons.refresh_rounded,
-          tooltip: 'Refresh',
-          onPressed: () => _loadAll(),
-        ),
-      ],
+    final isAnnouncement = _topic?.isAnnouncement ?? false;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 560;
+        return Container(
+          decoration: const BoxDecoration(
+            color: AdminColors.card,
+            border: Border(bottom: BorderSide(color: AdminColors.border)),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Row(
+            children: [
+              if (wide)
+                Tooltip(
+                  message: 'Back to forum list',
+                  child: OutlinedButton.icon(
+                    onPressed: widget.onClose,
+                    style: AdminButtonStyles.outlined(),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 17),
+                    label: const Text('Back'),
+                  ),
+                )
+              else
+                IconButton(
+                  tooltip: 'Back to forum list',
+                  onPressed: widget.onClose,
+                  style: AdminDensity.iconButtonStyle(
+                    foregroundColor: AdminColors.textPrimary,
+                  ),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                ),
+              const SizedBox(width: 12),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AdminColors.infoBg,
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
+                child: Icon(
+                  isAnnouncement
+                      ? Icons.campaign_outlined
+                      : Icons.forum_outlined,
+                  size: 18,
+                  color: AdminColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                        color: AdminColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      isAnnouncement
+                          ? 'Announcement thread'
+                          : 'Forum discussion',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AdminColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Refresh',
+                onPressed: _loading ? null : () => _loadAll(),
+                style: AdminDensity.iconButtonStyle(
+                  foregroundColor: AdminColors.textSecondary,
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 19),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

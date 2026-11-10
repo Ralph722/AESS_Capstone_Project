@@ -704,44 +704,193 @@ class AdminActivityLogSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final width = constraints.maxWidth;
         final bounded = constraints.maxHeight.isFinite;
-        return ShimmerScope(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            shrinkWrap: !bounded,
-            physics: bounded
-                ? const AlwaysScrollableScrollPhysics()
-                : const NeverScrollableScrollPhysics(),
-            itemCount: count,
-            itemBuilder: (_, __) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
+        final metricCols = width >= 780 ? 6 : (width >= 480 ? 2 : 1);
+        final rowsList = ListView.separated(
+          shrinkWrap: !bounded,
+          physics: bounded
+              ? const AlwaysScrollableScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          itemCount: count,
+          separatorBuilder: (_, __) =>
+              const Divider(height: 1, color: AdminColors.border),
+          itemBuilder: (_, __) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                if (width >= 720) ...[
+                  const Skeleton(width: 84, height: 12),
+                  const SizedBox(width: 16),
+                ],
+                const Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FractionallySizedBox(
+                        widthFactor: 0.72,
+                        child: Skeleton(height: 13),
+                      ),
+                      SizedBox(height: 6),
+                      Skeleton(width: 56, height: 10),
+                    ],
+                  ),
                 ),
-                child: const Row(
-                  children: [
-                    Skeleton(
-                      width: 8,
-                      height: 8,
-                      borderRadius: BorderRadius.all(Radius.circular(4)),
+                const SizedBox(width: 12),
+                if (width >= 720) ...[
+                  const Expanded(
+                    flex: 2,
+                    child: FractionallySizedBox(
+                      widthFactor: 0.68,
+                      child: Skeleton(height: 13),
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Skeleton(width: double.infinity, height: 14),
-                    ),
-                    SizedBox(width: 12),
-                    Skeleton(width: 72, height: 12),
-                  ],
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                const Skeleton(
+                  width: 66,
+                  height: 22,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
                 ),
-              ),
+              ],
             ),
           ),
         );
+
+        final tableCard = Container(
+          decoration: AdminSurfaces.card(),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
+                decoration: const BoxDecoration(
+                  color: AdminColors.background,
+                  border: Border(bottom: BorderSide(color: AdminColors.border)),
+                ),
+                child: const Row(
+                  children: [
+                    Skeleton(width: 96, height: 11),
+                    Spacer(),
+                    Skeleton(width: 64, height: 11),
+                  ],
+                ),
+              ),
+              if (bounded) Expanded(child: rowsList) else rowsList,
+            ],
+          ),
+        );
+
+        final metricsWidget = metricCols == 6
+            ? Row(
+                children: [
+                  for (var i = 0; i < 6; i++) ...[
+                    if (i > 0) const SizedBox(width: 10),
+                    const Expanded(child: _ActivityMetricSkeletonTile()),
+                  ],
+                ],
+              )
+            : Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (var i = 0; i < 4; i++)
+                    SizedBox(
+                      width: (width - 10 * (metricCols - 1)) / metricCols,
+                      child: const _ActivityMetricSkeletonTile(),
+                    ),
+                ],
+              );
+
+        return ShimmerScope(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: AdminSurfaces.card(),
+                child: Row(
+                  children: [
+                    const Skeleton(width: 140, height: 20),
+                    const Spacer(),
+                    if (width >= 520) ...[
+                      const Skeleton(
+                        width: 88,
+                        height: 34,
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    const Skeleton(
+                      width: 104,
+                      height: 34,
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              metricsWidget,
+              const SizedBox(height: 8),
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: AdminSurfaces.card(),
+                child: const Row(
+                  children: [
+                    Expanded(child: Skeleton(height: 16)),
+                    SizedBox(width: 12),
+                    Skeleton(width: 84, height: 28),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (bounded) Expanded(child: tableCard) else tableCard,
+            ],
+          ),
+        );
       },
+    );
+  }
+}
+
+class _ActivityMetricSkeletonTile extends StatelessWidget {
+  const _ActivityMetricSkeletonTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: AdminSurfaces.card(),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Skeleton(
+                width: 28,
+                height: 28,
+                borderRadius: BorderRadius.all(Radius.circular(6)),
+              ),
+              Skeleton(width: 32, height: 18),
+            ],
+          ),
+          Skeleton(width: 64, height: 11),
+        ],
+      ),
     );
   }
 }

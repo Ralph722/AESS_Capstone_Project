@@ -27,6 +27,7 @@ import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Search / command-palette result that opens the Change password dialog.
@@ -2341,21 +2342,15 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
       );
       return;
     }
-    final size = MediaQuery.of(context).size;
-    await showDialog<void>(
+    await showAdminDialogSurface<void>(
       context: context,
-      builder: (ctx) => Dialog(
-        clipBehavior: Clip.antiAlias,
-        child: SizedBox(
-          width: size.width.clamp(320.0, 720.0),
-          height: size.height * 0.8,
-          child: AdminEventCommentsDialog(
-            event: event!,
-            commentService: EventCommentService(),
-            onCommentDeleted: () {},
-            asDialog: true,
-          ),
-        ),
+      maxWidth: 680,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.84,
+      child: AdminEventCommentsDialog(
+        event: event,
+        commentService: EventCommentService(),
+        onCommentDeleted: () {},
+        asDialog: true,
       ),
     );
   }

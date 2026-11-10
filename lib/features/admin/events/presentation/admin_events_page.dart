@@ -9,18 +9,25 @@ import 'package:alumni_system/features/events/data/event_rsvp_service.dart';
 import 'package:alumni_system/features/events/data/event_service.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/events/models/event_rsvp_model.dart';
-import 'package:alumni_system/features/events/widgets/event_cover.dart';
-import 'package:alumni_system/features/events/widgets/event_status_badge.dart';
 import 'package:alumni_system/features/events/widgets/events_month_calendar.dart';
 import 'package:alumni_system/core/constants/event_category_constants.dart';
 import 'package:alumni_system/features/admin/events/widgets/admin_event_ui.dart';
 import 'package:alumni_system/features/share/share_link_sheet.dart';
 import 'package:alumni_system/features/share/shareable_content.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_badge.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_search_field.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
+
+enum _EventSort { soonest, newestAdded, mostGoing, titleAsc }
 
 class AdminEventsScreen extends StatefulWidget {
   const AdminEventsScreen({super.key});
@@ -43,6 +50,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   List<AlumniEvent> _filtered = [];
   Map<String, EventRsvpCounts> _counts = {};
   bool _loading = false;
+  bool _hasLoaded = false;
+  String? _loadError;
+  String? _loadErrorDetails;
   bool _showCalendar = false;
   String? _batchYear;
   String? _venue;
@@ -50,7 +60,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   DateTime? _from;
   DateTime? _to;
   String _search = '';
-  int _quickFilter = 0; // 0 all, 1 this week, 2 soon (7d), 3 newest
+  int _quickFilter = 0; // 0 all, 1 this week (7d), 2 next 3 days
+  _EventSort _sort = _EventSort.soonest;
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime? _selectedCalendarDay;
 
@@ -121,15 +132,24 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         _active = events;
         _counts = counts;
         _loading = false;
+        _hasLoaded = true;
+        _loadError = null;
+        _loadErrorDetails = null;
       });
       _applyFilters();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      if (showSpinner) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading events: $e')));
+      final friendly = eventFriendlyError(
+        e,
+        'Check your connection and try again.',
+      );
+      setState(() {
+        _loading = false;
+        _loadError = friendly;
+        _loadErrorDetails = '$e';
+      });
+      if (showSpinner && _hasLoaded) {
+        _showSnack(friendly, isError: true);
       }
     } finally {
       _reloadInFlight = false;
@@ -138,6 +158,17 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         unawaited(_load(showSpinner: false));
       }
     }
+  }
+
+  void _showSnack(String message, {bool isError = false, SnackBarAction? action}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AdminColors.danger : null,
+        action: action,
+      ),
+    );
   }
 
   void _applyFilters() {
@@ -158,11 +189,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
           final d = DateTime(e.date.year, e.date.month, e.date.day);
           return !d.isBefore(today) && !d.isAfter(soonEnd);
         }).toList();
-      case 3:
-        results = List<AlumniEvent>.from(results)
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      default:
-        results.sort((a, b) => a.date.compareTo(b.date));
     }
 
     if (_search.isNotEmpty) {
@@ -203,6 +229,25 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         return !d.isAfter(end);
       }).toList();
     }
+
+    switch (_sort) {
+      case _EventSort.soonest:
+        results.sort((a, b) => a.date.compareTo(b.date));
+      case _EventSort.newestAdded:
+        results.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      case _EventSort.mostGoing:
+        results.sort((a, b) {
+          final byGoing = (_counts[b.id]?.going ?? 0).compareTo(
+            _counts[a.id]?.going ?? 0,
+          );
+          return byGoing != 0 ? byGoing : a.date.compareTo(b.date);
+        });
+      case _EventSort.titleAsc:
+        results.sort(
+          (a, b) => a.theme.toLowerCase().compareTo(b.theme.toLowerCase()),
+        );
+    }
+
     setState(() => _filtered = results);
   }
 
@@ -214,7 +259,10 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       _to != null;
 
   bool get _hasAnyFilters =>
-      _hasAdvancedFilters || _search.isNotEmpty || _quickFilter != 0;
+      _hasAdvancedFilters ||
+      _search.isNotEmpty ||
+      _quickFilter != 0 ||
+      _sort != _EventSort.soonest;
 
   void _clearFilters() {
     setState(() {
@@ -225,16 +273,18 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       _to = null;
       _search = '';
       _quickFilter = 0;
+      _sort = _EventSort.soonest;
       _searchController.clear();
       _selectedCalendarDay = null;
     });
     _applyFilters();
   }
 
-  Future<void> _openEditor({AlumniEvent? event}) async {
+  Future<void> _openEditor({AlumniEvent? event, DateTime? initialDate}) async {
     final saved = await showAdminEventEditorDialog(
       context: context,
       event: event,
+      initialDate: initialDate,
     );
     if (saved == true) await _load();
   }
@@ -249,111 +299,80 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   }
 
   Future<void> _archive(AlumniEvent event) async {
-    final ok = await _confirm(
+    final ok = await showAdminConfirmDialog(
+      context,
       title: 'Archive event?',
-      body: '“${event.theme}” will move to Archives.',
+      message: '“${event.theme}” will move to Archives. You can restore it later.',
       confirmLabel: 'Archive',
+      icon: Icons.archive_outlined,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await _eventService.archiveEvent(event.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Event archived'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () async {
-              await _eventService.restoreEvent(event.id);
-              await _load();
-            },
-          ),
+      _showSnack(
+        'Event archived',
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await _eventService.restoreEvent(event.id);
+            await _load();
+          },
         ),
       );
       await _load();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error archiving: $e')));
+      _showSnack(
+        eventFriendlyError(e, "Couldn't archive the event. Please try again."),
+        isError: true,
+      );
     }
   }
 
   Future<void> _delete(AlumniEvent event) async {
-    final ok = await _confirm(
+    final ok = await showAdminConfirmDialog(
+      context,
       title: 'Delete event?',
-      body: 'This permanently deletes “${event.theme}”.',
+      message:
+          'This permanently deletes “${event.theme}” along with its RSVPs and comments.',
       confirmLabel: 'Delete',
       destructive: true,
+      icon: Icons.delete_outline_rounded,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await _eventService.deleteEvent(event.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Event deleted')));
+      _showSnack('Event deleted');
       await _load();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error deleting: $e')));
+      _showSnack(
+        eventFriendlyError(e, "Couldn't delete the event. Please try again."),
+        isError: true,
+      );
     }
   }
 
   Future<void> _cancel(AlumniEvent event) async {
-    final ok = await _confirm(
+    final ok = await showAdminConfirmDialog(
+      context,
       title: 'Cancel event?',
-      body: 'Alumni will be notified that “${event.theme}” is cancelled.',
+      message: 'Alumni will be notified that “${event.theme}” is cancelled.',
       confirmLabel: 'Cancel event',
       destructive: true,
+      icon: Icons.event_busy_outlined,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       // Alumni are notified by the events table trigger.
       await _eventService.cancelEvent(event.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Event cancelled')));
+      _showSnack('Event cancelled');
       await _load();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error cancelling: $e')));
+      _showSnack(
+        eventFriendlyError(e, "Couldn't cancel the event. Please try again."),
+        isError: true,
+      );
     }
-  }
-
-  Future<bool?> _confirm({
-    required String title,
-    required String body,
-    required String confirmLabel,
-    bool destructive = false,
-  }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: destructive
-                  ? const Color(0xFFDC2626)
-                  : AdminEventTheme.primary,
-            ),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
   }
 
   int get _soonCount {
@@ -373,29 +392,12 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
 
   int get _totalComments => _active.fold<int>(0, (sum, e) => sum + e.comments);
 
-  int _daysUntil(AlumniEvent event) {
-    final today = DateTime(
-      DateTime.now().year,
-      DateTime.now().month,
-      DateTime.now().day,
-    );
-    final eventDay = DateTime(
-      event.date.year,
-      event.date.month,
-      event.date.day,
-    );
-    return eventDay.difference(today).inDays;
-  }
-
-  String _countdownLabel(int daysUntil) {
-    if (daysUntil < 0) return 'Past';
-    if (daysUntil == 0) return 'Today';
-    if (daysUntil == 1) return 'Tomorrow';
-    if (daysUntil <= 7) return 'In $daysUntil days';
-    return DateFormat(
-      'MMM d',
-    ).format(DateTime.now().add(Duration(days: daysUntil)));
-  }
+  String _sortLabel(_EventSort s) => switch (s) {
+    _EventSort.soonest => 'Soonest event',
+    _EventSort.newestAdded => 'Newest added',
+    _EventSort.mostGoing => 'Most going',
+    _EventSort.titleAsc => 'Title A–Z',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -404,152 +406,174 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AdminPageHeader(
+        AdminCompactHeader(
           title: 'Events',
+          countBadge: _hasLoaded ? '${_active.length} active' : null,
           subtitle: _showCalendar
               ? 'Plan by date — tap a highlighted day to manage events'
               : 'Create, monitor attendance, and keep alumni engaged',
-          titleColor: AdminEventTheme.textPrimary,
-          subtitleColor: AdminEventTheme.textSecondary,
-          titleFontSize: AdminDensity.titleFontSize,
           actions: [
-            _viewToggle(),
+            OutlinedButton.icon(
+              onPressed: _loading ? null : () => _load(showSpinner: true),
+              icon: _loading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 15),
+              label: Text(_loading ? 'Refreshing…' : 'Refresh'),
+              style: AdminButtonStyles.outlined(),
+            ),
             FilledButton.icon(
               onPressed: () => _openEditor(),
-              icon: const Icon(Icons.add_rounded, size: 17),
+              icon: const Icon(Icons.add_rounded, size: 16),
               label: const Text('New Event'),
-              style: eventFilledButtonStyle(),
+              style: AdminButtonStyles.filled(),
             ),
           ],
         ),
-        const SizedBox(height: AdminEventTheme.space2),
-        _buildMetrics(),
-        const SizedBox(height: AdminEventTheme.space2),
-        _buildToolbar(),
-        const SizedBox(height: AdminEventTheme.space1),
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: _loading && _filtered.isEmpty
-                ? const AdminEventsListSkeleton()
-                : _showCalendar
-                ? _calendarView()
-                : _filtered.isEmpty
-                ? _empty()
-                : _listView(),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: AdminSaaSTabs(
+            tabs: [
+              AdminSaaSTabSpec(
+                label: 'List',
+                icon: Icons.view_agenda_outlined,
+                count: _hasLoaded && _filtered.isNotEmpty
+                    ? _filtered.length
+                    : null,
+                isSelected: !_showCalendar,
+                onTap: () => setState(() => _showCalendar = false),
+              ),
+              AdminSaaSTabSpec(
+                label: 'Calendar',
+                icon: Icons.calendar_month_outlined,
+                isSelected: _showCalendar,
+                onTap: () => setState(() => _showCalendar = true),
+              ),
+            ],
           ),
         ),
+        const SizedBox(height: 10),
+        _buildMetrics(),
+        const SizedBox(height: 10),
+        _buildToolbar(),
+        if (_hasLoaded && _loadError != null) ...[
+          const SizedBox(height: AdminEventTheme.space1),
+          _buildRefreshErrorNotice(),
+        ],
+        const SizedBox(height: 8),
+        Expanded(child: _buildBody()),
       ],
     );
   }
 
-  Widget _viewToggle() {
+  Widget _buildBody() {
+    if (!_hasLoaded && _loadError != null && !_loading) {
+      return AdminStateView.error(
+        title: "Couldn't load events",
+        message: _loadError,
+        details: _loadErrorDetails,
+        onRetry: () => _load(showSpinner: true),
+      );
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      child: _loading && _filtered.isEmpty
+          ? const AdminEventsListSkeleton()
+          : _showCalendar
+          ? _calendarView()
+          : _filtered.isEmpty
+          ? _empty()
+          : _listView(),
+    );
+  }
+
+  Widget _buildRefreshErrorNotice() {
     return Container(
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
       decoration: BoxDecoration(
-        color: AdminEventTheme.surface,
-        borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-        border: Border.all(color: AdminEventTheme.border),
+        color: AdminColors.warningBg,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.warning.withValues(alpha: 0.3)),
       ),
-      padding: const EdgeInsets.all(3),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          _viewToggleBtn(
-            selected: !_showCalendar,
-            icon: Icons.view_agenda_rounded,
-            label: 'List',
-            onTap: () => setState(() => _showCalendar = false),
+          const Icon(
+            Icons.cloud_off_outlined,
+            size: 18,
+            color: AdminColors.warning,
           ),
-          _viewToggleBtn(
-            selected: _showCalendar,
-            icon: Icons.calendar_month_rounded,
-            label: 'Calendar',
-            onTap: () => setState(() => _showCalendar = true),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              "Couldn't refresh events. Showing the last loaded list.",
+              style: TextStyle(fontSize: 13, color: AdminColors.textPrimary),
+            ),
+          ),
+          TextButton(
+            onPressed: _loading ? null : () => _load(showSpinner: true),
+            child: const Text('Try again'),
           ),
         ],
       ),
     );
   }
 
-  Widget _viewToggleBtn({
-    required bool selected,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: selected ? AdminEventTheme.primary : Colors.transparent,
-      borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected
-                    ? AdminEventTheme.gold
-                    : AdminEventTheme.textSecondary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: selected
-                      ? Colors.white
-                      : AdminEventTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildMetrics() {
-    return DirectoryStatsGrid(
-      children: [
-        DirectoryStatCard(
+    return AdminMetricRibbon(
+      items: [
+        AdminMetricRibbonItem(
           label: 'Active events',
           value: '${_active.length}',
-          description: 'On the live calendar',
           icon: Icons.event_available_rounded,
-          accent: AdminEventTheme.primary,
+          color: AdminColors.primary,
+          tooltip: 'Events on the live calendar — click to show all dates',
           onTap: () {
-            setState(() => _quickFilter = 0);
+            setState(() {
+              _quickFilter = 0;
+              _from = null;
+              _to = null;
+            });
             _applyFilters();
           },
         ),
-        DirectoryStatCard(
+        AdminMetricRibbonItem(
           label: 'Coming this week',
           value: '$_soonCount',
-          description: 'Next 7 days',
           icon: Icons.schedule_rounded,
-          accent: AdminEventTheme.warning,
+          color: AdminColors.warning,
+          isSelected: _quickFilter == 1,
+          tooltip: 'Events happening in the next 7 days — click to filter',
           onTap: () {
-            setState(() => _quickFilter = 1);
+            setState(() => _quickFilter = _quickFilter == 1 ? 0 : 1);
             _applyFilters();
           },
         ),
-        DirectoryStatCard(
+        AdminMetricRibbonItem(
           label: 'Going responses',
           value: '$_totalGoing',
-          description: 'RSVP confirmations',
           icon: Icons.check_circle_outline_rounded,
-          accent: AdminEventTheme.success,
+          color: AdminColors.success,
+          isSelected: _sort == _EventSort.mostGoing,
+          tooltip: 'Confirmed Going RSVPs — click to sort by most attended',
+          onTap: () {
+            setState(() {
+              _sort = _sort == _EventSort.mostGoing
+                  ? _EventSort.soonest
+                  : _EventSort.mostGoing;
+            });
+            _applyFilters();
+          },
         ),
-        DirectoryStatCard(
+        AdminMetricRibbonItem(
           label: 'Comments',
           value: '$_totalComments',
-          description: 'Across active events',
           icon: Icons.forum_outlined,
-          accent: AdminEventTheme.info,
+          color: AdminColors.secondary,
+          tooltip: 'Alumni comments and replies across active events',
         ),
       ],
     );
@@ -572,13 +596,12 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     if (_quickFilter != 0) {
       final label = switch (_quickFilter) {
         1 => 'This week',
-        2 => 'Soon',
-        3 => 'Newest',
+        2 => 'Next 3 days',
         _ => 'All',
       };
       chips.add(
         DirectoryActiveFilterChip(
-          label: 'Quick: $label',
+          label: 'Window: $label',
           onRemoved: () {
             setState(() => _quickFilter = 0);
             _applyFilters();
@@ -641,7 +664,41 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         ),
       );
     }
+    if (_sort != _EventSort.soonest) {
+      chips.add(
+        DirectoryActiveFilterChip(
+          label: 'Sort: ${_sortLabel(_sort)}',
+          onRemoved: () {
+            setState(() => _sort = _EventSort.soonest);
+            _applyFilters();
+          },
+        ),
+      );
+    }
     return chips;
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await DirectoryDateTimePickers.pickDateRange(
+      context,
+      initialDateRange: _from != null || _to != null
+          ? DateTimeRange(start: _from ?? _to!, end: _to ?? _from!)
+          : DateTimeRange(
+              start: DateTime(now.year, now.month, now.day),
+              end: DateTime(now.year, now.month, now.day)
+                  .add(const Duration(days: 30)),
+            ),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      helpText: 'Filter by event dates',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _from = picked.start;
+      _to = picked.end;
+    });
+    _applyFilters();
   }
 
   Widget _buildToolbar() {
@@ -655,8 +712,13 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     final venues =
         _active.map((e) => e.venue).where((v) => v.isNotEmpty).toSet().toList()
           ..sort();
+    // Keep dropdown selection valid if live updates remove an option.
+    final safeBatch =
+        _batchYear != null && years.contains(_batchYear) ? _batchYear : null;
+    final safeVenue =
+        _venue != null && venues.contains(_venue) ? _venue : null;
 
-    return DirectoryToolbarCard(
+    return AdminSaaSToolbar(
       searchController: _searchController,
       onSearchChanged: (q) {
         _search = q.trim();
@@ -667,142 +729,132 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         setState(() => _search = '');
         _applyFilters();
       },
-      isLoading: _loading,
-      onRefresh: () => _load(showSpinner: true),
-      hasActiveFilters: _hasAnyFilters,
-      onResetFilters: _clearFilters,
-      searchHint: 'Search by title, batch, venue, or category…',
-      activeFilterChips: _activeFilterChips(),
-      filters: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          DirectoryFilterField<String?>(
-            label: 'Category',
-            value: _category,
-            width: 140,
-            items: [
-              const DropdownMenuItem(
-                value: null,
-                child: Text('All categories'),
+      searchHint: 'Search title, batch, venue, or category…',
+      searchWidth: 240,
+      filters: [
+        DirectoryFilterField<String?>(
+          label: 'Category',
+          value: _category,
+          dense: true,
+          width: 132,
+          items: [
+            const DropdownMenuItem(value: null, child: Text('All categories')),
+            ...EventCategoryConstants.all.map(
+              (c) => DropdownMenuItem(
+                value: c,
+                child: Text(c, maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
-              ...EventCategoryConstants.all.map(
-                (c) => DropdownMenuItem(value: c, child: Text(c)),
+            ),
+          ],
+          onChanged: (v) {
+            setState(() => _category = v);
+            _applyFilters();
+          },
+        ),
+        DirectoryFilterField<String?>(
+          label: 'Batch',
+          value: safeBatch,
+          dense: true,
+          width: 110,
+          items: [
+            const DropdownMenuItem(value: null, child: Text('All batches')),
+            ...years.map((y) => DropdownMenuItem(value: y, child: Text(y))),
+          ],
+          onChanged: (v) {
+            setState(() => _batchYear = v);
+            _applyFilters();
+          },
+        ),
+        DirectoryFilterField<String?>(
+          label: 'Venue',
+          value: safeVenue,
+          dense: true,
+          width: 134,
+          items: [
+            const DropdownMenuItem(value: null, child: Text('All venues')),
+            ...venues.map(
+              (v) => DropdownMenuItem(
+                value: v,
+                child: Text(v, maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
-            ],
-            onChanged: (v) {
-              setState(() => _category = v);
-              _applyFilters();
-            },
-          ),
-          DirectoryFilterField<String?>(
-            label: 'Batch',
-            value: _batchYear,
-            width: 120,
-            items: [
-              const DropdownMenuItem(value: null, child: Text('All batches')),
-              ...years.map((y) => DropdownMenuItem(value: y, child: Text(y))),
-            ],
-            onChanged: (v) {
-              setState(() => _batchYear = v);
-              _applyFilters();
-            },
-          ),
-          DirectoryFilterField<String?>(
-            label: 'Venue',
-            value: _venue,
-            width: 140,
-            items: [
-              const DropdownMenuItem(value: null, child: Text('All venues')),
-              ...venues.map(
-                (v) => DropdownMenuItem(
-                  value: v,
-                  child: Text(v.length > 22 ? '${v.substring(0, 22)}…' : v),
-                ),
-              ),
-            ],
-            onChanged: (v) {
-              setState(() => _venue = v);
-              _applyFilters();
-            },
-          ),
-          DirectoryDateFilterChip(
-            label: 'From',
-            displayText: _from == null
-                ? 'Any date'
-                : DirectoryDateTimePickers.formatDate(
-                    _from!,
-                    includeYear: false,
-                  ),
-            active: _from != null,
-            onTap: () async {
-              final picked = await DirectoryDateTimePickers.pickDate(
-                context,
-                initialDate: _from ?? DateTime.now(),
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2100),
-                helpText: 'From date',
-              );
-              if (picked == null || !mounted) return;
-              setState(() {
-                _from = picked;
-                if (_to != null && _to!.isBefore(picked)) {
-                  _to = picked;
+            ),
+          ],
+          onChanged: (v) {
+            setState(() => _venue = v);
+            _applyFilters();
+          },
+        ),
+        AdminEventDateRangeChip(
+          from: _from,
+          to: _to,
+          onTap: _pickDateRange,
+          onClear: (_from != null || _to != null)
+              ? () {
+                  setState(() {
+                    _from = null;
+                    _to = null;
+                  });
+                  _applyFilters();
                 }
-              });
+              : null,
+        ),
+        for (final chip in const [
+          ('All', 0),
+          ('This week', 1),
+          ('Next 3 days', 2),
+        ])
+          DirectoryToolbarFilterChip(
+            label: chip.$1,
+            selected: _quickFilter == chip.$2,
+            onSelected: (_) {
+              setState(() => _quickFilter = chip.$2);
               _applyFilters();
             },
           ),
-          DirectoryDateFilterChip(
-            label: 'To',
-            displayText: _to == null
-                ? 'Any date'
-                : DirectoryDateTimePickers.formatDate(_to!, includeYear: false),
-            active: _to != null,
-            onTap: () async {
-              final picked = await DirectoryDateTimePickers.pickDate(
-                context,
-                initialDate: _to ?? DateTime.now(),
-                firstDate: _from ?? DateTime(2020),
-                lastDate: DateTime(2100),
-                helpText: 'To date',
-              );
-              if (picked == null || !mounted) return;
-              setState(() => _to = picked);
-              _applyFilters();
-            },
-          ),
-          for (final chip in const [
-            ('All', 0),
-            ('This week', 1),
-            ('Soon', 2),
-            ('Newest', 3),
-          ])
-            DirectoryToolbarFilterChip(
-              label: chip.$1,
-              selected: _quickFilter == chip.$2,
-              onSelected: (_) {
-                setState(() => _quickFilter = chip.$2);
-                _applyFilters();
-              },
+      ],
+      sortControl: DirectoryFilterField<_EventSort>(
+        label: 'Sort',
+        value: _sort,
+        dense: true,
+        width: 136,
+        items: [
+          for (final s in _EventSort.values)
+            DropdownMenuItem(
+              value: s,
+              child: Text(
+                _sortLabel(s),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
         ],
+        onChanged: (v) {
+          if (v != null) {
+            setState(() => _sort = v);
+            _applyFilters();
+          }
+        },
       ),
+      activeFilterChips: _activeFilterChips(),
+      hasActiveFilters: _hasAnyFilters,
+      onResetFilters: _clearFilters,
     );
   }
 
   Widget _empty() {
-    return DirectoryEmptyState(
+    return AdminStateView.empty(
       icon: _hasAnyFilters
           ? Icons.search_off_rounded
           : Icons.event_note_rounded,
       title: _hasAnyFilters ? 'No matching events' : 'No active events yet',
-      subtitle: _hasAnyFilters
+      message: _hasAnyFilters
           ? 'Try clearing filters or searching with a different keyword.'
           : 'Create your first alumni event to get the calendar rolling.',
-      primaryLabel: _hasAnyFilters ? 'Clear filters' : 'Create event',
-      primaryAction: _hasAnyFilters ? _clearFilters : () => _openEditor(),
+      primaryAction: AdminStateAction(
+        label: _hasAnyFilters ? 'Clear filters' : 'Create event',
+        icon: _hasAnyFilters ? Icons.filter_alt_off_outlined : Icons.add_rounded,
+        onPressed: _hasAnyFilters ? _clearFilters : () => _openEditor(),
+      ),
     );
   }
 
@@ -811,7 +863,18 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       key: const ValueKey('admin-events-list'),
       padding: const EdgeInsets.only(bottom: AdminDensity.space3),
       itemCount: _filtered.length,
-      itemBuilder: (context, i) => _eventCard(_filtered[i]),
+      itemBuilder: (context, i) => _buildEventRow(_filtered[i]),
+    );
+  }
+
+  Widget _buildEventRow(AlumniEvent event, {bool compact = false}) {
+    return AdminEventListCard(
+      event: event,
+      counts: _counts[event.id] ?? const EventRsvpCounts(),
+      compact: compact,
+      menuItems: _menuItemsFor(event),
+      onMenuSelected: (v) => _onEventMenuAction(event, v),
+      onOpen: () => _openDetails(event),
     );
   }
 
@@ -825,268 +888,215 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
                 e.date.day == selected.day;
           }).toList();
 
-    return ListView(
+    final calendarCard = EventsMonthCalendar(
+      month: _calendarMonth,
+      events: _filtered,
+      selectedDay: _selectedCalendarDay,
+      adminSurface: true,
+      showSelectedSummary: false,
+      onMonthChanged: (m) => setState(() {
+        _calendarMonth = m;
+        _selectedCalendarDay = null;
+      }),
+      onDaySelected: (day) => setState(() => _selectedCalendarDay = day),
+    );
+
+    return LayoutBuilder(
       key: const ValueKey('admin-events-calendar'),
-      padding: const EdgeInsets.only(bottom: AdminDensity.space3),
-      children: [
-        EventsMonthCalendar(
-          month: _calendarMonth,
-          events: _filtered,
-          selectedDay: _selectedCalendarDay,
-          onMonthChanged: (m) => setState(() {
-            _calendarMonth = m;
-            _selectedCalendarDay = null;
-          }),
-          onDaySelected: (day) {
-            final eventsOnDay = _filtered.where((e) {
-              return e.date.year == day.year &&
-                  e.date.month == day.month &&
-                  e.date.day == day.day;
-            }).toList();
-            setState(() => _selectedCalendarDay = day);
-            if (eventsOnDay.length == 1) {
-              _openDetails(eventsOnDay.first);
-            }
-          },
-        ),
-        const SizedBox(height: AdminEventTheme.space2),
-        if (selected == null)
-          Container(
-            padding: const EdgeInsets.all(AdminDensity.cardPadding),
-            decoration: AdminEventTheme.surfaceCard(),
-            child: const Row(
-              children: [
-                Icon(
-                  Icons.touch_app_rounded,
-                  color: AdminEventTheme.primary,
-                  size: 20,
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Tap a highlighted date to view and manage that day’s events.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AdminEventTheme.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else ...[
-          Row(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 960;
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                dayEvents.isEmpty
-                    ? 'No events on ${DateFormat('MMM d').format(selected)}'
-                    : '${dayEvents.length} event${dayEvents.length == 1 ? '' : 's'} on ${DateFormat('EEEE, MMM d').format(selected)}',
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                  color: AdminEventTheme.textPrimary,
+              Expanded(
+                flex: 12,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: AdminDensity.space3),
+                  child: calendarCard,
                 ),
               ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () => _openEditor(),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Add for this day'),
+              const SizedBox(width: AdminDensity.gridGap),
+              Expanded(
+                flex: 9,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: AdminDensity.space3),
+                  child: _buildSelectedDayPanel(
+                    selected,
+                    dayEvents,
+                    fillHeight: true,
+                  ),
+                ),
               ),
             ],
-          ),
-          const SizedBox(height: AdminEventTheme.space1),
-          if (dayEvents.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(AdminDensity.space3),
-              decoration: BoxDecoration(
-                color: AdminEventTheme.surface,
-                borderRadius: BorderRadius.circular(AdminEventTheme.radiusMd),
-                border: Border.all(color: AdminEventTheme.border),
-              ),
-              child: const Text(
-                'Nothing scheduled here yet. Create an event to fill this date.',
-                style: TextStyle(color: AdminEventTheme.textSecondary),
-              ),
-            )
-          else
-            ...dayEvents.map((e) => _eventCard(e, compact: true)),
-        ],
-      ],
+          );
+        }
+
+        return ListView(
+          padding: const EdgeInsets.only(bottom: AdminDensity.space3),
+          children: [
+            calendarCard,
+            const SizedBox(height: AdminDensity.gridGap),
+            _buildSelectedDayPanel(selected, dayEvents, fillHeight: false),
+          ],
+        );
+      },
     );
   }
 
-  Widget _eventCard(AlumniEvent event, {bool compact = false}) {
-    final counts = _counts[event.id] ?? const EventRsvpCounts();
-    final daysUntil = _daysUntil(event);
-    final soon = daysUntil >= 0 && daysUntil <= 7;
-    final today = daysUntil == 0;
+  Widget _buildSelectedDayPanel(
+    DateTime? selected,
+    List<AlumniEvent> dayEvents, {
+    required bool fillHeight,
+  }) {
+    final headerTitle = selected == null
+        ? 'Day schedule'
+        : DateFormat('EEEE, MMM d').format(selected);
 
-    final metaParts = <String>[
-      if (event.batchYear.isNotEmpty) 'Batch ${event.batchYear}',
-      '${DateFormat('MMM d, yyyy').format(event.date)} · ${event.startTime}–${event.endTime}',
-      if (event.venue.trim().isNotEmpty) event.venue.trim(),
-      '${counts.going} going',
-    ];
-    final metaLine = metaParts.join(' · ');
+    final Widget body;
+    if (selected == null) {
+      body = const AdminStateView.empty(
+        compact: true,
+        icon: Icons.touch_app_rounded,
+        title: 'Select a date',
+        message:
+            'Click any day on the calendar to review scheduled events or add one for that date.',
+      );
+    } else if (dayEvents.isEmpty) {
+      body = AdminStateView.empty(
+        compact: true,
+        icon: Icons.event_available_outlined,
+        title: 'No events on ${DateFormat('MMM d').format(selected)}',
+        message: 'Nothing is scheduled on this date with the current filters.',
+        primaryAction: AdminStateAction(
+          label: 'Add for this day',
+          icon: Icons.add_rounded,
+          onPressed: () => _openEditor(initialDate: selected),
+        ),
+      );
+    } else {
+      body = ListView.builder(
+        shrinkWrap: !fillHeight,
+        physics: fillHeight
+            ? const AlwaysScrollableScrollPhysics()
+            : const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(12),
+        itemCount: dayEvents.length,
+        itemBuilder: (_, i) => _buildEventRow(dayEvents[i], compact: true),
+      );
+    }
 
-    return AdminHoverShell(
-      builder: (context, hovered) => Container(
-        margin: const EdgeInsets.only(bottom: AdminDensity.listItemGap),
-        decoration: AdminEventTheme.surfaceCard(hovered: hovered),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AdminEventTheme.radiusLg),
-            onTap: () => _openDetails(event),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AdminEventTheme.radiusLg),
-                gradient: today
-                    ? LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          AdminEventTheme.gold.withValues(alpha: 0.12),
-                          Colors.white,
-                        ],
-                      )
-                    : null,
-              ),
-              padding: EdgeInsets.symmetric(
-                horizontal: AdminDensity.space3,
-                vertical: compact ? 10 : AdminDensity.cardPadding,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
+    return Container(
+      decoration: AdminSurfaces.card(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: fillHeight ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
                     children: [
-                      SizedBox(
-                        width: compact ? 72 : 80,
-                        child: EventCover(
-                          event: event,
-                          height: compact ? 48 : 56,
-                          borderRadius: AdminEventTheme.radiusSm,
-                        ),
-                      ),
-                      if (soon)
-                        Positioned(
-                          left: 4,
-                          top: 4,
-                          child: _countdownPill(daysUntil),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event.theme,
+                      Flexible(
+                        child: Text(
+                          headerTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: AdminEventTheme.textPrimary,
-                            letterSpacing: -0.2,
-                          ),
+                          style: AdminText.sectionTitle,
                         ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            EventCategoryChip(category: event.category),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          metaLine,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.35,
-                            color: AdminEventTheme.textSecondary,
-                          ),
+                      ),
+                      if (selected != null) ...[
+                        const SizedBox(width: 8),
+                        AdminBadge.neutral(
+                          label:
+                              '${dayEvents.length} ${dayEvents.length == 1 ? 'event' : 'events'}',
+                          dense: true,
                         ),
                       ],
+                    ],
+                  ),
+                ),
+                if (selected != null)
+                  OutlinedButton.icon(
+                    onPressed: () => _openEditor(initialDate: selected),
+                    icon: const Icon(Icons.add_rounded, size: 15),
+                    label: const Text('Add for this day'),
+                    style: AdminButtonStyles.outlined().copyWith(
+                      minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
+                      padding: const WidgetStatePropertyAll(
+                        EdgeInsets.symmetric(horizontal: 10),
+                      ),
                     ),
                   ),
-                  _actionsMenu(event),
-                ],
-              ),
+              ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _countdownPill(int daysUntil) {
-    final label = _countdownLabel(daysUntil);
-    final hot = daysUntil <= 1;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: hot ? AdminEventTheme.danger : AdminEventTheme.primary,
-        borderRadius: BorderRadius.circular(AdminEventTheme.radiusSm),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
+          const Divider(height: 1, color: AdminColors.border),
+          if (fillHeight) Expanded(child: body) else body,
         ],
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: hot ? Colors.white : AdminEventTheme.gold,
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
     );
   }
 
-  Widget _actionsMenu(AlumniEvent event) {
-    return PopupMenuButton<String>(
-      tooltip: 'Actions',
-      onSelected: (value) async {
-        switch (value) {
-          case 'share':
-            await showShareLinkSheet(
-              context,
-              ShareableContent.fromEvent(event),
-            );
-          case 'details':
-            await _openDetails(event);
-          case 'edit':
-            await _openEditor(event: event);
-          case 'archive':
-            await _archive(event);
-          case 'cancel':
-            await _cancel(event);
-          case 'delete':
-            await _delete(event);
-        }
-      },
-      itemBuilder: (_) => [
-        const PopupMenuItem(value: 'details', child: Text('View details')),
-        const PopupMenuItem(value: 'edit', child: Text('Edit')),
-        if (!event.cancelled && event.status.trim().toLowerCase() != 'archived')
-          const PopupMenuItem(value: 'share', child: Text('Share link…')),
-        const PopupMenuItem(value: 'archive', child: Text('Archive')),
-        const PopupMenuItem(value: 'cancel', child: Text('Cancel event')),
-        const PopupMenuItem(
-          value: 'delete',
-          child: Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
+  Future<void> _onEventMenuAction(AlumniEvent event, String value) async {
+    switch (value) {
+      case 'share':
+        await showShareLinkSheet(context, ShareableContent.fromEvent(event));
+      case 'details':
+        await _openDetails(event);
+      case 'edit':
+        await _openEditor(event: event);
+      case 'archive':
+        await _archive(event);
+      case 'cancel':
+        await _cancel(event);
+      case 'delete':
+        await _delete(event);
+    }
+  }
+
+  List<PopupMenuEntry<String>> _menuItemsFor(AlumniEvent event) {
+    final canShare =
+        !event.cancelled && event.status.trim().toLowerCase() != 'archived';
+    return [
+      adminEventMenuItem(
+        value: 'details',
+        label: 'View details',
+        icon: Icons.visibility_outlined,
+      ),
+      adminEventMenuItem(
+        value: 'edit',
+        label: 'Edit event',
+        icon: Icons.edit_outlined,
+      ),
+      if (canShare)
+        adminEventMenuItem(
+          value: 'share',
+          label: 'Share link…',
+          icon: Icons.share_outlined,
         ),
-      ],
-    );
+      const PopupMenuDivider(height: 8),
+      adminEventMenuItem(
+        value: 'archive',
+        label: 'Archive',
+        icon: Icons.archive_outlined,
+      ),
+      if (!event.cancelled)
+        adminEventMenuItem(
+          value: 'cancel',
+          label: 'Cancel event',
+          icon: Icons.event_busy_outlined,
+          destructive: true,
+        ),
+      adminEventMenuItem(
+        value: 'delete',
+        label: 'Delete',
+        icon: Icons.delete_outline_rounded,
+        destructive: true,
+      ),
+    ];
   }
 }

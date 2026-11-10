@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Simple month calendar highlighting days that have events.
@@ -12,6 +13,8 @@ class EventsMonthCalendar extends StatelessWidget {
     required this.onMonthChanged,
     required this.onDaySelected,
     this.selectedDay,
+    this.adminSurface = false,
+    this.showSelectedSummary = true,
   });
 
   final DateTime month;
@@ -19,6 +22,8 @@ class EventsMonthCalendar extends StatelessWidget {
   final ValueChanged<DateTime> onMonthChanged;
   final ValueChanged<DateTime> onDaySelected;
   final DateTime? selectedDay;
+  final bool adminSurface;
+  final bool showSelectedSummary;
 
   Map<DateTime, List<AlumniEvent>> get _byDay {
     final map = <DateTime, List<AlumniEvent>>{};
@@ -39,14 +44,30 @@ class EventsMonthCalendar extends StatelessWidget {
     final rows = ((totalCells + 6) / 7).floor();
     final byDay = _byDay;
 
+    final primary = adminSurface ? AdminColors.primary : PortalTheme.navy;
+    final accent = adminSurface ? AdminColors.accent : PortalTheme.gold;
+    final textPrimary = adminSurface ? AdminColors.textPrimary : PortalTheme.navy;
+    final textSecondary =
+        adminSurface ? AdminColors.textSecondary : PortalTheme.textSecondary;
+    final borderColor = adminSurface
+        ? AdminColors.border
+        : PortalTheme.border.withValues(alpha: 0.75);
+
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
-        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.75)),
-        boxShadow: PortalTheme.softShadow,
+      decoration: adminSurface
+          ? AdminSurfaces.card()
+          : BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(PortalTheme.radius2xl),
+              border: Border.all(color: borderColor),
+              boxShadow: PortalTheme.softShadow,
+            ),
+      padding: EdgeInsets.fromLTRB(
+        adminSurface ? 16 : 12,
+        adminSurface ? 14 : 12,
+        adminSurface ? 16 : 12,
+        14,
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
       child: Column(
         children: [
           Row(
@@ -55,20 +76,22 @@ class EventsMonthCalendar extends StatelessWidget {
                 tooltip: 'Previous month',
                 onPressed: () =>
                     onMonthChanged(DateTime(month.year, month.month - 1, 1)),
-                icon: const Icon(Icons.chevron_left, color: PortalTheme.navy),
+                icon: Icon(Icons.chevron_left, color: primary),
               ),
               Expanded(
                 child: Text(
                   DateFormat('MMMM yyyy').format(month),
                   textAlign: TextAlign.center,
-                  style: PortalTheme.sectionTitle.copyWith(fontSize: 16),
+                  style: adminSurface
+                      ? AdminText.sectionTitle.copyWith(fontSize: 15.5)
+                      : PortalTheme.sectionTitle.copyWith(fontSize: 16),
                 ),
               ),
               IconButton(
                 tooltip: 'Next month',
                 onPressed: () =>
                     onMonthChanged(DateTime(month.year, month.month + 1, 1)),
-                icon: const Icon(Icons.chevron_right, color: PortalTheme.navy),
+                icon: Icon(Icons.chevron_right, color: primary),
               ),
             ],
           ),
@@ -80,9 +103,12 @@ class EventsMonthCalendar extends StatelessWidget {
                     child: Center(
                       child: Text(
                         d,
-                        style: PortalTheme.caption.copyWith(
+                        style: (adminSurface
+                                ? AdminText.caption
+                                : PortalTheme.caption)
+                            .copyWith(
                           fontWeight: FontWeight.w600,
-                          color: PortalTheme.textSecondary,
+                          color: textSecondary,
                         ),
                       ),
                     ),
@@ -110,23 +136,26 @@ class EventsMonthCalendar extends StatelessWidget {
                       selectedDay!.month == day.month &&
                       selectedDay!.day == day.day;
                   final isToday = _isSameDay(day, DateTime.now());
+                  final cellRadius = adminSurface
+                      ? AdminSurfaces.radiusSm
+                      : 12.0;
 
                   return Expanded(
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(cellRadius),
                       onTap: () => onDaySelected(day),
                       child: Container(
                         height: 44,
-                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? PortalTheme.navy
+                              ? primary
                               : (hasEvents
-                                    ? PortalTheme.gold.withValues(alpha: 0.18)
+                                    ? accent.withValues(alpha: 0.18)
                                     : Colors.transparent),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(cellRadius),
                           border: isToday && !isSelected
-                              ? Border.all(color: PortalTheme.navy, width: 1.2)
+                              ? Border.all(color: primary, width: 1.2)
                               : null,
                         ),
                         child: Column(
@@ -137,23 +166,44 @@ class EventsMonthCalendar extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: isSelected
-                                    ? Colors.white
-                                    : PortalTheme.navy,
+                                color: isSelected ? Colors.white : textPrimary,
                               ),
                             ),
                             if (hasEvents)
-                              Container(
-                                width: 5,
-                                height: 5,
-                                margin: const EdgeInsets.only(top: 2),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? PortalTheme.gold
-                                      : PortalTheme.navy,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
+                              adminSurface && dayEvents.length > 1
+                                  ? Container(
+                                      margin: const EdgeInsets.only(top: 1),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 0.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? accent
+                                            : primary.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '${dayEvents.length}',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? AdminColors.primary
+                                              : primary,
+                                          height: 1.1,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      width: 5,
+                                      height: 5,
+                                      margin: const EdgeInsets.only(top: 2),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? accent : primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
                           ],
                         ),
                       ),
@@ -162,16 +212,43 @@ class EventsMonthCalendar extends StatelessWidget {
                 }),
               ),
             ),
-          if (selectedDay != null) ...[
-            const Divider(height: 16, color: PortalTheme.border),
+          if (adminSurface) ...[
+            const SizedBox(height: 6),
+            const Divider(height: 1, color: AdminColors.border),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 14,
+              runSpacing: 6,
+              alignment: WrapAlignment.start,
+              children: [
+                _legendItem(
+                  color: accent.withValues(alpha: 0.25),
+                  dotColor: primary,
+                  label: 'Has events',
+                ),
+                _legendItem(
+                  color: Colors.transparent,
+                  borderColor: primary,
+                  label: 'Today',
+                ),
+                _legendItem(
+                  color: primary,
+                  dotColor: accent,
+                  label: 'Selected',
+                ),
+              ],
+            ),
+          ],
+          if (showSelectedSummary && selectedDay != null) ...[
+            Divider(height: 16, color: borderColor),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 DateFormat('EEEE, MMM d').format(selectedDay!),
-                style: PortalTheme.cardTitle.copyWith(
-                  color: PortalTheme.navy,
-                  fontSize: 13,
-                ),
+                style: (adminSurface
+                        ? AdminText.sectionTitle
+                        : PortalTheme.cardTitle)
+                    .copyWith(color: primary, fontSize: 13),
               ),
             ),
             const SizedBox(height: 6),
@@ -192,6 +269,44 @@ class EventsMonthCalendar extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _legendItem({
+    required Color color,
+    Color? borderColor,
+    Color? dotColor,
+    required String label,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: borderColor ?? AdminColors.border,
+              width: borderColor != null ? 1.2 : 0.8,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: dotColor != null
+              ? Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: AdminText.caption),
+      ],
     );
   }
 

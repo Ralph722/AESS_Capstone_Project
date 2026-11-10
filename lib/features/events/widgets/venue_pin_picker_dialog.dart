@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_dialogs.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Result of the admin map pin picker.
 class VenuePinResult {
@@ -26,10 +30,11 @@ Future<VenuePinResult?> showVenuePinPickerDialog({
   double? initialLatitude,
   double? initialLongitude,
 }) {
-  return showDialog<VenuePinResult>(
+  return showAdminDialogSurface<VenuePinResult>(
     context: context,
+    maxWidth: 720,
     barrierDismissible: false,
-    builder: (context) => _VenuePinPickerDialog(
+    child: _VenuePinPickerDialog(
       venueLabel: venueLabel,
       initialLatitude: initialLatitude,
       initialLongitude: initialLongitude,
@@ -53,7 +58,6 @@ class _VenuePinPickerDialog extends StatefulWidget {
 }
 
 class _VenuePinPickerDialogState extends State<_VenuePinPickerDialog> {
-  static const _navy = Color(0xFF090A4F);
   // Default center near USTP Cagayan de Oro (common campus area for this app).
   static const _defaultCenter = LatLng(8.4859, 124.6565);
 
@@ -119,11 +123,15 @@ class _VenuePinPickerDialogState extends State<_VenuePinPickerDialog> {
       final point = LatLng(lat, lon);
       setState(() => _pin = point);
       _mapController.move(point, 16);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not find venue: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not look up that venue right now. Tap the map to drop a pin manually.',
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -132,87 +140,69 @@ class _VenuePinPickerDialogState extends State<_VenuePinPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: SizedBox(
-        width: size.width.clamp(320, 720),
-        height: size.height.clamp(420, 640),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return SizedBox(
+      height: size.height.clamp(420.0, 640.0).toDouble(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AdminModalHeader(
+            title: 'Pin exact location',
+            subtitle: 'Tap the map to drop or move the venue pin.',
+            icon: Icons.add_location_alt_outlined,
+            onClose: () => Navigator.pop(context),
+          ),
+          const Divider(height: 1, color: AdminColors.border),
+          if (widget.venueLabel.trim().isNotEmpty) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
               child: Row(
                 children: [
-                  const Icon(Icons.add_location_alt_outlined, color: _navy),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Pin exact location',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: _navy,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Tap the map to drop or move the pin.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
+                  const Icon(
+                    Icons.place_outlined,
+                    size: 16,
+                    color: AdminColors.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Venue: ${widget.venueLabel.trim()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AdminColors.textPrimary,
+                      ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _searching ? null : _searchVenueText,
+                    style: AdminButtonStyles.outlined(),
+                    icon: _searching
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.search, size: 16),
+                    label: const Text('Find from text'),
                   ),
                 ],
               ),
             ),
-            if (widget.venueLabel.trim().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Venue: ${widget.venueLabel.trim()}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: _searching ? null : _searchVenueText,
-                      icon: _searching
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.search, size: 16),
-                      label: const Text('Find from text'),
-                    ),
-                  ],
+            const Divider(height: 1, color: AdminColors.border),
+          ],
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+                  border: Border.all(color: AdminColors.border),
                 ),
-              ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
                   child: FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
@@ -247,50 +237,81 @@ class _VenuePinPickerDialogState extends State<_VenuePinPickerDialog> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              child: Row(
-                children: [
-                  if (_pin != null)
-                    Text(
-                      '${_pin!.latitude.toStringAsFixed(5)}, '
-                      '${_pin!.longitude.toStringAsFixed(5)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
+          ),
+          const Divider(height: 1, color: AdminColors.border),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(
+                          AdminSurfaces.radiusSm,
+                        ),
+                        border: Border.all(color: AdminColors.border),
+                      ),
+                      child: Text(
+                        _pin == null
+                            ? 'No pin dropped yet'
+                            : '${_pin!.latitude.toStringAsFixed(5)}, '
+                                '${_pin!.longitude.toStringAsFixed(5)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AdminColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  const Spacer(),
-                  if (_pin != null)
-                    TextButton(
-                      onPressed: () => setState(() => _pin = null),
-                      child: const Text('Clear pin'),
+                    if (_pin != null) ...[
+                      const SizedBox(width: 6),
+                      TextButton(
+                        onPressed: () => setState(() => _pin = null),
+                        style: AdminButtonStyles.ghost(),
+                        child: const Text('Clear pin'),
+                      ),
+                    ],
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: AdminButtonStyles.outlined(),
+                      child: const Text('Cancel'),
                     ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () {
-                      Navigator.pop(
-                        context,
-                        VenuePinResult(
-                          latitude: _pin?.latitude,
-                          longitude: _pin?.longitude,
-                        ),
-                      );
-                    },
-                    style: FilledButton.styleFrom(backgroundColor: _navy),
-                    child: Text(_pin == null ? 'Save without pin' : 'Save pin'),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.pop(
+                          context,
+                          VenuePinResult(
+                            latitude: _pin?.latitude,
+                            longitude: _pin?.longitude,
+                          ),
+                        );
+                      },
+                      style: AdminButtonStyles.filled(),
+                      child: Text(_pin == null ? 'Save without pin' : 'Save pin'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

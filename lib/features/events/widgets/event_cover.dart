@@ -15,6 +15,7 @@ class EventCover extends StatelessWidget {
     this.aspectRatio,
     this.borderRadius = 10,
     this.fit = BoxFit.cover,
+    this.placeholderColors,
   });
 
   final AlumniEvent event;
@@ -24,6 +25,7 @@ class EventCover extends StatelessWidget {
   final double? aspectRatio;
   final double borderRadius;
   final BoxFit fit;
+  final List<Color>? placeholderColors;
 
   /// Compact feed teaser — shorter than 16:9 so cards stay scannable.
   /// Image is cropped with [BoxFit.cover] (not stretched).
@@ -33,14 +35,15 @@ class EventCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = event.coverImageUrl.trim();
     final image = url.isEmpty
-        ? _Placeholder(title: event.theme)
+        ? _Placeholder(title: event.theme, colors: placeholderColors)
         : AppImage.widget(
             url,
             width: 720,
             height: aspectRatio != null ? 420 : height,
             fit: fit,
             semanticLabel: 'Cover for ${event.theme}',
-            errorBuilder: (_, __, ___) => _Placeholder(title: event.theme),
+            errorBuilder: (_, __, ___) =>
+                _Placeholder(title: event.theme, colors: placeholderColors),
           );
 
     return ClipRRect(
@@ -62,11 +65,13 @@ class EventCoverHero extends StatefulWidget {
     required this.event,
     this.borderRadius = 12,
     this.showDownload = true,
+    this.placeholderColors,
   });
 
   final AlumniEvent event;
   final double borderRadius;
   final bool showDownload;
+  final List<Color>? placeholderColors;
 
   @override
   State<EventCoverHero> createState() => _EventCoverHeroState();
@@ -108,7 +113,10 @@ class _EventCoverHeroState extends State<EventCoverHero> {
             SizedBox(
               height: 160,
               width: double.infinity,
-              child: _Placeholder(title: widget.event.theme),
+              child: _Placeholder(
+                title: widget.event.theme,
+                colors: widget.placeholderColors,
+              ),
             )
           else
             Image(
@@ -119,7 +127,10 @@ class _EventCoverHeroState extends State<EventCoverHero> {
               errorBuilder: (_, __, ___) => SizedBox(
                 height: 160,
                 width: double.infinity,
-                child: _Placeholder(title: widget.event.theme),
+                child: _Placeholder(
+                  title: widget.event.theme,
+                  colors: widget.placeholderColors,
+                ),
               ),
             ),
           if (widget.showDownload && widget.event.hasCoverImage)
@@ -135,18 +146,19 @@ class _EventCoverHeroState extends State<EventCoverHero> {
 }
 
 class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.title});
+  const _Placeholder({required this.title, this.colors});
 
   final String title;
+  final List<Color>? colors;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF090A4F), Color(0xFF1A237E)],
+          colors: colors ?? const [Color(0xFF090A4F), Color(0xFF1A237E)],
         ),
       ),
       padding: const EdgeInsets.all(12),

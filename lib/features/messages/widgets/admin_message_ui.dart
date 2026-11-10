@@ -6,7 +6,10 @@ import 'package:alumni_system/features/messages/data/image_storage_service.dart'
 import 'package:alumni_system/features/messages/models/message_filters.dart';
 import 'package:alumni_system/features/messages/widgets/message_a11y.dart';
 import 'package:alumni_system/features/messages/widgets/message_theme.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_badge.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Admin Messages chrome — aliases [AdminDirectoryTheme] (no second color system).
 abstract final class AdminMessageTheme {
@@ -52,16 +55,14 @@ class AdminInboxToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasSearchText =
+        searchController.text.isNotEmpty || query.search.trim().isNotEmpty;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        AdminMessageTheme.cardPadding,
-        AdminMessageTheme.space1,
-        AdminMessageTheme.cardPadding,
-        AdminMessageTheme.space1,
-      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: const BoxDecoration(
-        color: AdminMessageTheme.surface,
-        border: Border(bottom: BorderSide(color: AdminMessageTheme.border)),
+        color: AdminColors.card,
+        border: Border(bottom: BorderSide(color: AdminColors.border)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -71,21 +72,42 @@ class AdminInboxToolbar extends StatelessWidget {
             child: TextField(
               controller: searchController,
               onChanged: onSearchChanged,
-              style: const TextStyle(fontSize: 13),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AdminColors.textPrimary,
+              ),
               decoration: InputDecoration(
                 hintText: 'Search name, email, program, batch…',
                 hintStyle: const TextStyle(
-                  color: AdminMessageTheme.textMuted,
-                  fontSize: 13.5,
+                  color: AdminColors.textSecondary,
+                  fontSize: 13,
                 ),
-                prefixIcon: const Icon(Icons.search, size: 18),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  size: 18,
+                  color: AdminColors.textSecondary,
+                ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 40,
+                  minWidth: 38,
                   minHeight: AdminMessageTheme.toolbarControlHeight,
                 ),
+                suffixIcon: hasSearchText
+                    ? IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          searchController.clear();
+                          onSearchChanged('');
+                        },
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          size: 17,
+                          color: AdminColors.textSecondary,
+                        ),
+                      )
+                    : null,
                 isDense: true,
                 filled: true,
-                fillColor: AdminMessageTheme.pageBg,
+                fillColor: AdminColors.surface,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                 border: OutlineInputBorder(
                   borderRadius:
@@ -101,58 +123,48 @@ class AdminInboxToolbar extends StatelessWidget {
                   borderRadius:
                       BorderRadius.circular(AdminMessageTheme.radiusSm),
                   borderSide: const BorderSide(
-                    color: AdminMessageTheme.navy,
+                    color: AdminColors.primary,
                     width: 1.5,
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: AdminMessageTheme.space1),
+          const SizedBox(height: 8),
           Wrap(
-            spacing: AdminMessageTheme.space1,
-            runSpacing: AdminMessageTheme.space1,
+            spacing: 6,
+            runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               for (final f in MessageInboxFilter.values)
                 if (f != MessageInboxFilter.archived)
-                  FilterChip(
-                    label: Text(f.label, style: const TextStyle(fontSize: 12)),
-                    selected: query.filter == f,
-                    tooltip: 'Filter: ${f.label}',
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    onSelected: (_) => onFilterChanged(f),
-                  ),
-              const SizedBox(width: 4),
-              SizedBox(
-                height: AdminDensity.controlHeight,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<MessageInboxSort>(
-                    value: query.sort,
-                    isDense: true,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AdminMessageTheme.textPrimary,
+                  Tooltip(
+                    message: 'Filter: ${f.label}',
+                    child: DirectoryToolbarFilterChip(
+                      label: f.label,
+                      selected: query.filter == f,
+                      onSelected: (_) => onFilterChanged(f),
                     ),
-                    items: [
-                      for (final s in MessageInboxSort.values)
-                        DropdownMenuItem(value: s, child: Text(s.label)),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) onSortChanged(v);
-                    },
                   ),
-                ),
+              DirectoryFilterField<MessageInboxSort>(
+                label: 'Sort',
+                dense: true,
+                width: 148,
+                value: query.sort,
+                items: [
+                  for (final s in MessageInboxSort.values)
+                    DropdownMenuItem(value: s, child: Text(s.label)),
+                ],
+                onChanged: (v) {
+                  if (v != null) onSortChanged(v);
+                },
               ),
               if (query.hasActiveFilters && onReset != null)
-                TextButton(
+                TextButton.icon(
                   onPressed: onReset,
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: const Text('Reset', style: TextStyle(fontSize: 12)),
+                  style: AdminButtonStyles.ghost(foreground: AdminColors.primary),
+                  icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
+                  label: const Text('Reset'),
                 ),
             ],
           ),
@@ -162,7 +174,7 @@ class AdminInboxToolbar extends StatelessWidget {
   }
 }
 
-class AdminConversationListTile extends StatelessWidget {
+class AdminConversationListTile extends StatefulWidget {
   const AdminConversationListTile({
     super.key,
     required this.row,
@@ -175,7 +187,17 @@ class AdminConversationListTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<AdminConversationListTile> createState() =>
+      _AdminConversationListTileState();
+}
+
+class _AdminConversationListTileState extends State<AdminConversationListTile> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
+    final row = widget.row;
+    final selected = widget.selected;
     final name = (row['name'] as String?)?.trim().isNotEmpty == true
         ? row['name'] as String
         : 'Alumni';
@@ -183,11 +205,22 @@ class AdminConversationListTile extends StatelessWidget {
     final batch = row['batch'] as String? ?? '';
     final last = row['lastMessage'] as String? ?? '';
     final unread = row['isRead'] != true;
+    final needsReply =
+        (row['lastMessageFromRole'] as String?)?.toLowerCase() == 'user';
+    final isDraft = row['composeDraft'] == true;
     final time = row['lastMessageTime'] as DateTime?;
     final meta = [
       if (program.isNotEmpty) program,
       if (batch.isNotEmpty) batch,
     ].join(' · ');
+
+    final bgColor = selected
+        ? AdminColors.primaryTint
+        : (_hovered
+              ? AdminColors.rowHover
+              : (unread
+                    ? AdminColors.infoBg.withValues(alpha: 0.45)
+                    : AdminColors.card));
 
     return Semantics(
       button: true,
@@ -201,119 +234,151 @@ class AdminConversationListTile extends StatelessWidget {
         relativeTime:
             time != null ? formatMessageRelativeTime(time) : null,
       ),
-      child: Material(
-        color: selected
-            ? AdminMessageTheme.selectedBg
-            : (unread ? AdminMessageTheme.unreadBg : Colors.white),
-        child: InkWell(
-          onTap: onTap,
-          focusColor: AdminMessageTheme.navy.withValues(alpha: 0.12),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(
-              AdminMessageTheme.cardPadding,
-              AdminMessageTheme.space1,
-              AdminMessageTheme.cardPadding,
-              AdminMessageTheme.space1,
-            ),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: MessageA11y.border(context)),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Material(
+          color: bgColor,
+          child: InkWell(
+            onTap: widget.onTap,
+            focusColor: AdminColors.primary.withValues(alpha: 0.12),
+            child: Container(
+              padding: EdgeInsets.fromLTRB(
+                selected ? 11 : 14,
+                10,
+                14,
+                10,
               ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ExcludeSemantics(
-                  child: _Avatar(name: name, url: row['avatarUrl'] as String?),
+              decoration: BoxDecoration(
+                border: Border(
+                  left: selected
+                      ? const BorderSide(color: AdminColors.primary, width: 3)
+                      : BorderSide.none,
+                  bottom: BorderSide(color: MessageA11y.border(context)),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight:
-                                    unread ? FontWeight.w700 : FontWeight.w600,
-                                fontSize: 13.5,
-                                color: MessageA11y.textPrimary(context),
-                              ),
-                            ),
-                          ),
-                          if (time != null)
-                            ExcludeSemantics(
-                              child: Text(
-                                formatMessageRelativeTime(time),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: unread
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  color: unread
-                                      ? AdminMessageTheme.navy
-                                      : MessageTheme.textMuted,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      if (meta.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          meta,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: MessageTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              last.isEmpty ? 'No messages yet' : last,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: unread
-                                    ? MessageTheme.textPrimary
-                                    : MessageTheme.textMuted,
-                                fontWeight: unread
-                                    ? FontWeight.w500
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          if (unread) ...[
-                            const SizedBox(width: 6),
-                            Semantics(
-                              label: 'Unread',
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: AdminMessageTheme.navy,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ExcludeSemantics(
+                    child: _Avatar(name: name, url: row['avatarUrl'] as String?),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: (unread || selected)
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  fontSize: 13.5,
+                                  color: MessageA11y.textPrimary(context),
+                                ),
+                              ),
+                            ),
+                            if (time != null) ...[
+                              const SizedBox(width: 6),
+                              ExcludeSemantics(
+                                child: Text(
+                                  formatMessageRelativeTime(time),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: unread
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: unread
+                                        ? AdminColors.primary
+                                        : AdminColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (meta.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            meta,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: AdminColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                last.isEmpty ? 'No messages yet' : last,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: unread
+                                      ? AdminColors.textPrimary
+                                      : AdminColors.textSecondary,
+                                  fontWeight: unread
+                                      ? FontWeight.w500
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            if (unread) ...[
+                              const SizedBox(width: 6),
+                              Semantics(
+                                label: 'Unread',
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: AdminColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (isDraft || needsReply || unread) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (isDraft)
+                                const AdminBadge.info(
+                                  label: 'Draft',
+                                  dense: true,
+                                )
+                              else if (needsReply)
+                                const AdminBadge.warning(
+                                  label: 'Needs reply',
+                                  dense: true,
+                                )
+                              else if (unread)
+                                const AdminBadge.info(
+                                  label: 'Unread',
+                                  dense: true,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -361,12 +426,16 @@ class AdminConversationHeader extends StatelessWidget {
     this.onBack,
     this.onToggleProfile,
     this.showProfileToggle = false,
+    this.showProfilePanel = true,
+    this.needsReply = false,
   });
 
   final AlumniMessageProfile profile;
   final VoidCallback? onBack;
   final VoidCallback? onToggleProfile;
   final bool showProfileToggle;
+  final bool showProfilePanel;
+  final bool needsReply;
 
   @override
   Widget build(BuildContext context) {
@@ -381,97 +450,159 @@ class AdminConversationHeader extends StatelessWidget {
         'Conversation with ${profile.name}',
         if (meta.isNotEmpty) meta,
       ].join('. '),
-      child: Container(
-      height: AdminMessageTheme.toolbarControlHeight + 4,
-      padding: const EdgeInsets.symmetric(horizontal: AdminMessageTheme.space1),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: MessageA11y.border(context))),
-      ),
-      child: Row(
-        children: [
-          if (onBack != null)
-            IconButton(
-              tooltip: 'Back to inbox',
-              onPressed: onBack,
-              style: AdminDensity.iconButtonStyle(
-                foregroundColor: AdminMessageTheme.navy,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 460;
+          return Container(
+            constraints: const BoxConstraints(minHeight: 54),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AdminColors.card,
+              border: Border(
+                bottom: BorderSide(color: MessageA11y.border(context)),
               ),
-              icon: const Icon(Icons.arrow_back),
             ),
-          ExcludeSemantics(
-            child: _Avatar(name: profile.name, url: profile.avatarUrl),
-          ),
-          const SizedBox(width: AdminMessageTheme.space2),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  profile.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: AdminMessageTheme.textPrimary,
+                if (onBack != null)
+                  IconButton(
+                    tooltip: 'Back to inbox',
+                    onPressed: onBack,
+                    style: AdminDensity.iconButtonStyle(
+                      foregroundColor: AdminColors.primary,
+                    ),
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                ExcludeSemantics(
+                  child: _Avatar(name: profile.name, url: profile.avatarUrl),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              profile.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14.5,
+                                color: AdminColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (wide && needsReply) ...[
+                            const SizedBox(width: 8),
+                            const AdminBadge.warning(
+                              label: 'Needs reply',
+                              dense: true,
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (meta.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          meta,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AdminColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (meta.isNotEmpty)
-                  Text(
-                    meta,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AdminMessageTheme.textSecondary,
+                if (showProfileToggle && onToggleProfile != null) ...[
+                  const SizedBox(width: 8),
+                  if (wide)
+                    OutlinedButton.icon(
+                      onPressed: onToggleProfile,
+                      style: AdminButtonStyles.outlined(),
+                      icon: Icon(
+                        showProfilePanel
+                            ? Icons.info
+                            : Icons.info_outline,
+                        size: 16,
+                        color: showProfilePanel
+                            ? AdminColors.primary
+                            : AdminColors.textSecondary,
+                      ),
+                      label: const Text('Details'),
+                    )
+                  else
+                    IconButton(
+                      tooltip: 'Alumni details',
+                      onPressed: onToggleProfile,
+                      style: AdminDensity.iconButtonStyle(
+                        foregroundColor: AdminColors.primary,
+                      ),
+                      icon: const Icon(Icons.info_outline),
                     ),
-                  ),
+                ],
               ],
             ),
-          ),
-          if (showProfileToggle && onToggleProfile != null)
-            IconButton(
-              tooltip: 'Alumni details',
-              onPressed: onToggleProfile,
-              style: AdminDensity.iconButtonStyle(
-                foregroundColor: AdminMessageTheme.navy,
-              ),
-              icon: const Icon(Icons.info_outline),
-            ),
-        ],
+          );
+        },
       ),
-    ),
     );
   }
 }
 
 class AdminAlumniProfilePanel extends StatelessWidget {
-  const AdminAlumniProfilePanel({super.key, required this.profile});
+  const AdminAlumniProfilePanel({
+    super.key,
+    required this.profile,
+    this.width = AdminMessageTheme.profileWidth,
+    this.onClose,
+  });
 
   final AlumniMessageProfile profile;
+  final double? width;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: AdminMessageTheme.profileWidth,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(left: BorderSide(color: AdminMessageTheme.border)),
-      ),
+      width: width,
+      color: AdminColors.card,
       child: ListView(
         padding: const EdgeInsets.all(AdminDensity.cardPadding),
         children: [
-          const Text(
-            'Alumni details',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: MessageTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Alumni details',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    color: AdminColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (onClose != null)
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: onClose,
+                  visualDensity: VisualDensity.compact,
+                  style: AdminDensity.iconButtonStyle(
+                    foregroundColor: AdminColors.textSecondary,
+                  ),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
+          const Divider(height: 1, color: AdminColors.border),
+          const SizedBox(height: 14),
           Center(child: _Avatar(name: profile.name, url: profile.avatarUrl)),
           const SizedBox(height: 10),
           Text(
@@ -480,39 +611,105 @@ class AdminAlumniProfilePanel extends StatelessWidget {
             style: const TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 15,
+              color: AdminColors.textPrimary,
             ),
           ),
           if (profile.email.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
-              profile.email,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                color: MessageTheme.textSecondary,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    profile.email,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AdminColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'Copy email',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: profile.email));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        const SnackBar(content: Text('Email copied')),
+                      );
+                  },
+                  icon: const Icon(
+                    Icons.copy_outlined,
+                    size: 14,
+                    color: AdminColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ],
-          const SizedBox(height: 16),
-          _infoRow('Program', profile.program.isEmpty ? '—' : profile.program),
-          _infoRow('Batch', profile.batch.isEmpty ? '—' : profile.batch),
-          _infoRow('Registration', profile.registrationLabel),
-          _infoRow(
-            'Tracer profile',
-            profile.tracerComplete ? 'Complete' : 'Incomplete',
-          ),
-          _infoRow(
-            'Last activity',
-            profile.lastActive == null
-                ? '—'
-                : formatMessageRelativeTime(profile.lastActive!),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AdminColors.surface,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              border: Border.all(color: AdminColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _infoRow(
+                  'Program',
+                  profile.program.isEmpty ? '—' : profile.program,
+                ),
+                _infoRow('Batch', profile.batch.isEmpty ? '—' : profile.batch),
+                _badgeRow(
+                  'Registration',
+                  AdminBadge.info(
+                    label: profile.registrationLabel,
+                    dense: true,
+                  ),
+                ),
+                _badgeRow(
+                  'Tracer profile',
+                  profile.tracerComplete
+                      ? const AdminBadge.success(
+                          label: 'Complete',
+                          icon: Icons.check_circle_outline,
+                          dense: true,
+                        )
+                      : const AdminBadge.warning(
+                          label: 'Incomplete',
+                          icon: Icons.pending_outlined,
+                          dense: true,
+                        ),
+                ),
+                _infoRow(
+                  'Last activity',
+                  profile.lastActive == null
+                      ? '—'
+                      : formatMessageRelativeTime(profile.lastActive!),
+                  isLast: true,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           const Text(
             'Context stays here so you can reply without leaving the thread.',
             style: TextStyle(
               fontSize: 11.5,
-              color: MessageTheme.textMuted,
+              color: AdminColors.textSecondary,
               height: 1.35,
             ),
           ),
@@ -521,7 +718,35 @@ class AdminAlumniProfilePanel extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _infoRow(String label, String value, {bool isLast = false}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AdminColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AdminColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _badgeRow(String label, Widget badge) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -532,78 +757,32 @@ class AdminAlumniProfilePanel extends StatelessWidget {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: MessageTheme.textMuted,
+              color: AdminColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-              color: MessageTheme.textPrimary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          const SizedBox(height: 4),
+          badge,
         ],
       ),
     );
   }
 }
 
-class AdminInboxEmpty extends StatelessWidget {
-  const AdminInboxEmpty({super.key, this.filtered = false});
-  final bool filtered;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: AdminMessageTheme.space4,
-          horizontal: AdminMessageTheme.space3,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AdminMessageTheme.navy.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                filtered ? Icons.filter_alt_off_outlined : Icons.inbox_outlined,
-                size: 32,
-                color: AdminMessageTheme.navy,
-              ),
-            ),
-            const SizedBox(height: AdminMessageTheme.space2),
-            Text(
-              filtered ? 'No conversations match' : 'No conversations yet',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: AdminMessageTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: AdminMessageTheme.space1),
-            Text(
-              filtered
-                  ? 'Try clearing filters or search.'
-                  : 'Use New to message a registered alumnus, '
-                      'or wait for them to write in.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AdminMessageTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+/// Maps technical messaging exceptions to concise admin-facing copy.
+String messageFriendlyError(Object error, String fallback) {
+  var text = '$error';
+  while (text.startsWith('Exception: ')) {
+    text = text.substring('Exception: '.length);
   }
+  text = text.trim();
+  final technical =
+      text.isEmpty ||
+      text.startsWith('Error ') ||
+      text.contains('Exception') ||
+      text.contains('Postgrest') ||
+      text.contains('SocketException') ||
+      text.length > 160;
+  return technical ? fallback : text;
 }
 
 Future<void> copyAdminMessageText(BuildContext context, String text) async {

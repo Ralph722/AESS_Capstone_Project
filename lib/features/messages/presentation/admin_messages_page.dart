@@ -24,23 +24,50 @@ import 'package:alumni_system/features/messages/widgets/message_empty_state.dart
 import 'package:alumni_system/features/messages/widgets/message_reaction_picker.dart';
 import 'package:alumni_system/features/messages/widgets/message_theme.dart';
 import 'package:alumni_system/features/messages/widgets/message_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class AdminMessagesScreen extends StatefulWidget {
   final bool hideAppBar;
-  
-  const AdminMessagesScreen({super.key, this.hideAppBar = false});
+  final MessageService? service;
+  final MessageImagePipeline? imagePipeline;
+  final MessageImagePicker? imagePicker;
+  final String? currentUserIdOverride;
+  final String? currentUserNameOverride;
+  final String? currentUserEmailOverride;
+
+  const AdminMessagesScreen({
+    super.key,
+    this.hideAppBar = false,
+    this.service,
+    this.imagePipeline,
+    this.imagePicker,
+    this.currentUserIdOverride,
+    this.currentUserNameOverride,
+    this.currentUserEmailOverride,
+  });
 
   @override
   State<AdminMessagesScreen> createState() => _AdminMessagesScreenState();
 }
 
-class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
+class _AdminMessagesScreenState extends State<AdminMessagesScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-  final MessageImagePipeline _imagePipeline = MessageImagePipeline();
-  final MessageImagePicker _imagePicker = MessageImagePicker();
-  final MessageService _messageService = MessageService();
+  late final MessageImagePipeline _imagePipeline =
+      widget.imagePipeline ?? MessageImagePipeline();
+  late final MessageImagePicker _imagePicker =
+      widget.imagePicker ?? MessageImagePicker();
+  late final MessageService _messageService =
+      widget.service ?? MessageService();
 
   String? _currentAdminId;
   String? _currentAdminName;
@@ -51,6 +78,9 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
   bool _isLoadingMessages = false;
   bool _isLoadingUsers = false;
+  bool _hasLoadedInbox = false;
+  String? _inboxError;
+  String? _threadError;
   bool _isUploadingImage = false;
   double? _uploadProgress;
   bool _uploadFailed = false;
@@ -87,10 +117,10 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
   @override
   void initState() {
     super.initState();
-    _currentAdminId = AppSession.userId;
-    _currentAdminName =
+    _currentAdminId = widget.currentUserIdOverride ?? AppSession.userId;
+    _currentAdminName = widget.currentUserNameOverride ??
         AppSession.currentUser?.userMetadata?['display_name'] as String?;
-    _currentAdminEmail = AppSession.email;
+    _currentAdminEmail = widget.currentUserEmailOverride ?? AppSession.email;
     _adminDocId = _currentAdminId;
     _startInboxWatch();
     _openConversationSubscription =
@@ -185,7 +215,10 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
   void _startInboxWatch() {
     _inboxSubscription?.cancel();
-    setState(() => _isLoadingUsers = true);
+    setState(() {
+      _isLoadingUsers = true;
+      _inboxError = null;
+    });
 
     _inboxSubscription = _messageService.watchAdminInbox().listen(
       (conversations) {
@@ -195,11 +228,18 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
           _filteredConversations =
               applyInboxQuery(_conversationUsers, _inboxQuery);
           _isLoadingUsers = false;
+          _hasLoadedInbox = true;
+          _inboxError = null;
           _syncSelectedProfile();
         });
       },
-      onError: (_) {
-        if (mounted) setState(() => _isLoadingUsers = false);
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() {
+          _isLoadingUsers = false;
+          _hasLoadedInbox = true;
+          _inboxError = '$error';
+        });
       },
     );
   }
@@ -338,7 +378,8 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
     // Compare against the watched id — not [_selectedUserId], which is already
     // updated before this method runs on conversation switch.
     final alreadyWatching = isAlreadyWatchingAdminConversation(
-      hasActiveSubscription: _conversationSubscription != null,
+      hasActiveSubscription:
+          _conversationSubscription != null && _threadError == null,
       watchingMessagingId: _watchingUserId,
       requestedMessagingId: userMessagingId,
       watchingDocId: _watchingUserDocId,
@@ -353,6 +394,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
     setState(() {
       _isLoadingMessages = true;
+      _threadError = null;
       _messages = [];
       _olderById.clear();
       _hasMoreHistory = true;
@@ -383,13 +425,14 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
         final merged = _mergeAdminThreadWindow(filteredMessages);
         final fp = MessageRealtime.legacyListFingerprint(merged);
         final prevFp = MessageRealtime.legacyListFingerprint(_messages);
-        if (fp == prevFp && !_isLoadingMessages) {
+        if (fp == prevFp && !_isLoadingMessages && _threadError == null) {
           return;
         }
 
         setState(() {
           _messages = merged;
           _isLoadingMessages = false;
+          _threadError = null;
           _hasMoreHistory = MessageThreadHistory.inferHasMoreHistory(
             windowLength: filteredMessages.length,
             olderEmpty: _olderById.isEmpty,
@@ -403,8 +446,12 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
           _scrollToBottom(immediate: wasEmpty);
         }
       },
-      onError: (_) {
-        if (mounted) setState(() => _isLoadingMessages = false);
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() {
+          _isLoadingMessages = false;
+          _threadError = '$error';
+        });
       },
     );
   }
@@ -420,6 +467,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       _hasMoreHistory = true;
       _loadingOlder = false;
       _isLoadingMessages = false;
+      _threadError = null;
     }
   }
 
@@ -465,6 +513,15 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
     });
   }
 
+  void _showErrorSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AdminColors.danger),
+      );
+  }
+
   Future<String?> _uploadImage(String messageId) async {
     if (_selectedImage == null && _selectedImageBytes == null) return null;
 
@@ -481,12 +538,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
           _uploadFailed = state.failed;
         });
       },
-      onError: (msg) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
-        );
-      },
+      onError: _showErrorSnack,
     );
   }
 
@@ -554,11 +606,8 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
         await _messageService.discardUploadedMessageImage(imageUrl);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending message: $e'),
-            backgroundColor: Colors.red,
-          ),
+        _showErrorSnack(
+          messageFriendlyError(e, 'Could not send message. Please try again.'),
         );
         setState(() {
           _selectedImage = tempImage;
@@ -896,62 +945,135 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
     super.dispose();
   }
 
+  String? get _inboxCountBadge {
+    if (!_hasLoadedInbox) return null;
+    final unread = _conversationUsers.where((u) => u['isRead'] != true).length;
+    final total = _conversationUsers.length;
+    if (unread > 0) return '$unread unread';
+    return '$total ${total == 1 ? 'thread' : 'threads'}';
+  }
+
+  Widget _buildHeader() {
+    return AdminCompactHeader(
+      title: 'Messages',
+      countBadge: _inboxCountBadge,
+      subtitle: 'Support inbox for registered alumni conversations',
+      actions: [
+        FilledButton.icon(
+          onPressed: _openComposePicker,
+          icon: const Icon(Icons.edit_outlined, size: 17),
+          label: const Text('New message'),
+          style: AdminButtonStyles.filled(),
+        ),
+      ],
+    );
+  }
+
+  BoxDecoration _panelDecoration() {
+    return BoxDecoration(
+      color: AdminColors.card,
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+      border: Border.all(color: AdminColors.border),
+      boxShadow: AdminSurfaces.cardShadow,
+    );
+  }
+
+  Widget _buildInboxRefreshWarning() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: AdminColors.warningBg,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(color: AdminColors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.cloud_off_outlined,
+            size: 16,
+            color: AdminColors.warning,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Inbox sync paused.',
+              style: TextStyle(fontSize: 12.5, color: AdminColors.textPrimary),
+            ),
+          ),
+          TextButton(
+            onPressed: _isLoadingUsers ? null : _startInboxWatch,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInboxBody() {
+    if (_isLoadingUsers && _filteredConversations.isEmpty) {
+      return const MessageListSkeleton(count: 8, shrinkWrap: true);
+    }
+    if (_inboxError != null && _conversationUsers.isEmpty) {
+      return AdminStateView.error(
+        compact: true,
+        title: "Couldn't load conversations",
+        message: messageFriendlyError(
+          _inboxError!,
+          'Check your connection and try again.',
+        ),
+        details: _inboxError,
+        onRetry: _startInboxWatch,
+      );
+    }
+    if (_filteredConversations.isEmpty) {
+      final hasFilters = _inboxQuery.hasActiveFilters;
+      return AdminStateView.empty(
+        compact: true,
+        icon: hasFilters
+            ? Icons.filter_alt_off_outlined
+            : Icons.inbox_outlined,
+        title: hasFilters ? 'No conversations match' : 'No conversations yet',
+        message: hasFilters
+            ? 'Try clearing filters or searching a different keyword.'
+            : 'Start a message to a registered alumnus, or wait for incoming replies.',
+        primaryAction: hasFilters
+            ? AdminStateAction(
+                label: 'Reset filters',
+                icon: Icons.filter_alt_off_outlined,
+                onPressed: () {
+                  _searchController.clear();
+                  _applyInboxQuery(const MessageInboxQuery());
+                },
+              )
+            : AdminStateAction(
+                label: 'New message',
+                icon: Icons.edit_outlined,
+                onPressed: _openComposePicker,
+              ),
+      );
+    }
+    return ListView.builder(
+      itemCount: _filteredConversations.length,
+      itemBuilder: (context, index) {
+        final user = _filteredConversations[index];
+        final selected = user['messagingId'] == _selectedUserId;
+        return AdminConversationListTile(
+          row: user,
+          selected: selected,
+          onTap: () => _selectConversation(user),
+        );
+      },
+    );
+  }
+
   Widget _buildInboxPane({double? width = AdminMessageTheme.inboxWidth}) {
     return Container(
       width: width,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: MessageTheme.border)),
-      ),
+      decoration: _panelDecoration(),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          Semantics(
-            header: true,
-            label: 'Support inbox',
-            child: Container(
-              height: AdminMessageTheme.toolbarControlHeight,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AdminMessageTheme.cardPadding,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: AdminMessageTheme.border),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Support inbox',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        color: AdminMessageTheme.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Tooltip(
-                    message: 'Message a registered alumnus',
-                    child: TextButton.icon(
-                      onPressed: _openComposePicker,
-                      icon: const Icon(Icons.edit_outlined, size: 16),
-                      label: const Text('New'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AdminMessageTheme.navy,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        visualDensity: VisualDensity.compact,
-                        textStyle: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           AdminInboxToolbar(
             searchController: _searchController,
             query: _inboxQuery,
@@ -965,33 +1087,67 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
               _applyInboxQuery(const MessageInboxQuery());
             },
           ),
-          Expanded(
-            child: _isLoadingUsers && _filteredConversations.isEmpty
-                ? const MessageListSkeleton(count: 8, shrinkWrap: true)
-                : _filteredConversations.isEmpty
-                    ? AdminInboxEmpty(
-                        filtered: _inboxQuery.hasActiveFilters,
-                      )
-                    : ListView.builder(
-                        itemCount: _filteredConversations.length,
-                        itemBuilder: (context, index) {
-                          final user = _filteredConversations[index];
-                          final selected =
-                              user['messagingId'] == _selectedUserId;
-                          return AdminConversationListTile(
-                            row: user,
-                            selected: selected,
-                            onTap: () => _selectConversation(user),
-                          );
-                        },
-                      ),
-          ),
+          if (_inboxError != null && _conversationUsers.isNotEmpty)
+            _buildInboxRefreshWarning(),
+          Expanded(child: _buildInboxBody()),
         ],
       ),
     );
   }
 
-  Widget _buildThreadPane({required bool showBack}) {
+  Widget _buildEmptySelectionPane() {
+    return Container(
+      decoration: _panelDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: AdminStateView.empty(
+        icon: Icons.forum_outlined,
+        title: 'Select a conversation to reply',
+        message:
+            'Choose an alumnus from the inbox on the left or start a new message.',
+        primaryAction: AdminStateAction(
+          label: 'New message',
+          icon: Icons.edit_outlined,
+          onPressed: _openComposePicker,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openProfileSheet(AlumniMessageProfile profile) {
+    return showAdminSidePanel<void>(
+      context: context,
+      width: AdminMessageTheme.profileWidth + 24,
+      backgroundColor: AdminColors.card,
+      child: Builder(
+        builder: (panelContext) => SafeArea(
+          child: AdminAlumniProfilePanel(
+            profile: profile,
+            width: double.infinity,
+            onClose: () => Navigator.of(panelContext).pop(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThreadCard({
+    required bool showBack,
+    required bool canDockProfile,
+  }) {
+    return Container(
+      decoration: _panelDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: _buildThreadPane(
+        showBack: showBack,
+        canDockProfile: canDockProfile,
+      ),
+    );
+  }
+
+  Widget _buildThreadPane({
+    required bool showBack,
+    required bool canDockProfile,
+  }) {
     final profile = _selectedProfile ??
         AlumniMessageProfile(
           userId: _selectedUserId ?? '',
@@ -1002,11 +1158,21 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       'admin-thread-${_selectedUserId ?? _selectedUserDocId ?? 'none'}',
     );
 
+    final threadNeedsReply = _conversationUsers.any(
+      (u) =>
+          (u['messagingId'] == _selectedUserId ||
+              (_selectedUserDocId != null &&
+                  u['docId'] == _selectedUserDocId)) &&
+          (u['lastMessageFromRole'] as String?)?.toLowerCase() == 'user',
+    );
+
     return Column(
       key: threadKey,
       children: [
         AdminConversationHeader(
           profile: profile,
+          showProfilePanel: canDockProfile && _showProfilePanel,
+          needsReply: threadNeedsReply,
           onBack: showBack
               ? () => setState(() {
                     _isChatOpenOnMobile = false;
@@ -1016,116 +1182,131 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
                     _stopConversationWatch();
                   })
               : null,
-          showProfileToggle: !showBack,
-          onToggleProfile: () =>
-              setState(() => _showProfilePanel = !_showProfilePanel),
+          showProfileToggle: true,
+          onToggleProfile: canDockProfile
+              ? () => setState(() => _showProfilePanel = !_showProfilePanel)
+              : () => unawaited(_openProfileSheet(profile)),
         ),
         Expanded(
           child: ColoredBox(
-            color: MessageTheme.pageBg,
+            color: AdminColors.background,
             child: _isLoadingMessages && _messages.isEmpty
                 ? const MessageThreadSkeleton()
+                : _threadError != null && _messages.isEmpty
+                ? AdminStateView.error(
+                    compact: true,
+                    title: "Couldn't load conversation",
+                    message: messageFriendlyError(
+                      _threadError!,
+                      'Check your connection and try again.',
+                    ),
+                    details: _threadError,
+                    onRetry: () {
+                      final uid = _selectedUserId;
+                      if (uid != null && uid.isNotEmpty) {
+                        _startConversationWatch(
+                          uid,
+                          userDocId: _selectedUserDocId,
+                        );
+                      }
+                    },
+                  )
                 : _messages.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No messages in this conversation yet.',
-                          style: TextStyle(color: MessageTheme.textSecondary),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _messagesScrollController,
-                        padding: const EdgeInsets.all(MessageTheme.threadPadding),
-                        itemCount: _messages.length +
-                            (_hasMoreHistory || _loadingOlder ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          final hasHeader =
-                              _hasMoreHistory || _loadingOlder;
-                          if (hasHeader && index == 0) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Center(
-                                child: _loadingOlder
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : TextButton(
-                                        onPressed: _loadOlderMessages,
-                                        child: const Text(
-                                          'Load earlier messages',
-                                        ),
-                                      ),
-                              ),
-                            );
-                          }
-                          final msgIndex = hasHeader ? index - 1 : index;
-                          final msg = _messages[msgIndex];
-                          final isMine = msg['senderId'] == _currentAdminId ||
-                              (msg['senderDocId'] != null &&
-                                  _adminDocId != null &&
-                                  msg['senderDocId'] == _adminDocId);
-                          final timestamp =
-                              (msg['timestamp'] as DateTime?) ?? DateTime.now();
-                          final older =
-                              msgIndex > 0 ? _messages[msgIndex - 1] : null;
-                          final olderTs = older?['timestamp'] as DateTime?;
-                          final showDateSep = olderTs == null ||
-                              !isSameMessageCalendarDay(timestamp, olderTs);
-                          final text = msg['messageText'] as String? ?? '';
-                          final imageUrl = msg['imageUrl'] as String?;
-                          final docId = msg['docId'] as String? ?? '';
-                          final reactions = Map<String, dynamic>.from(
-                            msg['reactions'] ?? {},
-                          );
+                ? const AdminStateView.empty(
+                    compact: true,
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'No messages yet',
+                    message: 'Send a reply below to start the conversation.',
+                  )
+                : ListView.builder(
+                    controller: _messagesScrollController,
+                    padding: const EdgeInsets.all(MessageTheme.threadPadding),
+                    itemCount: _messages.length +
+                        (_hasMoreHistory || _loadingOlder ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      final hasHeader = _hasMoreHistory || _loadingOlder;
+                      if (hasHeader && index == 0) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: _loadingOlder
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : TextButton(
+                                    onPressed: _loadOlderMessages,
+                                    child: const Text('Load earlier messages'),
+                                  ),
+                          ),
+                        );
+                      }
+                      final msgIndex = hasHeader ? index - 1 : index;
+                      final msg = _messages[msgIndex];
+                      final isMine = msg['senderId'] == _currentAdminId ||
+                          (msg['senderDocId'] != null &&
+                              _adminDocId != null &&
+                              msg['senderDocId'] == _adminDocId);
+                      final timestamp =
+                          (msg['timestamp'] as DateTime?) ?? DateTime.now();
+                      final older = msgIndex > 0 ? _messages[msgIndex - 1] : null;
+                      final olderTs = older?['timestamp'] as DateTime?;
+                      final showDateSep = olderTs == null ||
+                          !isSameMessageCalendarDay(timestamp, olderTs);
+                      final text = msg['messageText'] as String? ?? '';
+                      final imageUrl = msg['imageUrl'] as String?;
+                      final docId = msg['docId'] as String? ?? '';
+                      final reactions = Map<String, dynamic>.from(
+                        msg['reactions'] ?? {},
+                      );
 
-                          return Column(
-                            children: [
-                              if (showDateSep)
-                                MessageDateSeparator(
-                                  label: formatMessageDateLabel(timestamp),
-                                ),
-                              MessageBubble(
-                                isMine: isMine,
-                                body: text,
-                                timestamp: timestamp,
-                                imageUrl: imageUrl,
-                                reactions: reactions,
-                                currentUserId: _currentAdminId,
-                                isEdited: msg['isEdited'] == true,
-                                isRead: msg['isRead'] == true,
-                                optimistic: msg['optimistic'] == true,
-                                peerIsOffice: false,
-                                peerAvatarUrl: _selectedProfile?.avatarUrl,
-                                peerDisplayName:
-                                    _selectedProfile?.name ?? _selectedUserName,
-                                onLongPress: () {
-                                  if (docId.isNotEmpty) {
-                                    _showMessageOptions(context, msg, docId);
-                                  }
-                                },
-                                onReact: (emoji) {
-                                  if (docId.isNotEmpty) {
-                                    _addReaction(docId, emoji);
-                                  }
-                                },
-                                onOpenImage: imageUrl == null
-                                    ? null
-                                    : () =>
-                                        _showImageFullScreen(context, imageUrl),
-                                onCopy: text.trim().isEmpty
-                                    ? null
-                                    : () => copyAdminMessageText(context, text),
-                                onEdit: isMine ? () => _editMessage(msg) : null,
-                                onDelete:
-                                    isMine ? () => _deleteMessage(msg) : null,
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                      return Column(
+                        children: [
+                          if (showDateSep)
+                            MessageDateSeparator(
+                              label: formatMessageDateLabel(timestamp),
+                            ),
+                          MessageBubble(
+                            isMine: isMine,
+                            body: text,
+                            timestamp: timestamp,
+                            imageUrl: imageUrl,
+                            reactions: reactions,
+                            currentUserId: _currentAdminId,
+                            isEdited: msg['isEdited'] == true,
+                            isRead: msg['isRead'] == true,
+                            optimistic: msg['optimistic'] == true,
+                            peerIsOffice: false,
+                            peerAvatarUrl: _selectedProfile?.avatarUrl,
+                            peerDisplayName:
+                                _selectedProfile?.name ?? _selectedUserName,
+                            onLongPress: () {
+                              if (docId.isNotEmpty) {
+                                _showMessageOptions(context, msg, docId);
+                              }
+                            },
+                            onReact: (emoji) {
+                              if (docId.isNotEmpty) {
+                                _addReaction(docId, emoji);
+                              }
+                            },
+                            onOpenImage: imageUrl == null
+                                ? null
+                                : () =>
+                                    _showImageFullScreen(context, imageUrl),
+                            onCopy: text.trim().isEmpty
+                                ? null
+                                : () => copyAdminMessageText(context, text),
+                            onEdit: isMine ? () => _editMessage(msg) : null,
+                            onDelete: isMine ? () => _deleteMessage(msg) : null,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
           ),
         ),
         MessageComposer(
@@ -1152,6 +1333,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final body = CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.escape): () {
@@ -1167,49 +1349,67 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
             final isMobile = constraints.maxWidth < 768;
             final isTablet =
                 constraints.maxWidth >= 768 && constraints.maxWidth < 1100;
-            final showProfile = !isMobile &&
-                !isTablet &&
+            final canDockProfile = !isMobile && !isTablet;
+            final showProfile = canDockProfile &&
                 _showProfilePanel &&
                 _selectedUserId != null &&
                 _selectedProfile != null;
+            final showHeader =
+                !(isMobile && _isChatOpenOnMobile && _selectedUserId != null);
 
+            final Widget workspace;
             if (isMobile) {
-              return _isChatOpenOnMobile && _selectedUserId != null
-                  ? _buildThreadPane(showBack: true)
+              workspace = _isChatOpenOnMobile && _selectedUserId != null
+                  ? _buildThreadCard(
+                      showBack: true,
+                      canDockProfile: false,
+                    )
                   : _buildInboxPane(width: null);
+            } else {
+              workspace = Row(
+                children: [
+                  _buildInboxPane(
+                    width: isTablet ? 300 : AdminMessageTheme.inboxWidth,
+                  ),
+                  const SizedBox(width: AdminDensity.space2),
+                  Expanded(
+                    child: _selectedUserId == null
+                        ? _buildEmptySelectionPane()
+                        : _buildThreadCard(
+                            showBack: false,
+                            canDockProfile: canDockProfile,
+                          ),
+                  ),
+                  if (showProfile) ...[
+                    const SizedBox(width: AdminDensity.space2),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(
+                        AdminSurfaces.radiusMd,
+                      ),
+                      child: Container(
+                        decoration: _panelDecoration(),
+                        clipBehavior: Clip.antiAlias,
+                        child: AdminAlumniProfilePanel(
+                          key: ValueKey<String>(
+                            'admin-profile-${_selectedProfile!.userId}',
+                          ),
+                          profile: _selectedProfile!,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
             }
 
-            return Row(
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildInboxPane(
-                  width: isTablet ? 300 : AdminMessageTheme.inboxWidth,
-                ),
-                Expanded(
-                  child: _selectedUserId == null
-                      ? Semantics(
-                          label: 'Select a conversation to reply',
-                          child: const ColoredBox(
-                            color: MessageTheme.pageBg,
-                            child: Center(
-                              child: Text(
-                                'Select a conversation to reply',
-                                style: TextStyle(
-                                  color: MessageTheme.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : _buildThreadPane(showBack: false),
-                ),
-                if (showProfile)
-                  AdminAlumniProfilePanel(
-                    key: ValueKey<String>(
-                      'admin-profile-${_selectedProfile!.userId}',
-                    ),
-                    profile: _selectedProfile!,
-                  ),
+                if (showHeader) ...[
+                  _buildHeader(),
+                  const SizedBox(height: AdminDensity.space2),
+                ],
+                Expanded(child: workspace),
               ],
             );
           },
@@ -1218,17 +1418,20 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
     );
 
     if (widget.hideAppBar) {
-      return ColoredBox(color: AdminMessageTheme.pageBg, child: body);
+      return ColoredBox(color: AdminColors.background, child: body);
     }
 
     return Scaffold(
-      backgroundColor: AdminMessageTheme.pageBg,
+      backgroundColor: AdminColors.background,
       appBar: AppBar(
         title: const Text('Messages'),
-        backgroundColor: MessageTheme.navy,
+        backgroundColor: AdminColors.primary,
         foregroundColor: Colors.white,
       ),
-      body: body,
+      body: Padding(
+        padding: const EdgeInsets.all(AdminDensity.space2),
+        child: body,
+      ),
     );
   }
 }

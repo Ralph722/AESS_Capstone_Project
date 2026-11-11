@@ -42,7 +42,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
 
   List<Announcement> _items = [];
   bool _isLoading = false;
-  bool _hasLoaded = false;
   String? _loadError;
   String _query = '';
   _AnnouncementStatusFilter _statusFilter = _AnnouncementStatusFilter.all;
@@ -74,14 +73,12 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
       setState(() {
         _items = list;
         _isLoading = false;
-        _hasLoaded = true;
         _loadError = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _hasLoaded = true;
         _loadError = '$e';
       });
     }
@@ -127,8 +124,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
     return list;
   }
 
-  int get _activeCount =>
-      _items.where((a) => a.status != AnnouncementStatus.archived).length;
   int get _draftCount =>
       _items.where((a) => a.status == AnnouncementStatus.draft).length;
   int get _publishedCount =>
@@ -418,15 +413,24 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
         _searchController.clear();
         setState(() => _query = '');
       },
-      isLoading: _isLoading,
-      onRefresh: _load,
-      refreshTooltip: 'Refresh announcements',
       hasActiveFilters: _hasActiveFilters,
       onResetFilters: _resetFilters,
       activeFilterChips: _activeFilterChips(),
       searchHint: 'Search title, message, or target…',
       searchWidth: 250,
       filters: [
+        for (final f in _AnnouncementStatusFilter.values)
+          DirectoryToolbarFilterChip(
+            label: switch (f) {
+              _AnnouncementStatusFilter.all => 'Active',
+              _AnnouncementStatusFilter.draft => 'Draft',
+              _AnnouncementStatusFilter.published => 'Published',
+              _AnnouncementStatusFilter.archived =>
+                'Archived ($_archivedCount)',
+            },
+            selected: _statusFilter == f,
+            onSelected: (_) => setState(() => _statusFilter = f),
+          ),
         DirectoryFilterField<AnnouncementPriority?>(
           label: 'Priority',
           value: _priorityFilter,
@@ -445,18 +449,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
           ],
           onChanged: (v) => setState(() => _priorityFilter = v),
         ),
-        for (final f in _AnnouncementStatusFilter.values)
-          DirectoryToolbarFilterChip(
-            label: switch (f) {
-              _AnnouncementStatusFilter.all => 'Active',
-              _AnnouncementStatusFilter.draft => 'Draft',
-              _AnnouncementStatusFilter.published => 'Published',
-              _AnnouncementStatusFilter.archived =>
-                'Archived ($_archivedCount)',
-            },
-            selected: _statusFilter == f,
-            onSelected: (_) => setState(() => _statusFilter = f),
-          ),
       ],
       sortControl: DirectoryFilterField<_AnnouncementSort>(
         label: 'Sort',
@@ -576,9 +568,19 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
       children: [
         AdminCompactHeader(
           title: 'Announcements',
-          countBadge: _hasLoaded ? '$_activeCount active' : null,
-          subtitle: 'Publish notices to alumni by course and batch.',
           actions: [
+            OutlinedButton.icon(
+              onPressed: _isLoading ? null : _load,
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 15),
+              label: Text(_isLoading ? 'Refreshing…' : 'Refresh'),
+              style: AdminButtonStyles.outlined(),
+            ),
             FilledButton.icon(
               onPressed: _isLoading ? null : _create,
               icon: const Icon(Icons.add, size: 17),

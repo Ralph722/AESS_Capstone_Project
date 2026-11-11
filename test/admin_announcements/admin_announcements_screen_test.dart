@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:alumni_system/features/admin/announcements/presentation/admin_announcement_editor_page.dart';
 import 'package:alumni_system/features/admin/announcements/presentation/admin_announcements_page.dart';
 import 'package:alumni_system/features/admin/announcements/widgets/admin_announcement_ui.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/features/announcements/models/announcement_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
@@ -198,7 +199,68 @@ void main() {
       expect(find.byType(AdminCompactHeader), findsOneWidget);
       expect(find.byType(AdminMetricRibbon), findsOneWidget);
       expect(find.byType(AdminSaaSToolbar), findsOneWidget);
-      expect(find.text('2 active'), findsOneWidget);
+      final headerWidget = tester.widget<AdminCompactHeader>(
+        find.byType(AdminCompactHeader),
+      );
+      expect(headerWidget.title, 'Announcements');
+      expect(headerWidget.countBadge, isNull);
+      expect(headerWidget.subtitle, isNull);
+      expect(
+        find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.byIcon(Icons.info_outline_rounded),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.textContaining('active'),
+        ),
+        findsNothing,
+      );
+
+      final headerRefreshFinder = find.descendant(
+        of: find.byType(AdminCompactHeader),
+        matching: find.text('Refresh'),
+      );
+      final newAnnouncementFinder = find.descendant(
+        of: find.byType(AdminCompactHeader),
+        matching: find.text('New announcement'),
+      );
+      expect(headerRefreshFinder, findsOneWidget);
+      expect(newAnnouncementFinder, findsOneWidget);
+      expect(
+        tester.getTopLeft(headerRefreshFinder).dx,
+        lessThan(tester.getTopLeft(newAnnouncementFinder).dx),
+      );
+
+      final toolbar = tester.widget<AdminSaaSToolbar>(
+        find.byType(AdminSaaSToolbar),
+      );
+      expect(toolbar.onRefresh, isNull);
+      expect(
+        find.descendant(
+          of: find.byType(AdminSaaSToolbar),
+          matching: find.byTooltip('Refresh announcements'),
+        ),
+        findsNothing,
+      );
+      expect(toolbar.filters, hasLength(5));
+      for (var i = 0; i < 4; i++) {
+        expect(toolbar.filters[i], isA<DirectoryToolbarFilterChip>());
+      }
+      expect(
+        toolbar.filters[4],
+        isA<DirectoryFilterField<AnnouncementPriority?>>(),
+      );
+      final lastChipDx = tester
+          .getTopLeft(find.byType(DirectoryToolbarFilterChip).last)
+          .dx;
+      final priorityDropdownDx = tester
+          .getTopLeft(find.byType(DirectoryFilterField<AnnouncementPriority?>))
+          .dx;
+      expect(lastChipDx, lessThan(priorityDropdownDx));
       expect(find.text('120'), findsOneWidget);
 
       // Active view hides archived by default.
@@ -308,7 +370,12 @@ void main() {
 
       // Fail on refresh keeps list visible with warning banner.
       service.throwOnGetAll = true;
-      await tester.tap(find.byTooltip('Refresh announcements'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('Refresh'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(
         find.text(

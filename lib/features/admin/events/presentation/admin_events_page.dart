@@ -30,7 +30,16 @@ import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 enum _EventSort { soonest, newestAdded, mostGoing, titleAsc }
 
 class AdminEventsScreen extends StatefulWidget {
-  const AdminEventsScreen({super.key});
+  const AdminEventsScreen({
+    super.key,
+    this.eventService,
+    this.rsvpService,
+    this.enableLiveUpdates = true,
+  });
+
+  final EventService? eventService;
+  final EventRsvpService? rsvpService;
+  final bool enableLiveUpdates;
 
   @override
   State<AdminEventsScreen> createState() => _AdminEventsScreenState();
@@ -41,8 +50,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   @override
   bool get wantKeepAlive => true;
 
-  final _eventService = EventService();
-  final _rsvpService = EventRsvpService();
+  late final EventService _eventService = widget.eventService ?? EventService();
+  late final EventRsvpService _rsvpService =
+      widget.rsvpService ?? EventRsvpService();
   final _searchController = TextEditingController();
   final _supabase = Supabase.instance.client;
 
@@ -77,7 +87,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _load(showSpinner: true);
-      _startLiveUpdates();
+      if (widget.enableLiveUpdates) {
+        _startLiveUpdates();
+      }
     });
   }
 
@@ -408,10 +420,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       children: [
         AdminCompactHeader(
           title: 'Events',
-          countBadge: _hasLoaded ? '${_active.length} active' : null,
-          subtitle: _showCalendar
-              ? 'Plan by date — tap a highlighted day to manage events'
-              : 'Create, monitor attendance, and keep alumni engaged',
           actions: [
             OutlinedButton.icon(
               onPressed: _loading ? null : () => _load(showSpinner: true),
@@ -732,6 +740,33 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       searchHint: 'Search title, batch, venue, or category…',
       searchWidth: 240,
       filters: [
+        AdminEventDateRangeChip(
+          from: _from,
+          to: _to,
+          onTap: _pickDateRange,
+          onClear: (_from != null || _to != null)
+              ? () {
+                  setState(() {
+                    _from = null;
+                    _to = null;
+                  });
+                  _applyFilters();
+                }
+              : null,
+        ),
+        for (final chip in const [
+          ('All', 0),
+          ('This week', 1),
+          ('Next 3 days', 2),
+        ])
+          DirectoryToolbarFilterChip(
+            label: chip.$1,
+            selected: _quickFilter == chip.$2,
+            onSelected: (_) {
+              setState(() => _quickFilter = chip.$2);
+              _applyFilters();
+            },
+          ),
         DirectoryFilterField<String?>(
           label: 'Category',
           value: _category,
@@ -784,33 +819,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
             _applyFilters();
           },
         ),
-        AdminEventDateRangeChip(
-          from: _from,
-          to: _to,
-          onTap: _pickDateRange,
-          onClear: (_from != null || _to != null)
-              ? () {
-                  setState(() {
-                    _from = null;
-                    _to = null;
-                  });
-                  _applyFilters();
-                }
-              : null,
-        ),
-        for (final chip in const [
-          ('All', 0),
-          ('This week', 1),
-          ('Next 3 days', 2),
-        ])
-          DirectoryToolbarFilterChip(
-            label: chip.$1,
-            selected: _quickFilter == chip.$2,
-            onSelected: (_) {
-              setState(() => _quickFilter = chip.$2);
-              _applyFilters();
-            },
-          ),
       ],
       sortControl: DirectoryFilterField<_EventSort>(
         label: 'Sort',

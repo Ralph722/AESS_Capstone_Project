@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:alumni_system/features/admin/forum/presentation/admin_forum_page.dart';
 import 'package:alumni_system/features/admin/forum/widgets/admin_forum_ui.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
@@ -261,7 +262,74 @@ void main() {
         expect(find.byType(AdminSaaSTabs), findsOneWidget);
         expect(find.byType(AdminMetricRibbon), findsOneWidget);
         expect(find.byType(AdminSaaSToolbar), findsOneWidget);
-        expect(find.text('3 topics'), findsOneWidget);
+        final header = tester.widget<AdminCompactHeader>(
+          find.byType(AdminCompactHeader),
+        );
+        expect(header.title, 'Forum Moderation');
+        expect(header.countBadge, isNull);
+        expect(header.subtitle, isNull);
+        expect(
+          find.descendant(
+            of: find.byType(AdminCompactHeader),
+            matching: find.byIcon(Icons.info_outline_rounded),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AdminCompactHeader),
+            matching: find.textContaining('topics'),
+          ),
+          findsNothing,
+        );
+
+        final headerRefresh = find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('Refresh'),
+        );
+        final headerExport = find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('Export'),
+        );
+        final headerNewAnnouncement = find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('New announcement'),
+        );
+        expect(headerRefresh, findsOneWidget);
+        expect(headerExport, findsOneWidget);
+        expect(headerNewAnnouncement, findsOneWidget);
+        expect(
+          tester.getTopLeft(headerRefresh).dx,
+          lessThan(tester.getTopLeft(headerExport).dx),
+        );
+        expect(
+          tester.getTopLeft(headerExport).dx,
+          lessThan(tester.getTopLeft(headerNewAnnouncement).dx),
+        );
+
+        final toolbar = tester.widget<AdminSaaSToolbar>(
+          find.byType(AdminSaaSToolbar),
+        );
+        expect(toolbar.onRefresh, isNull);
+        expect(
+          find.descendant(
+            of: find.byType(AdminSaaSToolbar),
+            matching: find.byTooltip('Refresh discussions'),
+          ),
+          findsNothing,
+        );
+        expect(toolbar.filters, hasLength(6));
+        for (var i = 0; i < 5; i++) {
+          expect(toolbar.filters[i], isA<ForumToolbarFilterChip>());
+        }
+        expect(toolbar.filters[5], isA<DirectoryFilterField<String?>>());
+        final lastChipDx = tester
+            .getTopLeft(find.byType(ForumToolbarFilterChip).last)
+            .dx;
+        final programDropdownDx = tester
+            .getTopLeft(find.byType(DirectoryFilterField<String?>))
+            .dx;
+        expect(lastChipDx, lessThan(programDropdownDx));
         expect(service.getAllTopicsCalls, 1);
 
         expect(find.text('Career Fair 2026 Schedule'), findsOneWidget);
@@ -472,6 +540,30 @@ void main() {
       await tester.tap(find.text('Reports'));
       await tester.pumpAndSettle();
 
+      final reportsHeader = tester.widget<AdminCompactHeader>(
+        find.byType(AdminCompactHeader),
+      );
+      expect(reportsHeader.countBadge, isNull);
+      expect(reportsHeader.subtitle, isNull);
+      expect(
+        find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('Refresh'),
+        ),
+        findsOneWidget,
+      );
+      final reportsToolbar = tester.widget<AdminSaaSToolbar>(
+        find.byType(AdminSaaSToolbar),
+      );
+      expect(reportsToolbar.onRefresh, isNull);
+      expect(
+        find.descendant(
+          of: find.byType(AdminSaaSToolbar),
+          matching: find.byTooltip('Refresh reports'),
+        ),
+        findsNothing,
+      );
+
       expect(find.byType(AdminForumReportCard), findsOneWidget);
       expect(find.text('Off-topic promotional link posted.'), findsOneWidget);
 
@@ -519,7 +611,12 @@ void main() {
         expect(find.text('Career Fair 2026 Schedule'), findsOneWidget);
 
         service.throwOnGetTopics = true;
-        await tester.tap(find.byTooltip('Refresh discussions'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AdminCompactHeader),
+            matching: find.text('Refresh'),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.text('Career Fair 2026 Schedule'), findsOneWidget);
         expect(

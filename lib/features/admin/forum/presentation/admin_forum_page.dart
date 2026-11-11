@@ -609,21 +609,31 @@ class _AdminForumScreenState extends State<AdminForumScreen>
         ? _catalog.isNotEmpty
         : _reports.isNotEmpty;
 
+    final refreshButton = OutlinedButton.icon(
+      onPressed: _loading
+          ? null
+          : () => _mode == _AdminForumMode.discussions
+              ? _refresh()
+              : _loadReportsOnly(),
+      icon: _loading && _hasLoaded
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh_rounded, size: 15),
+      label: Text(_loading && _hasLoaded ? 'Refreshing…' : 'Refresh'),
+      style: AdminButtonStyles.outlined(),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AdminCompactHeader(
           title: 'Forum Moderation',
-          countBadge: _hasLoaded
-              ? (_mode == _AdminForumMode.discussions
-                  ? '$_statTotal topics'
-                  : '$_statOpenReports open')
-              : null,
-          subtitle: _mode == _AdminForumMode.reports
-              ? 'Review alumni reports on discussions and replies.'
-              : 'Moderate alumni discussions and announcements.',
           actions: _mode == _AdminForumMode.discussions
               ? [
+                  refreshButton,
                   OutlinedButton.icon(
                     onPressed:
                         _visibleTopics.isEmpty || _loading ? null : _exportCsv,
@@ -638,7 +648,7 @@ class _AdminForumScreenState extends State<AdminForumScreen>
                     style: AdminButtonStyles.filled(),
                   ),
                 ]
-              : const [],
+              : [refreshButton],
         ),
         const SizedBox(height: AdminDensity.space2),
         Align(
@@ -877,9 +887,6 @@ class _AdminForumScreenState extends State<AdminForumScreen>
         _searchController.clear();
         setState(() => _search = '');
       },
-      isLoading: _loading,
-      onRefresh: () => _loadReportsOnly(),
-      refreshTooltip: 'Refresh reports',
       hasActiveFilters: _hasActiveReportFilters,
       onResetFilters: _resetReportFilters,
       activeFilterChips: [
@@ -1017,37 +1024,12 @@ class _AdminForumScreenState extends State<AdminForumScreen>
         setState(() => _search = '');
         _applyTopicFilters();
       },
-      isLoading: _loading,
-      onRefresh: () => _refresh(),
-      refreshTooltip: 'Refresh discussions',
       hasActiveFilters: _hasActiveFilters,
       onResetFilters: _resetFilters,
       activeFilterChips: _activeFilterChips(),
       searchHint: 'Search title, author, program, or tags…',
       searchWidth: 250,
       filters: [
-        DirectoryFilterField<String?>(
-          label: 'Program',
-          width: 136,
-          dense: true,
-          value: _programFilter,
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('All programs'),
-            ),
-            ..._allPrograms.map(
-              (p) => DropdownMenuItem(
-                value: p,
-                child: Text(p, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-            ),
-          ],
-          onChanged: (v) {
-            setState(() => _programFilter = v);
-            _applyTopicFilters();
-          },
-        ),
         ForumToolbarFilterChip(
           label: 'Pinned',
           selected: _filters.contains(ForumListFilter.pinned),
@@ -1073,6 +1055,28 @@ class _AdminForumScreenState extends State<AdminForumScreen>
           selected: _lockedOnly,
           onSelected: (v) {
             setState(() => _lockedOnly = v);
+            _applyTopicFilters();
+          },
+        ),
+        DirectoryFilterField<String?>(
+          label: 'Program',
+          width: 136,
+          dense: true,
+          value: _programFilter,
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('All programs'),
+            ),
+            ..._allPrograms.map(
+              (p) => DropdownMenuItem(
+                value: p,
+                child: Text(p, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ],
+          onChanged: (v) {
+            setState(() => _programFilter = v);
             _applyTopicFilters();
           },
         ),

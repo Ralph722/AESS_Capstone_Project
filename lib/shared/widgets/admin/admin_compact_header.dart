@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Compact SaaS-style page header for Admin Portal screens.
@@ -49,14 +50,18 @@ class AdminCompactHeader extends StatelessWidget {
               leading!,
               const SizedBox(width: 8),
             ],
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-                color: AdminColors.textPrimary,
-                height: 1.2,
-                letterSpacing: -0.4,
+            Flexible(
+              child: Text(
+                title,
+                maxLines: isNarrow ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  color: AdminColors.textPrimary,
+                  height: 1.2,
+                  letterSpacing: -0.4,
+                ),
               ),
             ),
             if (countBadge != null && countBadge!.trim().isNotEmpty) ...[
@@ -105,7 +110,15 @@ class AdminCompactHeader extends StatelessWidget {
               );
 
         if (actionRow == null) {
-          return titleRow;
+          return ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: AdminDensity.buttonHeight,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: titleRow,
+            ),
+          );
         }
 
         if (isNarrow) {
@@ -119,13 +132,18 @@ class AdminCompactHeader extends StatelessWidget {
           );
         }
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(child: titleRow),
-            const SizedBox(width: 16),
-            actionRow,
-          ],
+        return ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: AdminDensity.buttonHeight,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: titleRow),
+              const SizedBox(width: 16),
+              actionRow,
+            ],
+          ),
         );
       },
     );

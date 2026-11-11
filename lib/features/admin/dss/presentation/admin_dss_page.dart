@@ -874,52 +874,28 @@ class _AdminDssScreenState extends State<AdminDssScreen>
           value: '$_openCount',
           icon: Icons.flag_outlined,
           color: AdminColors.primary,
-          isSelected: _statusFilter == _DssStatusFilter.open,
           tooltip: 'Active findings waiting to be addressed',
-          onTap: () => setState(() {
-            _statusFilter = _statusFilter == _DssStatusFilter.open
-                ? _DssStatusFilter.queue
-                : _DssStatusFilter.open;
-          }),
         ),
         AdminMetricRibbonItem(
           label: 'In progress',
           value: '$_inProgressCount',
           icon: Icons.pending_actions_outlined,
           color: UstpColors.orange,
-          isSelected: _statusFilter == _DssStatusFilter.inProgress,
           tooltip: 'Findings with action currently underway',
-          onTap: () => setState(() {
-            _statusFilter = _statusFilter == _DssStatusFilter.inProgress
-                ? _DssStatusFilter.queue
-                : _DssStatusFilter.inProgress;
-          }),
         ),
         AdminMetricRibbonItem(
           label: 'Resolved',
           value: '$_resolvedCount',
           icon: Icons.check_circle_outline,
           color: AdminColors.success,
-          isSelected: _statusFilter == _DssStatusFilter.resolved,
           tooltip: 'Findings closed with action documentation',
-          onTap: () => setState(() {
-            _statusFilter = _statusFilter == _DssStatusFilter.resolved
-                ? _DssStatusFilter.queue
-                : _DssStatusFilter.resolved;
-          }),
         ),
         AdminMetricRibbonItem(
           label: 'Watch',
           value: '$_watchCount',
           icon: Icons.visibility_outlined,
           color: AdminColors.secondary,
-          isSelected: _statusFilter == _DssStatusFilter.watch,
           tooltip: 'Threshold reached but too few responses for finding status',
-          onTap: () => setState(() {
-            _statusFilter = _statusFilter == _DssStatusFilter.watch
-                ? _DssStatusFilter.queue
-                : _DssStatusFilter.watch;
-          }),
         ),
       ],
     );

@@ -793,13 +793,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 tooltip: _deactivatedCount > 0
                     ? 'Total alumni records, incl. $_deactivatedCount deactivated'
                     : 'Total alumni records',
-                onTap: () => setState(() {
-                  _registrationFilter = AlumniRegistrationFilter.all;
-                  _activeFilter = AlumniActiveFilter.all;
-                  _viewIndex = 0;
-                  _page = 0;
-                  _applyFilters();
-                }),
               ),
               AdminMetricRibbonItem(
                 label: 'Registered',
@@ -807,14 +800,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 icon: Icons.verified_outlined,
                 color: AdminColors.secondary,
                 tooltip: 'Signed in to the portal app',
-                onTap: () => setState(() {
-                  _registrationFilter =
-                      _registrationFilter == AlumniRegistrationFilter.registered
-                          ? AlumniRegistrationFilter.all
-                          : AlumniRegistrationFilter.registered;
-                  _page = 0;
-                  _applyFilters();
-                }),
               ),
               AdminMetricRibbonItem(
                 label: 'Not registered',
@@ -822,14 +807,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 icon: Icons.person_add_disabled_outlined,
                 color: UstpColors.orange,
                 tooltip: 'Awaiting app signup',
-                onTap: () => setState(() {
-                  _registrationFilter =
-                      _registrationFilter == AlumniRegistrationFilter.notRegistered
-                          ? AlumniRegistrationFilter.all
-                          : AlumniRegistrationFilter.notRegistered;
-                  _page = 0;
-                  _applyFilters();
-                }),
               ),
               AdminMetricRibbonItem(
                 label: 'Active (30d)',
@@ -837,13 +814,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                 icon: Icons.online_prediction_outlined,
                 color: AdminColors.success,
                 tooltip: 'Recently active users in past 30 days',
-                onTap: () => setState(() {
-                  _activeFilter = _activeFilter == AlumniActiveFilter.active30
-                      ? AlumniActiveFilter.all
-                      : AlumniActiveFilter.active30;
-                  _page = 0;
-                  _applyFilters();
-                }),
               ),
             ],
           ),

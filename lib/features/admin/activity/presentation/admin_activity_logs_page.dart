@@ -282,17 +282,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     );
   }
 
-  bool get _isTodayFilterActive {
-    if (_startDate == null || _endDate == null) return false;
-    final now = DateTime.now();
-    return _startDate!.year == now.year &&
-        _startDate!.month == now.month &&
-        _startDate!.day == now.day &&
-        _endDate!.year == now.year &&
-        _endDate!.month == now.month &&
-        _endDate!.day == now.day;
-  }
-
   String? get _headerCountBadge {
     if (!_hasLoaded) return null;
     if (_logs.length >= _fetchLimit) return '$_fetchLimit+ logs';
@@ -388,12 +377,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
   }
 
   Widget _buildMetrics() {
-    final isRangeDefault = _actorTypeFilter == 'All' &&
-        _statusFilter == 'All' &&
-        _categoryFilter == 'All' &&
-        _startDate == null &&
-        _endDate == null;
-
     return AdminMetricRibbon(
       items: [
         AdminMetricRibbonItem(
@@ -401,114 +384,42 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
           value: '${_stats.total}',
           icon: Icons.history,
           color: AdminColors.primary,
-          isSelected: isRangeDefault,
-          tooltip: 'All events in date range — click to clear quick filters',
-          onTap: () {
-            if (isRangeDefault) return;
-            setState(() {
-              _actorTypeFilter = 'All';
-              _statusFilter = 'All';
-              _categoryFilter = 'All';
-              _startDate = null;
-              _endDate = null;
-              _page = 0;
-            });
-            _loadLogs(refreshStats: true);
-          },
+          tooltip: 'All events in the current date range',
         ),
         AdminMetricRibbonItem(
           label: 'Today',
           value: '${_stats.today}',
           icon: Icons.today_outlined,
           color: AdminColors.info,
-          isSelected: _isTodayFilterActive,
-          tooltip: 'Events recorded today — click to toggle',
-          onTap: () {
-            if (_isTodayFilterActive) {
-              setState(() {
-                _startDate = null;
-                _endDate = null;
-                _page = 0;
-              });
-            } else {
-              final now = DateTime.now();
-              final today = DateTime(now.year, now.month, now.day);
-              setState(() {
-                _startDate = today;
-                _endDate = today;
-                _page = 0;
-              });
-            }
-            _loadLogs(refreshStats: true);
-          },
+          tooltip: 'Events recorded today',
         ),
         AdminMetricRibbonItem(
           label: 'Admin actions',
           value: '${_stats.adminActions}',
           icon: Icons.admin_panel_settings_outlined,
           color: AdminColors.accent,
-          isSelected: _actorTypeFilter == AuditActorTypes.admin,
-          tooltip: 'Administrator activity — click to toggle',
-          onTap: () {
-            setState(() {
-              _actorTypeFilter = _actorTypeFilter == AuditActorTypes.admin
-                  ? 'All'
-                  : AuditActorTypes.admin;
-              _page = 0;
-            });
-            _loadLogs();
-          },
+          tooltip: 'Administrator activity',
         ),
         AdminMetricRibbonItem(
           label: 'Security',
           value: '${_stats.securityEvents}',
           icon: Icons.shield_outlined,
           color: AdminColors.warning,
-          isSelected: _categoryFilter == AuditCategories.security,
-          tooltip: 'Security-category events — click to toggle',
-          onTap: () {
-            setState(() {
-              _categoryFilter = _categoryFilter == AuditCategories.security
-                  ? 'All'
-                  : AuditCategories.security;
-              _page = 0;
-            });
-            _loadLogs();
-          },
+          tooltip: 'Security-category events',
         ),
         AdminMetricRibbonItem(
           label: 'Failed',
           value: '${_stats.failed}',
           icon: Icons.error_outline,
           color: AdminColors.danger,
-          isSelected: _statusFilter == AuditStatus.failed,
-          tooltip: 'Failed or rejected actions — click to toggle FAILED filter',
-          onTap: () {
-            setState(() {
-              _statusFilter = _statusFilter == AuditStatus.failed
-                  ? 'All'
-                  : AuditStatus.failed;
-              _page = 0;
-            });
-            _loadLogs();
-          },
+          tooltip: 'Failed or rejected actions',
         ),
         AdminMetricRibbonItem(
           label: 'System',
           value: '${_stats.systemEvents}',
           icon: Icons.settings_suggest_outlined,
           color: AdminColors.textSecondary,
-          isSelected: _actorTypeFilter == AuditActorTypes.system,
-          tooltip: 'Automated system actors — click to toggle',
-          onTap: () {
-            setState(() {
-              _actorTypeFilter = _actorTypeFilter == AuditActorTypes.system
-                  ? 'All'
-                  : AuditActorTypes.system;
-              _page = 0;
-            });
-            _loadLogs();
-          },
+          tooltip: 'Automated system actors',
         ),
       ],
     );

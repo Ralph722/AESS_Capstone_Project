@@ -71,6 +71,7 @@ abstract final class AuditActions {
   static const updateAnnouncement = 'UPDATE_ANNOUNCEMENT';
   static const publishAnnouncement = 'PUBLISH_ANNOUNCEMENT';
   static const archiveAnnouncement = 'ARCHIVE_ANNOUNCEMENT';
+  static const restoreAnnouncement = 'RESTORE_ANNOUNCEMENT';
   static const deleteAnnouncement = 'DELETE_ANNOUNCEMENT';
 
   // Forum (selective)

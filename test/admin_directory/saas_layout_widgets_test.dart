@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
@@ -32,6 +34,89 @@ void main() {
 
       await tester.tap(find.text('Add Alumni'));
       expect(addClicked, isTrue);
+    });
+
+    testWidgets(
+        'maintains uniform 36px height and title alignment across desktop button and 36px control headers',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1366, 900);
+      addTearDown(tester.view.reset);
+
+      Future<(Rect header, Rect title, double? fontSize)> pumpHeader(
+        String title,
+        List<Widget> actions,
+      ) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(
+              platform: TargetPlatform.windows,
+              useMaterial3: true,
+            ),
+            home: Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AdminCompactHeader(
+                      title: title,
+                      actions: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final headerRect = tester.getRect(find.byType(AdminCompactHeader));
+        final titleFinder = find.text(title);
+        final titleRect = tester.getRect(titleFinder);
+        final style = tester.widget<Text>(titleFinder).style;
+        return (headerRect, titleRect, style?.fontSize);
+      }
+
+      final surveysLike = await pumpHeader('Surveys', [
+        OutlinedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.refresh_rounded, size: 15),
+          label: const Text('Refresh'),
+          style: AdminButtonStyles.outlined(),
+        ),
+        FilledButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.add, size: 15),
+          label: const Text('New survey'),
+          style: AdminButtonStyles.filled(),
+        ),
+      ]);
+
+      final insightsLike = await pumpHeader('Program Insights', [
+        Container(
+          height: AdminDensity.buttonHeight,
+          width: 140,
+          alignment: Alignment.center,
+          child: const Text('Updated just now'),
+        ),
+        FilledButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.analytics_outlined, size: 17),
+          label: const Text('Re-run analysis'),
+          style: AdminButtonStyles.filled(),
+        ),
+      ]);
+
+      final noActions = await pumpHeader('Reports', const []);
+
+      expect(surveysLike.$1.height, AdminDensity.buttonHeight);
+      expect(insightsLike.$1.height, AdminDensity.buttonHeight);
+      expect(noActions.$1.height, AdminDensity.buttonHeight);
+      expect(insightsLike.$2.top, surveysLike.$2.top);
+      expect(noActions.$2.top, surveysLike.$2.top);
+      expect(insightsLike.$3, 19);
+      expect(surveysLike.$3, 19);
+      expect(tester.takeException(), isNull);
     });
   });
 

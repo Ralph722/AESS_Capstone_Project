@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:alumni_system/features/admin/jobs/presentation/admin_job_management_page.dart';
 import 'package:alumni_system/features/admin/jobs/widgets/admin_job_ui.dart';
+import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/jobs/data/job_interest_service.dart';
 import 'package:alumni_system/features/jobs/data/job_service.dart';
 import 'package:alumni_system/features/jobs/models/job_interest_model.dart';
@@ -198,7 +199,66 @@ void main() {
         expect(find.byType(AdminSaaSTabs), findsOneWidget);
         expect(find.byType(AdminMetricRibbon), findsOneWidget);
         expect(find.byType(AdminSaaSToolbar), findsOneWidget);
-        expect(find.text('2 active'), findsOneWidget);
+        final header = tester.widget<AdminCompactHeader>(
+          find.byType(AdminCompactHeader),
+        );
+        expect(header.title, 'Job Postings');
+        expect(header.countBadge, isNull);
+        expect(header.subtitle, isNull);
+        expect(
+          find.descendant(
+            of: find.byType(AdminCompactHeader),
+            matching: find.byIcon(Icons.info_outline_rounded),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AdminCompactHeader),
+            matching: find.textContaining('active'),
+          ),
+          findsNothing,
+        );
+
+        final headerRefresh = find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('Refresh'),
+        );
+        final headerInsights = find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('Insights'),
+        );
+        final headerPostJob = find.descendant(
+          of: find.byType(AdminCompactHeader),
+          matching: find.text('Post new job'),
+        );
+        expect(headerRefresh, findsOneWidget);
+        expect(headerInsights, findsOneWidget);
+        expect(headerPostJob, findsOneWidget);
+        expect(
+          tester.getTopLeft(headerRefresh).dx,
+          lessThan(tester.getTopLeft(headerInsights).dx),
+        );
+        expect(
+          tester.getTopLeft(headerInsights).dx,
+          lessThan(tester.getTopLeft(headerPostJob).dx),
+        );
+
+        final toolbar = tester.widget<AdminSaaSToolbar>(
+          find.byType(AdminSaaSToolbar),
+        );
+        expect(toolbar.onRefresh, isNull);
+        expect(
+          find.descendant(
+            of: find.byType(AdminSaaSToolbar),
+            matching: find.byTooltip('Refresh job postings'),
+          ),
+          findsNothing,
+        );
+        expect(toolbar.filters, hasLength(4));
+        for (final filter in toolbar.filters) {
+          expect(filter, isA<DirectoryFilterField<String>>());
+        }
 
         // Active tab hides expired & archived jobs by default.
         expect(find.text('Mobile App Engineer'), findsOneWidget);
@@ -228,10 +288,10 @@ void main() {
         expect(find.text('Civil Site Lead'), findsOneWidget);
         expect(find.text('Legacy IT Support'), findsOneWidget);
 
-        // Return to Active via Active metric card.
+        // Return to Active via status tab.
         await tester.tap(
           find.descendant(
-            of: find.byType(AdminMetricRibbon),
+            of: find.byType(AdminSaaSTabs),
             matching: find.text('Active'),
           ),
         );
@@ -431,7 +491,12 @@ void main() {
         expect(find.text('Mobile App Engineer'), findsOneWidget);
 
         service.throwOnGetAll = true;
-        await tester.tap(find.byTooltip('Refresh job postings'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AdminCompactHeader),
+            matching: find.text('Refresh'),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.text('Mobile App Engineer'), findsOneWidget);
         expect(

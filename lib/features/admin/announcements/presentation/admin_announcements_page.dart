@@ -285,6 +285,27 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
       return;
     }
 
+    if (value == 'restore' && a.status == AnnouncementStatus.archived) {
+      setState(() => _busyIds.add(a.id));
+      try {
+        await _service.restoreAnnouncement(a.id);
+        if (!mounted) return;
+        _showSnack('Announcement restored');
+        await _load();
+      } catch (e) {
+        _showSnack(
+          announcementFriendlyError(
+            e,
+            'Could not restore this announcement. Please try again.',
+          ),
+          isError: true,
+        );
+      } finally {
+        if (mounted) setState(() => _busyIds.remove(a.id));
+      }
+      return;
+    }
+
     if (value == 'delete') {
       final label = a.title.trim().isEmpty
           ? 'this announcement'
@@ -334,6 +355,12 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
           label: 'Archive',
           icon: Icons.archive_outlined,
         ),
+      if (a.status == AnnouncementStatus.archived)
+        adminAnnouncementMenuItem(
+          value: 'restore',
+          label: 'Restore',
+          icon: Icons.unarchive_outlined,
+        ),
       const PopupMenuDivider(height: 8),
       adminAnnouncementMenuItem(
         value: 'delete',
@@ -352,54 +379,28 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
           value: '$_draftCount',
           icon: Icons.edit_note_outlined,
           color: AdminColors.warning,
-          isSelected: _statusFilter == _AnnouncementStatusFilter.draft,
-          tooltip: 'Unpublished announcement drafts — click to filter',
-          onTap: () => setState(() {
-            _statusFilter = _statusFilter == _AnnouncementStatusFilter.draft
-                ? _AnnouncementStatusFilter.all
-                : _AnnouncementStatusFilter.draft;
-          }),
+          tooltip: 'Unpublished announcement drafts',
         ),
         AdminMetricRibbonItem(
           label: 'Published',
           value: '$_publishedCount',
           icon: Icons.campaign_outlined,
           color: AdminColors.success,
-          isSelected: _statusFilter == _AnnouncementStatusFilter.published,
-          tooltip: 'Live alumni notices — click to filter',
-          onTap: () => setState(() {
-            _statusFilter =
-                _statusFilter == _AnnouncementStatusFilter.published
-                    ? _AnnouncementStatusFilter.all
-                    : _AnnouncementStatusFilter.published;
-          }),
+          tooltip: 'Live alumni notices',
         ),
         AdminMetricRibbonItem(
           label: 'Archived',
           value: '$_archivedCount',
           icon: Icons.archive_outlined,
           color: AdminColors.textSecondary,
-          isSelected: _statusFilter == _AnnouncementStatusFilter.archived,
-          tooltip: 'Retired notices — click to view archives',
-          onTap: () => setState(() {
-            _statusFilter =
-                _statusFilter == _AnnouncementStatusFilter.archived
-                    ? _AnnouncementStatusFilter.all
-                    : _AnnouncementStatusFilter.archived;
-          }),
+          tooltip: 'Retired notices available to restore',
         ),
         AdminMetricRibbonItem(
           label: 'Total reach',
           value: '$_reachTotal',
           icon: Icons.groups_outlined,
           color: AdminColors.primary,
-          isSelected: _sort == _AnnouncementSort.reachDesc,
-          tooltip: 'Alumni reached by published notices — click to sort by reach',
-          onTap: () => setState(() {
-            _sort = _sort == _AnnouncementSort.reachDesc
-                ? _AnnouncementSort.newest
-                : _AnnouncementSort.reachDesc;
-          }),
+          tooltip: 'Alumni reached by published notices',
         ),
       ],
     );

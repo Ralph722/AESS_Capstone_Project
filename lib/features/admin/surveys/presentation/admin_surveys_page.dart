@@ -769,8 +769,6 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
           icon: Icons.edit_note_outlined,
           color: UstpColors.orange,
           tooltip: 'Not yet published surveys',
-          onTap: () =>
-              setState(() => _statusFilter = _SurveyStatusFilter.draft),
         ),
         AdminMetricRibbonItem(
           label: 'Published',
@@ -778,8 +776,6 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
           icon: Icons.publish_outlined,
           color: AdminColors.primary,
           tooltip: 'Live, scheduled or window ended waves',
-          onTap: () =>
-              setState(() => _statusFilter = _SurveyStatusFilter.published),
         ),
         AdminMetricRibbonItem(
           label: 'Closed',
@@ -787,8 +783,6 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
           icon: Icons.lock_outline,
           color: AdminColors.textSecondary,
           tooltip: 'Ended survey waves',
-          onTap: () =>
-              setState(() => _statusFilter = _SurveyStatusFilter.closed),
         ),
         AdminMetricRibbonItem(
           label: 'Responses',

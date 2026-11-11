@@ -336,15 +336,27 @@ void main() {
         expect(find.text('Tracer Survey Help'), findsOneWidget);
         expect(find.text('Old Thread Archive'), findsOneWidget);
 
-        // Filter by Needs response metric card without triggering a second fetch.
-        await tester.tap(find.text('Needs response').first);
+        // Filter via Unanswered toolbar chip without triggering a second fetch.
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AdminSaaSToolbar),
+            matching: find.text('Unanswered'),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.text('Tracer Survey Help'), findsOneWidget);
         expect(find.text('Career Fair 2026 Schedule'), findsNothing);
         expect(service.getAllTopicsCalls, 1);
 
-        // Toggle Locked metric card.
-        await tester.tap(find.text('Locked').first);
+        // Toggle Locked toolbar chip.
+        await tester.tap(find.text('Reset'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AdminSaaSToolbar),
+            matching: find.text('Locked'),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.text('Old Thread Archive'), findsOneWidget);
         expect(find.text('Tracer Survey Help'), findsNothing);

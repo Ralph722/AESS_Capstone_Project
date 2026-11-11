@@ -30,6 +30,7 @@ class _FakeAnnouncementService extends AnnouncementService {
   int countAudienceCalls = 0;
   final List<String> createdTitles = [];
   final List<String> archivedIds = [];
+  final List<String> restoredIds = [];
   final List<String> deletedIds = [];
   final List<Announcement> updatedItems = [];
   final List<String> publishedIds = [];
@@ -112,6 +113,15 @@ class _FakeAnnouncementService extends AnnouncementService {
     final idx = items.indexWhere((a) => a.id == id);
     if (idx != -1) {
       items[idx] = items[idx].copyWith(status: AnnouncementStatus.archived);
+    }
+  }
+
+  @override
+  Future<void> restoreAnnouncement(String id) async {
+    restoredIds.add(id);
+    final idx = items.indexWhere((a) => a.id == id);
+    if (idx != -1) {
+      items[idx] = items[idx].copyWith(status: AnnouncementStatus.published);
     }
   }
 
@@ -268,14 +278,24 @@ void main() {
       expect(find.text('Survey Draft Notice'), findsOneWidget);
       expect(find.text('Past Homecoming Recap'), findsNothing);
 
-      // Click Drafts metric card to filter.
-      await tester.tap(find.text('Drafts'));
+      // Filter via Draft toolbar chip.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AdminSaaSToolbar),
+          matching: find.text('Draft'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Survey Draft Notice'), findsOneWidget);
       expect(find.text('Career Fair 2026'), findsNothing);
 
-      // Click Reset filters.
-      await tester.tap(find.text('Drafts'));
+      // Clear status filter via Active chip.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AdminSaaSToolbar),
+          matching: find.text('Active'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Career Fair 2026'), findsOneWidget);
 
@@ -339,6 +359,50 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
       await tester.pumpAndSettle();
       expect(service.deletedIds, ['a-draft']);
+    });
+
+    testWidgets('archived filter can restore a retired announcement', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final service = _FakeAnnouncementService(items: _seedAnnouncements());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AdminAnnouncementsScreen(service: service),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AdminSaaSToolbar),
+          matching: find.textContaining('Archived'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Past Homecoming Recap'), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AnnouncementListCard).first,
+          matching: find.byType(PopupMenuButton<String>),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Restore').last);
+      await tester.pumpAndSettle();
+
+      expect(service.restoredIds, ['a-arch']);
+      expect(
+        service.items.firstWhere((a) => a.id == 'a-arch').status,
+        AnnouncementStatus.published,
+      );
     });
 
     testWidgets('shows error state on initial failure and refresh warning banner on reload failure',

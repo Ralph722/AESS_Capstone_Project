@@ -1,5 +1,6 @@
 import 'package:alumni_system/features/admin/surveys/widgets/admin_survey_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -157,6 +158,45 @@ void main() {
     testWidgets('official CHED shows kind chip with version', (tester) async {
       await _pumpCard(tester, _survey(kind: 'ched_gts_builtin'));
       expect(find.text('Official CHED · v3.0.0'), findsOneWidget);
+    });
+
+    testWidgets(
+        'card contents and pills use uniform dense typography and AdminBadge sizing',
+        (tester) async {
+      await _pumpCard(tester, _survey());
+
+      final titleText = tester.widget<Text>(
+        find.text('Alumni Homecoming Feedback'),
+      );
+      expect(titleText.style?.fontSize, 14);
+      expect(titleText.style?.fontWeight, FontWeight.w700);
+      expect(titleText.style?.letterSpacing, -0.2);
+
+      final responsesHeader = tester.widget<Text>(find.text('RESPONSES'));
+      expect(responsesHeader.style?.fontSize, 11);
+      expect(responsesHeader.style?.fontWeight, FontWeight.w600);
+
+      final metaText = tester.widget<Text>(find.text('Created Oct 1, 2026'));
+      expect(metaText.style?.fontSize, 12);
+
+      final badges = tester.widgetList<AdminBadge>(find.byType(AdminBadge)).toList();
+      expect(badges, hasLength(2));
+      expect(badges.every((b) => b.dense), isTrue);
+
+      final pillText = tester.widget<Text>(find.text('Published'));
+      expect(pillText.style?.fontSize, 10.5);
+      expect(pillText.style?.height, 1.15);
+
+      await _pumpCard(tester, _survey(kind: 'ched_gts_builtin'));
+      final chedPillText = tester.widget<Text>(
+        find.text('Official CHED · v3.0.0'),
+      );
+      expect(chedPillText.style?.fontSize, 10.5);
+      expect(chedPillText.style?.height, 1.15);
+      expect(
+        tester.getSize(find.byType(SurveyStatusChip)).height,
+        tester.getSize(find.byType(SurveyKindChip)).height,
+      );
     });
 
     testWidgets('busy replaces the menu with a spinner', (tester) async {

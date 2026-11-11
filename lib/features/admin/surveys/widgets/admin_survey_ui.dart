@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_badge.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
@@ -133,17 +134,19 @@ class SurveyStatusChip extends StatelessWidget {
     this.archived = false,
     this.scheduled = false,
     this.windowEnded = false,
+    this.dense = true,
   });
 
   /// "Scheduled" only before the open date; "Window ended" once a published
   /// survey is past its close date.
-  factory SurveyStatusChip.fromSurvey(Survey survey) {
+  factory SurveyStatusChip.fromSurvey(Survey survey, {bool dense = true}) {
     final outside = survey.isScheduledWindow;
     return SurveyStatusChip(
       status: survey.status,
       archived: survey.archived,
       scheduled: outside && !survey.isPastClose,
       windowEnded: outside && survey.isPastClose,
+      dense: dense,
     );
   }
 
@@ -151,45 +154,51 @@ class SurveyStatusChip extends StatelessWidget {
   final bool archived;
   final bool scheduled;
   final bool windowEnded;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     if (archived) {
-      return const _SurveyChip(
+      return AdminBadge.neutral(
         label: 'Archived',
-        bg: AdminSurveyTheme.surface,
-        fg: AdminSurveyTheme.textMuted,
         icon: Icons.archive_outlined,
+        dense: dense,
       );
     }
-    final Color bg;
-    final Color fg;
-    final String label;
     switch (status) {
       case SurveyStatus.draft:
-        bg = AdminSurveyTheme.warningBg;
-        fg = AdminSurveyTheme.warning;
-        label = 'Draft';
+        return AdminBadge.warning(
+          label: 'Draft',
+          icon: Icons.edit_note_outlined,
+          dense: dense,
+        );
       case SurveyStatus.published:
         if (windowEnded) {
-          bg = AdminSurveyTheme.warningBg;
-          fg = AdminSurveyTheme.warning;
-          label = 'Window ended';
-        } else if (scheduled) {
-          bg = AdminSurveyTheme.infoBg;
-          fg = AdminSurveyTheme.primary;
-          label = 'Scheduled';
-        } else {
-          bg = AdminSurveyTheme.successBg;
-          fg = AdminSurveyTheme.success;
-          label = 'Published';
+          return AdminBadge.warning(
+            label: 'Window ended',
+            icon: Icons.schedule_rounded,
+            dense: dense,
+          );
         }
+        if (scheduled) {
+          return AdminBadge.info(
+            label: 'Scheduled',
+            icon: Icons.schedule_rounded,
+            dense: dense,
+          );
+        }
+        return AdminBadge.success(
+          label: 'Published',
+          dot: true,
+          dense: dense,
+        );
       case SurveyStatus.closed:
-        bg = AdminSurveyTheme.surface;
-        fg = AdminSurveyTheme.textSecondary;
-        label = 'Closed';
+        return AdminBadge.neutral(
+          label: 'Closed',
+          icon: Icons.lock_outline,
+          dense: dense,
+        );
     }
-    return _SurveyChip(label: label, bg: bg, fg: fg);
   }
 }
 
@@ -202,15 +211,22 @@ SurveyKindLabel surveyKindLabelFor(Survey survey) {
 }
 
 class SurveyKindChip extends StatelessWidget {
-  const SurveyKindChip({super.key, required this.kind, this.schemaVersion});
+  const SurveyKindChip({
+    super.key,
+    required this.kind,
+    this.schemaVersion,
+    this.dense = true,
+  });
 
   final SurveyKindLabel kind;
   final String? schemaVersion;
+  final bool dense;
 
-  factory SurveyKindChip.fromSurvey(Survey survey) {
+  factory SurveyKindChip.fromSurvey(Survey survey, {bool dense = true}) {
     return SurveyKindChip(
       kind: surveyKindLabelFor(survey),
       schemaVersion: survey.schemaVersion ?? survey.templateVersion,
+      dense: dense,
     );
   }
 
@@ -226,20 +242,19 @@ class SurveyKindChip extends StatelessWidget {
           bg: const Color(0xFFFFF7ED),
           fg: const Color(0xFFC2410C),
           icon: Icons.school_outlined,
+          dense: dense,
         );
       case SurveyKindLabel.chedPreset:
-        return _SurveyChip(
+        return AdminBadge.warning(
           label: 'CHED preset',
-          bg: AdminSurveyTheme.warningBg,
-          fg: AdminSurveyTheme.warning,
           icon: Icons.fact_check_outlined,
+          dense: dense,
         );
       case SurveyKindLabel.custom:
-        return const _SurveyChip(
+        return AdminBadge.neutral(
           label: 'Custom',
-          bg: AdminSurveyTheme.surface,
-          fg: AdminSurveyTheme.textSecondary,
           icon: Icons.tune_outlined,
+          dense: dense,
         );
     }
   }
@@ -251,38 +266,45 @@ class _SurveyChip extends StatelessWidget {
     required this.bg,
     required this.fg,
     this.icon,
+    this.dense = true,
   });
 
   final String label;
   final Color bg;
   final Color fg;
   final IconData? icon;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 6 : 8,
+        vertical: dense ? 2 : 3.5,
+      ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: fg.withValues(alpha: 0.20),
+          color: fg.withValues(alpha: 0.18),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 11, color: fg),
+            Icon(icon, size: dense ? 11 : 12, color: fg),
             const SizedBox(width: 4),
           ],
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: dense ? 10.5 : 11.5,
               fontWeight: FontWeight.w600,
               color: fg,
+              height: 1.15,
             ),
           ),
         ],
@@ -1525,7 +1547,7 @@ class SurveyListCard extends StatefulWidget {
     this.busy = false,
   });
 
-  static const zoneLayoutMinWidth = 960.0;
+  static const zoneLayoutMinWidth = 900.0;
 
   final Survey survey;
   final ValueChanged<String> onMenuSelected;
@@ -1546,7 +1568,7 @@ class _SurveyListCardState extends State<SurveyListCard> {
     fontSize: 11,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.3,
-    color: AdminColors.textMuted,
+    color: AdminColors.textSecondary,
   );
   static const _zoneValue = TextStyle(
     fontSize: 13,
@@ -1605,7 +1627,7 @@ class _SurveyListCardState extends State<SurveyListCard> {
 
   Widget _buildZones(Survey s) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       child: Row(
         children: [
           _buildIcon(s),
@@ -1624,12 +1646,12 @@ class _SurveyListCardState extends State<SurveyListCard> {
 
   Widget _buildStacked(Survey s) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildIcon(s),
-          const SizedBox(width: 12),
+          _buildIcon(s, size: 36),
+          const SizedBox(width: 10),
           Expanded(child: _buildIdentity(s, meta: _stackedMeta(s))),
           _buildMenu(),
         ],
@@ -1637,12 +1659,12 @@ class _SurveyListCardState extends State<SurveyListCard> {
     );
   }
 
-  Widget _buildIcon(Survey s) {
+  Widget _buildIcon(Survey s, {double size = 40}) {
     final official = s.isChedGtsBuiltin;
     return ExcludeSemantics(
       child: Container(
-        width: 40,
-        height: 40,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: official
               ? const Color(0xFFFFF7ED)
@@ -1657,7 +1679,7 @@ class _SurveyListCardState extends State<SurveyListCard> {
         ),
         child: Icon(
           official ? Icons.school_outlined : Icons.poll_outlined,
-          size: 20,
+          size: size >= 40 ? 20 : 18,
           color: official ? const Color(0xFFC2410C) : AdminColors.primary,
         ),
       ),
@@ -1678,16 +1700,18 @@ class _SurveyListCardState extends State<SurveyListCard> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
               height: 1.3,
               color: AdminColors.textPrimary,
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Wrap(
           spacing: 6,
           runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             SurveyStatusChip.fromSurvey(s),
             SurveyKindChip.fromSurvey(s),
@@ -1839,7 +1863,7 @@ class _SurveyListCardState extends State<SurveyListCard> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
       ),
-      icon: const Icon(Icons.more_vert, color: AdminColors.textMuted),
+      icon: const Icon(Icons.more_vert, color: AdminColors.textSecondary),
     );
   }
 }

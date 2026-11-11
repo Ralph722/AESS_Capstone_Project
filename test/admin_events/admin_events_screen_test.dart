@@ -61,6 +61,10 @@ void main() {
     expect(headerWidget.title, 'Events');
     expect(headerWidget.countBadge, isNull);
     expect(headerWidget.subtitle, isNull);
+    expect(find.text('Active'), findsWidgets);
+    expect(find.text('Archived'), findsWidgets);
+    expect(find.text('Calendar'), findsOneWidget);
+    expect(find.text('List'), findsNothing);
     expect(
       find.descendant(
         of: find.byType(AdminCompactHeader),

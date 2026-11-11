@@ -358,7 +358,7 @@ void main() {
   });
 
   testWidgets(
-      'tabs, metric quick-filters, debounced search, reset, and scoped stats reload work',
+      'tabs, debounced search, reset, and scoped stats reload work',
       (tester) async {
     final yesterday = DateTime.now().subtract(const Duration(days: 2));
     final service = _FakeAuditService(
@@ -402,17 +402,6 @@ void main() {
     expect(service.statsCalls, 1);
     expect(find.text('1 log'), findsOneWidget);
     expect(find.text('Category: security'), findsOneWidget);
-
-    // Metric ribbon Today toggle changes date range -> refreshes stats
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AdminMetricRibbon),
-        matching: find.text('Today'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(service.recordedQueries.last.startDate, isNotNull);
-    expect(service.statsCalls, 2);
 
     // Search debounce queries after 300ms and shows empty state when no match
     final searchField = find.byWidgetPredicate(

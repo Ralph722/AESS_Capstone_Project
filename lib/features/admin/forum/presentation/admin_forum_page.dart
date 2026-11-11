@@ -759,24 +759,14 @@ class _AdminForumScreenState extends State<AdminForumScreen>
             value: '$_statOpenReports',
             icon: Icons.flag_outlined,
             color: AdminColors.warning,
-            isSelected: _reportStatus == 'open',
-            tooltip: 'Open alumni flags — click to view open reports',
-            onTap: () {
-              setState(() => _reportStatus = 'open');
-              _loadReportsOnly();
-            },
+            tooltip: 'Open alumni flags',
           ),
           AdminMetricRibbonItem(
             label: 'Showing',
             value: '${_reports.length}',
             icon: Icons.inbox_outlined,
             color: AdminColors.primary,
-            isSelected: _reportStatus == 'all',
-            tooltip: 'All loaded reports — click to view all statuses',
-            onTap: () {
-              setState(() => _reportStatus = 'all');
-              _loadReportsOnly();
-            },
+            tooltip: 'Reports matching the current filter',
           ),
           AdminMetricRibbonItem(
             label: 'Open in list',
@@ -790,12 +780,7 @@ class _AdminForumScreenState extends State<AdminForumScreen>
             value: '$resolved',
             icon: Icons.check_circle_outline,
             color: AdminColors.success,
-            isSelected: _reportStatus == 'resolved',
-            tooltip: 'Resolved reports — click to view resolved items',
-            onTap: () {
-              setState(() => _reportStatus = 'resolved');
-              _loadReportsOnly();
-            },
+            tooltip: 'Resolved reports in the active filter',
           ),
         ],
       );
@@ -808,48 +793,21 @@ class _AdminForumScreenState extends State<AdminForumScreen>
           value: '$_statTotal',
           icon: Icons.forum_outlined,
           color: AdminColors.primary,
-          isSelected: !_hasActiveFilters,
-          tooltip: 'All discussions — click to clear filters',
-          onTap: _resetFilters,
+          tooltip: 'All forum discussions',
         ),
         AdminMetricRibbonItem(
           label: 'Needs response',
           value: '$_statUnanswered',
           icon: Icons.mark_chat_unread_outlined,
           color: AdminColors.warning,
-          isSelected: _filters.contains(ForumListFilter.unanswered),
-          tooltip: 'Unanswered topics with zero replies — click to filter',
-          onTap: () {
-            final alreadyOnly =
-                _filters.contains(ForumListFilter.unanswered) && !_lockedOnly;
-            setState(() {
-              _filters.clear();
-              if (alreadyOnly) {
-                _filters.add(ForumListFilter.all);
-              } else {
-                _filters.add(ForumListFilter.unanswered);
-              }
-              _lockedOnly = false;
-            });
-            _applyTopicFilters();
-          },
+          tooltip: 'Unanswered topics with zero replies',
         ),
         AdminMetricRibbonItem(
           label: 'Locked',
           value: '$_statLocked',
           icon: Icons.lock_outline,
           color: AdminColors.textSecondary,
-          isSelected: _lockedOnly,
-          tooltip: 'Topics closed for replies — click to filter',
-          onTap: () {
-            setState(() {
-              _filters
-                ..clear()
-                ..add(ForumListFilter.all);
-              _lockedOnly = !_lockedOnly;
-            });
-            _applyTopicFilters();
-          },
+          tooltip: 'Topics closed for replies',
         ),
         AdminMetricRibbonItem(
           label: 'Open reports',
@@ -858,17 +816,7 @@ class _AdminForumScreenState extends State<AdminForumScreen>
           color: _statOpenReports > 0
               ? AdminColors.danger
               : AdminColors.textSecondary,
-          tooltip: 'Flagged topics and replies — click to open Reports tab',
-          onTap: () {
-            setState(() {
-              _mode = _AdminForumMode.reports;
-              _reportStatus = 'open';
-              _search = '';
-              _searchController.clear();
-              _error = null;
-            });
-            _loadReportsOnly();
-          },
+          tooltip: 'Flagged topics and replies',
         ),
       ],
     );

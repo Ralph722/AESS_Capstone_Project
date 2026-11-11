@@ -162,6 +162,29 @@ class AnnouncementService {
     );
   }
 
+  /// Restores an archived announcement to published (visible to alumni again).
+  Future<void> restoreAnnouncement(String id) async {
+    final item = await getAnnouncement(id);
+    if (item == null) throw Exception('Announcement not found');
+    if (item.status != AnnouncementStatus.archived) {
+      throw Exception('Only archived announcements can be restored');
+    }
+
+    final restored = item.copyWith(status: AnnouncementStatus.published);
+    await updateAnnouncement(restored, audit: false);
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.restoreAnnouncement,
+        resource: 'Announcement',
+        resourceId: id,
+        description: 'Restored announcement: ${item.title}',
+        userRole: 'admin',
+        module: AuditModules.announcements,
+        targetLabel: item.title,
+      ),
+    );
+  }
+
   Future<List<TracerProfile>> _fetchEligibleAlumni() async {
     final rows = await _supabase
         .from('users')

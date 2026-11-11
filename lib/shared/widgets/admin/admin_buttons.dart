@@ -11,6 +11,7 @@ abstract final class AdminButtonStyles {
     backgroundColor: background ?? AdminColors.primary,
     foregroundColor: foreground,
     minimumSize: const Size(0, AdminDensity.buttonHeight),
+    visualDensity: VisualDensity.standard,
     padding: const EdgeInsets.symmetric(horizontal: 16),
     elevation: 0,
     shape: RoundedRectangleBorder(
@@ -22,6 +23,7 @@ abstract final class AdminButtonStyles {
     foregroundColor: AdminColors.textPrimary,
     side: const BorderSide(color: AdminColors.border),
     minimumSize: const Size(0, AdminDensity.buttonHeight),
+    visualDensity: VisualDensity.standard,
     padding: const EdgeInsets.symmetric(horizontal: 14),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
@@ -34,6 +36,7 @@ abstract final class AdminButtonStyles {
   static ButtonStyle ghost({Color? foreground}) => TextButton.styleFrom(
     foregroundColor: foreground ?? AdminColors.textPrimary,
     minimumSize: const Size(0, AdminDensity.buttonHeight),
+    visualDensity: VisualDensity.standard,
     padding: const EdgeInsets.symmetric(horizontal: 12),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
@@ -45,6 +48,7 @@ abstract final class AdminButtonStyles {
     backgroundColor: AdminColors.surface,
     foregroundColor: AdminColors.textPrimary,
     minimumSize: const Size(0, AdminDensity.buttonHeight),
+    visualDensity: VisualDensity.standard,
     padding: const EdgeInsets.symmetric(horizontal: 14),
     elevation: 0,
     shape: RoundedRectangleBorder(

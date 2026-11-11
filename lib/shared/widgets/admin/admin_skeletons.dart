@@ -895,55 +895,6 @@ class _ActivityMetricSkeletonTile extends StatelessWidget {
   }
 }
 
-/// Archives tab list.
-class AdminArchiveListSkeleton extends StatelessWidget {
-  const AdminArchiveListSkeleton({super.key, this.count = 5});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: ShimmerScope(
-        child: Column(
-          children: List.generate(
-            count,
-            (i) => Padding(
-              padding: EdgeInsets.only(bottom: i < count - 1 ? 12 : 0),
-              child: Container(
-                height: 72,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.all(14),
-                child: const Row(
-                  children: [
-                    Skeleton(width: 44, height: 44, borderRadius: BorderRadius.all(Radius.circular(8))),
-                    SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Skeleton(width: double.infinity, height: 14),
-                          SizedBox(height: 8),
-                          Skeleton(width: 100, height: 12),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Editor / detail form pages.
 class AdminFormEditorSkeleton extends StatelessWidget {
   const AdminFormEditorSkeleton({super.key, this.fieldCount = 5});

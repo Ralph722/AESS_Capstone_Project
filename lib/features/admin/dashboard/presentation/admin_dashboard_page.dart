@@ -14,7 +14,6 @@ import 'package:alumni_system/features/announcements/data/announcement_service.d
 import 'package:alumni_system/features/alumni/tracer/data/id_tracer_service.dart';
 import 'package:alumni_system/features/feedback/data/feedback_service.dart';
 import 'package:alumni_system/features/admin/activity/presentation/admin_activity_logs_page.dart';
-import 'package:alumni_system/features/admin/archives/presentation/admin_archives_page.dart';
 import 'package:alumni_system/features/admin/dashboard/presentation/admin_dashboard_home.dart';
 import 'package:alumni_system/features/admin/dashboard/application/admin_dashboard_metrics.dart';
 import 'package:alumni_system/features/admin/dashboard/application/dashboard_activity_trend.dart';
@@ -119,11 +118,12 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
   VoidCallback? _surveyCatalogListener;
   final Map<int, Widget> _pageCache = {};
   final Set<int> _visitedMenuItems = {0};
+  // Index 4 (legacy Archives hub) intentionally unused — archived content
+  // lives under each module's Archived filter/tab.
   static const List<int> _pageOrder = <int>[
     0,
     1,
     2,
-    4,
     5,
     6,
     7,
@@ -561,13 +561,13 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
         _pageCache.remove(2);
         _visitedMenuItems.remove(2);
       }
-      // Dashboard (0) and Archives (4) rebuild for fresh metrics / flex layout.
+      // Dashboard (0) rebuilds for fresh metrics / flex layout.
       // Forum (12) always rebuilds so deletes made in the DB dashboard aren't
       // stuck behind a stale StreamBuilder in the page cache.
       if (index == 9 || index == 12) {
         _pageCache.remove(index);
         _pageCache[index] = _buildPageForMenu(index);
-      } else if (index != 0 && index != 4) {
+      } else if (index != 0) {
         _pageCache[index] ??= _buildPageForMenu(index);
       }
     });
@@ -681,7 +681,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
             if (!_visitedMenuItems.contains(menuItem)) {
               return const SizedBox.shrink();
             }
-            if (menuItem == 0 || menuItem == 4) {
+            if (menuItem == 0) {
               return _buildPageForMenu(menuItem);
             }
             return _pageCache[menuItem] ?? const SizedBox.shrink();
@@ -716,8 +716,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
         return const AdminEventsScreen();
       case 2:
         return const AdminAlumniMembersScreen();
-      case 4:
-        return const AdminArchivesScreen();
       case 5:
         return AdminJobManagement(onOpenAdminMenu: _onMenuSelected);
       case 6:

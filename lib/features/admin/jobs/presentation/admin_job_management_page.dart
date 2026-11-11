@@ -490,36 +490,21 @@ class _AdminJobManagementState extends State<AdminJobManagement>
           value: '${_jobs.length}',
           icon: Icons.work_outline,
           color: AdminColors.primary,
-          isSelected: _status == 'all',
-          tooltip: 'All job postings — click to show every status',
-          onTap: () => setState(() {
-            _status = 'all';
-            _page = 0;
-          }),
+          tooltip: 'All job postings',
         ),
         AdminMetricRibbonItem(
           label: 'Active',
           value: '$_activeCount',
           icon: Icons.check_circle_outline,
           color: AdminColors.success,
-          isSelected: _status == 'active',
-          tooltip: 'Visible to alumni — click to filter active jobs',
-          onTap: () => setState(() {
-            _status = 'active';
-            _page = 0;
-          }),
+          tooltip: 'Jobs currently visible to alumni',
         ),
         AdminMetricRibbonItem(
           label: 'Interested',
           value: '$_totalInterest',
           icon: Icons.star_outline,
           color: AdminColors.warning,
-          isSelected: _sort == 'interested',
-          tooltip: 'Total alumni interest signals — click to sort by most interested',
-          onTap: () => setState(() {
-            _sort = _sort == 'interested' ? 'newest' : 'interested';
-            _page = 0;
-          }),
+          tooltip: 'Total alumni interest signals',
         ),
         AdminMetricRibbonItem(
           label: 'Avg interest',
@@ -542,9 +527,6 @@ class _AdminJobManagementState extends State<AdminJobManagement>
         _searchController.clear();
         setState(() => _page = 0);
       },
-      isLoading: _loading,
-      onRefresh: _load,
-      refreshTooltip: 'Refresh job postings',
       hasActiveFilters: _hasFilters,
       onResetFilters: _resetFilters,
       activeFilterChips: _activeFilterChips(),
@@ -795,9 +777,19 @@ class _AdminJobManagementState extends State<AdminJobManagement>
       children: [
         AdminCompactHeader(
           title: 'Job Postings',
-          countBadge: _hasLoaded ? '$_activeCount active' : null,
-          subtitle: 'University career board for alumni opportunities',
           actions: [
+            OutlinedButton.icon(
+              onPressed: _loading ? null : _load,
+              icon: _loading && _hasLoaded
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 15),
+              label: Text(_loading && _hasLoaded ? 'Refreshing…' : 'Refresh'),
+              style: AdminButtonStyles.outlined(),
+            ),
             OutlinedButton.icon(
               onPressed: _loading
                   ? null

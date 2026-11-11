@@ -57,6 +57,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   final _supabase = Supabase.instance.client;
 
   List<AlumniEvent> _active = [];
+  List<AlumniEvent> _archived = [];
   List<AlumniEvent> _filtered = [];
   Map<String, EventRsvpCounts> _counts = {};
   bool _loading = false;
@@ -64,6 +65,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   String? _loadError;
   String? _loadErrorDetails;
   bool _showCalendar = false;
+  bool _showArchived = false;
   String? _batchYear;
   String? _venue;
   String? _category;
@@ -136,12 +138,22 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final events = await _eventService.getActiveEvents(runAutoArchive: false);
-      final counts = await _rsvpService.getCountsForEvents(
-        events.map((e) => e.id).toList(),
-      );
+      List<AlumniEvent> archived = const [];
+      try {
+        archived = await _eventService.getArchivedEvents();
+      } catch (_) {
+        // Keep Active usable if the archived fetch fails.
+        archived = const [];
+      }
+      final countIds = {
+        ...events.map((e) => e.id),
+        ...archived.map((e) => e.id),
+      }.toList();
+      final counts = await _rsvpService.getCountsForEvents(countIds);
       if (!mounted) return;
       setState(() {
         _active = events;
+        _archived = archived;
         _counts = counts;
         _loading = false;
         _hasLoaded = true;
@@ -186,7 +198,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   void _applyFilters() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    var results = List<AlumniEvent>.from(_active);
+    final source = _showArchived && !_showCalendar ? _archived : _active;
+    var results = List<AlumniEvent>.from(source);
 
     switch (_quickFilter) {
       case 1:
@@ -314,7 +327,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     final ok = await showAdminConfirmDialog(
       context,
       title: 'Archive event?',
-      message: '“${event.theme}” will move to Archives. You can restore it later.',
+      message:
+          '“${event.theme}” will move to the Archived list on this screen. '
+          'You can restore it anytime.',
       confirmLabel: 'Archive',
       icon: Icons.archive_outlined,
     );
@@ -339,6 +354,32 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         isError: true,
       );
     }
+  }
+
+  Future<void> _restore(AlumniEvent event) async {
+    try {
+      await _eventService.restoreEvent(event.id);
+      if (!mounted) return;
+      _showSnack('Event restored');
+      await _load();
+    } catch (e) {
+      _showSnack(
+        eventFriendlyError(e, "Couldn't restore the event. Please try again."),
+        isError: true,
+      );
+    }
+  }
+
+  void _selectBrowseMode({required bool archived, required bool calendar}) {
+    setState(() {
+      _showArchived = archived;
+      _showCalendar = calendar;
+      if (archived) {
+        _quickFilter = 0;
+        _selectedCalendarDay = null;
+      }
+    });
+    _applyFilters();
   }
 
   Future<void> _delete(AlumniEvent event) async {
@@ -447,19 +488,24 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
           child: AdminSaaSTabs(
             tabs: [
               AdminSaaSTabSpec(
-                label: 'List',
+                label: 'Active',
                 icon: Icons.view_agenda_outlined,
-                count: _hasLoaded && _filtered.isNotEmpty
-                    ? _filtered.length
-                    : null,
-                isSelected: !_showCalendar,
-                onTap: () => setState(() => _showCalendar = false),
+                count: _hasLoaded ? _active.length : null,
+                isSelected: !_showCalendar && !_showArchived,
+                onTap: () => _selectBrowseMode(archived: false, calendar: false),
+              ),
+              AdminSaaSTabSpec(
+                label: 'Archived',
+                icon: Icons.archive_outlined,
+                count: _hasLoaded ? _archived.length : null,
+                isSelected: _showArchived && !_showCalendar,
+                onTap: () => _selectBrowseMode(archived: true, calendar: false),
               ),
               AdminSaaSTabSpec(
                 label: 'Calendar',
                 icon: Icons.calendar_month_outlined,
                 isSelected: _showCalendar,
-                onTap: () => setState(() => _showCalendar = true),
+                onTap: () => _selectBrowseMode(archived: false, calendar: true),
               ),
             ],
           ),
@@ -538,43 +584,21 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
           value: '${_active.length}',
           icon: Icons.event_available_rounded,
           color: AdminColors.primary,
-          tooltip: 'Events on the live calendar — click to show all dates',
-          onTap: () {
-            setState(() {
-              _quickFilter = 0;
-              _from = null;
-              _to = null;
-            });
-            _applyFilters();
-          },
+          tooltip: 'Events currently on the live calendar',
         ),
         AdminMetricRibbonItem(
           label: 'Coming this week',
           value: '$_soonCount',
           icon: Icons.schedule_rounded,
           color: AdminColors.warning,
-          isSelected: _quickFilter == 1,
-          tooltip: 'Events happening in the next 7 days — click to filter',
-          onTap: () {
-            setState(() => _quickFilter = _quickFilter == 1 ? 0 : 1);
-            _applyFilters();
-          },
+          tooltip: 'Events happening in the next 7 days',
         ),
         AdminMetricRibbonItem(
           label: 'Going responses',
           value: '$_totalGoing',
           icon: Icons.check_circle_outline_rounded,
           color: AdminColors.success,
-          isSelected: _sort == _EventSort.mostGoing,
-          tooltip: 'Confirmed Going RSVPs — click to sort by most attended',
-          onTap: () {
-            setState(() {
-              _sort = _sort == _EventSort.mostGoing
-                  ? _EventSort.soonest
-                  : _EventSort.mostGoing;
-            });
-            _applyFilters();
-          },
+          tooltip: 'Confirmed Going RSVPs across active events',
         ),
         AdminMetricRibbonItem(
           label: 'Comments',
@@ -850,11 +874,20 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   }
 
   Widget _empty() {
+    if (_showArchived && !_hasAnyFilters) {
+      return const AdminStateView.empty(
+        icon: Icons.archive_outlined,
+        title: 'No archived events',
+        message: 'Archived events will appear here so you can restore or delete them.',
+      );
+    }
     return AdminStateView.empty(
       icon: _hasAnyFilters
           ? Icons.search_off_rounded
           : Icons.event_note_rounded,
-      title: _hasAnyFilters ? 'No matching events' : 'No active events yet',
+      title: _hasAnyFilters
+          ? 'No matching events'
+          : 'No active events yet',
       message: _hasAnyFilters
           ? 'Try clearing filters or searching with a different keyword.'
           : 'Create your first alumni event to get the calendar rolling.',
@@ -1059,6 +1092,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         await _openEditor(event: event);
       case 'archive':
         await _archive(event);
+      case 'restore':
+        await _restore(event);
       case 'cancel':
         await _cancel(event);
       case 'delete':
@@ -1067,8 +1102,29 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   }
 
   List<PopupMenuEntry<String>> _menuItemsFor(AlumniEvent event) {
-    final canShare =
-        !event.cancelled && event.status.trim().toLowerCase() != 'archived';
+    final isArchived = event.status.trim().toLowerCase() == 'archived';
+    final canShare = !event.cancelled && !isArchived;
+    if (isArchived) {
+      return [
+        adminEventMenuItem(
+          value: 'details',
+          label: 'View details',
+          icon: Icons.visibility_outlined,
+        ),
+        adminEventMenuItem(
+          value: 'restore',
+          label: 'Restore',
+          icon: Icons.unarchive_outlined,
+        ),
+        const PopupMenuDivider(height: 8),
+        adminEventMenuItem(
+          value: 'delete',
+          label: 'Delete',
+          icon: Icons.delete_outline_rounded,
+          destructive: true,
+        ),
+      ];
+    }
     return [
       adminEventMenuItem(
         value: 'details',

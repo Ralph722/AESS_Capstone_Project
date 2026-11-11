@@ -37,9 +37,7 @@ class MessageInboxQuery {
   }
 
   bool get hasActiveFilters =>
-      search.trim().isNotEmpty ||
-      filter != MessageInboxFilter.all ||
-      sort != MessageInboxSort.newestActivity;
+      search.trim().isNotEmpty || filter != MessageInboxFilter.all;
 }
 
 extension MessageInboxFilterLabel on MessageInboxFilter {

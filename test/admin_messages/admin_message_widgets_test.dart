@@ -128,13 +128,12 @@ void main() {
   });
 
   group('AdminInboxToolbar', () {
-    testWidgets('renders filter chips, sort field, search clear, and reset',
+    testWidgets('renders filter chips, search clear, and reset',
         (tester) async {
       final searchCtrl = TextEditingController();
       addTearDown(searchCtrl.dispose);
 
       var filter = MessageInboxFilter.all;
-      var sort = MessageInboxSort.newestActivity;
       var latestSearch = '';
       var resetCount = 0;
 
@@ -147,17 +146,14 @@ void main() {
               query: MessageInboxQuery(
                 search: latestSearch,
                 filter: filter,
-                sort: sort,
               ),
               onSearchChanged: (v) => setState(() => latestSearch = v),
               onFilterChanged: (f) => setState(() => filter = f),
-              onSortChanged: (s) => setState(() => sort = s),
               onReset: () => setState(() {
                 resetCount++;
                 searchCtrl.clear();
                 latestSearch = '';
                 filter = MessageInboxFilter.all;
-                sort = MessageInboxSort.newestActivity;
               }),
             );
           },
@@ -172,6 +168,7 @@ void main() {
       expect(find.text('Archived'), findsNothing);
       expect(find.text('Reset'), findsNothing);
       expect(find.byTooltip('Clear search'), findsNothing);
+      expect(find.byType(DirectoryFilterField<MessageInboxSort>), findsNothing);
 
       await tester.tap(find.text('Unread'));
       await tester.pump();
@@ -188,17 +185,10 @@ void main() {
       expect(searchCtrl.text, isEmpty);
       expect(latestSearch, isEmpty);
 
-      await tester.tap(find.byType(DirectoryFilterField<MessageInboxSort>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Waiting longest').last);
-      await tester.pumpAndSettle();
-      expect(sort, MessageInboxSort.waitingLongest);
-
       await tester.tap(find.text('Reset'));
       await tester.pump();
       expect(resetCount, 1);
       expect(filter, MessageInboxFilter.all);
-      expect(sort, MessageInboxSort.newestActivity);
       expect(find.text('Reset'), findsNothing);
     });
 
@@ -217,7 +207,6 @@ void main() {
             ),
             onSearchChanged: (_) {},
             onFilterChanged: (_) {},
-            onSortChanged: (_) {},
             onReset: () {},
           ),
           width: width,

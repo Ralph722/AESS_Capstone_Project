@@ -262,10 +262,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
         final useInnerScroll = boundedHeight &&
             width >= AdminDensity.desktopSplitMin &&
             constraints.maxHeight >= 640;
-        final body = _buildContent(
-          bounded: useInnerScroll,
-          availableWidth: width,
-        );
+        final body = _buildContent(bounded: useInnerScroll);
         if (!useInnerScroll) {
           return SingleChildScrollView(child: body);
         }
@@ -274,19 +271,9 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     );
   }
 
-  String? get _headerCountBadge {
-    if (!_hasLoaded) return null;
-    if (_logs.length >= _fetchLimit) return '$_fetchLimit+ logs';
-    final n = _logs.length;
-    return '$n ${n == 1 ? 'log' : 'logs'}';
-  }
-
-  Widget _buildHeader(double availableWidth) {
-    final compactTitle = availableWidth < 460;
+  Widget _buildHeader() {
     return AdminCompactHeader(
       title: 'Activity Logs',
-      countBadge: compactTitle ? null : _headerCountBadge,
-      subtitle: compactTitle ? null : 'System activity and security audit trail',
       actions: [
         OutlinedButton.icon(
           onPressed: _loading ? null : () => _loadLogs(refreshStats: true),
@@ -377,10 +364,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     );
   }
 
-  Widget _buildContent({
-    required bool bounded,
-    required double availableWidth,
-  }) {
+  Widget _buildContent({required bool bounded}) {
     if (_loading && !_hasLoaded) {
       return const AdminActivityLogSkeleton();
     }
@@ -405,7 +389,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildHeader(availableWidth),
+        _buildHeader(),
         const SizedBox(height: AdminDensity.space2),
         _buildMetrics(),
         const SizedBox(height: AdminDensity.space2),
@@ -523,6 +507,55 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
       onResetFilters: _resetFilters,
       activeFilterChips: _activeFilterChips(),
       filters: [
+        DirectoryDateFilterChip(
+          label: 'From',
+          displayText: _startDate == null
+              ? 'Any date'
+              : DirectoryDateTimePickers.formatDate(_startDate!),
+          active: _startDate != null,
+          width: 126,
+          onTap: () async {
+            final picked = await DirectoryDateTimePickers.pickDate(
+              context,
+              initialDate: _startDate ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+              helpText: 'Start date',
+            );
+            if (picked == null || !mounted) return;
+            setState(() {
+              _startDate = picked;
+              if (_endDate != null && _endDate!.isBefore(picked)) {
+                _endDate = picked;
+              }
+              _page = 0;
+            });
+            _loadLogs();
+          },
+        ),
+        DirectoryDateFilterChip(
+          label: 'To',
+          displayText: _endDate == null
+              ? 'Any date'
+              : DirectoryDateTimePickers.formatDate(_endDate!),
+          active: _endDate != null,
+          width: 126,
+          onTap: () async {
+            final picked = await DirectoryDateTimePickers.pickDate(
+              context,
+              initialDate: _endDate ?? _startDate ?? DateTime.now(),
+              firstDate: _startDate ?? DateTime(2020),
+              lastDate: DateTime.now(),
+              helpText: 'End date',
+            );
+            if (picked == null || !mounted) return;
+            setState(() {
+              _endDate = picked;
+              _page = 0;
+            });
+            _loadLogs();
+          },
+        ),
         DirectoryFilterField<String>(
           label: 'Module',
           value: _moduleFilter,
@@ -611,55 +644,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
             if (v == null) return;
             setState(() {
               _actionFilter = v;
-              _page = 0;
-            });
-            _loadLogs();
-          },
-        ),
-        DirectoryDateFilterChip(
-          label: 'From',
-          displayText: _startDate == null
-              ? 'Any date'
-              : DirectoryDateTimePickers.formatDate(_startDate!),
-          active: _startDate != null,
-          width: 126,
-          onTap: () async {
-            final picked = await DirectoryDateTimePickers.pickDate(
-              context,
-              initialDate: _startDate ?? DateTime.now(),
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now(),
-              helpText: 'Start date',
-            );
-            if (picked == null || !mounted) return;
-            setState(() {
-              _startDate = picked;
-              if (_endDate != null && _endDate!.isBefore(picked)) {
-                _endDate = picked;
-              }
-              _page = 0;
-            });
-            _loadLogs();
-          },
-        ),
-        DirectoryDateFilterChip(
-          label: 'To',
-          displayText: _endDate == null
-              ? 'Any date'
-              : DirectoryDateTimePickers.formatDate(_endDate!),
-          active: _endDate != null,
-          width: 126,
-          onTap: () async {
-            final picked = await DirectoryDateTimePickers.pickDate(
-              context,
-              initialDate: _endDate ?? _startDate ?? DateTime.now(),
-              firstDate: _startDate ?? DateTime(2020),
-              lastDate: DateTime.now(),
-              helpText: 'End date',
-            );
-            if (picked == null || !mounted) return;
-            setState(() {
-              _endDate = picked;
               _page = 0;
             });
             _loadLogs();
@@ -838,10 +822,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     required int safePage,
     required bool bounded,
   }) {
-    final summaryText =
-        '$total record${total == 1 ? '' : 's'}'
-        '${total >= _fetchLimit ? ' (showing latest $_fetchLimit)' : ''}';
-
     final listContent = LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= AdminDensity.desktopSplitMin) {
@@ -857,20 +837,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AdminColors.border)),
-            ),
-            child: Text(
-              summaryText,
-              style: const TextStyle(
-                fontSize: 12.5,
-                color: AdminColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
           if (bounded) Expanded(child: listContent) else listContent,
           LayoutBuilder(
             builder: (context, constraints) {

@@ -78,7 +78,6 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen>
 
   bool _isLoadingMessages = false;
   bool _isLoadingUsers = false;
-  bool _hasLoadedInbox = false;
   String? _inboxError;
   String? _threadError;
   bool _isUploadingImage = false;
@@ -228,7 +227,6 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen>
           _filteredConversations =
               applyInboxQuery(_conversationUsers, _inboxQuery);
           _isLoadingUsers = false;
-          _hasLoadedInbox = true;
           _inboxError = null;
           _syncSelectedProfile();
         });
@@ -237,7 +235,6 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen>
         if (!mounted) return;
         setState(() {
           _isLoadingUsers = false;
-          _hasLoadedInbox = true;
           _inboxError = '$error';
         });
       },
@@ -945,19 +942,9 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen>
     super.dispose();
   }
 
-  String? get _inboxCountBadge {
-    if (!_hasLoadedInbox) return null;
-    final unread = _conversationUsers.where((u) => u['isRead'] != true).length;
-    final total = _conversationUsers.length;
-    if (unread > 0) return '$unread unread';
-    return '$total ${total == 1 ? 'thread' : 'threads'}';
-  }
-
   Widget _buildHeader() {
     return AdminCompactHeader(
       title: 'Messages',
-      countBadge: _inboxCountBadge,
-      subtitle: 'Support inbox for registered alumni conversations',
       actions: [
         FilledButton.icon(
           onPressed: _openComposePicker,
@@ -1080,8 +1067,6 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen>
             onSearchChanged: _searchConversations,
             onFilterChanged: (f) =>
                 _applyInboxQuery(_inboxQuery.copyWith(filter: f)),
-            onSortChanged: (s) =>
-                _applyInboxQuery(_inboxQuery.copyWith(sort: s)),
             onReset: () {
               _searchController.clear();
               _applyInboxQuery(const MessageInboxQuery());

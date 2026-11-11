@@ -42,7 +42,6 @@ class AdminInboxToolbar extends StatelessWidget {
     required this.query,
     required this.onSearchChanged,
     required this.onFilterChanged,
-    required this.onSortChanged,
     this.onReset,
   });
 
@@ -50,7 +49,6 @@ class AdminInboxToolbar extends StatelessWidget {
   final MessageInboxQuery query;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<MessageInboxFilter> onFilterChanged;
-  final ValueChanged<MessageInboxSort> onSortChanged;
   final VoidCallback? onReset;
 
   @override
@@ -146,19 +144,6 @@ class AdminInboxToolbar extends StatelessWidget {
                       onSelected: (_) => onFilterChanged(f),
                     ),
                   ),
-              DirectoryFilterField<MessageInboxSort>(
-                label: 'Sort',
-                dense: true,
-                width: 148,
-                value: query.sort,
-                items: [
-                  for (final s in MessageInboxSort.values)
-                    DropdownMenuItem(value: s, child: Text(s.label)),
-                ],
-                onChanged: (v) {
-                  if (v != null) onSortChanged(v);
-                },
-              ),
               if (query.hasActiveFilters && onReset != null)
                 TextButton.icon(
                   onPressed: onReset,

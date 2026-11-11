@@ -265,7 +265,7 @@ void main() {
         final header = tester.widget<AdminCompactHeader>(
           find.byType(AdminCompactHeader),
         );
-        expect(header.title, 'Forum Moderation');
+        expect(header.title, 'Forum');
         expect(header.countBadge, isNull);
         expect(header.subtitle, isNull);
         expect(

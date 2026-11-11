@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/messages/data/message_service.dart';
-import 'package:alumni_system/features/messages/models/message_filters.dart';
 import 'package:alumni_system/features/messages/presentation/admin_messages_page.dart';
 import 'package:alumni_system/features/messages/widgets/admin_message_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
@@ -305,7 +303,7 @@ void main() {
 
     expect(find.byType(AdminCompactHeader), findsOneWidget);
     expect(find.text('Messages'), findsOneWidget);
-    expect(find.text('1 unread'), findsOneWidget);
+    expect(find.text('1 unread'), findsNothing);
     expect(
       find.descendant(
         of: find.byType(AdminCompactHeader),
@@ -342,12 +340,6 @@ void main() {
     await tester.tap(find.byTooltip('Clear search'));
     await tester.pump();
     expect(find.text('Ana Santos'), findsOneWidget);
-
-    // Sort dropdown works
-    await tester.tap(find.byType(DirectoryFilterField<MessageInboxSort>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Unread first').last);
-    await tester.pumpAndSettle();
 
     // Select Ana -> load thread + mark read + show Profile panel
     await tester.tap(find.text('Ana Santos'));

@@ -662,4 +662,81 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('Reports Survey Tab Verification', () {
+    testWidgets('ReportsProgressList renders textSecondary chevron cue and triggers onTap cleanly', (tester) async {
+      var tapped = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 310,
+              height: 220,
+              child: ReportsProgressList(
+                items: [
+                  ReportsProgressItem(
+                    label: 'Annual Alumni Satisfaction Survey 2026',
+                    detail: '12/40',
+                    fraction: 0.30,
+                    color: AdminColors.warning,
+                    onTap: () => tapped = true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Annual Alumni Satisfaction Survey 2026'), findsOneWidget);
+      expect(find.text('12/40'), findsOneWidget);
+      expect(find.text('30%'), findsOneWidget);
+
+      final chevron = tester.widget<Icon>(find.byIcon(Icons.chevron_right_rounded));
+      expect(chevron.color, AdminColors.textSecondary);
+
+      await tester.tap(find.text('Annual Alumni Satisfaction Survey 2026'));
+      await tester.pump();
+      expect(tapped, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('ReportsDonutBreakdown renders Survey Response Split with USTP palette', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 340,
+              height: 220,
+              child: ReportsDonutBreakdown(
+                centerValue: '75%',
+                centerLabel: 'responded',
+                entries: [
+                  ReportsDonutEntry(
+                    label: 'Submitted',
+                    value: 75,
+                    color: UstpColors.blue,
+                  ),
+                  ReportsDonutEntry(
+                    label: 'Pending',
+                    value: 25,
+                    color: UstpColors.gold,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('75%'), findsNWidgets(2));
+      expect(find.text('responded'), findsOneWidget);
+      expect(find.text('Submitted'), findsOneWidget);
+      expect(find.text('Pending'), findsOneWidget);
+      expect(find.text('25%'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

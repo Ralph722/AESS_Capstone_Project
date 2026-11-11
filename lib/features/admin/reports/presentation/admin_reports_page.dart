@@ -2846,17 +2846,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         SizedBox(
           height: _viewBarHeight,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(flex: 3, child: _scopePill(scope)),
+              Expanded(child: _scopePill(scope)),
               const SizedBox(width: 8),
-              Flexible(
-                child: _bentoLink(
-                  'Open Surveys',
-                  () => _openAdminMenuOr(10, 2),
-                ),
+              _bentoLink(
+                'Open Surveys',
+                () => _openAdminMenuOr(10, 2),
               ),
-              const SizedBox(width: 4),
-              Flexible(child: _bentoLink('Downloads', () => _selectTab(3))),
+              const SizedBox(width: 6),
+              _bentoLink('Downloads', () => _selectTab(3)),
             ],
           ),
         ),
@@ -2866,7 +2865,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           kpis: _surveyKpis(a, scope),
           rows: [
             ReportsBentoRow(
-              flex: const [5, 4, 3],
+              flex: const [10, 7, 7],
               naturalHeight: 300,
               children: [
                 _surveyParticipationCard(a),
@@ -2875,7 +2874,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               ],
             ),
             ReportsBentoRow(
-              flex: const [7, 5],
+              flex: const [6, 6],
               naturalHeight: 300,
               children: [
                 _surveyWindowsCard(a),
@@ -2989,7 +2988,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         label: 'Response rate',
         value: assigned == 0 ? '—' : _pct(rate),
         icon: Icons.how_to_vote_outlined,
-        accent: AdminReportsTheme.primary,
+        accent: UstpColors.blue,
         pillLabel: assigned == 0
             ? 'No data'
             : reportsKpiStatusLabel(rateStatus),
@@ -3013,7 +3012,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         label: 'Pending responses',
         value: '$pending',
         icon: Icons.hourglass_bottom_outlined,
-        accent: AdminReportsTheme.gold,
+        accent: UstpColors.midBlue,
         pillLabel: assigned == 0 ? 'No data' : '${_pct(dropOff)} drop-off',
         pillColor: reportsStatusColor(rateStatus),
         rows: [
@@ -3034,7 +3033,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         label: 'Open for responses',
         value: '${open.length}',
         icon: Icons.event_available_outlined,
-        accent: AdminReportsTheme.success,
+        accent: UstpColors.skyBlue,
         pillLabel: open.isEmpty
             ? 'None open'
             : closingSoon > 0
@@ -3064,7 +3063,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         label: 'Live surveys',
         value: '${a.publishedSurveys}',
         icon: Icons.poll_outlined,
-        accent: ReportsBentoPalette.at(1),
+        accent: UstpColors.blue,
         pillLabel: '$portfolio in portfolio',
         pillColor: reportsStatusColor(ReportsKpiStatus.neutral),
         rows: [
@@ -3118,7 +3117,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           : ReportsGroupedBarChart(
               labels: [
                 for (final s in list)
-                  s.title.length > 10 ? '${s.title.substring(0, 9)}…' : s.title,
+                  () {
+                    final title =
+                        s.title.trim().isEmpty ? 'Survey' : s.title.trim();
+                    return title.length > 10
+                        ? '${title.substring(0, 9)}…'
+                        : title;
+                  }(),
               ],
               tooltipTitles: [for (final s in list) s.title],
               series: [
@@ -3163,12 +3168,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 ReportsDonutEntry(
                   label: 'Submitted',
                   value: submitted,
-                  color: AdminReportsTheme.success,
+                  color: UstpColors.blue,
                 ),
                 ReportsDonutEntry(
                   label: 'Pending',
                   value: pending,
-                  color: AdminReportsTheme.gold,
+                  color: UstpColors.gold,
                 ),
               ],
             ),
@@ -3283,7 +3288,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                         : _surveyWindowLabel(s),
                     fraction: _surveyRate(a, s),
                     color: a.assignmentCount(s) == 0
-                        ? AdminReportsTheme.textMuted
+                        ? AdminReportsTheme.textSecondary
                         : reportsStatusColor(
                             reportsKpiStatusFromRate(_surveyRate(a, s)),
                           ),

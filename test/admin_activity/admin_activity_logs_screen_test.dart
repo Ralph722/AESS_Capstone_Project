@@ -337,7 +337,6 @@ void main() {
     expect(find.byType(AdminActivityLogSkeleton), findsNothing);
     expect(find.byType(AdminCompactHeader), findsOneWidget);
     expect(find.text('Activity Logs'), findsOneWidget);
-    expect(find.text('3 logs'), findsOneWidget);
     expect(find.text('Export CSV'), findsOneWidget);
     expect(find.text('Refresh'), findsOneWidget);
 
@@ -352,7 +351,6 @@ void main() {
 
     expect(find.byType(AdminDataTable), findsOneWidget);
     expect(find.byType(AdminPaginationBar), findsOneWidget);
-    expect(find.text('3 records'), findsOneWidget);
     expect(find.text('Showing 1–3 of 3'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -397,7 +395,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.recordedQueries.last.status, AuditStatus.failed);
     expect(service.statsCalls, 1);
-    expect(find.text('1 log'), findsOneWidget);
+    expect(find.text('Showing 1–1 of 1'), findsOneWidget);
     expect(find.text('Status: FAILED'), findsOneWidget);
 
     // Search debounce queries after 300ms and shows empty state when no match
@@ -416,7 +414,7 @@ void main() {
 
     await tester.tap(find.text('Clear filters'));
     await tester.pumpAndSettle();
-    expect(find.text('2 logs'), findsOneWidget);
+    expect(find.text('Showing 1–2 of 2'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -630,7 +630,7 @@ class _AdminForumScreenState extends State<AdminForumScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AdminCompactHeader(
-          title: 'Forum Moderation',
+          title: 'Forum',
           actions: _mode == _AdminForumMode.discussions
               ? [
                   refreshButton,

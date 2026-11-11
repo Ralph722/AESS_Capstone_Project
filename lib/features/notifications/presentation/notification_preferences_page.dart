@@ -39,10 +39,13 @@ class _NotificationPreferencesScreenState
     NotificationType.message: 'Messages from the alumni office',
     NotificationType.announcement: 'Announcements from the alumni office',
     NotificationType.survey: 'Tracer and alumni surveys, reminders',
-    NotificationType.feedback: 'Replies and updates to your feedback',
     NotificationType.forum: 'Replies, mentions, and moderation',
     NotificationType.system: 'Account and verification updates',
   };
+
+  /// Preference rows (legacy Feedback tickets removed from the product).
+  static Iterable<NotificationType> get _prefTypes => NotificationType.values
+      .where((t) => t != NotificationType.feedback);
 
   @override
   void initState() {
@@ -197,7 +200,7 @@ class _NotificationPreferencesScreenState
       children: [
         _sectionTitle('In the app', 'What appears in your notification list.'),
         _card([
-          for (final type in NotificationType.values)
+          for (final type in _prefTypes)
             _switchRow(
               type: type,
               value: _prefs.inAppEnabled(type),
@@ -213,7 +216,7 @@ class _NotificationPreferencesScreenState
               'its in-app notices. Sign-in and password codes always arrive.',
         ),
         _card([
-          for (final type in NotificationType.values)
+          for (final type in _prefTypes)
             _switchRow(
               type: type,
               value: _prefs.emailEnabled(type),
@@ -248,7 +251,7 @@ class _NotificationPreferencesScreenState
           _card([_deviceRow()]),
           const SizedBox(height: 12),
           _card([
-            for (final type in NotificationType.values)
+            for (final type in _prefTypes)
               _switchRow(
                 type: type,
                 value: _prefs.pushEnabled(type),

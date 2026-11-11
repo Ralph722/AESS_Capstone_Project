@@ -19,7 +19,6 @@ class AdminDashboardMetrics {
     this.unreadMessages = 0,
     this.publishedAnnouncements = 0,
     this.forumTopics = 0,
-    this.openFeedback = 0,
   });
 
   final int rosterTotal;
@@ -44,7 +43,6 @@ class AdminDashboardMetrics {
   final int unreadMessages;
   final int publishedAnnouncements;
   final int forumTopics;
-  final int openFeedback;
 
   int get unclaimedRoster => rosterTotal - registeredOnRoster;
 
@@ -63,10 +61,7 @@ class AdminDashboardMetrics {
       : totalSurveyResponses / totalSurveyAssignments;
 
   int get attentionCount =>
-      unreadMessages +
-      pendingSurveyAssignments +
-      openFeedback +
-      registeredWithoutTracer;
+      unreadMessages + pendingSurveyAssignments + registeredWithoutTracer;
 
   @override
   bool operator ==(Object other) {
@@ -89,8 +84,7 @@ class AdminDashboardMetrics {
         other.activeJobs == activeJobs &&
         other.unreadMessages == unreadMessages &&
         other.publishedAnnouncements == publishedAnnouncements &&
-        other.forumTopics == forumTopics &&
-        other.openFeedback == openFeedback;
+        other.forumTopics == forumTopics;
   }
 
   @override
@@ -113,6 +107,5 @@ class AdminDashboardMetrics {
         unreadMessages,
         publishedAnnouncements,
         forumTopics,
-        openFeedback,
       ]);
 }

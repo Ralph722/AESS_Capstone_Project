@@ -23,6 +23,10 @@ class AdminTabBar extends StatefulWidget {
     this.onSelected,
     this.isScrollable = true,
     this.background = AdminColors.card,
+    this.borderRadius,
+    this.border,
+    this.boxShadow,
+    this.padding,
   }) : assert(
          (controller == null) != (selectedIndex == null),
          'Provide either controller or selectedIndex',
@@ -37,6 +41,10 @@ class AdminTabBar extends StatefulWidget {
   /// across the width when false.
   final bool isScrollable;
   final Color background;
+  final BorderRadius? borderRadius;
+  final BoxBorder? border;
+  final List<BoxShadow>? boxShadow;
+  final EdgeInsetsGeometry? padding;
 
   @override
   State<AdminTabBar> createState() => _AdminTabBarState();
@@ -107,9 +115,18 @@ class _AdminTabBarState extends State<AdminTabBar>
 
     return Material(
       color: widget.background,
+      borderRadius: widget.borderRadius,
+      clipBehavior: widget.borderRadius != null ? Clip.antiAlias : Clip.none,
       child: Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AdminColors.border)),
+        padding: widget.padding,
+        decoration: BoxDecoration(
+          borderRadius: widget.borderRadius,
+          border:
+              widget.border ??
+              (widget.borderRadius != null
+                  ? Border.all(color: AdminColors.border)
+                  : const Border(bottom: BorderSide(color: AdminColors.border))),
+          boxShadow: widget.boxShadow,
         ),
         child: ListenableBuilder(
           listenable: controller,
@@ -123,8 +140,11 @@ class _AdminTabBarState extends State<AdminTabBar>
                   ? TabAlignment.start
                   : TabAlignment.fill,
               indicatorSize: TabBarIndicatorSize.label,
-              indicatorColor: AdminColors.primary,
-              indicatorWeight: 2.5,
+              indicator: const UnderlineTabIndicator(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(3)),
+                borderSide: BorderSide(color: AdminColors.primary, width: 2.5),
+              ),
+              splashBorderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
               labelColor: AdminColors.primary,
               unselectedLabelColor: AdminColors.textSecondary,
               labelStyle: AdminText.tabActive,

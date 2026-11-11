@@ -693,7 +693,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
   Widget _buildBody(String? uid) {
     if (_loading && _topic == null) {
-      return const FeedbackDetailSkeleton();
+      return const PortalDetailSkeleton();
     }
     if (_error != null && _topic == null) {
       return ForumErrorState(message: _error!, onRetry: () => _loadAll());

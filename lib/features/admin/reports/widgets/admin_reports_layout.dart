@@ -673,7 +673,11 @@ class ReportsChartEmptyState extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AdminReportsTheme.border),
               ),
-              child: Icon(icon, color: AdminReportsTheme.textMuted, size: 22),
+              child: Icon(
+                icon,
+                color: AdminReportsTheme.textSecondary,
+                size: 22,
+              ),
             ),
             const SizedBox(height: 12),
             Text(

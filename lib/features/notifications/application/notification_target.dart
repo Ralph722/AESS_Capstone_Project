@@ -32,7 +32,6 @@ abstract final class AdminNotificationMenu {
   static const surveys = 10;
   static const announcements = 11;
   static const forum = 12;
-  static const feedback = 14;
 
   static int forType(NotificationType type) => switch (type) {
     NotificationType.event => events,
@@ -40,7 +39,7 @@ abstract final class AdminNotificationMenu {
     NotificationType.message => messages,
     NotificationType.announcement => announcements,
     NotificationType.survey => surveys,
-    NotificationType.feedback => feedback,
+    NotificationType.feedback => dashboard,
     NotificationType.forum => forum,
     NotificationType.system => dashboard,
   };
@@ -123,9 +122,8 @@ class NotificationTarget {
       case 'announcement':
         return NotificationTarget(NotificationDestination.announcement, id: id);
       case 'feedback':
-        return id == null
-            ? null
-            : NotificationTarget(NotificationDestination.feedback, id: id);
+        // Feature removed; keep route parseable for legacy notification rows.
+        return NotificationTarget.none;
       case 'forum':
         return id == null
             ? null
@@ -172,16 +170,7 @@ class NotificationTarget {
                 adminMenuIndex: AdminNotificationMenu.events,
               );
       case 'feedback':
-        return id == null
-            ? const NotificationTarget(
-                NotificationDestination.adminMenu,
-                adminMenuIndex: AdminNotificationMenu.feedback,
-              )
-            : NotificationTarget(
-                NotificationDestination.adminFeedback,
-                id: id,
-                adminMenuIndex: AdminNotificationMenu.feedback,
-              );
+        return NotificationTarget.none;
       case 'messages':
         return NotificationTarget(
           NotificationDestination.adminConversation,
@@ -248,10 +237,7 @@ class NotificationTarget {
           id: _dataId(n, 'announcementId'),
         );
       case NotificationType.feedback:
-        final id = _dataId(n, 'feedbackId');
-        return id == null
-            ? none
-            : NotificationTarget(NotificationDestination.feedback, id: id);
+        return none;
       case NotificationType.forum:
         final id = _dataId(n, 'topicId');
         return id == null
@@ -275,15 +261,7 @@ class NotificationTarget {
           adminMenuIndex: menu,
         );
       case NotificationType.feedback:
-        final id = _dataId(n, 'feedbackId');
-        if (id != null) {
-          return NotificationTarget(
-            NotificationDestination.adminFeedback,
-            id: id,
-            adminMenuIndex: menu,
-          );
-        }
-        break;
+        return none;
       case NotificationType.event:
         if (n.data?['target'] == 'event_comments') {
           final id = _dataId(n, 'eventId');

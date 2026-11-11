@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Enterprise analytics dashboard header for Reports & Analytics.
 ///
-/// Implemented according to the established AESS AdminCompactHeader blueprint:
-/// clean 48px height, standard typography, live status badge, and unified
-/// refresh action.
+/// Matches the standardized 36px [AdminCompactHeader] height, typography, live
+/// status pill, and unified refresh action.
 class ReportsPageHeader extends StatelessWidget {
   const ReportsPageHeader({
     super.key,
@@ -18,8 +18,8 @@ class ReportsPageHeader extends StatelessWidget {
     this.refreshing = false,
   });
 
-  /// Standard compact header height (~48px) matching the AESS admin portal shell.
-  static const double height = 48;
+  /// Standardized compact header height (36px) matching the AESS admin portal shell.
+  static const double height = AdminDensity.buttonHeight;
 
   final String? subtitle;
 
@@ -73,12 +73,14 @@ class _LiveStatus extends StatelessWidget {
           'Figures refresh automatically when alumni, tracer, or survey data changes.',
       waitDuration: const Duration(milliseconds: 500),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        height: AdminDensity.buttonHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: AdminColors.surface,
           borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
           border: Border.all(color: AdminColors.border),
         ),
+        alignment: Alignment.center,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -110,7 +112,7 @@ class _LiveStatus extends StatelessWidget {
               ' · $time',
               style: const TextStyle(
                 fontSize: 11.5,
-                color: AdminColors.textMuted,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],

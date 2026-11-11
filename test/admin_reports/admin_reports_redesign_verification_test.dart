@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_alumni_list.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_report_engine.dart';
 import 'package:alumni_system/features/admin/reports/data/gts_saved_report_service.dart';
@@ -7,13 +9,20 @@ import 'package:alumni_system/features/admin/reports/models/custom_report_templa
 import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_respondent.dart';
+import 'package:alumni_system/features/admin/reports/models/reports_dashboard_filters.dart';
+import 'package:alumni_system/features/admin/reports/widgets/admin_reports_filter_bar.dart';
+import 'package:alumni_system/features/admin/reports/widgets/admin_reports_header.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_alumni_list_panel.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_builder_mode_switch.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_report_preview.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_saved_reports_bar.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_downloads_panel.dart';
+import 'package:alumni_system/features/admin/reports/widgets/tracer_outcome_extras.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class _FakeStore implements GtsSavedReportStore {
   final reports = <GtsSavedReport>[];
@@ -75,7 +84,7 @@ void main() {
       expect(selected, 0);
     });
 
-    testWidgets('ReportsStatCard renders metric value, pill badge, and breakdown rows', (tester) async {
+    testWidgets('ReportsStatCard is read-only and renders metric value, dense pill badge, and breakdown rows', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -83,9 +92,9 @@ void main() {
               label: 'Tracer reach',
               value: '85%',
               icon: Icons.school_outlined,
-              accent: const Color(0xFF1E3A8A),
+              accent: UstpColors.blue,
               pillLabel: 'Healthy',
-              pillColor: const Color(0xFF10B981),
+              pillColor: AdminColors.success,
               rows: const [
                 ReportsStatRow('Took tracer', '340'),
                 ReportsStatRow('Registered, no tracer', '60'),
@@ -98,10 +107,16 @@ void main() {
       expect(find.text('TRACER REACH'), findsOneWidget);
       expect(find.text('85%'), findsOneWidget);
       expect(find.text('Healthy'), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+      expect(find.descendant(of: find.byType(ReportsStatCard), matching: find.byType(InkWell)), findsNothing);
       expect(find.text('Took tracer'), findsOneWidget);
       expect(find.text('340'), findsOneWidget);
       expect(find.text('Registered, no tracer'), findsOneWidget);
       expect(find.text('60'), findsOneWidget);
+
+      final pillText = tester.widget<Text>(find.text('Healthy'));
+      expect(pillText.style?.fontSize, 10.5);
+      expect(pillText.style?.height, 1.15);
     });
 
     testWidgets('ReportsDownloadsPanel renders scope bar, presets, and export buttons', (tester) async {
@@ -368,6 +383,283 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(Scrollbar), findsAtLeastNWidgets(2));
+    });
+  });
+
+  group('Reports Overview Chrome & Palette Verification', () {
+    test('ReportsBentoPalette uses USTP primary/neutral system palette', () {
+      expect(ReportsBentoPalette.series, const <Color>[
+        UstpColors.blue,
+        UstpColors.midBlue,
+        UstpColors.gold,
+        UstpColors.skyBlue,
+        UstpColors.darkNavy,
+        AdminColors.textSecondary,
+        Color(0xFFCBD5E1),
+      ]);
+    });
+
+    testWidgets('ReportsPageHeader matches 36px AdminDensity height and renders Live chip', (tester) async {
+      expect(ReportsPageHeader.height, AdminDensity.buttonHeight);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1200,
+              child: ReportsPageHeader(
+                updatedAt: DateTime.now(),
+                onRefresh: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Reports & Analytics'), findsOneWidget);
+      expect(find.text('Live'), findsOneWidget);
+      expect(find.text('Refresh'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final width in const <double>[768, 1366]) {
+      testWidgets('AdminReportsSkeleton renders inside SingleChildScrollView at ${width.toInt()}px', (tester) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                padding: EdgeInsets.all(20),
+                child: AdminReportsSkeleton(),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byType(AdminReportsSkeleton), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('ReportsDonutBreakdown expands legend across available card width without dead right space', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 420,
+                height: 220,
+                child: ReportsDonutBreakdown(
+                  centerValue: '11',
+                  centerLabel: 'Alumni',
+                  entries: const [
+                    ReportsDonutEntry(label: 'BSIT', value: 8, color: UstpColors.blue),
+                    ReportsDonutEntry(label: 'BTLED-ICT', value: 2, color: UstpColors.midBlue),
+                    ReportsDonutEntry(label: 'BTLED-HE', value: 1, color: UstpColors.gold),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('BSIT'), findsOneWidget);
+      expect(find.text('BTLED-ICT'), findsOneWidget);
+      expect(find.text('BTLED-HE'), findsOneWidget);
+      expect(find.text('73%'), findsOneWidget);
+      expect(find.text('18%'), findsOneWidget);
+      expect(find.text('9%'), findsOneWidget);
+      expect(find.byType(Divider), findsNWidgets(2));
+
+      final legendRect = tester.getRect(find.byType(SingleChildScrollView));
+      expect(legendRect.right, closeTo(420.0, 2.0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('ReportsTrendChart and ReportsColumnChart fit tooltips inside chart bounds', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                SizedBox(
+                  width: 360,
+                  height: 200,
+                  child: ReportsTrendChart(
+                    labels: const ['Oct 26', 'Nov 26'],
+                    series: const [
+                      ReportsTrendSeries(
+                        label: 'Alumni list',
+                        color: UstpColors.blue,
+                        values: [4, 11],
+                      ),
+                      ReportsTrendSeries(
+                        label: 'Registered',
+                        color: UstpColors.gold,
+                        values: [2, 8],
+                        filled: false,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(
+                  width: 320,
+                  height: 180,
+                  child: ReportsColumnChart(
+                    labels: ['2024', '2025'],
+                    values: [6, 5],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final lineChart = tester.widget<LineChart>(find.byType(LineChart));
+      expect(lineChart.data.lineTouchData.touchTooltipData.fitInsideHorizontally, isTrue);
+      expect(lineChart.data.lineTouchData.touchTooltipData.fitInsideVertically, isTrue);
+
+      final barChart = tester.widget<BarChart>(find.byType(BarChart));
+      expect(barChart.data.barTouchData.touchTooltipData.fitInsideHorizontally, isTrue);
+      expect(barChart.data.barTouchData.touchTooltipData.fitInsideVertically, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('Reports Tracer Tab Verification', () {
+    for (final width in const <double>[768, 1280]) {
+      testWidgets('ReportsCohortFilterBar renders 12px card frame and active count badge at ${width.toInt()}px', (tester) async {
+        ReportsDashboardFilters current = const ReportsDashboardFilters(batchYear: '2024');
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: width,
+                  child: StatefulBuilder(
+                    builder: (context, setState) => ReportsCohortFilterBar(
+                      filters: current,
+                      surveys: const [],
+                      batchYears: const ['2024', '2025'],
+                      onChanged: (next) => setState(() => current = next),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('Filters'), findsOneWidget);
+        expect(find.text('1'), findsOneWidget);
+        expect(find.text('Reset'), findsOneWidget);
+
+        final container = tester.widget<Container>(find.byType(Container).first);
+        final dec = container.decoration! as BoxDecoration;
+        expect(dec.borderRadius, BorderRadius.circular(AdminSurfaces.radiusMd));
+
+        await tester.tap(find.text('Reset'));
+        await tester.pump();
+        expect(current.batchYear, isNull);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('TracerLongitudinalPanel renders dense status pills and opens respondent dialog callback', (tester) async {
+      TracerLongitudinalRow? opened;
+      final row = TracerLongitudinalRow(
+        userId: 'u1',
+        displayName: 'Maria Santos',
+        points: [
+          TracerWaveStatusPoint(
+            waveLabel: 'CHED 2024',
+            waveDate: DateTime(2024, 5, 10),
+            status: 'Yes',
+          ),
+          TracerWaveStatusPoint(
+            waveLabel: 'CHED 2025',
+            waveDate: DateTime(2025, 6, 12),
+            status: 'No',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: TracerLongitudinalPanel(
+                rows: [row],
+                onOpenPerson: (r) => opened = r,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Maria Santos'), findsOneWidget);
+      expect(find.text('2 waves'), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+
+      final wavesBadge = tester.widget<Text>(find.text('2 waves'));
+      expect(wavesBadge.style?.fontSize, 10.5);
+      expect(wavesBadge.style?.height, 1.15);
+
+      await tester.tap(find.text('Maria Santos'));
+      await tester.pump();
+      expect(opened, row);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('ReportsGroupedBarChart keeps tooltips inside chart bounds', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              height: 200,
+              child: ReportsGroupedBarChart(
+                labels: const ['Wave 1', 'Wave 2'],
+                series: const [
+                  ReportsBarSeries(
+                    label: 'Answers',
+                    color: UstpColors.blue,
+                    values: [20, 30],
+                  ),
+                  ReportsBarSeries(
+                    label: 'Employed',
+                    color: UstpColors.gold,
+                    values: [16, 25],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final barChart = tester.widget<BarChart>(find.byType(BarChart));
+      expect(barChart.data.barTouchData.touchTooltipData.fitInsideHorizontally, isTrue);
+      expect(barChart.data.barTouchData.touchTooltipData.fitInsideVertically, isTrue);
+      expect(tester.takeException(), isNull);
     });
   });
 }

@@ -1086,7 +1086,7 @@ class _FormFieldSkeleton extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Portal lists (announcements / surveys / forum / feedback)
+// Portal lists (announcements / surveys / forum)
 // ---------------------------------------------------------------------------
 
 /// Generic avatar ListTile cards (surveys / forum). Prefer dedicated
@@ -1244,81 +1244,6 @@ class _AnnouncementCardSkeleton extends StatelessWidget {
     );
   }
 }
-
-/// Feedback list — chip row + preview text (no avatar).
-class FeedbackListSkeleton extends StatelessWidget {
-  const FeedbackListSkeleton({super.key, this.count = 5});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return ShimmerScope(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: count,
-        itemBuilder: (_, __) => const Padding(
-          padding: EdgeInsets.only(bottom: 12),
-          child: _FeedbackCardSkeleton(),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeedbackCardSkeleton extends StatelessWidget {
-  const _FeedbackCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Skeleton(
-                width: 72,
-                height: 22,
-                borderRadius: BorderRadius.all(Radius.circular(11)),
-              ),
-              Spacer(),
-              Skeleton(
-                width: 64,
-                height: 22,
-                borderRadius: BorderRadius.all(Radius.circular(11)),
-              ),
-            ],
-          ),
-          SizedBox(height: 14),
-          Skeleton(width: double.infinity, height: 15),
-          SizedBox(height: 6),
-          Skeleton(width: 200, height: 15),
-          SizedBox(height: 10),
-          Skeleton(width: 140, height: 12),
-          SizedBox(height: 8),
-          Skeleton(width: 80, height: 10),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Tracer forms
-// ---------------------------------------------------------------------------
 
 class TracerFormSkeleton extends StatelessWidget {
   const TracerFormSkeleton({super.key, this.fieldCount = 6});
@@ -1577,11 +1502,11 @@ class _CommentCardSkeleton extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Feedback detail
+// Generic portal detail
 // ---------------------------------------------------------------------------
 
-class FeedbackDetailSkeleton extends StatelessWidget {
-  const FeedbackDetailSkeleton({super.key});
+class PortalDetailSkeleton extends StatelessWidget {
+  const PortalDetailSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {

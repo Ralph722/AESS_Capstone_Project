@@ -9,7 +9,6 @@ import 'package:alumni_system/features/admin/dashboard/application/admin_dashboa
 import 'package:alumni_system/features/notifications/data/notification_service.dart';
 import 'package:alumni_system/features/messages/data/message_open_bus.dart';
 import 'package:alumni_system/features/admin/events/presentation/admin_event_comments_dialog.dart';
-import 'package:alumni_system/features/admin/feedback/presentation/admin_feedback_detail_page.dart';
 import 'package:alumni_system/features/events/data/event_comment_service.dart';
 import 'package:alumni_system/features/events/data/event_service.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
@@ -249,12 +248,6 @@ const List<AdminNavSection> kAdminNavSections = [
         icon: Icons.history,
         label: 'Activity Logs',
         keywords: ['audit', 'logs', 'history', 'activity'],
-      ),
-      AdminNavItem(
-        index: 14,
-        icon: Icons.feedback_outlined,
-        label: 'Feedback',
-        keywords: ['feedback', 'tickets', 'support'],
       ),
     ],
   ),
@@ -1133,19 +1126,6 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
           color: AdminColors.warning,
           menuIndex: 10,
           notificationType: NotificationType.survey,
-        ),
-      );
-    }
-    if (m.openFeedback > 0) {
-      items.add(
-        _AdminActivityAlert(
-          title:
-              '${m.openFeedback} feedback item${m.openFeedback == 1 ? '' : 's'}',
-          subtitle: 'Open feedback awaiting review',
-          icon: Icons.feedback_outlined,
-          color: AdminColors.primary,
-          menuIndex: 14,
-          notificationType: NotificationType.feedback,
         ),
       );
     }
@@ -2318,11 +2298,9 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
         if (id != null && id.isNotEmpty) MessageOpenBus.openConversation(id);
         widget.onMenuSelected(AdminNotificationMenu.messages);
       case NotificationDestination.adminFeedback:
-        widget.onMenuSelected(AdminNotificationMenu.feedback);
-        if (id == null) return;
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AdminFeedbackDetailScreen(feedbackId: id),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Feedback tickets are no longer available.'),
           ),
         );
       case NotificationDestination.adminEvent:
@@ -2392,7 +2370,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
       NotificationType.message => 'Open inbox',
       NotificationType.announcement => 'View announcements',
       NotificationType.survey => 'Review surveys',
-      NotificationType.feedback => 'Open feedback',
+      NotificationType.feedback => 'View notification',
       NotificationType.forum => 'Open forum',
       NotificationType.system => 'Go to dashboard',
     };
@@ -2402,7 +2380,6 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
     return switch (alert.menuIndex) {
       6 => 'Open inbox',
       10 => 'Review responses',
-      14 => 'Open feedback',
       2 => 'Open directory',
       _ => 'Open',
     };
@@ -3465,7 +3442,7 @@ class _AdminDashboardTopHeaderState extends State<AdminDashboardTopHeader> {
         content: const Text(
           'Use the search bar (Ctrl/⌘ K) to jump to any page or action. '
           'For assistance with the Alumni Portal, contact your system '
-          'administrator or submit a message from the Feedback screen.',
+          'administrator.',
           style: PortalTheme.bodySecondary,
         ),
         actions: [

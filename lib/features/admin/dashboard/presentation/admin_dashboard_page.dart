@@ -12,7 +12,6 @@ import 'package:alumni_system/features/admin/roster/data/alumni_member_service.d
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/features/alumni/tracer/data/id_tracer_service.dart';
-import 'package:alumni_system/features/feedback/data/feedback_service.dart';
 import 'package:alumni_system/features/admin/activity/presentation/admin_activity_logs_page.dart';
 import 'package:alumni_system/features/admin/dashboard/presentation/admin_dashboard_home.dart';
 import 'package:alumni_system/features/admin/dashboard/application/admin_dashboard_metrics.dart';
@@ -40,7 +39,6 @@ import 'package:alumni_system/features/admin/reports/presentation/admin_reports_
 import 'package:alumni_system/features/admin/surveys/presentation/admin_surveys_page.dart';
 import 'package:alumni_system/features/admin/announcements/presentation/admin_announcements_page.dart';
 import 'package:alumni_system/features/admin/forum/presentation/admin_forum_page.dart';
-import 'package:alumni_system/features/admin/feedback/presentation/admin_feedback_page.dart';
 import 'package:alumni_system/features/admin/dss/presentation/admin_dss_page.dart';
 import 'package:alumni_system/features/surveys/application/survey_catalog_refresh.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
@@ -67,7 +65,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
   final SurveyService _surveyService = SurveyService();
   final AnnouncementService _announcementService = AnnouncementService();
   final IdTracerService _idTracerService = IdTracerService();
-  final FeedbackService _feedbackService = FeedbackService();
   final ForumService _forumService = ForumService();
   final DssRepository _dssRepository = DssRepository();
 
@@ -103,7 +100,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
   static const _liveTables = [
     'events',
     'announcements',
-    'feedback',
     'survey_assignments',
     'forum_topics',
   ];
@@ -113,13 +109,12 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
   static const _insightsMaxAge = Duration(minutes: 2);
 
   StreamSubscription<int>? _adminUnreadSubscription;
-  StreamSubscription<int>? _openFeedbackSubscription;
   StreamSubscription<String>? _messageOpenSubscription;
   VoidCallback? _surveyCatalogListener;
   final Map<int, Widget> _pageCache = {};
   final Set<int> _visitedMenuItems = {0};
-  // Index 4 (legacy Archives hub) intentionally unused — archived content
-  // lives under each module's Archived filter/tab.
+  // Index 4 (legacy Archives hub) and 14 (legacy Feedback) intentionally
+  // unused — do not renumber other menu indices.
   static const List<int> _pageOrder = <int>[
     0,
     1,
@@ -132,7 +127,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
     10,
     11,
     12,
-    14,
   ];
 
   @override
@@ -184,7 +178,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
         _announcementService.countPublishedAnnouncements(),
         _forumService.getTopicCount(),
         _idTracerService.getActiveRegisteredRecordsCount(),
-        _feedbackService.countOpenFeedback(),
       ]);
 
       final totalEvents = results[0] as int;
@@ -206,7 +199,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
       final publishedAnnouncements = results[7] as int;
       final forumCount = results[8] as int;
       final employmentCount = results[9] as int;
-      final openFeedback = results[10] as int;
 
       if (!mounted) return;
       setState(() {
@@ -232,7 +224,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
           unreadMessages: unreadCount,
           publishedAnnouncements: publishedAnnouncements,
           forumTopics: forumCount,
-          openFeedback: openFeedback,
         );
       });
     } catch (e) {
@@ -304,7 +295,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
           unreadMessages: metrics.unreadMessages,
           publishedAnnouncements: metrics.publishedAnnouncements,
           forumTopics: metrics.forumTopics,
-          openFeedback: metrics.openFeedback,
         );
       });
     } catch (e) {
@@ -497,7 +487,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
     int? unreadMessages,
     int? publishedAnnouncements,
     int? forumTopics,
-    int? openFeedback,
   }) {
     return AdminDashboardMetrics(
       rosterTotal: rosterTotal ?? metrics.rosterTotal,
@@ -523,7 +512,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
       publishedAnnouncements:
           publishedAnnouncements ?? metrics.publishedAnnouncements,
       forumTopics: forumTopics ?? metrics.forumTopics,
-      openFeedback: openFeedback ?? metrics.openFeedback,
     );
   }
 
@@ -733,8 +721,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
         return const AdminAnnouncementsScreen();
       case 12:
         return const AdminForumScreen();
-      case 14:
-        return const AdminFeedbackScreen();
       case 15:
         return AdminDssScreen(onOpenAdminMenu: _onMenuSelected);
       default:
@@ -751,13 +737,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
           setState(() => metrics = _metricsWith(unreadMessages: unread));
         });
 
-    _openFeedbackSubscription?.cancel();
-    _openFeedbackSubscription = _feedbackService
-        .watchOpenFeedbackCount()
-        .listen((open) {
-          if (!mounted) return;
-          setState(() => metrics = _metricsWith(openFeedback: open));
-        });
   }
 
   @override
@@ -771,7 +750,6 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
     final channel = _liveChannel;
     if (channel != null) Supabase.instance.client.removeChannel(channel);
     _adminUnreadSubscription?.cancel();
-    _openFeedbackSubscription?.cancel();
     _messageOpenSubscription?.cancel();
     if (_surveyCatalogListener != null) {
       SurveyCatalogRefresh.instance.revision.removeListener(

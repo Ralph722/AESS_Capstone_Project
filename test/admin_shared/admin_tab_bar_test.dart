@@ -83,4 +83,49 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('supports rounded card frame with custom border and padding', (
+    tester,
+  ) async {
+    final radius = BorderRadius.circular(12);
+    const border = Border.fromBorderSide(BorderSide(color: Color(0xFFE5E7EB)));
+    const padding = EdgeInsets.symmetric(horizontal: 6);
+
+    await pumpAdmin(
+      tester,
+      AdminTabBar(
+        tabs: _tabs,
+        selectedIndex: 0,
+        onSelected: (_) {},
+        borderRadius: radius,
+        border: border,
+        padding: padding,
+      ),
+    );
+    expect(tester.takeException(), isNull);
+
+    final material = tester.widget<Material>(
+      find
+          .descendant(
+            of: find.byType(AdminTabBar),
+            matching: find.byType(Material),
+          )
+          .first,
+    );
+    expect(material.borderRadius, radius);
+    expect(material.clipBehavior, Clip.antiAlias);
+
+    final container = tester.widget<Container>(
+      find
+          .descendant(
+            of: find.byType(AdminTabBar),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+    expect(container.padding, padding);
+    final decoration = container.decoration! as BoxDecoration;
+    expect(decoration.borderRadius, radius);
+    expect(decoration.border, border);
+  });
 }

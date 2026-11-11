@@ -4,8 +4,6 @@ import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/features/announcements/presentation/user_announcements_page.dart';
 import 'package:alumni_system/features/events/presentation/events_page.dart';
-import 'package:alumni_system/features/feedback/data/feedback_service.dart';
-import 'package:alumni_system/features/feedback/presentation/user_feedback_detail_page.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
 import 'package:alumni_system/features/jobs/presentation/job_posting_page.dart';
@@ -237,16 +235,8 @@ abstract final class NotificationRouter {
         if (!stillValid()) return;
         await _push(UserAnnouncementsScreen(initialAnnouncementId: id));
       case NotificationDestination.feedback:
-        if (id == null) return;
-        final item = await _safe(() => FeedbackService().getFeedbackById(id));
         if (!stillValid()) return;
-        if (item == null) {
-          AppNavigator.showMessage(
-            'This feedback item is no longer available.',
-          );
-          return;
-        }
-        await _push(UserFeedbackDetailScreen(feedbackId: id));
+        AppNavigator.showMessage('Feedback tickets are no longer available.');
       case NotificationDestination.forumTopic:
         if (id == null) return;
         final topic = await _safe(() => ForumService().getTopic(id));

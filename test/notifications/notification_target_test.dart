@@ -48,7 +48,10 @@ void main() {
         parse('announcement/a1')!.destination,
         NotificationDestination.announcement,
       );
-      expect(parse('feedback/f1')!.id, 'f1');
+      expect(
+        parse('feedback/f1')!.destination,
+        NotificationDestination.none,
+      );
       expect(
         parse('forum/t1')!.destination,
         NotificationDestination.forumTopic,
@@ -74,9 +77,10 @@ void main() {
       expect(ev.id, 'e1');
       expect(ev.adminMenuIndex, AdminNotificationMenu.events);
 
-      final fb = parse('admin/feedback/f1')!;
-      expect(fb.destination, NotificationDestination.adminFeedback);
-      expect(fb.adminMenuIndex, AdminNotificationMenu.feedback);
+      expect(
+        parse('admin/feedback/f1')!.destination,
+        NotificationDestination.none,
+      );
     });
 
     test('module routes', () {

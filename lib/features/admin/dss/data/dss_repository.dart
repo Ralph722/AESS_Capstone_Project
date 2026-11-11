@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/core/services/audit_events.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_evaluator.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_finding_sync.dart';
@@ -16,6 +17,30 @@ class DssRepository {
 
   final SupabaseClient _supabase;
   final AuditService _audit;
+
+  static String _flagTargetLabel(DssFlag flag) {
+    final cohort = flag.cohortLabel.trim();
+    if (cohort.isEmpty) return flag.ruleId;
+    return '${flag.ruleId} · $cohort';
+  }
+
+  Future<void> _logDssFlagAction({
+    required String action,
+    required DssFlag flag,
+    required String description,
+    Map<String, dynamic>? changes,
+  }) {
+    return _audit.logAction(
+      action: action,
+      resource: 'dss_flags',
+      resourceId: flag.id,
+      description: description,
+      changes: changes,
+      userRole: 'admin',
+      module: AuditModules.dss,
+      targetLabel: _flagTargetLabel(flag),
+    );
+  }
 
   static const _flagSelect =
       '*, dss_rules(name, severity, playbook, recommended_action, operator, min_n, category), '
@@ -40,7 +65,7 @@ class DssRepository {
         })
         .eq('rule_id', rule.ruleId);
     await _audit.logAction(
-      action: 'DSS_RULE_UPDATE',
+      action: AuditActions.dssRuleUpdate,
       resource: 'dss_rules',
       resourceId: rule.ruleId,
       description: 'Updated DSS rule ${rule.ruleId}',
@@ -50,8 +75,9 @@ class DssRepository {
         'enabled': rule.enabled,
       },
       userRole: 'admin',
-      module: 'dss',
-      category: 'security',
+      module: AuditModules.dss,
+      category: AuditCategories.security,
+      targetLabel: rule.ruleId,
     );
   }
 
@@ -180,10 +206,9 @@ class DssRepository {
       await _fillStartDate(flag);
     }
 
-    await _audit.logAction(
-      action: 'DSS_FLAG_STATUS',
-      resource: 'dss_flags',
-      resourceId: flag.id,
+    await _logDssFlagAction(
+      action: AuditActions.dssFlagStatus,
+      flag: flag,
       description:
           'DSS flag ${flag.ruleId} → ${status.label} (${flag.cohortLabel})',
       changes: {
@@ -193,7 +218,6 @@ class DssRepository {
         if (interventionType != null) 'intervention': interventionType,
         if (impactVerdict != null) 'impact': impactVerdict,
       },
-      userRole: 'admin',
     );
 
     return (await getFlag(flag.id)) ?? flag;
@@ -237,17 +261,15 @@ class DssRepository {
       },
     );
 
-    await _audit.logAction(
-      action: 'DSS_FLAG_IMPACT',
-      resource: 'dss_flags',
-      resourceId: flag.id,
+    await _logDssFlagAction(
+      action: AuditActions.dssFlagImpact,
+      flag: flag,
       description: 'DSS impact recheck ${flag.ruleId} → $impactVerdict',
       changes: {
         'impact_verdict': impactVerdict,
         'followup_value': followupValue,
         'followup_sample_n': followupSampleN,
       },
-      userRole: 'admin',
     );
 
     return (await getFlag(flag.id)) ?? flag;
@@ -876,13 +898,11 @@ class DssRepository {
       eventType: DssNoteEventType.assign,
       metadata: row,
     );
-    await _audit.logAction(
-      action: 'DSS_FLAG_PLAN',
-      resource: 'dss_flags',
-      resourceId: flag.id,
+    await _logDssFlagAction(
+      action: AuditActions.dssFlagPlan,
+      flag: flag,
       description: 'DSS flag ${flag.ruleId} plan updated (${flag.cohortLabel})',
       changes: {'from': before, 'to': row},
-      userRole: 'admin',
     );
     return (await getFlag(flag.id)) ?? flag;
   }
@@ -950,10 +970,9 @@ class DssRepository {
     } on PostgrestException catch (e) {
       throw Exception(_accountabilityError(e));
     }
-    await _audit.logAction(
-      action: 'DSS_FLAG_EVIDENCE',
-      resource: 'dss_flags',
-      resourceId: flag.id,
+    await _logDssFlagAction(
+      action: AuditActions.dssFlagEvidence,
+      flag: flag,
       description:
           'DSS flag ${flag.ruleId} evidence added: ${type.label} '
           '(${flag.cohortLabel})',
@@ -961,7 +980,6 @@ class DssRepository {
         'evidence_type': type.dbValue,
         'evidence_date': dssDateValue(date),
       },
-      userRole: 'admin',
     );
   }
 
@@ -978,15 +996,13 @@ class DssRepository {
     } on PostgrestException catch (e) {
       throw Exception(_accountabilityError(e));
     }
-    await _audit.logAction(
-      action: 'DSS_FLAG_EVIDENCE_REMOVED',
-      resource: 'dss_flags',
-      resourceId: flag.id,
+    await _logDssFlagAction(
+      action: AuditActions.dssFlagEvidenceRemoved,
+      flag: flag,
       description:
           'DSS flag ${flag.ruleId} evidence removed: ${entry.type.label} '
           '(${flag.cohortLabel})',
       changes: {'evidence_id': entry.id},
-      userRole: 'admin',
     );
   }
 
@@ -1131,10 +1147,9 @@ class DssRepository {
     } on PostgrestException catch (e) {
       throw Exception(_outcomeError(e));
     }
-    await _audit.logAction(
-      action: 'DSS_INTERVENTION',
-      resource: 'dss_flags',
-      resourceId: flag.id,
+    await _logDssFlagAction(
+      action: AuditActions.dssIntervention,
+      flag: flag,
       description:
           'DSS flag ${flag.ruleId} intervention recorded: $interventionType '
           '(${flag.cohortLabel})',
@@ -1142,7 +1157,6 @@ class DssRepository {
         'intervention_type': interventionType.trim(),
         'success_target': ?successTarget,
       },
-      userRole: 'admin',
     );
   }
 
@@ -1216,10 +1230,9 @@ class DssRepository {
     } on PostgrestException catch (e) {
       throw Exception(_outcomeError(e));
     }
-    await _audit.logAction(
-      action: 'DSS_INTERVENTION_DECISION',
-      resource: 'dss_flags',
-      resourceId: flag.id,
+    await _logDssFlagAction(
+      action: AuditActions.dssInterventionDecision,
+      flag: flag,
       description:
           'DSS flag ${flag.ruleId} outcome decision: ${decision.label} '
           '(${flag.cohortLabel})',
@@ -1229,7 +1242,6 @@ class DssRepository {
         'decision': decision.dbValue,
         'escalated_to': ?office,
       },
-      userRole: 'admin',
     );
     final id = res?.toString() ?? '';
     return id.isEmpty ? null : id;

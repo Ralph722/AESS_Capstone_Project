@@ -3,20 +3,21 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_kpi.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
-/// Category colours for bento charts: AESS navy ramp with a gold accent.
+/// Category colours for bento charts grounded in official USTP system colours.
 abstract final class ReportsBentoPalette {
   static const series = <Color>[
-    AdminReportsTheme.primary,
-    AdminReportsTheme.gold,
-    Color(0xFF2563EB),
-    Color(0xFFD97706),
-    Color(0xFF38BDF8),
-    Color(0xFF64748B),
+    UstpColors.blue,
+    UstpColors.midBlue,
+    UstpColors.gold,
+    UstpColors.skyBlue,
+    UstpColors.darkNavy,
+    AdminColors.textSecondary,
     Color(0xFFCBD5E1),
   ];
 
@@ -67,7 +68,7 @@ class ReportsBentoGrid extends StatelessWidget {
     required this.kpis,
     required this.rows,
     this.fitHeight,
-    this.kpiHeight = 164,
+    this.kpiHeight = 152,
     this.minRowHeight = 190,
     this.gap = AdminReportsTheme.gutter,
     this.wideBreakpoint = 1000,
@@ -197,7 +198,7 @@ class ReportsBentoGrid extends StatelessWidget {
 
 BoxDecoration _bentoDecoration() => BoxDecoration(
   color: AdminReportsTheme.card,
-  borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
+  borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
   border: Border.all(color: AdminReportsTheme.border),
   boxShadow: AdminReportsTheme.cardShadow,
 );
@@ -245,6 +246,7 @@ class ReportsBentoCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                         color: AdminReportsTheme.textPrimary,
                       ),
                     ),
@@ -255,7 +257,7 @@ class ReportsBentoCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 11.5,
-                          color: AdminReportsTheme.textMuted,
+                          color: AdminReportsTheme.textSecondary,
                         ),
                       ),
                   ],
@@ -327,8 +329,8 @@ class ReportsStatRow {
   final String value;
 }
 
-/// Headline KPI: accent strip, big value with a context pill, and a short
-/// breakdown underneath.
+/// Read-only headline KPI: icon tile, concise value with a dense status pill,
+/// and a short breakdown underneath.
 class ReportsStatCard extends StatelessWidget {
   const ReportsStatCard({
     super.key,
@@ -340,7 +342,6 @@ class ReportsStatCard extends StatelessWidget {
     this.pillColor,
     this.rows = const [],
     this.details,
-    this.onTap,
   });
 
   final String label;
@@ -351,137 +352,144 @@ class ReportsStatCard extends StatelessWidget {
   final Color? pillColor;
   final List<ReportsStatRow> rows;
   final String? details;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final pill = pillLabel;
-    final pillTint = pillColor ?? AdminReportsTheme.textMuted;
+    final pillTint = pillColor ?? AdminReportsTheme.textSecondary;
     final detailsText = details;
 
-    final body = Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Icon(icon, size: 14, color: accent),
+    return Container(
+      decoration: _bentoDecoration(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                      color: accent.withValues(alpha: 0.16),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        label.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.6,
-                          color: AdminReportsTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                    if (detailsText != null && detailsText.isNotEmpty)
-                      ReportsDetailsButton(title: label, body: detailsText),
-                  ],
+                  ),
+                  child: Icon(icon, size: 15, color: accent),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          value,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            height: 1.1,
-                            letterSpacing: -0.5,
-                            color: AdminReportsTheme.textPrimary,
-                          ),
-                        ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: AdminReportsTheme.textSecondary,
+                    ),
+                  ),
+                ),
+                if (detailsText != null && detailsText.isNotEmpty)
+                  ReportsDetailsButton(title: label, body: detailsText),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                        letterSpacing: -0.5,
+                        color: AdminReportsTheme.textPrimary,
                       ),
                     ),
-                    if (pill != null && pill.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: pillTint.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-                          border: Border.all(
-                            color: pillTint.withValues(alpha: 0.25),
+                  ),
+                ),
+                if (pill != null && pill.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: pillTint.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: pillTint.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (pillColor != null) ...[
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: pillTint,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        child: Text(
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
                           pill,
                           style: TextStyle(
                             fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             color: pillTint,
+                            height: 1.15,
                           ),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
-                const Spacer(),
-                for (var i = 0; i < rows.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          rows[i].label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AdminReportsTheme.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        rows[i].value,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AdminReportsTheme.textPrimary,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ],
             ),
-          );
-
-    return Material(
-      color: Colors.transparent,
-      child: Ink(
-        decoration: _bentoDecoration(),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AdminReportsTheme.radiusLg),
-            child: body,
-          ),
+            const Spacer(),
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const SizedBox(height: 3),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      rows[i].label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AdminReportsTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    rows[i].value,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AdminReportsTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -530,13 +538,12 @@ class ReportsDonutBreakdown extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final side = constraints.maxWidth >= 220;
-        // Match chart size across equal-height cards. Cap so the legend keeps
-        // room when the card is only as wide as its content needs.
-        const legendReserve = 200.0;
-        const maxChart = 132.0;
+        final wideCard = constraints.maxWidth >= 320;
+        final legendReserve = wideCard ? 188.0 : 156.0;
+        final maxChart = wideCard ? 148.0 : 124.0;
         final double size = side
             ? math.min(
-                math.min(constraints.maxHeight * 0.68, maxChart),
+                math.min(constraints.maxHeight * 0.74, maxChart),
                 math.max(88.0, constraints.maxWidth - legendReserve),
               )
             : math.min(constraints.maxHeight, constraints.maxWidth);
@@ -589,7 +596,8 @@ class ReportsDonutBreakdown extends StatelessWidget {
                             centerLabel,
                             style: const TextStyle(
                               fontSize: 10.5,
-                              color: AdminReportsTheme.textMuted,
+                              fontWeight: FontWeight.w600,
+                              color: AdminReportsTheme.textSecondary,
                             ),
                           ),
                       ],
@@ -602,22 +610,30 @@ class ReportsDonutBreakdown extends StatelessWidget {
 
         if (!side) return Center(child: chart);
 
-        // Legend packs tightly beside the chart; leftover card width stays
-        // empty on the right instead of stretching label↔count gaps.
+        // Expand legend cleanly to fill available right-hand card space
+        // with hairline dividers and right-aligned count/percentage columns.
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             chart,
-            const SizedBox(width: 10),
-            Flexible(
+            SizedBox(width: wideCard ? 20 : 12),
+            Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var i = 0; i < visible.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 7),
-                      _legendRow(visible[i], total),
+                      if (i > 0)
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: AdminReportsTheme.border.withValues(alpha: 0.6),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: _legendRow(visible[i], total),
+                      ),
                     ],
                   ],
                 ),
@@ -632,20 +648,15 @@ class ReportsDonutBreakdown extends StatelessWidget {
   Widget _legendRow(ReportsDonutEntry e, int total) {
     final pct = total == 0 ? 0 : e.value / total * 100;
     return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: e.color, shape: BoxShape.circle),
-          ),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: e.color, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 7),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 148),
+        const SizedBox(width: 8),
+        Expanded(
           child: Text(
             e.label,
             maxLines: 2,
@@ -653,12 +664,13 @@ class ReportsDonutBreakdown extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12,
+              fontWeight: FontWeight.w500,
               height: 1.25,
-              color: AdminReportsTheme.textSecondary,
+              color: AdminReportsTheme.textPrimary,
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Text(
           '${e.value}',
           style: const TextStyle(
@@ -668,11 +680,23 @@ class ReportsDonutBreakdown extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(
-          '${pct.toStringAsFixed(0)}%',
-          style: const TextStyle(
-            fontSize: 11,
-            color: AdminReportsTheme.textMuted,
+        Container(
+          constraints: const BoxConstraints(minWidth: 38),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AdminReportsTheme.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AdminReportsTheme.border),
+          ),
+          child: Text(
+            '${pct.toStringAsFixed(0)}%',
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              height: 1.15,
+              color: AdminReportsTheme.textSecondary,
+            ),
           ),
         ),
       ],
@@ -727,31 +751,54 @@ class ReportsTrendChart extends StatelessWidget {
         .fold<double>(0, (m, v) => v > m ? v : m);
     final maxY = this.maxY ?? math.max(4.0, maxValue * 1.15);
 
-    return LineChart(
-      LineChartData(
-        minX: 0,
-        maxX: math.max(0, labels.length - 1).toDouble(),
-        minY: 0,
-        maxY: maxY,
-        lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipColor: (_) => AdminReportsTheme.primary,
-            tooltipRoundedRadius: 8,
-            getTooltipItems: (spots) => [
-              for (final s in spots)
-                LineTooltipItem(
-                  tooltipBuilder?.call(s.barIndex, s.spotIndex) ??
-                      '${series[s.barIndex].label}: '
-                          '${s.y.round()}$valueSuffix',
-                  const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: LineChart(
+        LineChartData(
+          minX: 0,
+          maxX: math.max(0, labels.length - 1).toDouble(),
+          minY: 0,
+          maxY: maxY,
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (_) => AdminReportsTheme.primary,
+              tooltipRoundedRadius: 8,
+              tooltipMargin: 8,
+              tooltipPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+              maxContentWidth: 180,
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              getTooltipItems: (spots) => [
+                for (var i = 0; i < spots.length; i++)
+                  () {
+                    final s = spots[i];
+                    final dateLabel =
+                        s.spotIndex >= 0 && s.spotIndex < labels.length
+                        ? labels[s.spotIndex]
+                        : '';
+                    final prefix =
+                        i == 0 && spots.length > 1 && dateLabel.isNotEmpty
+                        ? '$dateLabel\n'
+                        : (spots.length == 1 && dateLabel.isNotEmpty
+                              ? '$dateLabel · '
+                              : '');
+                    return LineTooltipItem(
+                      tooltipBuilder?.call(s.barIndex, s.spotIndex) ??
+                          '$prefix${series[s.barIndex].label}: '
+                              '${s.y.round()}$valueSuffix',
+                      const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  }(),
+              ],
+            ),
           ),
-        ),
         gridData: FlGridData(
           drawVerticalLine: false,
           horizontalInterval: maxY / 4,
@@ -775,8 +822,8 @@ class ReportsTrendChart extends StatelessWidget {
                 return Text(
                   '${reportsCompactNumber(value)}$valueSuffix',
                   style: const TextStyle(
-                    fontSize: 10,
-                    color: AdminReportsTheme.textMuted,
+                    fontSize: 10.5,
+                    color: AdminReportsTheme.textSecondary,
                   ),
                 );
               },
@@ -800,8 +847,8 @@ class ReportsTrendChart extends StatelessWidget {
                   child: Text(
                     labels[i],
                     style: const TextStyle(
-                      fontSize: 10,
-                      color: AdminReportsTheme.textMuted,
+                      fontSize: 10.5,
+                      color: AdminReportsTheme.textSecondary,
                     ),
                   ),
                 );
@@ -848,6 +895,7 @@ class ReportsTrendChart extends StatelessWidget {
         ],
       ),
       duration: Duration.zero,
+    ),
     );
   }
 }
@@ -891,6 +939,9 @@ class ReportsColumnChart extends StatelessWidget {
               touchTooltipData: BarTouchTooltipData(
                 getTooltipColor: (_) => AdminReportsTheme.primary,
                 tooltipRoundedRadius: 8,
+                tooltipMargin: 8,
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) =>
                     BarTooltipItem(
                       '${(tooltipLabels ?? labels)[group.x]}\n'
@@ -926,8 +977,8 @@ class ReportsColumnChart extends StatelessWidget {
                     return Text(
                       reportsCompactNumber(value),
                       style: const TextStyle(
-                        fontSize: 10,
-                        color: AdminReportsTheme.textMuted,
+                        fontSize: 10.5,
+                        color: AdminReportsTheme.textSecondary,
                       ),
                     );
                   },
@@ -949,8 +1000,8 @@ class ReportsColumnChart extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 10,
-                          color: AdminReportsTheme.textMuted,
+                          fontSize: 10.5,
+                          color: AdminReportsTheme.textSecondary,
                         ),
                       ),
                     );
@@ -1088,7 +1139,7 @@ class ReportsFunnelBars extends StatelessWidget {
         textAlign: TextAlign.right,
         style: const TextStyle(
           fontSize: 11,
-          color: AdminReportsTheme.textMuted,
+          color: AdminReportsTheme.textSecondary,
         ),
       ),
     ),
@@ -1190,7 +1241,7 @@ class ReportsProgressList extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 11,
-                        color: AdminReportsTheme.textMuted,
+                        color: AdminReportsTheme.textSecondary,
                       ),
                     ),
                   ),
@@ -1203,12 +1254,14 @@ class ReportsProgressList extends StatelessWidget {
                       color: item.color,
                     ),
                   ),
-                  if (item.onTap != null)
+                  if (item.onTap != null) ...[
+                    const SizedBox(width: 2),
                     const Icon(
                       Icons.chevron_right_rounded,
                       size: 16,
-                      color: AdminReportsTheme.textMuted,
+                      color: AdminReportsTheme.textSecondary,
                     ),
+                  ],
                 ],
               ),
             ),
@@ -1289,6 +1342,9 @@ class ReportsGroupedBarChart extends StatelessWidget {
               touchTooltipData: BarTouchTooltipData(
                 getTooltipColor: (_) => AdminReportsTheme.primary,
                 tooltipRoundedRadius: 8,
+                tooltipMargin: 8,
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
                   final title = (tooltipTitles ?? labels)[group.x];
                   final footer = tooltipFooter?.call(group.x);
@@ -1327,8 +1383,8 @@ class ReportsGroupedBarChart extends StatelessWidget {
                     return Text(
                       reportsCompactNumber(value),
                       style: const TextStyle(
-                        fontSize: 10,
-                        color: AdminReportsTheme.textMuted,
+                        fontSize: 10.5,
+                        color: AdminReportsTheme.textSecondary,
                       ),
                     );
                   },
@@ -1350,8 +1406,8 @@ class ReportsGroupedBarChart extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 10,
-                          color: AdminReportsTheme.textMuted,
+                          fontSize: 10.5,
+                          color: AdminReportsTheme.textSecondary,
                         ),
                       ),
                     );
@@ -1526,16 +1582,18 @@ class ReportsSegmentedToggle extends StatelessWidget {
                     duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 5,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: i == selected
                           ? AdminColors.card
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm - 2),
-                      border: i == selected
-                          ? Border.all(color: AdminColors.border.withValues(alpha: 0.8))
-                          : null,
+                      border: Border.all(
+                        color: i == selected
+                            ? AdminColors.border.withValues(alpha: 0.9)
+                            : Colors.transparent,
+                      ),
                       boxShadow: i == selected
                           ? [
                               BoxShadow(

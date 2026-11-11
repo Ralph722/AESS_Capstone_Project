@@ -10,7 +10,6 @@ import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -292,7 +291,7 @@ void main() {
 
   tearDownAll(() => Supabase.instance.dispose());
 
-  testWidgets('shows loading skeleton then renders SaaS header, tabs, metrics, and table',
+  testWidgets('shows loading skeleton then renders SaaS header, metrics, and table',
       (tester) async {
     final completer = Completer<List<AuditLog>>();
     final logs = [
@@ -342,23 +341,24 @@ void main() {
     expect(find.text('Export CSV'), findsOneWidget);
     expect(find.text('Refresh'), findsOneWidget);
 
-    expect(find.byType(AdminSaaSTabs), findsOneWidget);
-    expect(find.text('All logs'), findsOneWidget);
-    expect(find.text('Activity'), findsOneWidget);
-    expect(find.text('Security'), findsWidgets);
-
     expect(find.byType(AdminMetricRibbon), findsOneWidget);
+    expect(find.text('Total (range)'), findsOneWidget);
+    expect(find.text('Admin actions'), findsOneWidget);
+    expect(find.text('Security'), findsOneWidget);
+    expect(find.text('Failed'), findsOneWidget);
+    expect(find.text('Today'), findsNothing);
+    // System actor still appears in the table; no System KPI card.
+    expect(find.text('System'), findsOneWidget);
+
     expect(find.byType(AdminDataTable), findsOneWidget);
     expect(find.byType(AdminPaginationBar), findsOneWidget);
     expect(find.text('3 records'), findsOneWidget);
     expect(find.text('Showing 1–3 of 3'), findsOneWidget);
-    // Metric card label + fallback actor name for system events.
-    expect(find.text('System'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 
   testWidgets(
-      'tabs, debounced search, reset, and scoped stats reload work',
+      'status filter, debounced search, reset, and scoped stats reload work',
       (tester) async {
     final yesterday = DateTime.now().subtract(const Duration(days: 2));
     final service = _FakeAuditService(
@@ -390,18 +390,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.statsCalls, 1);
 
-    // Switching category tab filters without re-querying date-range stats
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AdminSaaSTabs),
-        matching: find.text('Security'),
-      ),
-    );
+    // Status filter narrows results without re-querying date-range stats
+    await tester.tap(find.byKey(const ValueKey('Status-All')));
     await tester.pumpAndSettle();
-    expect(service.recordedQueries.last.category, AuditCategories.security);
+    await tester.tap(find.text('FAILED').last);
+    await tester.pumpAndSettle();
+    expect(service.recordedQueries.last.status, AuditStatus.failed);
     expect(service.statsCalls, 1);
     expect(find.text('1 log'), findsOneWidget);
-    expect(find.text('Category: security'), findsOneWidget);
+    expect(find.text('Status: FAILED'), findsOneWidget);
 
     // Search debounce queries after 300ms and shows empty state when no match
     final searchField = find.byWidgetPredicate(

@@ -71,7 +71,7 @@ class _ReportsHoverSurfaceState extends State<ReportsHoverSurface> {
   Widget build(BuildContext context) {
     final radius =
         widget.borderRadius ??
-        BorderRadius.circular(AdminReportsTheme.radiusLg);
+        BorderRadius.circular(AdminReportsTheme.radiusMd);
 
     Widget surface = ListenableBuilder(
       listenable: Listenable.merge([_hovered, _focused]),

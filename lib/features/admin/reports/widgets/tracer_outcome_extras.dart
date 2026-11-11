@@ -89,7 +89,7 @@ Future<void> showTracerRespondentsDialog({
           padding: EdgeInsets.all(16),
           child: Text(
             'No matching respondents in this slice.',
-            style: TextStyle(color: AdminReportsTheme.textMuted),
+            style: TextStyle(color: AdminReportsTheme.textSecondary),
           ),
         )
       : ListView.separated(
@@ -129,7 +129,7 @@ Future<void> showTracerRespondentsDialog({
                       r.subtitle!,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: AdminReportsTheme.textMuted,
+                        color: AdminReportsTheme.textSecondary,
                       ),
                     ),
               trailing: r.status == null
@@ -217,7 +217,7 @@ Future<void> showTracerRespondentsDialog({
               subtitle,
               style: const TextStyle(
                 fontSize: 12.5,
-                color: AdminReportsTheme.textMuted,
+                color: AdminReportsTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 12),
@@ -283,9 +283,9 @@ class TracerLongitudinalPanel extends StatelessWidget {
           'No alumni appear in more than one tracer wave yet. '
           'This panel fills in as the same people submit later waves.',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 12.5,
             height: 1.4,
-            color: AdminReportsTheme.textMuted,
+            color: AdminReportsTheme.textSecondary,
           ),
         ),
       );
@@ -300,11 +300,12 @@ class TracerLongitudinalPanel extends StatelessWidget {
           Material(
             color: AdminReportsTheme.card,
             borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
+            clipBehavior: Clip.antiAlias,
             child: InkWell(
               borderRadius: BorderRadius.circular(AdminReportsTheme.radiusMd),
               onTap: onOpenPerson == null ? null : () => onOpenPerson!(rows[i]),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
                 decoration: BoxDecoration(
                   borderRadius:
                       BorderRadius.circular(AdminReportsTheme.radiusMd),
@@ -321,17 +322,38 @@ class TracerLongitudinalPanel extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 13.5,
                               fontWeight: FontWeight.w700,
+                              color: AdminReportsTheme.textPrimary,
                             ),
                           ),
                         ),
-                        Text(
-                          '${rows[i].points.length} waves',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: AdminReportsTheme.textMuted,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AdminColors.surface,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AdminColors.border),
+                          ),
+                          child: Text(
+                            '${rows[i].points.length} waves',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              height: 1.15,
+                              color: AdminReportsTheme.textSecondary,
+                            ),
                           ),
                         ),
+                        if (onOpenPerson != null) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16,
+                            color: AdminReportsTheme.textSecondary,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -340,30 +362,49 @@ class TracerLongitudinalPanel extends StatelessWidget {
                       runSpacing: 6,
                       children: [
                         for (final p in rows[i].points)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: p.status.toLowerCase() == 'yes'
-                                  ? Colors.green.withValues(alpha: 0.1)
-                                  : Colors.orange.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: p.status.toLowerCase() == 'yes'
-                                    ? Colors.green.withValues(alpha: 0.25)
-                                    : Colors.orange.withValues(alpha: 0.25),
+                          () {
+                            final employed =
+                                p.status.toLowerCase() == 'yes';
+                            final tone = employed
+                                ? AdminColors.success
+                                : AdminColors.warning;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
                               ),
-                            ),
-                            child: Text(
-                              '${fmt.format(p.waveDate)} · ${p.status}',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
+                              decoration: BoxDecoration(
+                                color: tone.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: tone.withValues(alpha: 0.20),
+                                ),
                               ),
-                            ),
-                          ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: tone,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${fmt.format(p.waveDate)} · ${p.status}',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.15,
+                                      color: AdminReportsTheme.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }(),
                       ],
                     ),
                   ],

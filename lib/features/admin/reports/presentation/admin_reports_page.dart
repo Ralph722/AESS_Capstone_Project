@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
@@ -167,7 +168,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   ];
 
   // Task-based tabs: Overview · Tracer · Survey · Downloads.
-  static const double _tabBarHeight = 45;
+  static const double _tabBarHeight = 46;
   late final TabController _tabController;
 
   /// Cohort filters for Tracer / Survey tabs only.
@@ -890,7 +891,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               child: ReportsDashboardCanvas(
                 child: Padding(
                   padding: const EdgeInsets.only(
-                    top: AdminReportsTheme.space3,
+                    top: AdminReportsTheme.space2,
                     bottom: AdminReportsTheme.space4,
                   ),
                   child: _buildSelectedTab(
@@ -901,7 +902,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                               ReportsPageHeader.height -
                               _tabBarHeight -
                               (showCohortFilters ? _filterBlockHeight : 0) -
-                              AdminReportsTheme.space3 -
+                              AdminReportsTheme.space2 -
                               AdminReportsTheme.space4
                         : null,
                   ),
@@ -1033,38 +1034,34 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     }
   }
 
-  /// Underline section navigation tabs (pins cleanly when scrolled).
+  /// Rounded card-framed underline section tabs (pins cleanly when scrolled).
   Widget _buildTabBar({required bool pinned}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AdminColors.card,
-        border: Border(
-          bottom: BorderSide(
-            color: AdminColors.border.withValues(alpha: pinned ? 0.9 : 0.6),
+    final radius = BorderRadius.circular(AdminSurfaces.radiusMd);
+    return AdminTabBar(
+      controller: _tabController,
+      tabs: [
+        for (var i = 0; i < _tabLabels.length; i++)
+          AdminTabSpec(
+            label: _tabLabels[i],
+            icon: _tabIcons[i],
           ),
-        ),
-        boxShadow: pinned
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
+      ],
+      isScrollable: true,
+      background: AdminColors.card,
+      borderRadius: radius,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      border: Border.all(
+        color: AdminColors.border.withValues(alpha: pinned ? 1.0 : 0.9),
       ),
-      child: AdminTabBar(
-        controller: _tabController,
-        tabs: [
-          for (var i = 0; i < _tabLabels.length; i++)
-            AdminTabSpec(
-              label: _tabLabels[i],
-              icon: _tabIcons[i],
-            ),
-        ],
-        isScrollable: true,
-        background: AdminColors.card,
-      ),
+      boxShadow: pinned
+          ? AdminSurfaces.cardShadow
+          : const [
+              BoxShadow(
+                color: Color(0x0A0F172A),
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
     );
   }
 
@@ -1077,8 +1074,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       kpis: _overviewKpis(a, coverage),
       rows: [
         ReportsBentoRow(
-          flex: const [5, 4, 3],
-          naturalHeight: 300,
+          flex: const [11, 7, 6],
+          naturalHeight: 288,
           children: [
             _overviewTrendCard(a),
             _overviewProgramCard(a),
@@ -1086,8 +1083,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           ],
         ),
         ReportsBentoRow(
-          flex: const [5, 4, 3],
-          naturalHeight: 300,
+          flex: const [4, 4, 4],
+          naturalHeight: 288,
           children: [
             _overviewSurveyHealthCard(a),
             _overviewBatchCard(a),
@@ -1135,13 +1132,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         label: 'Alumni list',
         value: '${a.rosterTotal}',
         icon: Icons.groups_outlined,
-        accent: AdminReportsTheme.primary,
+        accent: UstpColors.blue,
         pillLabel: addedThisMonth > 0
             ? '+$addedThisMonth this month'
             : 'None new this month',
         pillColor: addedThisMonth > 0
             ? AdminReportsTheme.success
-            : AdminReportsTheme.textMuted,
+            : AdminReportsTheme.textSecondary,
         rows: [
           ReportsStatRow('Registered', '${a.registeredOnRoster}'),
           ReportsStatRow('Unclaimed', '${a.unclaimedRoster}'),
@@ -1157,13 +1154,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               'since the 1st.',
           scope: scope,
         ),
-        onTap: () => _openAdminMenuOr(2, 1),
       ),
       ReportsStatCard(
         label: 'Tracer reach',
         value: _pct(coverage.tracerTakeRateAmongRegistered),
         icon: Icons.school_outlined,
-        accent: ReportsBentoPalette.at(1),
+        accent: UstpColors.midBlue,
         pillLabel: reportsKpiStatusLabel(tracerStatus),
         pillColor: reportsStatusColor(tracerStatus),
         rows: [
@@ -1187,13 +1183,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               '"Profile complete" is the alumni list profile flag, not a tracer '
               'submission.',
         ),
-        onTap: () => _selectTab(1),
       ),
       ReportsStatCard(
         label: 'Survey completion',
         value: _pct(a.surveyResponseRate),
         icon: Icons.poll_outlined,
-        accent: ReportsBentoPalette.at(4),
+        accent: UstpColors.skyBlue,
         pillLabel: reportsKpiStatusLabel(surveyStatus),
         pillColor: reportsStatusColor(surveyStatus),
         rows: [
@@ -1209,13 +1204,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               '${a.totalSurveyAssignments} assigned.',
           scope: 'All survey waves included in this overview.',
         ),
-        onTap: () => _selectTab(2),
       ),
       ReportsStatCard(
         label: 'Employment rate',
         value: hasEmployment ? _pct(a.employmentRateAmongSubmissions) : '—',
         icon: Icons.work_outline,
-        accent: AdminReportsTheme.success,
+        accent: UstpColors.blue,
         pillLabel: hasEmployment
             ? reportsKpiStatusLabel(employmentStatus)
             : 'No data',
@@ -1238,7 +1232,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               'If the data set is large, results may be capped. Tracer '
               'employment charts use survey answers instead.',
         ),
-        onTap: () => _selectTab(1),
       ),
     ];
   }
@@ -1371,22 +1364,22 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 ReportsFunnelStep(
                   label: 'Alumni list',
                   value: a.rosterTotal,
-                  color: AdminReportsTheme.primary,
+                  color: UstpColors.blue,
                 ),
                 ReportsFunnelStep(
                   label: 'Registered',
                   value: a.registeredOnRoster,
-                  color: ReportsBentoPalette.at(1),
+                  color: UstpColors.midBlue,
                 ),
                 ReportsFunnelStep(
                   label: 'Took tracer',
                   value: coverage.tookTracer,
-                  color: ReportsBentoPalette.at(2),
+                  color: UstpColors.skyBlue,
                 ),
                 ReportsFunnelStep(
                   label: 'Profile complete',
                   value: a.tracerCompleteCount,
-                  color: AdminReportsTheme.gold,
+                  color: UstpColors.gold,
                 ),
               ],
             ),
@@ -1506,8 +1499,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
                   color: AdminColors.primary,
                 ),
               ),
@@ -1802,7 +1795,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         PopupMenuItem(value: 'downloads', child: Text('Open Downloads tab')),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        height: _viewBarHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: AdminColors.card,
           borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
@@ -1822,17 +1816,17 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               Icons.download_outlined,
               size: 15,
               color: _downloadBusy
-                  ? AdminColors.textMuted
+                  ? AdminColors.textSecondary
                   : AdminColors.primary,
             ),
             const SizedBox(width: 6),
             Text(
               _downloadBusy ? 'Exporting…' : 'Export view',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
                 color: _downloadBusy
-                    ? AdminColors.textMuted
+                    ? AdminColors.textSecondary
                     : AdminColors.primary,
               ),
             ),
@@ -1841,7 +1835,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               Icons.arrow_drop_down,
               size: 16,
               color: _downloadBusy
-                  ? AdminColors.textMuted
+                  ? AdminColors.textSecondary
                   : AdminColors.primary,
             ),
           ],
@@ -1883,7 +1877,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         label: 'Total traced',
         value: denom == 0 ? '$traced' : '$traced / $denom',
         icon: Icons.assignment_turned_in_outlined,
-        accent: AdminReportsTheme.primary,
+        accent: UstpColors.blue,
         pillLabel: denom == 0
             ? 'No data'
             : '${_pct(responseRate)} response rate',
@@ -1926,7 +1920,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         label: 'Employment rate',
         value: hidden ? '—' : _pct(employmentRate),
         icon: Icons.work_outline,
-        accent: AdminReportsTheme.success,
+        accent: UstpColors.midBlue,
         pillLabel: answered == 0
             ? 'No data'
             : hidden
@@ -1956,7 +1950,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       _yesShareKpi(
         label: 'Degree alignment',
         icon: Icons.school_outlined,
-        accent: ReportsBentoPalette.at(1),
+        accent: UstpColors.skyBlue,
         share: _chedYesShare('ched_24a'),
         yesLabel: 'Aligned',
         noLabel: 'Not aligned',
@@ -1970,7 +1964,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       _yesShareKpi(
         label: 'Curriculum relevance',
         icon: Icons.menu_book_outlined,
-        accent: ReportsBentoPalette.at(4),
+        accent: UstpColors.blue,
         share: _chedYesShare('ched_32'),
         yesLabel: 'Relevant',
         noLabel: 'Not relevant',
@@ -2062,7 +2056,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_29'),
             emptyMessage: 'No time-to-first-job answers yet',
             emptyIcon: Icons.schedule_outlined,
-            color: AdminReportsTheme.primary,
+            color: UstpColors.blue,
           ),
           _bentoDistributionCard(
             title: 'First job after college',
@@ -2073,7 +2067,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_22', employedOnly: true),
             emptyMessage: _noChedEmployedDetails,
             emptyIcon: Icons.work_history_outlined,
-            color: AdminReportsTheme.gold,
+            color: UstpColors.midBlue,
             noun: 'employed graduates',
           ),
           _bentoDistributionCard(
@@ -2085,7 +2079,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_27', employedOnly: true),
             emptyMessage: _noChedEmployedDetails,
             emptyIcon: Icons.timelapse_outlined,
-            color: ReportsBentoPalette.at(2),
+            color: UstpColors.darkNavy,
             noun: 'employed graduates',
           ),
         ],
@@ -2107,7 +2101,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_28', employedOnly: true, byCount: true),
             emptyMessage: _noChedEmployedDetails,
             emptyIcon: Icons.travel_explore_outlined,
-            color: ReportsBentoPalette.at(4),
+            color: UstpColors.midBlue,
             noun: 'employed graduates',
           ),
         ],
@@ -2118,8 +2112,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   List<ReportsBentoRow> _tracerCurriculumRows() {
     return [
       ReportsBentoRow(
-        flex: const [5, 7],
-        naturalHeight: 320,
+        flex: const [6, 6],
+        naturalHeight: 204,
         children: [
           _bentoDistributionCard(
             title: 'Curriculum relevance',
@@ -2130,9 +2124,26 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_32', employedOnly: true),
             emptyMessage: _noChedEmployedDetails,
             emptyIcon: Icons.menu_book_outlined,
-            color: AdminReportsTheme.primary,
+            color: UstpColors.blue,
             noun: 'employed graduates',
           ),
+          _bentoDistributionCard(
+            title: 'First job related to course',
+            details: _chedDetails(
+              'Whether the first job related to the course taken in college '
+              '(item 24).',
+            ),
+            data: _tracerCounts('ched_24a'),
+            emptyMessage: 'No course-relatedness answers yet',
+            emptyIcon: Icons.school_outlined,
+            color: UstpColors.midBlue,
+          ),
+        ],
+      ),
+      ReportsBentoRow(
+        flex: const [12],
+        naturalHeight: 308,
+        children: [
           _bentoDistributionCard(
             title: 'Useful competencies',
             details: ReportsDetailsButton.compose(
@@ -2148,24 +2159,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_33', byCount: true),
             emptyMessage: 'No competency answers yet',
             emptyIcon: Icons.psychology_outlined,
-            color: ReportsBentoPalette.at(1),
-          ),
-        ],
-      ),
-      ReportsBentoRow(
-        flex: const [12],
-        naturalHeight: 280,
-        children: [
-          _bentoDistributionCard(
-            title: 'First job related to course',
-            details: _chedDetails(
-              'Whether the first job related to the course taken in college '
-              '(item 24).',
-            ),
-            data: _tracerCounts('ched_24a'),
-            emptyMessage: 'No course-relatedness answers yet',
-            emptyIcon: Icons.school_outlined,
-            color: ReportsBentoPalette.at(4),
+            color: UstpColors.blue,
           ),
         ],
       ),
@@ -2192,7 +2186,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_21', employedOnly: true),
             emptyMessage: _noChedEmployedDetails,
             emptyIcon: Icons.place_outlined,
-            color: ReportsBentoPalette.at(4),
+            color: UstpColors.darkNavy,
             noun: 'employed graduates',
           ),
         ],
@@ -2218,7 +2212,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             ),
             emptyMessage: _noChedEmployedDetails,
             emptyIcon: Icons.factory_outlined,
-            color: AdminReportsTheme.primary,
+            color: UstpColors.blue,
             noun: 'employed graduates',
           ),
           _bentoDistributionCard(
@@ -2233,7 +2227,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_31', employedOnly: true),
             emptyMessage: _noChedEmployedDetails,
             emptyIcon: Icons.payments_outlined,
-            color: ReportsBentoPalette.at(1),
+            color: UstpColors.midBlue,
             noun: 'employed graduates',
           ),
           _bentoDistributionCard(
@@ -2245,7 +2239,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_17', byCount: true),
             emptyMessage: 'No not-employed reason answers yet',
             emptyIcon: Icons.person_off_outlined,
-            color: AdminReportsTheme.gold,
+            color: UstpColors.darkNavy,
           ),
         ],
       ),
@@ -2286,7 +2280,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             data: _tracerCounts('ched_15b', byCount: true),
             emptyMessage: 'No further-studies responses yet',
             emptyIcon: Icons.menu_book_outlined,
-            color: ReportsBentoPalette.at(1),
+            color: UstpColors.blue,
           ),
         ],
       ),
@@ -2447,7 +2441,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         series: [
           ReportsTrendSeries(
             label: 'Employment rate',
-            color: AdminReportsTheme.success,
+            color: UstpColors.blue,
             values: [for (final p in points) p.rate],
           ),
         ],
@@ -2522,12 +2516,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 ReportsDonutEntry(
                   label: 'Employed',
                   value: employed,
-                  color: AdminReportsTheme.success,
+                  color: UstpColors.blue,
                 ),
                 ReportsDonutEntry(
                   label: 'Not employed',
                   value: notEmployed,
-                  color: AdminReportsTheme.gold,
+                  color: UstpColors.gold,
                 ),
               ],
             ),
@@ -2640,11 +2634,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               spacing: 10,
               children: [
                 ReportsLegendDot(
-                  color: AdminReportsTheme.primary,
+                  color: UstpColors.blue,
                   label: 'Answers',
                 ),
                 ReportsLegendDot(
-                  color: AdminReportsTheme.success,
+                  color: UstpColors.gold,
                   label: 'Employed',
                 ),
               ],
@@ -2660,12 +2654,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               series: [
                 ReportsBarSeries(
                   label: 'Answers',
-                  color: AdminReportsTheme.primary,
+                  color: UstpColors.blue,
                   values: [for (final p in points) p.answered],
                 ),
                 ReportsBarSeries(
                   label: 'Employed',
-                  color: AdminReportsTheme.success,
+                  color: UstpColors.gold,
                   values: [for (final p in points) p.employed],
                 ),
               ],
@@ -2726,7 +2720,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                             label: label,
                             detail: 'Not enough data',
                             fraction: 0,
-                            color: AdminReportsTheme.textMuted,
+                            color: AdminReportsTheme.textSecondary,
                           )
                         : ReportsProgressItem(
                             label: label,
@@ -3612,7 +3606,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       items.add(
         _AttentionItem(
           icon: Icons.work_off_outlined,
-          color: AdminReportsTheme.gold,
+          color: AdminColors.warning,
           title: 'No employment submissions yet',
           subtitle: 'Employment charts stay empty until alumni submit data.',
           actionLabel: 'Tracer',
@@ -3738,7 +3732,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 11,
-                        color: AdminReportsTheme.textMuted,
+                        color: AdminReportsTheme.textSecondary,
                         height: 1.3,
                       ),
                     ),

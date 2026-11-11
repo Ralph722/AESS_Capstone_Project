@@ -254,10 +254,13 @@ class ReportsDetailsButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      style: IconButton.styleFrom(
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
       icon: const Icon(
         Icons.info_outline,
         size: 16,
-        color: AdminReportsTheme.textMuted,
+        color: AdminReportsTheme.textSecondary,
       ),
     );
   }

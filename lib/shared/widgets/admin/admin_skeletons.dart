@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/skeleton.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 export 'package:alumni_system/shared/widgets/user/portal_skeletons.dart'
-    show CommentListSkeleton, JobListSkeleton, MessageListSkeleton, PortalCardListSkeleton, SurveyFormSkeleton;
+    show
+        CommentListSkeleton,
+        JobListSkeleton,
+        MessageListSkeleton,
+        PortalCardListSkeleton,
+        PortalDetailSkeleton,
+        SurveyFormSkeleton;
 
 /// Admin dashboard home — title row, KPI row, chart/activity row, card row.
 class AdminDashboardHomeSkeleton extends StatelessWidget {
@@ -601,78 +608,116 @@ class AdminReportsSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShimmerScope(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.only(bottom: AdminDensity.space4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Skeleton(width: 260, height: 26),
-            const SizedBox(height: 8),
-            const Skeleton(width: 360, height: 14),
-            const SizedBox(height: 24),
-            Container(
-              height: 52,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            SizedBox(
+              height: AdminDensity.buttonHeight,
+              child: const Row(
                 children: [
-                  const Skeleton(width: 140, height: 16),
-                  const SizedBox(height: 6),
-                  const Skeleton(width: 220, height: 12),
-                  const SizedBox(height: 16),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final narrow = constraints.maxWidth < 520;
-                      if (narrow) {
-                        return Column(
-                          children: List.generate(
-                            3,
-                            (i) => Padding(
-                              padding: EdgeInsets.only(bottom: i < 2 ? 12 : 0),
-                              child: _reportsStatTile(),
-                            ),
-                          ),
-                        );
-                      }
-                      return Row(
-                        children: List.generate(
-                          3,
-                          (i) => Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.only(left: i == 0 ? 0 : 12),
-                              child: _reportsStatTile(),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  const Skeleton(width: 160, height: 16),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                  ),
+                  Skeleton(width: 190, height: 22),
+                  Spacer(),
+                  Skeleton(width: 92, height: 36),
+                  SizedBox(width: 8),
+                  Skeleton(width: 96, height: 36),
                 ],
               ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: AdminColors.card,
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+                border: Border.all(color: AdminColors.border),
+              ),
+              child: const Row(
+                children: [
+                  Skeleton(width: 78, height: 14),
+                  SizedBox(width: 24),
+                  Skeleton(width: 64, height: 14),
+                  SizedBox(width: 24),
+                  Skeleton(width: 68, height: 14),
+                  SizedBox(width: 24),
+                  Skeleton(width: 84, height: 14),
+                ],
+              ),
+            ),
+            const SizedBox(height: AdminDensity.space2),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 1000;
+                final medium = !wide && constraints.maxWidth >= 640;
+                if (wide) {
+                  return Row(
+                    children: [
+                      for (var i = 0; i < 4; i++) ...[
+                        if (i > 0) const SizedBox(width: AdminDensity.space2),
+                        Expanded(child: _reportsStatTile()),
+                      ],
+                    ],
+                  );
+                }
+                if (medium) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: _reportsStatTile()),
+                          const SizedBox(width: AdminDensity.space2),
+                          Expanded(child: _reportsStatTile()),
+                        ],
+                      ),
+                      const SizedBox(height: AdminDensity.space2),
+                      Row(
+                        children: [
+                          Expanded(child: _reportsStatTile()),
+                          const SizedBox(width: AdminDensity.space2),
+                          Expanded(child: _reportsStatTile()),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+                return Column(
+                  children: List.generate(
+                    4,
+                    (i) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: i < 3 ? AdminDensity.space2 : 0,
+                      ),
+                      child: _reportsStatTile(),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: AdminDensity.space2),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 1000;
+                if (!wide) {
+                  return Column(
+                    children: [
+                      _reportsChartCardSkeleton(),
+                      const SizedBox(height: AdminDensity.space2),
+                      _reportsChartCardSkeleton(),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(flex: 11, child: _reportsChartCardSkeleton()),
+                    const SizedBox(width: AdminDensity.space2),
+                    Expanded(flex: 7, child: _reportsChartCardSkeleton()),
+                    const SizedBox(width: AdminDensity.space2),
+                    Expanded(flex: 6, child: _reportsChartCardSkeleton()),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -682,14 +727,70 @@ class AdminReportsSkeleton extends StatelessWidget {
 
   static Widget _reportsStatTile() {
     return Container(
-      height: 72,
+      height: 152,
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+        border: Border.all(color: AdminColors.border),
       ),
-      alignment: Alignment.center,
-      child: const Skeleton(width: 56, height: 18),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Skeleton(
+                width: 26,
+                height: 26,
+                borderRadius: BorderRadius.all(Radius.circular(7)),
+              ),
+              SizedBox(width: 8),
+              Skeleton(width: 84, height: 11),
+            ],
+          ),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              Skeleton(width: 64, height: 24),
+              SizedBox(width: 8),
+              Skeleton(width: 58, height: 18),
+            ],
+          ),
+          Spacer(),
+          Skeleton(height: 11),
+          SizedBox(height: 6),
+          FractionallySizedBox(widthFactor: 0.78, child: Skeleton(height: 11)),
+        ],
+      ),
+    );
+  }
+
+  static Widget _reportsChartCardSkeleton() {
+    return Container(
+      height: 288,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+        border: Border.all(color: AdminColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Skeleton(width: 150, height: 14),
+          const SizedBox(height: 6),
+          const Skeleton(width: 190, height: 11),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AdminColors.surface,
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -706,7 +807,7 @@ class AdminActivityLogSkeleton extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final bounded = constraints.maxHeight.isFinite;
-        final metricCols = width >= 780 ? 6 : (width >= 480 ? 2 : 1);
+        final metricCols = width >= 780 ? 4 : (width >= 480 ? 2 : 1);
         final rowsList = ListView.separated(
           shrinkWrap: !bounded,
           physics: bounded
@@ -787,10 +888,10 @@ class AdminActivityLogSkeleton extends StatelessWidget {
           ),
         );
 
-        final metricsWidget = metricCols == 6
+        final metricsWidget = metricCols == 4
             ? Row(
                 children: [
-                  for (var i = 0; i < 6; i++) ...[
+                  for (var i = 0; i < 4; i++) ...[
                     if (i > 0) const SizedBox(width: 10),
                     const Expanded(child: _ActivityMetricSkeletonTile()),
                   ],
@@ -1243,6 +1344,6 @@ class AdminMemberDetailSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const FeedbackDetailSkeleton();
+    return const PortalDetailSkeleton();
   }
 }

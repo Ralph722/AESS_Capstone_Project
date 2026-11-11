@@ -13,7 +13,6 @@ import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_metric_ribbon.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_saas_tabs.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
@@ -62,9 +61,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
   String? _loadedStatsRangeKey;
   int _loadSeq = 0;
   String _actionFilter = 'All';
-  String _resourceFilter = 'All';
   String _moduleFilter = 'All';
-  String _categoryFilter = 'All';
   String _statusFilter = 'All';
   String _actorTypeFilter = 'All';
   DateTime? _startDate;
@@ -82,7 +79,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     AuditModules.events,
     AuditModules.jobs,
     AuditModules.forum,
-    AuditModules.feedback,
     AuditModules.announcements,
     AuditModules.reports,
     AuditModules.administration,
@@ -112,9 +108,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
             ? null
             : _searchController.text.trim(),
         action: _actionFilter,
-        resource: _resourceFilter,
         module: _moduleFilter,
-        category: _categoryFilter,
         status: _statusFilter,
         actorType: _actorTypeFilter,
         startDate: _startDate,
@@ -192,9 +186,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     _lastSearchedTerm = '';
     setState(() {
       _actionFilter = 'All';
-      _resourceFilter = 'All';
       _moduleFilter = 'All';
-      _categoryFilter = 'All';
       _statusFilter = 'All';
       _actorTypeFilter = 'All';
       _startDate = null;
@@ -319,63 +311,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     );
   }
 
-  Widget _buildTabs() {
-    final activityCount =
-        (_stats.total - _stats.securityEvents).clamp(0, _stats.total);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: AdminSaaSTabs(
-          tabs: [
-            AdminSaaSTabSpec(
-              label: 'All logs',
-              icon: Icons.list_alt_outlined,
-              count: _hasLoaded ? _stats.total : null,
-              isSelected: _categoryFilter == 'All',
-              onTap: () {
-                if (_categoryFilter == 'All') return;
-                setState(() {
-                  _categoryFilter = 'All';
-                  _page = 0;
-                });
-                _loadLogs();
-              },
-            ),
-            AdminSaaSTabSpec(
-              label: 'Activity',
-              icon: Icons.history_outlined,
-              count: _hasLoaded ? activityCount : null,
-              isSelected: _categoryFilter == AuditCategories.activity,
-              onTap: () {
-                if (_categoryFilter == AuditCategories.activity) return;
-                setState(() {
-                  _categoryFilter = AuditCategories.activity;
-                  _page = 0;
-                });
-                _loadLogs();
-              },
-            ),
-            AdminSaaSTabSpec(
-              label: 'Security',
-              icon: Icons.shield_outlined,
-              count: _hasLoaded ? _stats.securityEvents : null,
-              isSelected: _categoryFilter == AuditCategories.security,
-              onTap: () {
-                if (_categoryFilter == AuditCategories.security) return;
-                setState(() {
-                  _categoryFilter = AuditCategories.security;
-                  _page = 0;
-                });
-                _loadLogs();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildMetrics() {
     return AdminMetricRibbon(
       items: [
@@ -385,13 +320,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
           icon: Icons.history,
           color: AdminColors.primary,
           tooltip: 'All events in the current date range',
-        ),
-        AdminMetricRibbonItem(
-          label: 'Today',
-          value: '${_stats.today}',
-          icon: Icons.today_outlined,
-          color: AdminColors.info,
-          tooltip: 'Events recorded today',
         ),
         AdminMetricRibbonItem(
           label: 'Admin actions',
@@ -413,13 +341,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
           icon: Icons.error_outline,
           color: AdminColors.danger,
           tooltip: 'Failed or rejected actions',
-        ),
-        AdminMetricRibbonItem(
-          label: 'System',
-          value: '${_stats.systemEvents}',
-          icon: Icons.settings_suggest_outlined,
-          color: AdminColors.textSecondary,
-          tooltip: 'Automated system actors',
         ),
       ],
     );
@@ -470,12 +391,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
       ..._logs.map((l) => l.action).where((a) => a.isNotEmpty),
     }.toList()
       ..sort();
-    final resources = {
-      'All',
-      if (_resourceFilter != 'All') _resourceFilter,
-      ..._logs.map((l) => l.resource).where((r) => r.isNotEmpty),
-    }.toList()
-      ..sort();
 
     final safePage = adminClampPage(_page, _logs.length, _pageSize);
     final pageLogs = adminPaginate(_logs, safePage, _pageSize);
@@ -492,11 +407,9 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
       children: [
         _buildHeader(availableWidth),
         const SizedBox(height: AdminDensity.space2),
-        _buildTabs(),
-        const SizedBox(height: AdminDensity.space2),
         _buildMetrics(),
         const SizedBox(height: AdminDensity.space2),
-        _buildToolbar(actions: actions, resources: resources),
+        _buildToolbar(actions: actions),
         if (_error != null && _logs.isNotEmpty) ...[
           const SizedBox(height: AdminDensity.space1),
           _buildRefreshErrorNotice(),
@@ -518,17 +431,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
             _searchController.clear();
             _lastSearchedTerm = '';
             setState(() => _page = 0);
-            _loadLogs();
-          },
-        ),
-      if (_categoryFilter != 'All')
-        DirectoryActiveFilterChip(
-          label: 'Category: $_categoryFilter',
-          onRemoved: () {
-            setState(() {
-              _categoryFilter = 'All';
-              _page = 0;
-            });
             _loadLogs();
           },
         ),
@@ -576,17 +478,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
             _loadLogs();
           },
         ),
-      if (_resourceFilter != 'All')
-        DirectoryActiveFilterChip(
-          label: 'Resource: $_resourceFilter',
-          onRemoved: () {
-            setState(() {
-              _resourceFilter = 'All';
-              _page = 0;
-            });
-            _loadLogs();
-          },
-        ),
       if (_startDate != null)
         DirectoryActiveFilterChip(
           label: 'From: ${DirectoryDateTimePickers.formatDate(_startDate!)}',
@@ -612,10 +503,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
     ];
   }
 
-  Widget _buildToolbar({
-    required List<String> actions,
-    required List<String> resources,
-  }) {
+  Widget _buildToolbar({required List<String> actions}) {
     return AdminSaaSToolbar(
       searchHint: 'Search actor, action, description…',
       searchWidth: 240,
@@ -728,24 +616,6 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
             _loadLogs();
           },
         ),
-        DirectoryFilterField<String>(
-          label: 'Resource',
-          value: _resourceFilter,
-          dense: true,
-          width: 132,
-          items: [
-            for (final r in resources)
-              DropdownMenuItem(value: r, child: Text(r)),
-          ],
-          onChanged: (v) {
-            if (v == null) return;
-            setState(() {
-              _resourceFilter = v;
-              _page = 0;
-            });
-            _loadLogs();
-          },
-        ),
         DirectoryDateFilterChip(
           label: 'From',
           displayText: _startDate == null
@@ -801,9 +671,7 @@ class _AdminActivityLogsScreenState extends State<AdminActivityLogsScreen>
 
   bool get _hasActiveFilters =>
       _actionFilter != 'All' ||
-      _resourceFilter != 'All' ||
       _moduleFilter != 'All' ||
-      _categoryFilter != 'All' ||
       _statusFilter != 'All' ||
       _actorTypeFilter != 'All' ||
       _startDate != null ||

@@ -6,6 +6,7 @@ import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layou
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Cohort filter bar for Tracer / Survey tabs (wave · batch · course).
@@ -72,12 +73,12 @@ class ReportsCohortFilterBar extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             foregroundColor: AdminColors.textSecondary,
             side: BorderSide(color: AdminColors.border),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            minimumSize: const Size(0, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            minimumSize: const Size(0, AdminDensity.controlHeight),
             visualDensity: VisualDensity.compact,
             textStyle: const TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
@@ -91,15 +92,9 @@ class ReportsCohortFilterBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: AdminColors.card,
-        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
         border: Border.all(color: AdminColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        boxShadow: AdminSurfaces.cardShadow,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -185,12 +180,12 @@ class ReportsCohortFilterBar extends StatelessWidget {
       runSpacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(
+        const Text(
           'Active:',
           style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w600,
-            color: AdminColors.textMuted,
+            color: AdminColors.textSecondary,
           ),
         ),
         if (showWaveFilter &&
@@ -241,16 +236,20 @@ class ReportsCohortFilterBar extends StatelessWidget {
         if (active) ...[
           const SizedBox(width: 6),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: AdminColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: AdminColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: AdminColors.primary.withValues(alpha: 0.18),
+              ),
             ),
             child: Text(
               '$activeCount',
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w700,
+                height: 1.15,
                 color: AdminColors.primary,
               ),
             ),

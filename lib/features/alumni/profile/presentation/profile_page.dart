@@ -12,7 +12,6 @@ import 'package:alumni_system/features/alumni/profile/presentation/profile_infor
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
 import 'package:alumni_system/features/shell/presentation/main_navigation.dart';
-import 'package:alumni_system/features/feedback/presentation/user_feedback_list_page.dart';
 import 'package:alumni_system/features/messages/presentation/user_messages_page.dart';
 import 'package:alumni_system/features/notifications/presentation/notifications_page.dart';
 import 'package:alumni_system/features/surveys/presentation/user_surveys_page.dart';
@@ -289,21 +288,6 @@ class ProfileScreenState extends State<ProfileScreen>
                     context,
                     MaterialPageRoute(
                       builder: (_) => const NotificationsScreen(),
-                    ),
-                  );
-                },
-              ),
-              const _PortalAccountDivider(),
-              _PortalAccountRow(
-                icon: Icons.feedback_outlined,
-                iconColor: PortalTheme.navy,
-                title: 'Feedback',
-                subtitle: 'Share bugs, ideas, or issues',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const UserFeedbackListScreen(),
                     ),
                   );
                 },

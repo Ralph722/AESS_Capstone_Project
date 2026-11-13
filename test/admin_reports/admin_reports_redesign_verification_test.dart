@@ -6,6 +6,7 @@ import 'package:alumni_system/features/admin/reports/application/gts_alumni_list
 import 'package:alumni_system/features/admin/reports/application/gts_report_engine.dart';
 import 'package:alumni_system/features/admin/reports/data/gts_saved_report_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
+import 'package:alumni_system/features/admin/reports/models/report_catalog.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_respondent.dart';
@@ -13,7 +14,6 @@ import 'package:alumni_system/features/admin/reports/models/reports_dashboard_fi
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_filter_bar.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_header.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_alumni_list_panel.dart';
-import 'package:alumni_system/features/admin/reports/widgets/gts_builder_mode_switch.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_report_preview.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_saved_reports_bar.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
@@ -215,33 +215,6 @@ void main() {
       expect(find.text('GTS participation and data quality'), findsOneWidget);
     });
 
-    testWidgets('GtsBuilderModeSwitch switches between Summary and List modes', (tester) async {
-      var mode = GtsBuilderMode.summary;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, setState) => GtsBuilderModeSwitch(
-                mode: mode,
-                onChanged: (m) => setState(() => mode = m),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Summary & charts'), findsOneWidget);
-      expect(find.text('Alumni list'), findsOneWidget);
-
-      await tester.tap(find.text('Alumni list'));
-      await tester.pumpAndSettle();
-      expect(mode, GtsBuilderMode.list);
-
-      await tester.tap(find.text('Summary & charts'));
-      await tester.pumpAndSettle();
-      expect(mode, GtsBuilderMode.summary);
-    });
-
     testWidgets('GtsSavedReportsBar shows unsaved changes and action buttons', (tester) async {
       final store = _FakeStore();
       final saved = GtsSavedReport(
@@ -409,7 +382,6 @@ void main() {
               width: 1200,
               child: ReportsPageHeader(
                 updatedAt: DateTime.now(),
-                onRefresh: () {},
               ),
             ),
           ),
@@ -419,7 +391,7 @@ void main() {
 
       expect(find.text('Reports & Analytics'), findsOneWidget);
       expect(find.text('Live'), findsOneWidget);
-      expect(find.text('Refresh'), findsOneWidget);
+      expect(find.text('Refresh'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -477,9 +449,9 @@ void main() {
       expect(find.text('BSIT'), findsOneWidget);
       expect(find.text('BTLED-ICT'), findsOneWidget);
       expect(find.text('BTLED-HE'), findsOneWidget);
-      expect(find.text('73%'), findsOneWidget);
-      expect(find.text('18%'), findsOneWidget);
-      expect(find.text('9%'), findsOneWidget);
+      expect(find.text('72.7%'), findsOneWidget);
+      expect(find.text('18.2%'), findsOneWidget);
+      expect(find.text('9.1%'), findsOneWidget);
       expect(find.byType(Divider), findsNWidgets(2));
 
       final legendRect = tester.getRect(find.byType(SingleChildScrollView));
@@ -736,6 +708,117 @@ void main() {
       expect(find.text('Submitted'), findsOneWidget);
       expect(find.text('Pending'), findsOneWidget);
       expect(find.text('25%'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('Reports Downloads Tab Verification', () {
+    testWidgets('ReportsDownloadCard renders multi-line title, subtitle, and highlight bullets', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              height: 275,
+              child: ReportsDownloadCard(
+                preset: const ReportsDownloadPreset(
+                  id: 'employment_employability',
+                  title: 'Institutional employment & employability overview',
+                  description: 'Strategic employment metrics for board, president, and academic leadership',
+                  icon: Icons.account_balance_outlined,
+                  sections: [],
+                  includeItems: [
+                    'Response rate for the selected scope',
+                    'Present employment (Q16) and employment status (Q18)',
+                    'Place of work — local vs abroad (Q21)',
+                  ],
+                  privacy: ReportPrivacyClass.aggregated,
+                ),
+                details: 'Report details calculation and scope',
+                badge: Container(
+                  key: const Key('privacy-badge'),
+                  child: const Text('Aggregated'),
+                ),
+                content: const SingleChildScrollView(
+                  physics: NeverScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Response rate for the selected scope'),
+                      SizedBox(height: 4),
+                      Text('Present employment (Q16) and employment status (Q18)'),
+                    ],
+                  ),
+                ),
+                actions: const Row(
+                  children: [
+                    Text('PDF'),
+                    Text('Excel'),
+                    Text('CSV'),
+                    Text('Print'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.text('Institutional employment & employability overview'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Strategic employment metrics for board, president, and academic leadership'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('privacy-badge')), findsOneWidget);
+      expect(find.text('Aggregated'), findsOneWidget);
+      expect(find.text('Response rate for the selected scope'), findsOneWidget);
+      expect(find.text('PDF'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('ReportsDownloadsPanel renders wave comparison readiness and catalog highlights', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final downloads = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ReportsDownloadsPanel(
+                filterLabel: 'Batch 2024 · BSIT',
+                chedWaveCount: 3,
+                rowCounts: const {
+                  CustomReportSectionId.alumniRoster: 120,
+                  CustomReportSectionId.employmentRecords: 85,
+                },
+                onDownload: (preset, {required format, required printPreview}) async {
+                  downloads.add('${preset.id}:${format.name}:$printPreview');
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Verify wave comparison status text
+      expect(find.text('3 CHED waves available'), findsOneWidget);
+      expect(find.text('Select waves after choosing format'), findsOneWidget);
+
+      // Verify catalog highlights rendered on Institutional GTS cards
+      expect(find.text('Response rate for the selected scope'), findsOneWidget);
+      expect(find.text('Present employment (Q16) and employment status (Q18)'), findsOneWidget);
+
+      // Verify row counts rendered on operational cards
+      expect(find.text('120 rows'), findsOneWidget);
+      expect(find.text('85 rows'), findsNWidgets(3));
+
       expect(tester.takeException(), isNull);
     });
   });

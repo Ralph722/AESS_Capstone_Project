@@ -32,6 +32,10 @@ fi
 echo "Icon font OK: MaterialIcons-Regular.otf (${ICON_SIZE} bytes)"
 
 echo ""
+echo "Cache-busting MaterialIcons filename (avoids stale tree-shaken font)..."
+python3 tool/bust_web_icon_font.py
+
+echo ""
 echo "========================================"
 echo "Deploying to Firebase Hosting"
 echo "========================================"

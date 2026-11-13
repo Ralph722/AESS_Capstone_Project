@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/features/notifications/models/notification_model.dart';
@@ -424,6 +425,23 @@ class _SidebarBrandHeader extends StatelessWidget {
 
   final bool collapsed;
 
+  static const _logoAsset = 'assets/AESS_Icon.svg';
+  static const _logoSize = 32.0;
+  static const _logoRadius = 8.0;
+
+  Widget _brandLogo() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(_logoRadius),
+      child: SvgPicture.asset(
+        _logoAsset,
+        width: _logoSize,
+        height: _logoSize,
+        fit: BoxFit.cover,
+        excludeFromSemantics: true,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -442,41 +460,19 @@ class _SidebarBrandHeader extends StatelessWidget {
               child: Tooltip(
                 message: 'AESS Admin Portal',
                 waitDuration: _AdminSidebarLayout.tooltipWait,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Image.asset(
-                    'assets/images/system_logo.png',
-                    fit: BoxFit.contain,
-                  ),
+                child: Semantics(
+                  label: 'AESS Admin Portal',
+                  image: true,
+                  child: _brandLogo(),
                 ),
               ),
             )
           : Row(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Image.asset(
-                    'assets/images/system_logo.png',
-                    fit: BoxFit.contain,
-                  ),
+                Semantics(
+                  label: 'AESS Admin Portal',
+                  image: true,
+                  child: _brandLogo(),
                 ),
                 const SizedBox(width: 10),
                 Expanded(

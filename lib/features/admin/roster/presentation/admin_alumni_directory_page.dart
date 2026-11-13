@@ -221,7 +221,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     }
   }
 
-  /// CHED GTS column data loads after the roster so the list paints first;
+  /// Tracer column data loads after the roster so the list paints first;
   /// cells show a dash until progress arrives.
   Future<void> _loadChedProgress() async {
     final progress = await _surveyService.getChedGtsProgressByUser();
@@ -704,27 +704,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
     });
   }
 
-  Duration? _activeWindowForFilter() {
-    switch (_activeFilter) {
-      case AlumniActiveFilter.active7:
-        return const Duration(days: 7);
-      case AlumniActiveFilter.active30:
-        return const Duration(days: 30);
-      case AlumniActiveFilter.active90:
-        return const Duration(days: 90);
-      default:
-        return null;
-    }
-  }
-
-  bool _showActiveBadge(AlumniMember member) {
-    final window = _activeWindowForFilter();
-    if (window != null) {
-      return member.isActiveWithin(window);
-    }
-    return member.isActiveWithin(const Duration(days: 30));
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1195,7 +1174,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                     return DirectoryMemberTableRow(
                       member: member,
                       isSelected: _selectedMember?.id == member.id,
-                      showActiveBadge: _showActiveBadge(member),
                       chedProgress: _chedFor(member),
                       onTap: () => _selectMember(member),
                       onEdit: () => _showAddOrEditDialog(existing: member),
@@ -1214,7 +1192,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                     return DirectoryMemberCard(
                       member: member,
                       isSelected: _selectedMember?.id == member.id,
-                      showActiveBadge: _showActiveBadge(member),
                       chedProgress: _chedFor(member),
                       onTap: () => _selectMember(member),
                       onEdit: () => _showAddOrEditDialog(existing: member),

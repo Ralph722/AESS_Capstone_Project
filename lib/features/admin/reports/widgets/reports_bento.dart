@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import 'package:alumni_system/core/constants/ustp_colors.dart';
+import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_kpi.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
@@ -690,7 +691,7 @@ class ReportsDonutBreakdown extends StatelessWidget {
             border: Border.all(color: AdminReportsTheme.border),
           ),
           child: Text(
-            '${pct.toStringAsFixed(0)}%',
+            formatReportPercentPoints(pct.toDouble()),
             style: const TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w600,
@@ -1135,7 +1136,7 @@ class ReportsFunnelBars extends StatelessWidget {
     SizedBox(
       width: 40,
       child: Text(
-        base == 0 ? '—' : '${(_fraction(s, base) * 100).toStringAsFixed(0)}%',
+        base == 0 ? '—' : formatReportPercent(_fraction(s, base)),
         textAlign: TextAlign.right,
         style: const TextStyle(
           fontSize: 11,
@@ -1247,7 +1248,7 @@ class ReportsProgressList extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${(item.fraction * 100).toStringAsFixed(0)}%',
+                    formatReportPercent(item.fraction),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -1533,7 +1534,7 @@ class ReportsSplitBars extends StatelessWidget {
                     ReportsLegendDot(
                       color: e.color,
                       label:
-                          '${e.label} ${(e.value / total * 100).toStringAsFixed(0)}%',
+                          '${e.label} ${formatReportPercent(e.value / total)}',
                     ),
                 ],
               ),

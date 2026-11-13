@@ -1,7 +1,6 @@
 import 'package:alumni_system/features/admin/dashboard/application/dashboard_insights.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
-import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -46,16 +45,6 @@ Survey _survey(
   archived: archived,
   assignmentCount: assigned,
   responseCount: submitted,
-);
-
-EmploymentRecord _employment(String uid, String status) => EmploymentRecord(
-  id: 'r-$uid',
-  userId: uid,
-  userName: '',
-  userEmail: '',
-  schoolId: '',
-  employmentStatus: status,
-  contactNumber: '',
 );
 
 JobPosting _job(String id, DateTime deadline) => JobPosting(
@@ -136,7 +125,7 @@ DashboardInsights _build({
   Map<String, int> assigned = const {},
   Map<String, int> submitted = const {},
   Set<String> submitters = const {},
-  List<EmploymentRecord> employment = const [],
+  Map<String, String> liveEmployment = const {},
   List<JobPosting> jobs = const [],
   List<DssFlag>? flags = const [],
 }) => DashboardInsights.build(
@@ -145,7 +134,7 @@ DashboardInsights _build({
   assignmentCounts: assigned,
   submittedCounts: submitted,
   tracerSubmitterIds: submitters,
-  employmentRecords: employment,
+  liveEmploymentByUserId: liveEmployment,
   activeJobs: jobs,
   flags: flags,
   now: _now,
@@ -198,14 +187,14 @@ void main() {
     });
   });
 
-  test('employment rate uses Reports calculation (one per person)', () {
+  test('employment rate uses live profile status (one per registered)', () {
     final i = _build(
       members: roster,
-      employment: [
-        _employment('u1', 'Employed'),
-        _employment('u2', 'Unemployed'),
-        _employment('not-on-roster', 'Employed'),
-      ],
+      liveEmployment: {
+        'u1': 'Employed',
+        'u2': 'Unemployed',
+        'not-on-roster': 'Employed',
+      },
     );
     expect(i.employmentRecords, 2);
     expect(i.employed, 1);

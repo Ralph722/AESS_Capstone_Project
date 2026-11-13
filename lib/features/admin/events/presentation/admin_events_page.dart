@@ -73,7 +73,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   DateTime? _to;
   String _search = '';
   int _quickFilter = 0; // 0 all, 1 this week (7d), 2 next 3 days
-  _EventSort _sort = _EventSort.soonest;
+  _EventSort _sort = _EventSort.newestAdded;
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime? _selectedCalendarDay;
 
@@ -287,7 +287,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       _hasAdvancedFilters ||
       _search.isNotEmpty ||
       _quickFilter != 0 ||
-      _sort != _EventSort.soonest;
+      _sort != _EventSort.newestAdded;
 
   void _clearFilters() {
     setState(() {
@@ -298,7 +298,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       _to = null;
       _search = '';
       _quickFilter = 0;
-      _sort = _EventSort.soonest;
+      _sort = _EventSort.newestAdded;
       _searchController.clear();
       _selectedCalendarDay = null;
     });
@@ -696,12 +696,12 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         ),
       );
     }
-    if (_sort != _EventSort.soonest) {
+    if (_sort != _EventSort.newestAdded) {
       chips.add(
         DirectoryActiveFilterChip(
           label: 'Sort: ${_sortLabel(_sort)}',
           onRemoved: () {
-            setState(() => _sort = _EventSort.soonest);
+            setState(() => _sort = _EventSort.newestAdded);
             _applyFilters();
           },
         ),

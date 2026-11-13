@@ -2,6 +2,7 @@ import 'package:alumni_system/features/admin/roster/models/alumni_member_model.d
 import 'package:alumni_system/features/announcements/models/announcement_model.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
+import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_member_service.dart';
 
@@ -14,6 +15,7 @@ class AdminReportsAnalytics {
     required this.announcements,
     required this.forumTopics,
     required this.portalUserCount,
+    this.liveEmploymentByUserId = const {},
     this.pendingSurveyAssignments = 0,
     this.assignmentCountsBySurveyId = const {},
     this.submittedResponsesBySurveyId = const {},
@@ -26,6 +28,10 @@ class AdminReportsAnalytics {
 
   final List<AlumniMember> members;
   final List<EmploymentRecord> employmentRecords;
+
+  /// Live `users.employment_status` for registered alumni, keyed by auth uid.
+  /// Powers Overview / Home employment KPIs (not Tracer-tab item 16).
+  final Map<String, String> liveEmploymentByUserId;
   final List<Survey> surveys;
   final List<Announcement> announcements;
   final List<ForumTopic> forumTopics;
@@ -70,18 +76,33 @@ class AdminReportsAnalytics {
   int get registeredWithoutTracerComplete =>
       (registeredOnRoster - tracerCompleteCount).clamp(0, registeredOnRoster);
 
-  /// Employed ÷ submissions with employment data (deduped registered alumni).
+  /// Employed ÷ registered alumni with live-profile employment status.
   ///
-  /// Definition (shown under KPIs): employed among alumni who submitted
-  /// employment data — not among the full alumni list.
+  /// Tracer-wave employment (CHED item 16) stays on the Tracer tab.
   static const employmentRateDefinition =
-      'Employment rate is the share of employed alumni among those who '
-      'submitted employment information — not among the entire alumni list.';
+      'Employment rate is the share of employed alumni among registered '
+      'alumni who have employment status on their live profile — not among '
+      'the entire alumni list. Tracer employment uses survey item 16 on the '
+      'Tracer tab.';
 
   double get employmentRateAmongSubmissions =>
       reportEmploymentCount == 0 ? 0 : employedCount / reportEmploymentCount;
 
-  /// One entry per alumni (latest submission wins); excludes orphan test docs.
+  /// Live-profile statuses for active registered alumni (non-empty only).
+  List<String> get _liveEmploymentStatuses {
+    final out = <String>[];
+    for (final m in activeRoster) {
+      if (!m.isRegisteredUser) continue;
+      final uid = (m.authUid ?? '').trim();
+      if (uid.isEmpty) continue;
+      final status = (liveEmploymentByUserId[uid] ?? '').trim();
+      if (status.isEmpty) continue;
+      out.add(status);
+    }
+    return out;
+  }
+
+  /// One entry per alumni (latest `gts_employment_records` row); for exports.
   List<EmploymentRecord> get reportEmploymentRecords {
     final registeredAuth = <String>{
       for (final m in activeRoster)
@@ -111,23 +132,24 @@ class AdminReportsAnalytics {
     }).toList();
   }
 
-  int get reportEmploymentCount => reportEmploymentRecords.length;
+  /// Registered alumni with a non-empty live-profile employment status.
+  int get reportEmploymentCount => _liveEmploymentStatuses.length;
 
-  int get employedCount => reportEmploymentRecords
-      .where((r) => r.employmentStatus.toLowerCase() == 'employed')
+  int get employedCount => _liveEmploymentStatuses
+      .where((s) => s.toLowerCase() == 'employed')
       .length;
 
-  /// Everyone not employed: CHED item 16 "No" plus "Never Employed".
+  /// Everyone with a live status other than Employed.
   int get unemployedCount => reportEmploymentCount - employedCount;
 
-  /// CHED item 16 "No" only.
-  int get notEmployedCount => reportEmploymentRecords
-      .where((r) => r.employmentStatus.toLowerCase() == 'unemployed')
+  /// Live profile "Unemployed" only.
+  int get notEmployedCount => _liveEmploymentStatuses
+      .where((s) => s.toLowerCase() == 'unemployed')
       .length;
 
-  /// CHED item 16 "Never Employed" only.
-  int get neverEmployedCount => reportEmploymentRecords
-      .where((r) => r.employmentStatus.toLowerCase() == 'never employed')
+  /// Live profile "Never employed" only.
+  int get neverEmployedCount => _liveEmploymentStatuses
+      .where((s) => s.toLowerCase() == 'never employed')
       .length;
 
   static String _employmentPersonKey(EmploymentRecord r) {
@@ -136,6 +158,19 @@ class AdminReportsAnalytics {
     final sid = AlumniMemberService.normalizeStudentId(r.schoolId);
     if (sid.isNotEmpty) return 'sid:$sid';
     return 'doc:${r.id}';
+  }
+
+  /// Builds auth-uid → status from live [TracerProfile]s.
+  static Map<String, String> liveEmploymentFromProfiles(
+    Map<String, TracerProfile> profiles,
+  ) {
+    final out = <String, String>{};
+    for (final e in profiles.entries) {
+      final status = e.value.employmentStatus.trim();
+      if (status.isEmpty) continue;
+      out[e.key] = status;
+    }
+    return out;
   }
 
   Map<String, int> get membersByCourse {

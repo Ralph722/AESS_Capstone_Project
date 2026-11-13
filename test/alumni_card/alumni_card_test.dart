@@ -220,7 +220,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('SCAN TO VERIFY'), findsOneWidget);
     expect(find.text('USTP ALUMNI OFFICE'), findsOneWidget);
-    expect(find.text('K7Q-4MZ'), findsOneWidget);
+    expect(find.text('K7Q-4MZ'), findsNothing);
     expect(find.textContaining('Non-transferable'), findsNothing);
     expect(find.textContaining('Refreshes in'), findsWidgets);
 
@@ -271,7 +271,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('SCAN TO VERIFY'), findsOneWidget);
-    expect(find.text('K7Q-4MZ'), findsOneWidget);
+    expect(find.text('K7Q-4MZ'), findsNothing);
+    expect(find.textContaining('Refreshes in'), findsWidgets);
   });
 
   testWidgets('offline dialog shows saved copy without QR', (tester) async {

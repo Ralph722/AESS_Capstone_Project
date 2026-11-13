@@ -40,7 +40,6 @@ Widget _tableRow(
     shrinkWrap: true,
     rowBuilder: (_, __) => DirectoryMemberTableRow(
       member: member,
-      showActiveBadge: false,
       chedProgress: ched,
       onTap: () {},
       onEdit: () {},
@@ -81,17 +80,19 @@ Widget _toolbar({double? singleRowMinWidth, bool hasActiveFilters = false}) {
 
 void main() {
   group('Directory table', () {
-    testWidgets('has Batch and CHED GTS columns in order', (tester) async {
+    testWidgets('has ID NUMBER, Batch and TRACER columns in order', (
+      tester,
+    ) async {
       await pumpAdmin(tester, _tableRow(_member()));
       final labels = kDirectoryTableColumns.map((c) => c.label).toList();
       expect(labels, [
         'NAME',
+        'ID NUMBER',
         'COURSE',
         'BATCH',
-        'STUDENT ID',
         'EMAIL',
         'LAST ACTIVE',
-        'CHED GTS',
+        'TRACER',
         'STATUS',
       ]);
       for (final label in labels) {
@@ -99,13 +100,14 @@ void main() {
       }
     });
 
-    testWidgets('row shows batch, CHED completion and full-email tooltip', (
+    testWidgets('row shows batch, tracer completion and full-email tooltip', (
       tester,
     ) async {
       await pumpAdmin(tester, _tableRow(_member()));
       expect(find.text('2024'), findsOneWidget);
       expect(find.text('Complete'), findsOneWidget);
       expect(find.text('Registered'), findsOneWidget);
+      expect(find.text('Active'), findsNothing);
       final tooltip = tester.widget<Tooltip>(
         find.ancestor(
           of: find.text('catherine@example.com'),
@@ -115,14 +117,13 @@ void main() {
       expect(tooltip.message, 'catherine@example.com');
     });
 
-    testWidgets('partial CHED progress shows submitted over assigned', (
-      tester,
-    ) async {
+    testWidgets('partial tracer progress shows Incomplete', (tester) async {
       await pumpAdmin(
         tester,
         _tableRow(_member(), ched: const (assigned: 3, submitted: 1)),
       );
-      expect(find.text('1/3'), findsOneWidget);
+      expect(find.text('Incomplete'), findsOneWidget);
+      expect(find.text('1/3'), findsNothing);
       expect(find.text('Complete'), findsNothing);
     });
 
@@ -163,7 +164,6 @@ void main() {
       tester,
       DirectoryMemberCard(
         member: _member(),
-        showActiveBadge: false,
         onTap: () {},
         onEdit: () {},
         onDelete: () {},

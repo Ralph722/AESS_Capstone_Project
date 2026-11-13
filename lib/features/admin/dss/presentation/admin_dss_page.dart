@@ -32,7 +32,7 @@ import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 enum _DssPanel { list, detail, history, settings }
 
 enum _DssStatusFilter {
-  /// Open + In progress — the default work queue.
+  /// Open + In progress work queue.
   queue,
   all,
   open,
@@ -81,10 +81,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   _DssPanel _panel = _DssPanel.list;
   String? _activeFlagId;
 
-  _DssStatusFilter _statusFilter = _DssStatusFilter.queue;
+  _DssStatusFilter _statusFilter = _DssStatusFilter.all;
   String _ruleFilter = '';
   DssPriority? _priorityFilter;
-  String _officeFilter = '';
   _DssDueFilter _dueFilter = _DssDueFilter.all;
   _DssSort _sort = _DssSort.priority;
   String _query = '';
@@ -272,10 +271,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   }
 
   bool get _hasActiveFilters =>
-      _statusFilter != _DssStatusFilter.queue ||
+      _statusFilter != _DssStatusFilter.all ||
       _ruleFilter.isNotEmpty ||
       _priorityFilter != null ||
-      _officeFilter.isNotEmpty ||
       _dueFilter != _DssDueFilter.all ||
       _query.isNotEmpty ||
       _sort != _DssSort.priority ||
@@ -289,7 +287,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             DssPriority? priority,
             _DssSort sort,
             _DssDueFilter due,
-            String office,
             bool mineOnly,
           })
         >(
@@ -299,10 +296,8 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             initialPriority: _priorityFilter,
             initialSort: _sort,
             initialDue: _dueFilter,
-            initialOffice: _officeFilter,
             initialMineOnly: _mineOnly,
             rules: _rules,
-            offices: _offices,
           ),
         );
     if (result != null && mounted) {
@@ -311,7 +306,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         _priorityFilter = result.priority;
         _sort = result.sort;
         _dueFilter = result.due;
-        _officeFilter = result.office;
         _mineOnly = result.mineOnly;
       });
     }
@@ -320,10 +314,9 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   void _resetFilters() {
     _searchController.clear();
     setState(() {
-      _statusFilter = _DssStatusFilter.queue;
+      _statusFilter = _DssStatusFilter.all;
       _ruleFilter = '';
       _priorityFilter = null;
-      _officeFilter = '';
       _dueFilter = _DssDueFilter.all;
       _sort = _DssSort.priority;
       _query = '';
@@ -365,9 +358,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       if (wantedPriority != null &&
           (!f.isActive ||
               DssPriorityCalc.of(f, now: now).level != wantedPriority)) {
-        return false;
-      }
-      if (_officeFilter.isNotEmpty && f.ownerOffice != _officeFilter) {
         return false;
       }
       if (_dueFilter != _DssDueFilter.all) {
@@ -433,12 +423,12 @@ class _AdminDssScreenState extends State<AdminDssScreen>
 
   List<Widget> _activeFilterChips() {
     final chips = <Widget>[];
-    if (_statusFilter != _DssStatusFilter.queue) {
+    if (_statusFilter != _DssStatusFilter.all) {
       chips.add(
         DirectoryActiveFilterChip(
           label: 'Status: ${_statusFilterLabel(_statusFilter)}',
           onRemoved: () =>
-              setState(() => _statusFilter = _DssStatusFilter.queue),
+              setState(() => _statusFilter = _DssStatusFilter.all),
         ),
       );
     }
@@ -467,14 +457,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
         DirectoryActiveFilterChip(
           label: 'Sort: ${_sortLabel(_sort)}',
           onRemoved: () => setState(() => _sort = _DssSort.priority),
-        ),
-      );
-    }
-    if (_officeFilter.isNotEmpty) {
-      chips.add(
-        DirectoryActiveFilterChip(
-          label: 'Office: $_officeFilter',
-          onRemoved: () => setState(() => _officeFilter = ''),
         ),
       );
     }
@@ -532,16 +514,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     _DssDueFilter.overdue => 'Overdue',
     _DssDueFilter.dueSoon => 'Due within 7 days',
   };
-
-  /// Offices recorded on any flag, alphabetical.
-  List<String> get _offices {
-    final set = <String>{
-      for (final f in _flags)
-        if (f.ownerOffice != null) f.ownerOffice!,
-    };
-    return set.toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -915,14 +887,13 @@ class _AdminDssScreenState extends State<AdminDssScreen>
             _buildPriorityFilter(),
             _buildDueFilter(),
           ],
-          if (showAllInline) ...[_buildOfficeFilter(), _buildScopeFilter()],
+          if (showAllInline) _buildScopeFilter(),
           if (!showAllInline)
             _buildMoreButton(
               exceedingCount: showPartialInline
-                  ? (_officeFilter.isNotEmpty ? 1 : 0) + (_mineOnly ? 1 : 0)
+                  ? (_mineOnly ? 1 : 0)
                   : (_priorityFilter != null ? 1 : 0) +
                         (_dueFilter != _DssDueFilter.all ? 1 : 0) +
-                        (_officeFilter.isNotEmpty ? 1 : 0) +
                         (_mineOnly ? 1 : 0),
             ),
         ];
@@ -1031,26 +1002,6 @@ class _AdminDssScreenState extends State<AdminDssScreen>
     );
   }
 
-  Widget _buildOfficeFilter() {
-    return DirectoryFilterField<String>(
-      label: 'Office',
-      value: _officeFilter,
-      dense: true,
-      width: 120,
-      items: [
-        const DropdownMenuItem(value: '', child: Text('All offices')),
-        for (final o in _offices)
-          DropdownMenuItem(
-            value: o,
-            child: Text(o, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-      ],
-      onChanged: (v) {
-        if (v != null) setState(() => _officeFilter = v);
-      },
-    );
-  }
-
   Widget _buildScopeFilter() {
     return DirectoryFilterField<bool>(
       label: 'Scope',
@@ -1127,27 +1078,23 @@ class _AdminDssScreenState extends State<AdminDssScreen>
   }
 }
 
-/// Secondary findings filters: rule, priority, sort, due, office, ownership.
+/// Secondary findings filters: rule, priority, sort, due, ownership.
 class _MoreFiltersDialog extends StatefulWidget {
   const _MoreFiltersDialog({
     required this.initialRule,
     required this.initialPriority,
     required this.initialSort,
     required this.initialDue,
-    required this.initialOffice,
     required this.initialMineOnly,
     required this.rules,
-    required this.offices,
   });
 
   final String initialRule;
   final DssPriority? initialPriority;
   final _DssSort initialSort;
   final _DssDueFilter initialDue;
-  final String initialOffice;
   final bool initialMineOnly;
   final List<DssRule> rules;
-  final List<String> offices;
 
   @override
   State<_MoreFiltersDialog> createState() => _MoreFiltersDialogState();
@@ -1158,7 +1105,6 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
   late DssPriority? _priority = widget.initialPriority;
   late _DssSort _sort = widget.initialSort;
   late _DssDueFilter _due = widget.initialDue;
-  late String _office = widget.initialOffice;
   late bool _mineOnly = widget.initialMineOnly;
 
   String _dueLabel(_DssDueFilter f) => switch (f) {
@@ -1193,8 +1139,7 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
             children: [
               AdminModalHeader(
                 title: 'More Filters',
-                subtitle:
-                    'Rule, priority, sort, due date, office, and ownership.',
+                subtitle: 'Rule, priority, sort, due date, and ownership.',
                 icon: Icons.tune_rounded,
                 onClose: () => Navigator.of(context).pop(),
               ),
@@ -1275,24 +1220,6 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
                         },
                       ),
                       const SizedBox(height: 12),
-                      DirectoryFilterField<String>(
-                        label: 'Assigned office',
-                        value: _office,
-                        width: double.infinity,
-                        items: [
-                          const DropdownMenuItem<String>(
-                            value: '',
-                            child: Text('All offices'),
-                          ),
-                          for (final o in widget.offices)
-                            DropdownMenuItem<String>(
-                              value: o,
-                              child: Text(o, overflow: TextOverflow.ellipsis),
-                            ),
-                        ],
-                        onChanged: (v) => setState(() => _office = v ?? ''),
-                      ),
-                      const SizedBox(height: 12),
                       InkWell(
                         onTap: () => setState(() => _mineOnly = !_mineOnly),
                         borderRadius: BorderRadius.circular(
@@ -1369,7 +1296,6 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
                         _priority = null;
                         _sort = _DssSort.priority;
                         _due = _DssDueFilter.all;
-                        _office = '';
                         _mineOnly = false;
                       });
                     },
@@ -1388,7 +1314,6 @@ class _MoreFiltersDialogState extends State<_MoreFiltersDialog> {
                       priority: _priority,
                       sort: _sort,
                       due: _due,
-                      office: _office,
                       mineOnly: _mineOnly,
                     )),
                     style: AdminButtonStyles.filled(),

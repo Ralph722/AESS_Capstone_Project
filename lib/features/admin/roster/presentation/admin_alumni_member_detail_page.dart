@@ -676,7 +676,7 @@ class _AdminAlumniMemberDetailPanelState
       tabs: [
         const AdminTabSpec(label: 'Profile info', icon: Icons.person_outline),
         AdminTabSpec(
-          label: 'Tracer responses',
+          label: 'Survey responses',
           icon: Icons.assignment_outlined,
           count: tracerCount > 0 ? tracerCount : null,
         ),

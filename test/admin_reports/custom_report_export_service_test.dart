@@ -161,6 +161,10 @@ void main() {
             lastUpdated: DateTime(2026, 5, 1),
           ),
         ],
+        liveEmploymentByUserId: const {
+          'uid-1': 'Employed',
+          'uid-3': 'Unemployed',
+        },
         surveys: [
           Survey(
             id: 's1',
@@ -479,6 +483,11 @@ void main() {
             lastUpdated: DateTime(2026, 5, 2),
           ),
         ],
+        liveEmploymentByUserId: const {
+          'uid-1': 'Employed',
+          'uid-3': 'Unemployed',
+          'uid-5': 'Never employed',
+        },
         surveys: const [],
         announcements: const [],
         forumTopics: const [],
@@ -500,9 +509,9 @@ void main() {
       String value(String metric) =>
           kpis.rows.firstWhere((r) => r.first == metric)[1];
 
-      expect(value('Employed (item 16: Yes)'), '1');
-      expect(value('Not employed (item 16: No)'), '1');
-      expect(value('Never employed (item 16: Never Employed)'), '1');
+      expect(value('Employed (live profile)'), '1');
+      expect(value('Not employed (live profile)'), '1');
+      expect(value('Never employed (live profile)'), '1');
       expect(kpis.rows.any((r) => r.first == 'Unemployed'), isFalse);
     });
 

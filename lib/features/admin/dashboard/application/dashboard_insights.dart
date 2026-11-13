@@ -4,7 +4,6 @@ import 'package:alumni_system/features/admin/reports/application/admin_reports_a
 import 'package:alumni_system/features/admin/reports/application/tracer_coverage.dart';
 import 'package:alumni_system/features/admin/reports/models/reports_dashboard_filters.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
-import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -154,7 +153,7 @@ class DashboardInsights {
     required Map<String, int> assignmentCounts,
     required Map<String, int> submittedCounts,
     required Set<String> tracerSubmitterIds,
-    required List<EmploymentRecord> employmentRecords,
+    required Map<String, String> liveEmploymentByUserId,
     required List<JobPosting> activeJobs,
     List<DssFlag>? flags,
     DateTime? now,
@@ -164,7 +163,8 @@ class DashboardInsights {
 
     final analytics = AdminReportsAnalytics(
       members: members,
-      employmentRecords: employmentRecords,
+      employmentRecords: const [],
+      liveEmploymentByUserId: liveEmploymentByUserId,
       surveys: surveys,
       announcements: const [],
       forumTopics: const [],

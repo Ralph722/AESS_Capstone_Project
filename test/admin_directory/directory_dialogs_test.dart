@@ -202,6 +202,14 @@ void main() {
       expect(find.text('Remove registered alumni?'), findsOneWidget);
       expect(find.text('Deactivate'), findsOneWidget);
       expect(find.text('Remove account'), findsOneWidget);
+      expect(
+        find.textContaining('hides their forum posts and event comments'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('admins still keep those records'),
+        findsOneWidget,
+      );
       final cancel = tester.widget<OutlinedButton>(
         find.widgetWithText(OutlinedButton, 'Cancel'),
       );

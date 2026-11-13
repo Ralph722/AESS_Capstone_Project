@@ -261,7 +261,7 @@ void main() {
       await _pumpContent(tester, _home(), content: _contentSizes['1440x900']!);
 
       expect(find.text('Alumni registered'), findsOneWidget);
-      expect(find.text('38%'), findsOneWidget);
+      expect(find.text('37.5%'), findsOneWidget);
       expect(find.text('3 of 8 on the alumni list'), findsOneWidget);
 
       expect(find.text('Tracer response'), findsOneWidget);
@@ -269,7 +269,10 @@ void main() {
       expect(find.text('Closes Nov 30'), findsOneWidget);
 
       expect(find.text('Employment rate'), findsOneWidget);
-      expect(find.text('1 of 1 with employment info'), findsOneWidget);
+      expect(
+        find.text('1 of 1 with employment status on profile'),
+        findsOneWidget,
+      );
 
       expect(find.text('Program Insights findings'), findsOneWidget);
       expect(find.text('2 open · 1 in progress'), findsOneWidget);
@@ -310,7 +313,7 @@ void main() {
 
       expect(find.text('Other surveys'), findsOneWidget);
       expect(_inPanel('Other surveys', find.text('7')), findsOneWidget);
-      expect(_inPanel('Other surveys', find.text('21%')), findsOneWidget);
+      expect(_inPanel('Other surveys', find.text('21.1%')), findsOneWidget);
       expect(_inPanel('Other surveys', find.text('4 of 19')), findsOneWidget);
       expect(find.text('Lowest: Test 2'), findsOneWidget);
 
@@ -430,7 +433,7 @@ void main() {
         settle: false,
       );
       expect(find.text('Loading…'), findsNWidgets(4));
-      expect(find.text('38%'), findsNothing);
+      expect(find.text('37.5%'), findsNothing);
       expect(find.text('BSIT'), findsNothing);
       // Events still show while survey/job/insight dates load.
       expect(find.text('Event 0'), findsOneWidget);
@@ -503,7 +506,10 @@ void main() {
       expect(find.text('No alumni on the alumni list yet'), findsOneWidget);
       expect(find.text('Nothing due in the next 30 days'), findsOneWidget);
       expect(find.text('No tracer open'), findsOneWidget);
-      expect(find.text('No employment information yet'), findsOneWidget);
+      expect(
+        find.text('No live-profile employment status yet'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('header shows date chip instead of Live or Refresh', (
@@ -518,7 +524,7 @@ void main() {
       expect(find.byIcon(Icons.refresh_rounded), findsNothing);
       expect(find.text('Live'), findsNothing);
       expect(find.byType(DashboardLiveIndicator), findsNothing);
-      expect(find.text('Verify card'), findsOneWidget);
+      expect(find.text('Verify card'), findsNothing);
       expect(find.byIcon(Icons.calendar_today_outlined), findsOneWidget);
     });
   });
@@ -552,7 +558,9 @@ void main() {
     final handle = tester.ensureSemantics();
     await _pumpContent(tester, _home(), content: _contentSizes['1440x900']!);
     expect(
-      find.bySemanticsLabel('Alumni registered, 38%, 3 of 8 on the alumni list'),
+      find.bySemanticsLabel(
+        'Alumni registered, 37.5%, 3 of 8 on the alumni list',
+      ),
       findsOneWidget,
     );
     expect(

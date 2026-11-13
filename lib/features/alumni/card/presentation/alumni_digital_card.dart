@@ -676,24 +676,14 @@ class _CardBack extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          offline ? '———' : (token?.displayShortCode ?? '———'),
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2,
-                            fontSize: fs(context, 11),
-                            color: PortalTheme.navy,
-                          ),
-                        ),
-                        Text(
                           offline
                               ? 'QR needs internet'
                               : token == null
                               ? (failed
                                     ? (failHint == null || failHint!.isEmpty
-                                          ? 'Code unavailable'
+                                          ? 'QR unavailable'
                                           : failHint!)
-                                    : 'Getting code…')
+                                    : 'Getting QR…')
                               : countdown,
                           textAlign: TextAlign.center,
                           maxLines: 3,

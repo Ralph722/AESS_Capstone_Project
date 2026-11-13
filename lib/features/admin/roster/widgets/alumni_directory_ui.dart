@@ -1282,7 +1282,6 @@ class DirectoryMemberCard extends StatefulWidget {
   const DirectoryMemberCard({
     super.key,
     required this.member,
-    required this.showActiveBadge,
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
@@ -1294,7 +1293,6 @@ class DirectoryMemberCard extends StatefulWidget {
   });
 
   final AlumniMember member;
-  final bool showActiveBadge;
   final bool isSelected;
   final bool isChecked;
   final ValueChanged<bool?>? onCheckedChanged;
@@ -1303,7 +1301,7 @@ class DirectoryMemberCard extends StatefulWidget {
   final VoidCallback onDelete;
   final VoidCallback? onReactivate;
 
-  /// CHED GTS waves assigned vs submitted; null while loading or unknown.
+  /// Tracer survey waves assigned vs submitted; null while loading or unknown.
   final ChedGtsProgress? chedProgress;
 
   @override
@@ -1316,7 +1314,6 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
   @override
   Widget build(BuildContext context) {
     final member = widget.member;
-    final isActive = widget.showActiveBadge && member.isRegisteredUser;
     final hasUpdate = member.hasProfileUpdates;
 
     return MouseRegion(
@@ -1389,10 +1386,7 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
                               const SizedBox(width: 4),
                             ],
                             Expanded(
-                              child: _MemberIdentityColumn(
-                                member: member,
-                                isActive: isActive,
-                              ),
+                              child: _MemberIdentityColumn(member: member),
                             ),
                             menu,
                           ],
@@ -1405,7 +1399,6 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
                             Expanded(
                               child: _MemberStatusColumn(
                                 member: member,
-                                isActive: isActive,
                                 chedProgress: widget.chedProgress,
                               ),
                             ),
@@ -1427,10 +1420,7 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
                       ],
                       Expanded(
                         flex: 3,
-                        child: _MemberIdentityColumn(
-                          member: member,
-                          isActive: isActive,
-                        ),
+                        child: _MemberIdentityColumn(member: member),
                       ),
                       const SizedBox(width: AdminDirectoryTheme.space3),
                       Expanded(flex: 4, child: _MemberMetaGrid(member: member)),
@@ -1442,7 +1432,6 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
                           children: [
                             _MemberStatusColumn(
                               member: member,
-                              isActive: isActive,
                               chedProgress: widget.chedProgress,
                             ),
                             const SizedBox(height: 4),
@@ -1462,18 +1451,18 @@ class _DirectoryMemberCardState extends State<DirectoryMemberCard> {
   }
 }
 
-/// CHED GTS wave progress for one member: waves assigned vs submitted.
+/// Tracer (CHED GTS) wave progress for one member: waves assigned vs submitted.
 typedef ChedGtsProgress = ({int assigned, int submitted});
 
 /// Column definitions for the wide desktop directory table.
 const kDirectoryTableColumns = <AdminDataColumn>[
   AdminDataColumn(label: 'NAME', flex: 3),
+  AdminDataColumn(label: 'ID NUMBER', width: 112),
   AdminDataColumn(label: 'COURSE', width: 96),
   AdminDataColumn(label: 'BATCH', width: 64),
-  AdminDataColumn(label: 'STUDENT ID', width: 112),
   AdminDataColumn(label: 'EMAIL', flex: 2),
   AdminDataColumn(label: 'LAST ACTIVE', width: 120),
-  AdminDataColumn(label: 'CHED GTS', width: 100),
+  AdminDataColumn(label: 'TRACER', width: 100),
   AdminDataColumn(label: 'STATUS', width: 116),
 ];
 
@@ -1482,7 +1471,6 @@ class DirectoryMemberTableRow extends StatelessWidget {
   const DirectoryMemberTableRow({
     super.key,
     required this.member,
-    required this.showActiveBadge,
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
@@ -1494,7 +1482,6 @@ class DirectoryMemberTableRow extends StatelessWidget {
   });
 
   final AlumniMember member;
-  final bool showActiveBadge;
   final bool isSelected;
   final bool isChecked;
   final ValueChanged<bool?>? onCheckedChanged;
@@ -1503,55 +1490,39 @@ class DirectoryMemberTableRow extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback? onReactivate;
 
-  /// CHED GTS waves assigned vs submitted; null while loading or unknown.
+  /// Tracer survey waves assigned vs submitted; null while loading or unknown.
   final ChedGtsProgress? chedProgress;
 
-  Widget get _chedCell {
+  Widget get _tracerCell {
     final progress = chedProgress;
     if (progress == null || progress.assigned == 0) {
       return const AdminTableTextCell('—', muted: true);
     }
-    if (progress.submitted >= progress.assigned) {
-      return const Align(
-        alignment: Alignment.centerLeft,
-        child: AdminTableBadge(
-          label: 'Complete',
-          bg: AdminTableTheme.successBg,
-          fg: AdminTableTheme.success,
-        ),
-      );
-    }
+    final done = progress.submitted >= progress.assigned;
     return Align(
       alignment: Alignment.centerLeft,
       child: AdminTableBadge(
-        label: '${progress.submitted}/${progress.assigned}',
-        bg: AdminTableTheme.warningBg,
-        fg: AdminTableTheme.warning,
+        label: done ? 'Complete' : 'Incomplete',
+        bg: done ? AdminTableTheme.successBg : AdminTableTheme.warningBg,
+        fg: done ? AdminTableTheme.success : AdminTableTheme.warning,
       ),
     );
   }
 
   String get _statusLabel {
     if (member.isDeactivated) return 'Deactivated';
-    if (showActiveBadge && member.isRegisteredUser) return 'Active';
     if (member.isRegisteredUser) return 'Registered';
     return 'Not registered';
   }
 
   Color get _statusFg {
     if (member.isDeactivated) return AdminTableTheme.danger;
-    if (showActiveBadge && member.isRegisteredUser) {
-      return AdminTableTheme.success;
-    }
     if (member.isRegisteredUser) return AdminTableTheme.primary;
     return AdminTableTheme.warning;
   }
 
   Color get _statusBg {
     if (member.isDeactivated) return AdminTableTheme.dangerBg;
-    if (showActiveBadge && member.isRegisteredUser) {
-      return AdminTableTheme.successBg;
-    }
     if (member.isRegisteredUser) return AdminColors.infoBg;
     return AdminTableTheme.warningBg;
   }
@@ -1564,7 +1535,6 @@ class DirectoryMemberTableRow extends StatelessWidget {
     final lastActive = member.lastActiveAt == null
         ? '—'
         : DateFormat.MMMd().add_jm().format(member.lastActiveAt!);
-    final isActive = showActiveBadge && member.isRegisteredUser;
 
     return AdminDataRow(
       columns: kDirectoryTableColumns,
@@ -1585,22 +1555,22 @@ class DirectoryMemberTableRow extends StatelessWidget {
         AdminTableIdentityCell(
           title: member.fullName.isEmpty ? 'Unnamed' : member.fullName,
           subtitle: member.hasProfileUpdates ? 'Profile updated' : null,
-          leading: _DirectoryTableAvatar(member: member, isActive: isActive),
+          leading: _DirectoryTableAvatar(member: member),
+        ),
+        AdminTableTextCell(
+          member.studentId.isEmpty ? '—' : member.studentId,
+          muted: member.studentId.isEmpty,
         ),
         AdminTableTextCell(
           member.course.isEmpty ? 'No course' : member.course,
           muted: member.course.isEmpty,
         ),
         AdminTableTextCell(batch.isEmpty ? '—' : batch, muted: batch.isEmpty),
-        AdminTableTextCell(
-          member.studentId.isEmpty ? '—' : member.studentId,
-          muted: member.studentId.isEmpty,
-        ),
         hasEmail
             ? Tooltip(message: email, child: AdminTableTextCell(email))
             : const AdminTableTextCell('—', muted: true),
         AdminTableTextCell(lastActive, muted: member.lastActiveAt == null),
-        _chedCell,
+        _tracerCell,
         Align(
           alignment: Alignment.centerLeft,
           child: AdminTableBadge(
@@ -1615,131 +1585,91 @@ class DirectoryMemberTableRow extends StatelessWidget {
 }
 
 class _DirectoryTableAvatar extends StatelessWidget {
-  const _DirectoryTableAvatar({required this.member, required this.isActive});
+  const _DirectoryTableAvatar({required this.member});
 
   final AlumniMember member;
-  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
     final image = member.profileImageUrl?.trim();
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: AdminDirectoryTheme.surface,
-          ),
-          child: ClipOval(
-            child: image != null && image.isNotEmpty
-                ? AppImage.widget(
-                    image,
-                    width: 32,
-                    height: 32,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => ColoredBox(
-                      color: AdminDirectoryTheme.infoBg,
-                      child: Center(
-                        child: Text(
-                          member.fullName.isNotEmpty
-                              ? member.fullName[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            color: AdminDirectoryTheme.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : ColoredBox(
-                    color: AdminDirectoryTheme.infoBg,
-                    child: Center(
-                      child: Text(
-                        member.fullName.isNotEmpty
-                            ? member.fullName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: AdminDirectoryTheme.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: AdminDirectoryTheme.surface,
+      ),
+      child: ClipOval(
+        child: image != null && image.isNotEmpty
+            ? AppImage.widget(
+                image,
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => ColoredBox(
+                  color: AdminDirectoryTheme.infoBg,
+                  child: Center(
+                    child: Text(
+                      member.fullName.isNotEmpty
+                          ? member.fullName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: AdminDirectoryTheme.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
                       ),
                     ),
                   ),
-          ),
-        ),
-        if (isActive)
-          Positioned(
-            right: -1,
-            bottom: -1,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: AdminDirectoryTheme.success,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
+                ),
+              )
+            : ColoredBox(
+                color: AdminDirectoryTheme.infoBg,
+                child: Center(
+                  child: Text(
+                    member.fullName.isNotEmpty
+                        ? member.fullName[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      color: AdminDirectoryTheme.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.member, required this.isActive});
+  const _Avatar({required this.member});
 
   final AlumniMember member;
-  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
     final image = member.profileImageUrl?.trim();
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AdminDirectoryTheme.surface,
-          ),
-          child: ClipOval(
-            child: image != null && image.isNotEmpty
-                ? AppImage.widget(
-                    image,
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        _AvatarFallback(fullName: member.fullName),
-                  )
-                : _AvatarFallback(fullName: member.fullName),
-          ),
-        ),
-        if (isActive)
-          Positioned(
-            right: -1,
-            bottom: -1,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: AdminDirectoryTheme.success,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-            ),
-          ),
-      ],
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: AdminDirectoryTheme.surface,
+      ),
+      child: ClipOval(
+        child: image != null && image.isNotEmpty
+            ? AppImage.widget(
+                image,
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _AvatarFallback(fullName: member.fullName),
+              )
+            : _AvatarFallback(fullName: member.fullName),
+      ),
     );
   }
 }
@@ -1768,17 +1698,16 @@ class _AvatarFallback extends StatelessWidget {
 }
 
 class _MemberIdentityColumn extends StatelessWidget {
-  const _MemberIdentityColumn({required this.member, required this.isActive});
+  const _MemberIdentityColumn({required this.member});
 
   final AlumniMember member;
-  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Avatar(member: member, isActive: isActive),
+        _Avatar(member: member),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
@@ -1866,7 +1795,7 @@ class _MemberMetaGrid extends StatelessWidget {
     final items = [
       _MemberMetaItem(
         icon: Icons.badge_outlined,
-        label: 'Student ID',
+        label: 'ID Number',
         value: member.studentId.isEmpty ? 'Not provided' : member.studentId,
       ),
       _MemberMetaItem(
@@ -1968,28 +1897,16 @@ class _MemberMetaItem extends StatelessWidget {
 class _MemberStatusColumn extends StatelessWidget {
   const _MemberStatusColumn({
     required this.member,
-    required this.isActive,
     this.chedProgress,
   });
 
   final AlumniMember member;
-  final bool isActive;
   final ChedGtsProgress? chedProgress;
 
   @override
   Widget build(BuildContext context) {
     final badges = <Widget>[];
 
-    if (isActive) {
-      badges.add(
-        const _DirectoryBadge(
-          label: 'Active recently',
-          bg: AdminDirectoryTheme.successBg,
-          fg: AdminDirectoryTheme.success,
-          icon: Icons.circle,
-        ),
-      );
-    }
     if (!member.isRegisteredUser && !member.isDeactivated) {
       badges.add(
         const _DirectoryBadge(
@@ -2025,9 +1942,7 @@ class _MemberStatusColumn extends StatelessWidget {
       final done = ched.submitted >= ched.assigned;
       badges.add(
         _DirectoryBadge(
-          label: done
-              ? 'CHED complete'
-              : 'CHED ${ched.submitted}/${ched.assigned}',
+          label: done ? 'Complete' : 'Incomplete',
           bg: done
               ? AdminDirectoryTheme.successBg
               : AdminDirectoryTheme.warningBg,
@@ -2971,7 +2886,6 @@ class MemberDetailPanelHeader extends StatelessWidget {
           _MemberDetailAvatar(
             name: member.fullName,
             imageUrl: imageUrl,
-            isActive: isActive,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -3019,62 +2933,41 @@ class _MemberDetailAvatar extends StatelessWidget {
   const _MemberDetailAvatar({
     required this.name,
     required this.imageUrl,
-    required this.isActive,
   });
 
   final String name;
   final String? imageUrl;
-  final bool isActive;
 
   static const double _size = 48;
 
   @override
   Widget build(BuildContext context) {
     final image = imageUrl?.trim() ?? '';
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ClipOval(
-          child: SizedBox(
-            width: _size,
-            height: _size,
-            child: image.isNotEmpty
-                ? AppImage.widget(
-                    image,
-                    width: _size,
-                    height: _size,
-                    fit: BoxFit.cover,
-                  )
-                : ColoredBox(
-                    color: AdminColors.primaryTint,
-                    child: Center(
-                      child: Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AdminColors.primary,
-                        ),
-                      ),
+    return ClipOval(
+      child: SizedBox(
+        width: _size,
+        height: _size,
+        child: image.isNotEmpty
+            ? AppImage.widget(
+                image,
+                width: _size,
+                height: _size,
+                fit: BoxFit.cover,
+              )
+            : ColoredBox(
+                color: AdminColors.primaryTint,
+                child: Center(
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AdminColors.primary,
                     ),
                   ),
-          ),
-        ),
-        if (isActive)
-          Positioned(
-            right: -1,
-            bottom: -1,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: AdminColors.success,
-                shape: BoxShape.circle,
-                border: Border.all(color: AdminColors.card, width: 2),
+                ),
               ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }

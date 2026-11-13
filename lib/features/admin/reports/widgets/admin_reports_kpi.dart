@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
@@ -286,7 +287,7 @@ class _GrowthChip extends StatelessWidget {
         ),
         const SizedBox(width: 2),
         Text(
-          '${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(0)}%',
+          '${percent >= 0 ? '+' : ''}${formatReportPercentPoints(percent)}',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,

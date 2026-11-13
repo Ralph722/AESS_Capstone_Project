@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Enterprise analytics dashboard header for Reports & Analytics.
 ///
-/// Matches the standardized 36px [AdminCompactHeader] height, typography, live
-/// status pill, and unified refresh action.
+/// Matches the standardized 36px [AdminCompactHeader] height, typography, and
+/// live status pill. Data reloads via realtime/poll, so no manual Refresh.
 class ReportsPageHeader extends StatelessWidget {
   const ReportsPageHeader({
     super.key,
     this.subtitle,
     this.updatedAt,
-    this.onRefresh,
-    this.refreshing = false,
   });
 
   /// Standardized compact header height (36px) matching the AESS admin portal shell.
@@ -25,8 +22,6 @@ class ReportsPageHeader extends StatelessWidget {
 
   /// When the dashboard data last finished loading.
   final DateTime? updatedAt;
-  final VoidCallback? onRefresh;
-  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -35,19 +30,6 @@ class ReportsPageHeader extends StatelessWidget {
       subtitle: subtitle,
       actions: [
         if (updatedAt != null) _LiveStatus(updatedAt: updatedAt!),
-        if (onRefresh != null)
-          OutlinedButton.icon(
-            onPressed: refreshing ? null : onRefresh,
-            icon: refreshing
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded, size: 15),
-            label: Text(refreshing ? 'Refreshing…' : 'Refresh'),
-            style: AdminButtonStyles.outlined(),
-          ),
       ],
     );
   }

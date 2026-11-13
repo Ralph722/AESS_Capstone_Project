@@ -1,12 +1,14 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/features/admin/reports/models/report_catalog.dart';
 import 'package:alumni_system/features/admin/reports/models/report_filter_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
-import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 typedef ReportsPresetDownload =
@@ -16,7 +18,7 @@ typedef ReportsPresetDownload =
       required bool printPreview,
     });
 
-/// Ready-to-download preset reports laid out as bento cards.
+/// Ready-to-download preset reports laid out as responsive download cards.
 class ReportsDownloadsPanel extends StatelessWidget {
   const ReportsDownloadsPanel({
     super.key,
@@ -48,7 +50,8 @@ class ReportsDownloadsPanel extends StatelessWidget {
   final String? busyPresetId;
   final double? fitHeight;
 
-  static const double _barHeight = 36;
+  static const double _barHeight = AdminDensity.buttonHeight; // 36px
+  static const double _cardHeight = 275;
 
   /// Sections that honour the batch / course filters.
   static const filteredSections = {
@@ -145,6 +148,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
       definition: entry.definition,
       privacy: entry.privacy,
       category: entry.category,
+      includeItems: entry.includeItems,
     );
   }
 
@@ -152,48 +156,50 @@ class ReportsDownloadsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Always size to content. This panel lives under a page-level
-    // CustomScrollView / SliverToBoxAdapter (unbounded height), so Expanded
-    // cannot be used here — that left the Column with size MISSING and a blank
-    // Downloads tab.
-    final body = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final category in categoryPresetIds.keys) ...[
-          _categoryHeader(category),
-          const SizedBox(height: 8),
-          ReportsBentoGrid(
-            kpis: const [],
-            fitHeight: null,
-            rows: [
-              for (final chunk in _chunks(categoryPresetIds[category]!, 3))
-                ReportsBentoRow(
-                  flex: [for (final _ in chunk) 4],
-                  naturalHeight: 250,
-                  children: [
-                    for (final id in chunk)
-                      id == 'ched_wave_compare'
-                          ? _waveCompareCard(_preset(id))
-                          : _card(_preset(id)),
-                  ],
-                ),
+    // LayoutBuilder adapts column count while sizing cleanly to content.
+    final body = LayoutBuilder(
+      builder: (context, constraints) {
+        final width =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 1200.0;
+        final int columns;
+        if (width >= 1060) {
+          columns = 3;
+        } else if (width >= 640) {
+          columns = 2;
+        } else {
+          columns = 1;
+        }
+
+        const gutter = AdminReportsTheme.gutter;
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final category in categoryPresetIds.keys) ...[
+              _categoryHeader(category),
+              const SizedBox(height: 10),
+              ..._buildCategoryGrid(
+                presetIds: categoryPresetIds[category]!,
+                columns: columns,
+                cardHeight: _cardHeight,
+                gutter: gutter,
+              ),
+              const SizedBox(height: AdminReportsTheme.sectionGap),
             ],
-          ),
-          const SizedBox(height: AdminReportsTheme.gutter),
-        ],
-      ],
+          ],
+        );
+      },
     );
 
     final chrome = <Widget>[
-      SizedBox(height: _barHeight, child: _scopeBar()),
+      _scopeBar(),
       const SizedBox(height: AdminReportsTheme.gutter),
     ];
 
     final maxH = fitHeight;
     // When the page passes a viewport budget, bound the panel first — then
-    // Expanded/scroll is safe. Never put Expanded directly under a
-    // SliverToBoxAdapter (unbounded height → blank Downloads tab).
+    // SingleChildScrollView inside Expanded is safe.
     if (maxH != null && maxH.isFinite && maxH > _barHeight) {
       return SizedBox(
         height: maxH,
@@ -215,15 +221,63 @@ class ReportsDownloadsPanel extends StatelessWidget {
   }
 
   Widget _categoryHeader(ReportCatalogCategory category) {
-    return Text(
-      category.label.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.45,
-        color: AdminReportsTheme.textMuted,
-      ),
+    return Row(
+      children: [
+        Container(
+          width: 3.5,
+          height: 13,
+          decoration: BoxDecoration(
+            color: UstpColors.blue,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          category.label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+            color: AdminColors.textSecondary,
+          ),
+        ),
+      ],
     );
+  }
+
+  List<Widget> _buildCategoryGrid({
+    required List<String> presetIds,
+    required int columns,
+    required double cardHeight,
+    required double gutter,
+  }) {
+    final chunks = _chunks(presetIds, columns);
+    return [
+      for (var r = 0; r < chunks.length; r++) ...[
+        if (r > 0) SizedBox(height: gutter),
+        SizedBox(
+          height: cardHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < chunks[r].length; i++) ...[
+                if (i > 0) SizedBox(width: gutter),
+                Expanded(
+                  child: chunks[r][i] == 'ched_wave_compare'
+                      ? _waveCompareCard(_preset(chunks[r][i]))
+                      : _card(_preset(chunks[r][i])),
+                ),
+              ],
+              // Pad any remaining column slots so all cards maintain identical widths
+              for (var i = chunks[r].length; i < columns; i++) ...[
+                SizedBox(width: gutter),
+                const Expanded(child: SizedBox.shrink()),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ];
   }
 
   static List<List<String>> _chunks(List<String> ids, int size) {
@@ -236,76 +290,68 @@ class ReportsDownloadsPanel extends StatelessWidget {
 
   Widget _scopeBar() {
     final clear = onClearFilters;
-    return Row(
-      children: [
-        Expanded(
-          flex: 3,
-          child: Align(
-            alignment: Alignment.centerLeft,
+    return Container(
+      height: _barHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+        border: Border.all(color: AdminColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.filter_list_rounded,
+            size: 14,
+            color: UstpColors.blue,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
             child: Tooltip(
               message:
                   '${AessReportCatalog.downloadsIntro} '
                   'Alumni list and employment extracts use these filters. '
                   'Change them on the Tracer or Survey tab.',
               waitDuration: const Duration(milliseconds: 500),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AdminColors.surface,
-                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-                  border: Border.all(color: AdminColors.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.filter_list_rounded,
-                      size: 13,
-                      color: AdminColors.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Exports use: $filterLabel',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: AdminColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
+              child: Text(
+                'Exports use: $filterLabel',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AdminColors.textPrimary,
                 ),
               ),
             ),
           ),
-        ),
-        if (clear != null) ...[
-          const SizedBox(width: 8),
-          Flexible(
-            child: TextButton.icon(
+          if (clear != null) ...[
+            const SizedBox(width: 8),
+            TextButton.icon(
               onPressed: clear,
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                foregroundColor: AdminColors.primary,
+                foregroundColor: UstpColors.blue,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
-              icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
+              icon: const Icon(Icons.filter_alt_off_outlined, size: 14),
               label: const Text(
                 'Clear filters',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
               ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -337,86 +383,162 @@ class ReportsDownloadsPanel extends StatelessWidget {
     );
   }
 
+  Widget? _privacyBadge(ReportPrivacyClass? privacy) {
+    if (privacy == null) return null;
+    final isAggregated = privacy == ReportPrivacyClass.aggregated;
+    final label = switch (privacy) {
+      ReportPrivacyClass.aggregated => 'Aggregated',
+      ReportPrivacyClass.confidentialIdentifiable => 'Confidential',
+      ReportPrivacyClass.restrictedFollowUp => 'Restricted',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isAggregated
+            ? UstpColors.blue.withValues(alpha: 0.06)
+            : AdminColors.warningBg,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        border: Border.all(
+          color: isAggregated
+              ? UstpColors.blue.withValues(alpha: 0.2)
+              : AdminColors.warning.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: isAggregated ? UstpColors.blue : AdminColors.warning,
+        ),
+      ),
+    );
+  }
+
   Widget _card(ReportsDownloadPreset preset) {
     final counts = [for (final s in preset.sections) rowCounts[s]];
     final allKnown =
         preset.sections.isNotEmpty && counts.every((c) => c != null);
     final empty = allKnown && counts.fold<int>(0, (s, c) => s + c!) == 0;
     final privacy = preset.privacy;
-    return ReportsBentoCard(
-      title: preset.title,
-      caption: preset.description,
-      details: _details(preset),
-      trailing: _PresetIcon(icon: preset.icon),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (privacy != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                switch (privacy) {
-                  ReportPrivacyClass.aggregated => 'Aggregated',
-                  ReportPrivacyClass.confidentialIdentifiable =>
-                    'Confidential',
-                  ReportPrivacyClass.restrictedFollowUp =>
-                    'Restricted follow-up',
-                },
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: privacy == ReportPrivacyClass.aggregated
-                      ? AdminReportsTheme.textMuted
-                      : AdminReportsTheme.warning,
-                ),
-              ),
-            ),
-          Expanded(
-            child: preset.sections.isEmpty
-                ? Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      preset.scopeNote ??
-                          AessReportCatalog.institutionalScopeBadge,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: AdminReportsTheme.textMuted,
-                      ),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: preset.sections.length,
-                    separatorBuilder: (context, index) => const Divider(
-                      height: 12,
-                      color: AdminReportsTheme.border,
-                    ),
-                    itemBuilder: (context, i) => _SectionLine(
-                      label: preset.sections[i].label,
-                      count: counts[i],
-                    ),
-                  ),
+
+    Widget middleContent;
+    if (empty) {
+      middleContent = const Center(
+        child: _Note(
+          text: 'Nothing to export with current filters',
+          color: AdminColors.warning,
+        ),
+      );
+    } else if (preset.sections.isNotEmpty) {
+      middleContent = ListView.separated(
+        padding: EdgeInsets.zero,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: preset.sections.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 5),
+        itemBuilder: (context, i) => _SectionLine(
+          label: preset.sections[i].label,
+          count: counts[i],
+        ),
+      );
+    } else if (preset.includeItems.isNotEmpty) {
+      middleContent = ListView.separated(
+        padding: EdgeInsets.zero,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: math.min(preset.includeItems.length, 3),
+        separatorBuilder: (context, index) => const SizedBox(height: 5),
+        itemBuilder: (context, i) => _HighlightLine(
+          text: preset.includeItems[i],
+        ),
+      );
+    } else {
+      middleContent = Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          preset.scopeNote ?? AessReportCatalog.institutionalScopeBadge,
+          style: const TextStyle(
+            fontSize: 11.5,
+            height: 1.35,
+            color: AdminColors.textMuted,
           ),
-          if (empty) ...[
-            const SizedBox(height: 6),
-            const _Note(
-              text: 'Nothing to export with these filters',
-              color: AdminReportsTheme.warning,
-            ),
-          ],
-          const SizedBox(height: 8),
-          _actions(preset),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return ReportsDownloadCard(
+      preset: preset,
+      details: _details(preset),
+      badge: _privacyBadge(privacy),
+      content: middleContent,
+      actions: _actions(preset),
     );
   }
 
   Widget _waveCompareCard(ReportsDownloadPreset preset) {
     final ready = chedWaveCount >= 2;
-    return ReportsBentoCard(
-      title: preset.title,
-      caption: preset.description,
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: ready
+                ? UstpColors.blue.withValues(alpha: 0.05)
+                : AdminColors.surface,
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            border: Border.all(
+              color: ready
+                  ? UstpColors.blue.withValues(alpha: 0.2)
+                  : AdminColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                ready ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                size: 16,
+                color: ready ? UstpColors.blue : AdminColors.warning,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      chedWaveCount == 1
+                          ? '1 CHED wave available'
+                          : '$chedWaveCount CHED waves available',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AdminColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      ready
+                          ? 'Select waves after choosing format'
+                          : 'Needs at least 2 waves with responses',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: ready
+                            ? AdminColors.textSecondary
+                            : AdminColors.warning,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    return ReportsDownloadCard(
+      preset: preset,
       details: ReportsDetailsButton.compose(
         definition: preset.definition ?? preset.description,
         calculation:
@@ -426,75 +548,35 @@ class ReportsDownloadsPanel extends StatelessWidget {
             'Published or closed Official CHED GTS waves with submitted '
                 'responses.',
       ),
-      trailing: _PresetIcon(icon: preset.icon),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$chedWaveCount',
-                      style: const TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: AdminReportsTheme.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      chedWaveCount == 1
-                          ? 'CHED wave available'
-                          : 'CHED waves available',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AdminReportsTheme.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          _Note(
-            text: ready
-                ? 'You choose the waves after picking a format'
-                : 'Needs at least 2 CHED waves with responses',
-            color: ready
-                ? AdminReportsTheme.textMuted
-                : AdminReportsTheme.warning,
-          ),
-          const SizedBox(height: 8),
-          _actions(preset, enabled: ready),
-        ],
-      ),
+      badge: _privacyBadge(preset.privacy),
+      content: content,
+      actions: _actions(preset, enabled: ready),
     );
   }
 
   Widget _actions(ReportsDownloadPreset preset, {bool enabled = true}) {
     if (busy && busyPresetId == preset.id) {
-      return const SizedBox(
+      return Container(
         height: 30,
-        child: Row(
+        alignment: Alignment.centerLeft,
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              width: 13,
+              height: 13,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: UstpColors.blue,
+              ),
             ),
             SizedBox(width: 8),
             Text(
               'Preparing…',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w600,
-                color: AdminReportsTheme.textSecondary,
+                color: AdminColors.textSecondary,
               ),
             ),
           ],
@@ -519,11 +601,21 @@ class ReportsDownloadsPanel extends StatelessWidget {
                         printPreview: false,
                       )
                     : null,
-                style: AdminButtonStyles.outlined(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: UstpColors.blue,
+                  side: const BorderSide(color: AdminColors.border),
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 28),
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                  ),
+                ),
                 child: Text(
                   format.label,
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -539,17 +631,113 @@ class ReportsDownloadsPanel extends StatelessWidget {
                     )
                   : null,
               style: TextButton.styleFrom(
+                foregroundColor: UstpColors.blue,
+                padding: const EdgeInsets.symmetric(horizontal: 7),
+                minimumSize: const Size(0, 28),
                 visualDensity: VisualDensity.compact,
-                foregroundColor: AdminReportsTheme.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                ),
               ),
-              icon: const Icon(Icons.print_outlined, size: 16),
+              icon: const Icon(Icons.print_outlined, size: 14),
               label: const Text(
                 'Print',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Redesigned download card with multi-line typography, accessory badges,
+/// and value-driven highlight items instead of empty placeholder space.
+class ReportsDownloadCard extends StatelessWidget {
+  const ReportsDownloadCard({
+    super.key,
+    required this.preset,
+    required this.details,
+    required this.content,
+    required this.actions,
+    this.badge,
+  });
+
+  final ReportsDownloadPreset preset;
+  final String details;
+  final Widget content;
+  final Widget actions;
+  final Widget? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+        border: Border.all(color: AdminColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Top Accessory Row: Leading Icon Badge + Privacy Tag + Details Button
+          Row(
+            children: [
+              _PresetIcon(icon: preset.icon),
+              if (badge != null) ...[
+                const SizedBox(width: 8),
+                badge!,
+              ],
+              const Spacer(),
+              ReportsDetailsButton(title: preset.title, body: details),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Title (maxLines: 2, softWrap: true)
+          Text(
+            preset.title,
+            maxLines: 2,
+            softWrap: true,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+              height: 1.25,
+              color: AdminColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Description / Subtitle (maxLines: 2, softWrap: true)
+          Text(
+            preset.description,
+            maxLines: 2,
+            softWrap: true,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11.5,
+              height: 1.35,
+              color: AdminColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: AdminColors.border),
+          const SizedBox(height: 8),
+          // Middle content (replaces the dead thumbnail space)
+          Expanded(child: ClipRect(child: content)),
+          const SizedBox(height: 8),
+          // Action buttons row (pinned to bottom)
+          actions,
+        ],
       ),
     );
   }
@@ -569,6 +757,7 @@ class ReportsDownloadPreset {
     this.definition,
     this.privacy,
     this.category,
+    this.includeItems = const [],
   });
 
   final String id;
@@ -594,6 +783,7 @@ class ReportsDownloadPreset {
 
   final ReportPrivacyClass? privacy;
   final ReportCatalogCategory? category;
+  final List<String> includeItems;
 }
 
 class _PresetIcon extends StatelessWidget {
@@ -604,13 +794,49 @@ class _PresetIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 28,
-      height: 28,
+      width: 30,
+      height: 30,
       decoration: BoxDecoration(
-        color: AdminReportsTheme.primary.withValues(alpha: 0.1),
+        color: UstpColors.blue.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, size: 15, color: AdminReportsTheme.primary),
+      child: Icon(icon, size: 16, color: UstpColors.blue),
+    );
+  }
+}
+
+class _HighlightLine extends StatelessWidget {
+  const _HighlightLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: const BoxDecoration(
+            color: UstpColors.blue,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              color: AdminColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -628,21 +854,19 @@ class _SectionLine extends StatelessWidget {
       children: [
         Icon(
           Icons.check_circle_rounded,
-          size: 14,
-          color: n == 0
-              ? AdminReportsTheme.textMuted
-              : AdminReportsTheme.success,
+          size: 13,
+          color: n == 0 ? AdminColors.textMuted : UstpColors.blue,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 7),
         Expanded(
           child: Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 12.5,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AdminReportsTheme.textPrimary,
+              color: AdminColors.textPrimary,
             ),
           ),
         ),
@@ -650,11 +874,11 @@ class _SectionLine extends StatelessWidget {
         Text(
           n == null ? 'counted on download' : '$n ${n == 1 ? 'row' : 'rows'}',
           style: TextStyle(
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: n == null ? FontWeight.w500 : FontWeight.w700,
             color: n == null
-                ? AdminReportsTheme.textMuted
-                : AdminReportsTheme.textSecondary,
+                ? AdminColors.textMuted
+                : AdminColors.textSecondary,
           ),
         ),
       ],

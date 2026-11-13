@@ -39,6 +39,16 @@ if %ICON_SIZE% LSS 500000 (
 echo Icon font OK: MaterialIcons-Regular.otf (%ICON_SIZE% bytes)
 
 echo.
+echo Cache-busting MaterialIcons filename (avoids stale tree-shaken font)...
+python tool\bust_web_icon_font.py
+if errorlevel 1 (
+  echo.
+  echo Icon font cache-bust failed!
+  pause
+  exit /b 1
+)
+
+echo.
 echo ========================================
 echo Deploying to Firebase Hosting
 echo ========================================

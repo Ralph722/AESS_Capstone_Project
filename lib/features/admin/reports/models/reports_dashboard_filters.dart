@@ -111,6 +111,7 @@ AdminReportsAnalytics applyReportsDashboardFilters({
   return AdminReportsAnalytics(
     members: members,
     employmentRecords: employment,
+    liveEmploymentByUserId: source.liveEmploymentByUserId,
     surveys: surveys,
     announcements: source.announcements,
     forumTopics: source.forumTopics,

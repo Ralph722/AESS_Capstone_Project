@@ -138,9 +138,9 @@ void main() {
       expect(rows, contains(equals([GtsListTables.totalLabel, '5', '100%'])));
       expect(
         rows,
-        contains(equals([GtsListTables.responseRateLabel, '3 of 5', '60.0%'])),
+        contains(equals([GtsListTables.responseRateLabel, '3 of 5', '60%'])),
       );
-      expect(rows, contains(equals(['Answered', '3', '60.0%'])));
+      expect(rows, contains(equals(['Answered', '3', '60%'])));
       expect(rows, contains(equals(['Yes', '1', '33.3%'])));
       expect(
         rows,

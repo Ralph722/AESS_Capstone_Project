@@ -8,7 +8,7 @@ enum ReportCatalogSurface {
   /// Reports & Analytics → Downloads (institutional / cross-survey).
   downloadsLibrary,
 
-  /// Reports & Analytics → Builder (ad-hoc CHED analytics).
+  /// Reports & Analytics → Builder (alumni list exports).
   reportBuilder,
 }
 

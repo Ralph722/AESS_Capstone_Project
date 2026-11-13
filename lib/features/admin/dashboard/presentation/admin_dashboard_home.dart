@@ -5,6 +5,7 @@ import 'package:alumni_system/features/admin/activity/models/audit_log_model.dar
 import 'package:alumni_system/features/admin/dashboard/application/admin_dashboard_metrics.dart';
 import 'package:alumni_system/features/admin/dashboard/application/dashboard_insights.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_dashboard_widgets.dart';
+import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_kpi_card.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_page_header.dart';
@@ -12,7 +13,6 @@ import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_state_view.dart';
 import 'package:alumni_system/features/admin/dashboard/application/dashboard_activity_trend.dart';
 import 'package:alumni_system/features/admin/dashboard/widgets/dashboard_engagement_chart.dart';
-import 'package:alumni_system/features/alumni/card/presentation/alumni_card_verify_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 class AdminDashboardHome extends StatelessWidget {
@@ -94,7 +94,7 @@ class AdminDashboardHome extends StatelessWidget {
       insights != null ? null : (insightsFailed ? "Couldn't load" : 'Loading…');
 
   static String _pct(double? rate) =>
-      rate == null ? _placeholder : '${(rate * 100).toStringAsFixed(0)}%';
+      rate == null ? _placeholder : formatReportPercent(rate);
 
   @override
   Widget build(BuildContext context) {
@@ -261,27 +261,6 @@ class AdminDashboardHome extends StatelessWidget {
       title: greeting(_now, adminName),
       subtitle: "Here's what's happening across the alumni portal today.",
       actions: [
-        Builder(
-          builder: (context) => OutlinedButton.icon(
-            onPressed: () => showAlumniCardVerifyDialog(context),
-            icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
-            label: const Text('Verify card'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AdminColors.primary,
-              backgroundColor: AdminColors.card,
-              side: const BorderSide(color: AdminColors.border),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              minimumSize: const Size(0, AdminDensity.buttonHeight),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
         _DashboardDateChip(date: _now, lastUpdated: lastUpdated),
       ],
     );
@@ -322,9 +301,9 @@ class AdminDashboardHome extends StatelessWidget {
         caption:
             insightsStatus ??
             (i!.employmentRecords == 0
-                ? 'No employment information yet'
+                ? 'No live-profile employment status yet'
                 : '${i.employed} of ${i.employmentRecords} with employment '
-                      'info'),
+                      'status on profile'),
         icon: Icons.work_outline,
         palette: AdminAccents.blue,
         dense: dense,
@@ -489,8 +468,8 @@ class AdminDashboardHome extends StatelessWidget {
   }
 
   static const _programAlumniWidth = 56.0;
-  static const _programRegisteredWidth = 78.0;
-  static const _programTracerWidth = 56.0;
+  static const _programRegisteredWidth = 84.0;
+  static const _programTracerWidth = 66.0;
 
   Widget _programHeaderRow({required bool showAlumni}) {
     const style = TextStyle(
@@ -537,7 +516,14 @@ class AdminDashboardHome extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(_pct(rate), style: numberStyle, textAlign: TextAlign.right),
+          Text(
+            _pct(rate),
+            style: numberStyle,
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+          ),
           const SizedBox(height: 3),
           SizedBox(
             width: 48,

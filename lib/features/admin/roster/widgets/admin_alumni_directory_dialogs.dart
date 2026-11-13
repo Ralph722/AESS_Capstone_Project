@@ -1002,10 +1002,11 @@ class RosterRemoveDialog extends StatelessWidget {
           Text(
             registered
                 ? 'Deactivate blocks sign-in and can be undone later. '
-                      'Remove account also erases their personal details '
-                      '(name, email, contact info, photo) from the portal. '
-                      'Their tracer answers stay in the statistics without '
-                      'identifying details, and the alumni list entry stays deactivated. '
+                      'Remove account clears their portal personal details '
+                      '(login, email, contact info, photo) and hides their '
+                      'forum posts and event comments from other alumni — '
+                      'admins still keep those records and tracer statistics. '
+                      'The alumni list entry stays deactivated. '
                       'This cannot be undone.'
                 : 'Remove ${member.fullName} from the alumni list? '
                       'They will not be able to register.',

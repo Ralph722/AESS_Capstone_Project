@@ -686,12 +686,6 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
                             ],
                             const SizedBox(width: 14),
                             nextActionPill,
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              color: AdminColors.textMuted,
-                              size: 18,
-                            ),
                           ],
                         );
                       }
@@ -719,18 +713,7 @@ class _DssFlagListCardState extends State<DssFlagListCard> {
                                         runSpacing: 4,
                                         children: urgencyChips,
                                       ),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        nextActionPill,
-                                        const SizedBox(width: 4),
-                                        const Icon(
-                                          Icons.chevron_right_rounded,
-                                          color: AdminColors.textMuted,
-                                          size: 18,
-                                        ),
-                                      ],
-                                    ),
+                                    nextActionPill,
                                   ],
                                 ),
                               ],

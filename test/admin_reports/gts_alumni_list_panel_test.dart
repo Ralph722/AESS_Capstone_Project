@@ -6,7 +6,6 @@ import 'package:alumni_system/features/admin/reports/data/gts_list_data_service.
 import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_alumni_list_panel.dart';
-import 'package:alumni_system/features/admin/reports/widgets/gts_builder_mode_switch.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 
@@ -159,14 +158,14 @@ void main() {
       expect(lines['Summary: ${GtsListTables.totalLabel}'], '5 | 100%');
       expect(
         lines['Summary: ${GtsListTables.responseRateLabel}'],
-        '3 of 5 | 60.0%',
+        '3 of 5 | 60%',
       );
-      expect(lines['Tracer status: Answered'], '3 | 60.0%');
+      expect(lines['Tracer status: Answered'], '3 | 60%');
       expect(
         lines['Tracer status: Untracked – registered, not yet answered'],
-        '1 | 20.0%',
+        '1 | 20%',
       );
-      expect(lines['Tracer status: Untracked – not registered'], '1 | 20.0%');
+      expect(lines['Tracer status: Untracked – not registered'], '1 | 20%');
       expect(lines.containsKey('Summary: ${GtsListTables.employmentRateLabel}'), isFalse);
     });
 
@@ -417,23 +416,6 @@ void main() {
         ['w2'],
       ]);
     });
-  });
-
-  testWidgets('the mode switch names both purposes', (tester) async {
-    GtsBuilderMode? picked;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: GtsBuilderModeSwitch(
-            mode: GtsBuilderMode.list,
-            onChanged: (m) => picked = m,
-          ),
-        ),
-      ),
-    );
-    expect(find.text('Who answered and what they said'), findsOneWidget);
-    await tester.tap(find.text('Summary & charts'));
-    expect(picked, GtsBuilderMode.summary);
   });
 
   test('answer filters keep the report filter shape', () {

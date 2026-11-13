@@ -315,7 +315,8 @@ class AlumniMemberService {
   }
 
   /// Deactivates and anonymizes the linked portal account. The roster row
-  /// stays (deactivated, unlinked) and tracer answers are kept with
+  /// stays (deactivated, unlinked). Peer-facing forum/event activity is
+  /// soft-hidden; admin retains the rows. Tracer answers stay with
   /// identifying items blanked.
   Future<void> removeRegisteredMemberAccount(AlumniMember member) async {
     final authUid = member.authUid?.trim() ?? '';

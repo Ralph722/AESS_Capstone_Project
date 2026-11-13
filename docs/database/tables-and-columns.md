@@ -56,6 +56,7 @@ Public schema: 40 tables, 444 columns.
 | course | text | yes | `''::text` |  |
 | student_id | text | yes | `''::text` |  |
 | auth_uid | uuid |  |  |  |
+| former_auth_uid | uuid |  |  |  |
 | registered_email | text |  |  |  |
 | is_registered_user | boolean | yes | `false` |  |
 | is_deactivated | boolean | yes | `false` |  |

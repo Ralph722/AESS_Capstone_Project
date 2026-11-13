@@ -4,6 +4,7 @@ import 'package:alumni_system/features/admin/reports/application/gts_alumni_list
 import 'package:alumni_system/features/admin/reports/application/gts_field_dictionary.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_list_columns.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_report_chart.dart';
+import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
@@ -23,7 +24,7 @@ class GtsTallyLine {
   /// "12", or "3 of 5" for rates.
   final String count;
 
-  /// "20.0%"; "–" when there is no base; empty outside the total.
+  /// "20%" or "66.7%"; "–" when there is no base; empty outside the total.
   final String share;
   final bool isTotal;
   final bool isRate;
@@ -82,7 +83,7 @@ abstract final class GtsListTables {
       };
 
   static String percent(double? value) =>
-      value == null ? '–' : '${(value * 100).toStringAsFixed(1)}%';
+      value == null ? '–' : formatReportPercent(value);
 
   static const _rosterShareNote =
       'Shares are of alumni on the alumni list.';

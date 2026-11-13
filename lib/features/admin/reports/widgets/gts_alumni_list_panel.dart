@@ -62,7 +62,8 @@ class GtsAlumniListPanel extends StatefulWidget {
   final GtsSavedReport? initialOpen;
   final ValueChanged<GtsSavedReport?>? onOpenChanged;
 
-  /// Opens a saved summary report in that mode; hidden when null.
+  /// Legacy hook for opening a saved summary report. Unused now that Builder
+  /// is list-only; kept optional so older call sites compile.
   final ValueChanged<GtsSavedReport>? onOpenSummary;
 
   /// CHED GTS waves that can have responses, newest first.
@@ -679,7 +680,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
         ),
         _stepCard(
           step: '3',
-          title: 'Filters (Only include)',
+          title: 'Filters (Only Include)',
           subtitle: 'Filter by tracer status, course, batch, or answers',
           children: [
             _label('Tracer status'),

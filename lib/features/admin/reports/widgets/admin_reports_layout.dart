@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 
@@ -621,7 +622,7 @@ class ReportsRankedSummary extends StatelessWidget {
               ),
               Text(
                 '${entries[i].value}'
-                '${total > 0 ? ' · ${(entries[i].value / total * 100).toStringAsFixed(0)}%' : ''}',
+                '${total > 0 ? ' · ${formatReportPercent(entries[i].value / total)}' : ''}',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,

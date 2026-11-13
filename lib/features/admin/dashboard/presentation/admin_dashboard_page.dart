@@ -12,6 +12,7 @@ import 'package:alumni_system/features/admin/roster/data/alumni_member_service.d
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
 import 'package:alumni_system/features/announcements/data/announcement_service.dart';
 import 'package:alumni_system/features/alumni/tracer/data/id_tracer_service.dart';
+import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/features/admin/activity/presentation/admin_activity_logs_page.dart';
 import 'package:alumni_system/features/admin/dashboard/presentation/admin_dashboard_home.dart';
 import 'package:alumni_system/features/admin/dashboard/application/admin_dashboard_metrics.dart';
@@ -20,8 +21,9 @@ import 'package:alumni_system/features/admin/dashboard/application/dashboard_ins
 import 'package:alumni_system/features/admin/dss/data/dss_repository.dart';
 import 'package:alumni_system/features/admin/profile/data/admin_profile_service.dart';
 import 'package:alumni_system/features/admin/dss/models/dss_models.dart';
+import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
-import 'package:alumni_system/features/alumni/tracer/models/id_tracer_model.dart';
+import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/admin/events/presentation/admin_events_page.dart';
@@ -65,6 +67,7 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
   final SurveyService _surveyService = SurveyService();
   final AnnouncementService _announcementService = AnnouncementService();
   final IdTracerService _idTracerService = IdTracerService();
+  final UserProfileService _profileService = UserProfileService();
   final ForumService _forumService = ForumService();
   final DssRepository _dssRepository = DssRepository();
 
@@ -322,12 +325,13 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
         _surveyService.countSubmittedResponsesBySurvey(
           activeRegisteredOnly: true,
         ),
-        _idTracerService.getAllEmploymentRecords(),
+        _profileService.getRegisteredProfileIndex(),
         _jobService.getJobsByStatus('active'),
         _loadInsightFlags(),
       ]);
       final surveys = results[1] as List<Survey>;
       final submitted = results[3] as Map<String, int>;
+      final profiles = results[4] as Map<String, TracerProfile>;
       final tracerIds = await _tracerSubmitterIds(surveys, submitted);
       final built = DashboardInsights.build(
         members: results[0] as List<AlumniMember>,
@@ -335,7 +339,8 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
         assignmentCounts: results[2] as Map<String, int>,
         submittedCounts: submitted,
         tracerSubmitterIds: tracerIds,
-        employmentRecords: results[4] as List<EmploymentRecord>,
+        liveEmploymentByUserId:
+            AdminReportsAnalytics.liveEmploymentFromProfiles(profiles),
         activeJobs: results[5] as List<JobPosting>,
         flags: results[6] as List<DssFlag>?,
       );

@@ -29,6 +29,7 @@ import 'package:alumni_system/features/admin/reports/application/ched_wave_compa
 import 'package:alumni_system/features/admin/reports/application/gts_field_dictionary.dart';
 import 'package:alumni_system/features/admin/reports/application/institutional_ched_templates.dart';
 import 'package:alumni_system/features/admin/reports/application/report_file_names.dart';
+import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_coverage.dart';
 import 'package:alumni_system/features/admin/reports/application/tracer_tab_stats.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_list_config.dart';
@@ -45,10 +46,7 @@ import 'package:alumni_system/features/admin/reports/widgets/admin_reports_polis
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_filter_bar.dart';
 import 'package:alumni_system/features/admin/reports/widgets/ched_wave_comparison_dialog.dart';
 import 'package:alumni_system/features/admin/reports/widgets/gts_alumni_list_panel.dart';
-import 'package:alumni_system/features/admin/reports/widgets/gts_builder_mode_switch.dart';
-import 'package:alumni_system/features/admin/reports/widgets/gts_report_builder.dart';
 import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
-import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_bento.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_download_config_dialog.dart';
@@ -178,47 +176,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   bool _downloadBusy = false;
   DateTime? _lastLoadedAt;
-  bool _manualRefreshing = false;
   String? _downloadingPresetId;
   Object? _exportCountsKey;
   Map<CustomReportSectionId, int?> _exportCounts = const {};
 
-  /// Report builder settings, kept while switching tabs.
-  GtsReportConfig? _builderConfig;
+  /// Alumni list builder settings, kept while switching tabs.
   late final _savedReports = GtsSavedReportService();
-  final _builderRespondents = <String, List<GtsRespondent>>{};
-  var _builderMode = GtsBuilderMode.list;
   GtsListConfig? _listConfig;
   final _listResponses = <String, List<GtsListResponse>>{};
-
-  /// Saved reports each builder mode has open, kept across tab switches.
-  GtsSavedReport? _builderOpen;
   GtsSavedReport? _listOpen;
-
-  /// Opens a saved report from the other builder mode in its own mode.
-  void _openSavedInMode(GtsSavedReport report) {
-    try {
-      if (report.isList) {
-        final settings = report.listSettings.copyWith(title: report.name);
-        setState(() {
-          _listConfig = settings;
-          _listOpen = report;
-          _builderMode = GtsBuilderMode.list;
-        });
-      } else {
-        final settings = report.settings.copyWith(title: report.name);
-        setState(() {
-          _builderConfig = settings;
-          _builderOpen = report;
-          _builderMode = GtsBuilderMode.summary;
-        });
-      }
-    } on FormatException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
 
   @override
   void initState() {
@@ -387,6 +353,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       final analytics = AdminReportsAnalytics(
         members: members,
         employmentRecords: records,
+        liveEmploymentByUserId:
+            AdminReportsAnalytics.liveEmploymentFromProfiles(
+              registeredProfiles,
+            ),
         surveys: adjustedSurveys,
         announcements: announcements,
         forumTopics: forumTopics,
@@ -769,6 +739,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         _analytics = AdminReportsAnalytics(
           members: ac.members,
           employmentRecords: ac.employmentRecords,
+          liveEmploymentByUserId: ac.liveEmploymentByUserId,
           surveys: adjustedSurveys,
           announcements: ac.announcements,
           forumTopics: ac.forumTopics,
@@ -936,20 +907,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   }
 
   Widget _buildDashboardHeader() {
-    return ReportsPageHeader(
-      updatedAt: _lastLoadedAt,
-      refreshing: _manualRefreshing,
-      onRefresh: _refreshFromHeader,
-    );
-  }
-
-  Future<void> _refreshFromHeader() async {
-    setState(() => _manualRefreshing = true);
-    try {
-      await _loadAllData();
-    } finally {
-      if (mounted) setState(() => _manualRefreshing = false);
-    }
+    return ReportsPageHeader(updatedAt: _lastLoadedAt);
   }
 
   List<ReportsInsightCardData> _insightCardsWithActions(
@@ -1095,7 +1053,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  String _pct(double rate) => '${(rate * 100).toStringAsFixed(0)}%';
+  String _pct(double rate) => formatReportPercent(rate);
 
   void _openAdminMenuOr(int menu, int fallbackTab) {
     final open = widget.onOpenAdminMenu;
@@ -1129,7 +1087,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return [
       ReportsStatCard(
-        label: 'Alumni list',
+        label: 'Alumni List',
         value: '${a.rosterTotal}',
         icon: Icons.groups_outlined,
         accent: UstpColors.blue,
@@ -1142,7 +1100,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         rows: [
           ReportsStatRow('Registered', '${a.registeredOnRoster}'),
           ReportsStatRow('Unclaimed', '${a.unclaimedRoster}'),
-          ReportsStatRow('Registration rate', _pct(a.registrationRate)),
+          ReportsStatRow('Registration Rate', _pct(a.registrationRate)),
         ],
         details: ReportsDetailsButton.compose(
           definition:
@@ -1156,20 +1114,20 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       ReportsStatCard(
-        label: 'Tracer reach',
+        label: 'Tracer Reach',
         value: _pct(coverage.tracerTakeRateAmongRegistered),
         icon: Icons.school_outlined,
         accent: UstpColors.midBlue,
         pillLabel: reportsKpiStatusLabel(tracerStatus),
         pillColor: reportsStatusColor(tracerStatus),
         rows: [
-          ReportsStatRow('Took tracer', '${coverage.tookTracer}'),
+          ReportsStatRow('Took Tracer', '${coverage.tookTracer}'),
           ReportsStatRow(
-            'Registered, no tracer',
+            'Registered, No Tracer',
             '${coverage.registeredNoTracer}',
           ),
           ReportsStatRow(
-            'Profile complete',
+            'Profile Complete',
             '${a.tracerCompleteCount}/${a.registeredOnRoster}',
           ),
         ],
@@ -1185,7 +1143,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       ReportsStatCard(
-        label: 'Survey completion',
+        label: 'Survey Completion',
         value: _pct(a.surveyResponseRate),
         icon: Icons.poll_outlined,
         accent: UstpColors.skyBlue,
@@ -1194,7 +1152,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         rows: [
           ReportsStatRow('Submitted', '${a.totalSurveyResponses}'),
           ReportsStatRow('Pending', '${a.pendingSurveyAssignments}'),
-          ReportsStatRow('Published surveys', '${a.publishedSurveys}'),
+          ReportsStatRow('Published Surveys', '${a.publishedSurveys}'),
         ],
         details: ReportsDetailsButton.compose(
           definition:
@@ -1206,7 +1164,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       ReportsStatCard(
-        label: 'Employment rate',
+        label: 'Employment Rate',
         value: hasEmployment ? _pct(a.employmentRateAmongSubmissions) : '—',
         icon: Icons.work_outline,
         accent: UstpColors.blue,
@@ -1216,21 +1174,21 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         pillColor: reportsStatusColor(employmentStatus),
         rows: [
           ReportsStatRow('Employed', '${a.employedCount}'),
-          ReportsStatRow('Not employed', '${a.unemployedCount}'),
-          ReportsStatRow('Records on file', '${a.reportEmploymentCount}'),
+          ReportsStatRow('Not Employed', '${a.unemployedCount}'),
+          ReportsStatRow('Status on Profile', '${a.reportEmploymentCount}'),
         ],
         details: ReportsDetailsButton.compose(
           definition: AdminReportsAnalytics.employmentRateDefinition,
           calculation: hasEmployment
               ? '${a.employedCount} employed out of ${a.reportEmploymentCount} '
-                    'with employment information.'
-              : 'No employment information is available yet.',
+                    'with employment status on their live profile.'
+              : 'No live-profile employment status is available yet.',
           scope:
-              'Registered alumni with employment information on file '
-              '(each person counted once).',
+              'Registered alumni with employment status on their live '
+              'profile (each person counted once).',
           limitation:
-              'If the data set is large, results may be capped. Tracer '
-              'employment charts use survey answers instead.',
+              'This Overview figure uses the live profile, not tracer '
+              'item 16. Tracer-tab employment still uses survey answers.',
         ),
       ),
     ];
@@ -1244,7 +1202,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final labels = [for (final m in _monthWindow()) _monthLabel(m)];
     final empty = roster.cumulative.every((v) => v == 0);
     return ReportsBentoCard(
-      title: 'Alumni list & registration trend',
+      title: 'Alumni List & Registration Trend',
       caption: 'Cumulative alumni, last 12 months',
       details: ReportsDetailsButton.compose(
         definition:
@@ -1262,7 +1220,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               children: [
                 ReportsLegendDot(
                   color: AdminReportsTheme.primary,
-                  label: 'Alumni list',
+                  label: 'Alumni List',
                 ),
                 ReportsLegendDot(
                   color: AdminReportsTheme.gold,
@@ -1280,7 +1238,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               labels: labels,
               series: [
                 ReportsTrendSeries(
-                  label: 'Alumni list',
+                  label: 'Alumni List',
                   color: AdminReportsTheme.primary,
                   values: roster.cumulative,
                 ),
@@ -1307,7 +1265,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       if (courses.length > maxSlices)
         ReportsDonutEntry(
-          label: 'Other programs',
+          label: 'Other Programs',
           value: courses
               .skip(maxSlices)
               .fold<int>(0, (sum, e) => sum + e.value),
@@ -1315,7 +1273,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
     ];
     return ReportsBentoCard(
-      title: 'Alumni by program',
+      title: 'Alumni by Program',
       caption: '${courses.length} programs on the alumni list',
       details: ReportsDetailsButton.compose(
         definition: 'Active alumni list members grouped by their program (course).',
@@ -1342,7 +1300,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     TracerCoverageSnapshot coverage,
   ) {
     return ReportsBentoCard(
-      title: 'Engagement funnel',
+      title: 'Engagement Funnel',
       caption: 'Share of the alumni list at each step',
       details: ReportsDetailsButton.compose(
         definition:
@@ -1362,7 +1320,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           : ReportsFunnelBars(
               steps: [
                 ReportsFunnelStep(
-                  label: 'Alumni list',
+                  label: 'Alumni List',
                   value: a.rosterTotal,
                   color: UstpColors.blue,
                 ),
@@ -1372,12 +1330,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                   color: UstpColors.midBlue,
                 ),
                 ReportsFunnelStep(
-                  label: 'Took tracer',
+                  label: 'Took Tracer',
                   value: coverage.tookTracer,
                   color: UstpColors.skyBlue,
                 ),
                 ReportsFunnelStep(
-                  label: 'Profile complete',
+                  label: 'Profile Complete',
                   value: a.tracerCompleteCount,
                   color: UstpColors.gold,
                 ),
@@ -1389,7 +1347,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _overviewSurveyHealthCard(AdminReportsAnalytics a) {
     final surveys = a.surveysForChart;
     return ReportsBentoCard(
-      title: 'Survey response health',
+      title: 'Survey Response Health',
       caption: 'Top surveys by response rate',
       details: ReportsDetailsButton.compose(
         definition: 'Response rate for each survey that has assignments.',
@@ -1424,7 +1382,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _overviewBatchCard(AdminReportsAnalytics a) {
     final batches = a.topBatchYears();
     return ReportsBentoCard(
-      title: 'Alumni by batch year',
+      title: 'Alumni by Batch Year',
       caption: 'Most recent ${batches.length} batches',
       details: ReportsDetailsButton.compose(
         definition: 'Active alumni list members grouped by batch (graduation) year.',
@@ -1451,7 +1409,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
     final showInsights = _overviewActionView == 1;
     return ReportsBentoCard(
-      title: 'Action center',
+      title: 'Action Center',
       caption: showInsights
           ? (_insightsAreAi ? 'AI-generated summary' : 'Rule-based highlights')
           : (attention.isEmpty
@@ -1874,7 +1832,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return [
       ReportsStatCard(
-        label: 'Total traced',
+        label: 'Total Traced',
         value: denom == 0 ? '$traced' : '$traced / $denom',
         icon: Icons.assignment_turned_in_outlined,
         accent: UstpColors.blue,
@@ -1888,11 +1846,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             '$denom',
           ),
           ReportsStatRow(
-            usesAssignments ? 'Pending assignments' : 'Registered, no tracer',
+            usesAssignments ? 'Pending Assignments' : 'Registered, No Tracer',
             '$pending',
           ),
           ReportsStatRow(
-            'Share of alumni list',
+            'Share of Alumni List',
             _pct(coverage.tracerTakeRateAmongRoster),
           ),
         ],
@@ -1917,7 +1875,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       ReportsStatCard(
-        label: 'Employment rate',
+        label: 'Employment Rate',
         value: hidden ? '—' : _pct(employmentRate),
         icon: Icons.work_outline,
         accent: UstpColors.midBlue,
@@ -1930,10 +1888,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         rows: [
           ReportsStatRow('Employed (Yes)', hidden ? '—' : '$employed'),
           ReportsStatRow(
-            'Not / never employed',
+            'Not / Never Employed',
             hidden ? '—' : '${ched?.notEmployed ?? 0}',
           ),
-          ReportsStatRow('Answered item 16', hidden ? '—' : '$answered'),
+          ReportsStatRow('Answered Item 16', hidden ? '—' : '$answered'),
         ],
         details: ReportsDetailsButton.compose(
           definition:
@@ -1948,7 +1906,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       _yesShareKpi(
-        label: 'Degree alignment',
+        label: 'Degree Alignment',
         icon: Icons.school_outlined,
         accent: UstpColors.skyBlue,
         share: _chedYesShare('ched_24a'),
@@ -1962,7 +1920,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             'is their first job (item 22 = Yes).',
       ),
       _yesShareKpi(
-        label: 'Curriculum relevance',
+        label: 'Curriculum Relevance',
         icon: Icons.menu_book_outlined,
         accent: UstpColors.blue,
         share: _chedYesShare('ched_32'),
@@ -2048,7 +2006,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         naturalHeight: 300,
         children: [
           _bentoDistributionCard(
-            title: 'Time to first job',
+            title: 'Time to First Job',
             details: _chedDetails(
               'How long it took graduates to land their first job '
               '(item 29) on this tracer wave.',
@@ -2059,7 +2017,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             color: UstpColors.blue,
           ),
           _bentoDistributionCard(
-            title: 'First job after college',
+            title: 'First Job After College',
             details: _chedDetails(
               'Whether the present job is the graduate’s first job after '
               'college (item 22).',
@@ -2071,7 +2029,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             noun: 'employed graduates',
           ),
           _bentoDistributionCard(
-            title: 'Duration in first job',
+            title: 'Duration in First Job',
             details: _chedDetails(
               'How long graduates stayed in their first job (item 27) on '
               'this tracer wave.',
@@ -2090,7 +2048,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         children: [
           _tracerJobLevelCard(),
           _bentoDistributionCard(
-            title: 'Job search channels',
+            title: 'Job Search Channels',
             details: ReportsDetailsButton.compose(
               definition:
                   'How graduates found their first job (item 28) among '
@@ -2116,7 +2074,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         naturalHeight: 204,
         children: [
           _bentoDistributionCard(
-            title: 'Curriculum relevance',
+            title: 'Curriculum Relevance',
             details: _chedDetails(
               'Whether graduates felt the college curriculum was relevant '
               'to their first job (item 32).',
@@ -2128,7 +2086,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             noun: 'employed graduates',
           ),
           _bentoDistributionCard(
-            title: 'First job related to course',
+            title: 'First Job Related to Course',
             details: _chedDetails(
               'Whether the first job related to the course taken in college '
               '(item 24).',
@@ -2145,7 +2103,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         naturalHeight: 308,
         children: [
           _bentoDistributionCard(
-            title: 'Useful competencies',
+            title: 'Useful Competencies',
             details: ReportsDetailsButton.compose(
               definition:
                   'Competencies from college that graduates found useful '
@@ -2175,7 +2133,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           _tracerStatusCard(a),
           _tracerEmploymentTypeCard(),
           _bentoDistributionCard(
-            title: 'Place of work',
+            title: 'Place of Work',
             details: ReportsDetailsButton.compose(
               definition:
                   'Where employed graduates work: local or abroad (item 21) '
@@ -2196,7 +2154,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         naturalHeight: 300,
         children: [
           _bentoDistributionCard(
-            title: 'Industry (employed)',
+            title: 'Industry (Employed)',
             details: ReportsDetailsButton.compose(
               definition:
                   'Top 10 industries or sectors (item 20) reported by '
@@ -2216,7 +2174,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             noun: 'employed graduates',
           ),
           _bentoDistributionCard(
-            title: 'Initial monthly earning',
+            title: 'Initial Monthly Earning',
             details: ReportsDetailsButton.compose(
               definition:
                   'Initial gross monthly earning in the first job (item 31), '
@@ -2231,7 +2189,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             noun: 'employed graduates',
           ),
           _bentoDistributionCard(
-            title: 'Reasons not employed',
+            title: 'Reasons Not Employed',
             details: _chedDetails(
               'Reasons graduates gave for not being employed yet (item 17) '
               'on this tracer wave.',
@@ -2266,7 +2224,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         naturalHeight: 320,
         children: [
           _bentoDistributionCard(
-            title: 'Reasons for advanced studies',
+            title: 'Reasons for Advanced Studies',
             details: ReportsDetailsButton.compose(
               definition:
                   'Reasons graduates gave for pursuing advance studies '
@@ -2290,17 +2248,17 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _tracerMobilityCard() {
     const specs = <(String, String, String)>[
       (
-        'Reasons for staying',
+        'Reasons for Staying',
         'ched_23',
         'Reasons employed graduates gave for staying on the job (item 23).',
       ),
       (
-        'Reasons for accepting',
+        'Reasons for Accepting',
         'ched_24b',
         'Reasons graduates gave for accepting the job (item 25).',
       ),
       (
-        'Reasons for changing',
+        'Reasons for Changing',
         'ched_25',
         'Reasons graduates gave for changing jobs (item 26).',
       ),
@@ -2309,7 +2267,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final data = _tracerCounts(spec.$2, byCount: true);
     final answered = data.answered;
     return ReportsBentoCard(
-      title: 'Retention & job change reasons',
+      title: 'Retention & Job Change Reasons',
       caption: answered == 0 || data.small
           ? null
           : 'n = $answered graduates',
@@ -2369,7 +2327,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
     final answered = data.answered;
     return ReportsBentoCard(
-      title: 'Job level position',
+      title: 'Job Level Position',
       caption: answered == 0 || data.small
           ? null
           : 'n = $answered employed graduates',
@@ -2440,18 +2398,18 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         showDots: true,
         series: [
           ReportsTrendSeries(
-            label: 'Employment rate',
+            label: 'Employment Rate',
             color: UstpColors.blue,
             values: [for (final p in points) p.rate],
           ),
         ],
         tooltipBuilder: (_, i) =>
-            '${points[i].label}\n${points[i].rate.toStringAsFixed(0)}% '
+            '${points[i].label}\n${formatReportPercentPoints(points[i].rate)} '
             '(${points[i].employed}/${points[i].answered})',
       );
     }
     return ReportsBentoCard(
-      title: 'Employment rate by tracer wave',
+      title: 'Employment Rate by Tracer Wave',
       caption: '${points.length} waves in chronological order',
       details: ReportsDetailsButton.compose(
         definition:
@@ -2495,7 +2453,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           );
     final small = ched?.small ?? false;
     return ReportsBentoCard(
-      title: 'Employment status',
+      title: 'Employment Status',
       caption: total == 0 || small ? null : _sampleCaption(total, 'answers'),
       details: details,
       child: small
@@ -2519,7 +2477,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                   color: UstpColors.blue,
                 ),
                 ReportsDonutEntry(
-                  label: 'Not employed',
+                  label: 'Not Employed',
                   value: notEmployed,
                   color: UstpColors.gold,
                 ),
@@ -2532,7 +2490,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final types = _tracerCounts('ched_18', employedOnly: true, byCount: true);
     final total = types.answered;
     return ReportsBentoCard(
-      title: 'Employment type',
+      title: 'Employment Type',
       caption: total == 0 || types.small
           ? null
           : 'n = $total employed graduates',
@@ -2618,7 +2576,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _tracerWaveBarsCard(AdminReportsAnalytics a) {
     final points = _employmentRateByWavePoints(a);
     return ReportsBentoCard(
-      title: 'By published tracer',
+      title: 'By Published Tracer',
       caption: points.isEmpty ? null : 'Tap a bar to list respondents',
       details: ReportsDetailsButton.compose(
         definition:
@@ -2664,7 +2622,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
                 ),
               ],
               tooltipFooter: (i) =>
-                  'Rate ${points[i].rate.toStringAsFixed(0)}% · tap for names',
+                  'Rate ${formatReportPercentPoints(points[i].rate)} · tap for names',
               onGroupTap: (i) {
                 if (i < 0 || i >= points.length) return;
                 unawaited(
@@ -2689,7 +2647,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ]..sort((x, y) => y.answered.compareTo(x.answered));
     final total = grouped.fold<int>(0, (s, r) => s + r.answered);
     return ReportsBentoCard(
-      title: byBatch ? 'Employment by batch' : 'Employment by course',
+      title: byBatch ? 'Employment by Batch' : 'Employment by Course',
       caption: total == 0 ? null : 'n = $total answers',
       details: ReportsDetailsButton.compose(
         definition: byBatch
@@ -2747,7 +2705,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _tracerLongitudinalCard(AdminReportsAnalytics a) {
     final rows = _longitudinalRows(a);
     return ReportsBentoCard(
-      title: 'Same alumni across waves',
+      title: 'Same Alumni Across Waves',
       caption: '${rows.length} alumni answered 2+ waves',
       details: ReportsDetailsButton.compose(
         definition:
@@ -2985,7 +2943,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
     return [
       ReportsStatCard(
-        label: 'Response rate',
+        label: 'Response Rate',
         value: assigned == 0 ? '—' : _pct(rate),
         icon: Icons.how_to_vote_outlined,
         accent: UstpColors.blue,
@@ -2996,7 +2954,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         rows: [
           ReportsStatRow('Submitted', '$submitted'),
           ReportsStatRow('Assigned', '$assigned'),
-          ReportsStatRow('Surveys with assignments', '${participating.length}'),
+          ReportsStatRow('Surveys with Assignments', '${participating.length}'),
         ],
         details: ReportsDetailsButton.compose(
           definition:
@@ -3009,15 +2967,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       ReportsStatCard(
-        label: 'Pending responses',
+        label: 'Pending Responses',
         value: '$pending',
         icon: Icons.hourglass_bottom_outlined,
         accent: UstpColors.midBlue,
         pillLabel: assigned == 0 ? 'No data' : '${_pct(dropOff)} drop-off',
         pillColor: reportsStatusColor(rateStatus),
         rows: [
-          ReportsStatRow('Low-response surveys', '$lowCount'),
-          ReportsStatRow('Surveys still waiting', '$waiting'),
+          ReportsStatRow('Low-Response Surveys', '$lowCount'),
+          ReportsStatRow('Surveys Still Waiting', '$waiting'),
           ReportsStatRow('Drop-off', assigned == 0 ? '—' : _pct(dropOff)),
         ],
         details: ReportsDetailsButton.compose(
@@ -3030,7 +2988,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       ReportsStatCard(
-        label: 'Open for responses',
+        label: 'Open for Responses',
         value: '${open.length}',
         icon: Icons.event_available_outlined,
         accent: UstpColors.skyBlue,
@@ -3047,9 +3005,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
               : ReportsKpiStatus.positive,
         ),
         rows: [
-          ReportsStatRow('Closing within 7 days', '$closingSoon'),
-          ReportsStatRow('Scheduled (not yet open)', '$scheduled'),
-          ReportsStatRow('Open with no close date', '$noCloseDate'),
+          ReportsStatRow('Closing Within 7 Days', '$closingSoon'),
+          ReportsStatRow('Scheduled (Not Yet Open)', '$scheduled'),
+          ReportsStatRow('Open with No Close Date', '$noCloseDate'),
         ],
         details: ReportsDetailsButton.compose(
           definition: 'Published surveys that alumni can answer right now.',
@@ -3060,7 +3018,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         ),
       ),
       ReportsStatCard(
-        label: 'Live surveys',
+        label: 'Live Surveys',
         value: '${a.publishedSurveys}',
         icon: Icons.poll_outlined,
         accent: UstpColors.blue,
@@ -3085,7 +3043,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
   Widget _surveyParticipationCard(AdminReportsAnalytics a) {
     final list = _participationSurveys(a).take(8).toList();
     return ReportsBentoCard(
-      title: 'Participation by survey',
+      title: 'Participation by Survey',
       caption: list.isEmpty ? null : 'Top ${list.length} by response rate',
       details: ReportsDetailsButton.compose(
         definition:
@@ -3149,7 +3107,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final submitted = a.totalSurveyResponses;
     final pending = (assigned - submitted).clamp(0, assigned);
     return ReportsBentoCard(
-      title: 'Response split',
+      title: 'Response Split',
       caption: assigned == 0 ? null : _sampleCaption(assigned, 'assignments'),
       details: ReportsDetailsButton.compose(
         definition: 'Submitted versus still-pending survey assignments.',
@@ -3185,7 +3143,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final low = _lowResponseSurveys(a);
     final threshold = '${(_lowResponseThreshold * 100).round()}%';
     return ReportsBentoCard(
-      title: 'Needs follow-up',
+      title: 'Needs Follow-Up',
       caption: low.isEmpty ? null : '${low.length} below $threshold response',
       details: ReportsDetailsButton.compose(
         definition:
@@ -3262,7 +3220,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     final open = surveys.where((s) => s.isOpen).length;
     final scheduled = surveys.where((s) => s.isNotYetOpen).length;
     return ReportsBentoCard(
-      title: 'Survey windows',
+      title: 'Survey Windows',
       caption: surveys.isEmpty ? null : '$open open · $scheduled scheduled',
       details: ReportsDetailsButton.compose(
         definition:
@@ -3327,7 +3285,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           return byRate != 0 ? byRate : x.prompt.compareTo(y.prompt);
         });
     return ReportsBentoCard(
-      title: 'Question completion',
+      title: 'Question Completion',
       caption: questions.isEmpty
           ? null
           : 'Least answered first · ${rollups.length} '
@@ -3421,38 +3379,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             )
             .toList()
           ..sort((x, y) => opened(y).compareTo(opened(x)));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        GtsBuilderModeSwitch(
-          mode: _builderMode,
-          onChanged: (m) => setState(() => _builderMode = m),
-        ),
-        const SizedBox(height: 16),
-        switch (_builderMode) {
-          GtsBuilderMode.list => GtsAlumniListPanel(
-            waves: waves,
-            roster: a.members,
-            responseCache: _listResponses,
-            initialConfig: _listConfig,
-            onConfigChanged: (c) => _listConfig = c,
-            savedReports: _savedReports,
-            initialOpen: _listOpen,
-            onOpenChanged: (r) => _listOpen = r,
-            onOpenSummary: _openSavedInMode,
-          ),
-          GtsBuilderMode.summary => GtsReportBuilderPanel(
-            waves: waves,
-            savedReports: _savedReports,
-            respondentCache: _builderRespondents,
-            initialConfig: _builderConfig,
-            onConfigChanged: (c) => _builderConfig = c,
-            initialOpen: _builderOpen,
-            onOpenChanged: (r) => _builderOpen = r,
-            onOpenList: _openSavedInMode,
-          ),
-        },
-      ],
+    return GtsAlumniListPanel(
+      waves: waves,
+      roster: a.members,
+      responseCache: _listResponses,
+      initialConfig: _listConfig,
+      onConfigChanged: (c) => _listConfig = c,
+      savedReports: _savedReports,
+      initialOpen: _listOpen,
+      onOpenChanged: (r) => _listOpen = r,
     );
   }
 

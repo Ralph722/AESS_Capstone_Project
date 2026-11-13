@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/core/config/ai_config.dart';
 import 'package:alumni_system/features/admin/reports/application/admin_reports_analytics.dart';
+import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/ai/data/ai_assistant_service.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
@@ -109,27 +110,29 @@ List<ReportsInsightCardData> buildHeuristicReportInsights(
   int chedPublished = 0,
   int chedResponses = 0,
 }) {
-  final regPct = (a.registrationRate * 100).toStringAsFixed(0);
-  final tracerPct = (a.tracerCompletionRate * 100).toStringAsFixed(0);
-  final surveyPct = (a.surveyResponseRate * 100).toStringAsFixed(0);
+  String pctNum(double rate) =>
+      formatReportPercent(rate).replaceAll('%', '');
+  final regPct = pctNum(a.registrationRate);
+  final tracerPct = pctNum(a.tracerCompletionRate);
+  final surveyPct = pctNum(a.surveyResponseRate);
   final empPct = a.reportEmploymentCount == 0
       ? '0'
-      : (a.employmentRateAmongSubmissions * 100).toStringAsFixed(0);
+      : pctNum(a.employmentRateAmongSubmissions);
 
   return [
     ReportsInsightCardData(
       kind: ReportsInsightKind.executiveSummary,
-      title: 'Executive summary',
+      title: 'Executive Summary',
       icon: Icons.auto_awesome_outlined,
       isPlaceholder: true,
       body:
           'Portfolio snapshot: $regPct% of alumni list registered, $tracerPct% tracer-complete '
           'among registered alumni, $surveyPct% survey completion, and $empPct% employed '
-          'among employment submissions. Tap Generate AI insights for a narrative brief.',
+          'among live-profile employment statuses. Tap Generate AI insights for a narrative brief.',
     ),
     ReportsInsightCardData(
       kind: ReportsInsightKind.keyFindings,
-      title: 'Key findings',
+      title: 'Key Findings',
       icon: Icons.flag_outlined,
       isPlaceholder: true,
       body: [
@@ -162,7 +165,7 @@ List<ReportsInsightCardData> buildHeuristicReportInsights(
     ),
     ReportsInsightCardData(
       kind: ReportsInsightKind.participation,
-      title: 'Participation insights',
+      title: 'Participation Insights',
       icon: Icons.poll_outlined,
       isPlaceholder: true,
       body:
@@ -172,17 +175,18 @@ List<ReportsInsightCardData> buildHeuristicReportInsights(
     ),
     ReportsInsightCardData(
       kind: ReportsInsightKind.employment,
-      title: 'Employment highlights',
+      title: 'Employment Highlights',
       icon: Icons.work_outline,
       isPlaceholder: true,
       body:
-          '${a.reportEmploymentCount} employment submissions on file; '
-          '${a.employedCount} employed ($empPct% of submissions). '
-          'Use Employment analytics for industry mix.',
+          '${a.reportEmploymentCount} registered alumni have employment status '
+          'on their live profile; ${a.employedCount} employed '
+          '($empPct% of those with status). '
+          'Tracer-tab employment still uses survey item 16.',
     ),
     ReportsInsightCardData(
       kind: ReportsInsightKind.ched,
-      title: 'CHED highlights',
+      title: 'CHED Highlights',
       icon: Icons.verified_outlined,
       isPlaceholder: true,
       body: chedPublished == 0
@@ -218,8 +222,8 @@ METRICS:
 - Tracer complete: ${a.tracerCompleteCount}
 - Tracer completion rate (of registered): ${(a.tracerCompletionRate * 100).toStringAsFixed(1)}%
 - Registered without complete tracer: ${a.registeredWithoutTracerComplete}
-- Employment submissions: ${a.reportEmploymentCount}
-- Employed among submissions: ${a.employedCount} (${(a.employmentRateAmongSubmissions * 100).toStringAsFixed(1)}%)
+- Live-profile employment statuses: ${a.reportEmploymentCount}
+- Employed among those with live status: ${a.employedCount} (${(a.employmentRateAmongSubmissions * 100).toStringAsFixed(1)}%)
 - Published surveys: ${a.publishedSurveys}
 - Draft surveys: ${a.draftSurveys}
 - Survey assignments: ${a.totalSurveyAssignments}
@@ -477,7 +481,7 @@ class ReportsInsightsPanel extends StatelessWidget {
 
     return ReportsSectionShell(
       icon: Icons.auto_awesome_outlined,
-      title: 'AI insights',
+      title: 'AI Insights',
       subtitle: 'Optional brief — expand for takeaways.',
       initiallyExpanded: false,
       actions: [

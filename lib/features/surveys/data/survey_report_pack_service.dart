@@ -16,7 +16,7 @@ import 'package:alumni_system/features/surveys/models/survey_reports_aggregate.d
 /// Professional multi-section survey report packs (Phase 6).
 ///
 /// Sections: Executive, Survey, Participation, Audience, Question, Response,
-/// Insights, Recommendations â€” exportable as PDF, Excel, or CSV.
+/// Insights, Recommendations — exportable as PDF, Excel, or CSV.
 class SurveyReportPackService {
   SurveyReportPackService._();
 
@@ -58,13 +58,13 @@ class SurveyReportPackService {
     }
     if (analytics.draftSurveys > 0) {
       recommendations.add(
-        '${analytics.draftSurveys} draft survey(s) await publish â€” finish '
+        '${analytics.draftSurveys} draft survey(s) await publish — finish '
         'audience/schedule and publish when ready.',
       );
     }
     if (analytics.pendingSurveyAssignments > 20) {
       recommendations.add(
-        'Large pending backlog â€” use Remind pending from each wave, then '
+        'Large pending backlog — use Remind pending from each wave, then '
         're-assign if new alumni matched the audience.',
       );
     }
@@ -159,12 +159,12 @@ class SurveyReportPackService {
           'pending assignments as in-progress/not-started combined.',
       audienceBuckets: const [],
       audienceNote:
-          'Open a single surveyâ€™s Responses â†’ Overview for course/batch '
+          'Open a single survey’s Responses → Overview for course/batch '
           'audience analytics, or export a per-survey pack.',
       questionRows: questionRows,
       responseRows: const [],
       responseNote:
-          'Per-respondent extracts are available from each surveyâ€™s export '
+          'Per-respondent extracts are available from each survey’s export '
           'menu (CSV / CHED Excel). This pack focuses on management summaries.',
       insights: insights,
       recommendations: recommendations,
@@ -215,7 +215,7 @@ class SurveyReportPackService {
     if (participation.notStarted > participation.inProgress &&
         participation.notStarted > 5) {
       recommendations.add(
-        'Many assignees have not started â€” push an in-app notification wave.',
+        'Many assignees have not started — push an in-app notification wave.',
       );
     }
     if (skipped.isNotEmpty) {
@@ -231,7 +231,7 @@ class SurveyReportPackService {
       insights.add(
         'Schedule window: '
         '${survey.openAt != null ? DateFormat.yMMMd().add_jm().format(survey.openAt!) : "open"}'
-        ' â†’ '
+        ' → '
         '${survey.closeAt != null ? DateFormat.yMMMd().add_jm().format(survey.closeAt!) : "no close"}.',
       );
     }
@@ -342,7 +342,7 @@ class SurveyReportPackService {
     }
     if (a.scaleAverage != null) {
       return 'avg ${a.scaleAverage!.toStringAsFixed(1)} '
-          '(${a.scaleMinObserved}â€“${a.scaleMaxObserved})';
+          '(${a.scaleMinObserved}–${a.scaleMaxObserved})';
     }
     if (a.textAnswerCount > 0) {
       return '${a.textAnswerCount} text answers';

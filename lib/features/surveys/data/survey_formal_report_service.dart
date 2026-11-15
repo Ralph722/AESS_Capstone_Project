@@ -54,7 +54,7 @@ class SurveyFormalReportService {
         usedAi: false,
         generatedAt: generatedAt,
         disclaimer:
-            'Metric-based draft (AI turned off) â€” review before official use.',
+            'Metric-based draft (AI turned off) — review before official use.',
       );
     }
 
@@ -70,7 +70,7 @@ class SurveyFormalReportService {
           usedAi: false,
           generatedAt: generatedAt,
           disclaimer:
-              'AI returned empty text â€” showing metric-based draft. Review before official use.',
+              'AI returned empty text — showing metric-based draft. Review before official use.',
         );
       }
       return SurveyFormalReportResult(
@@ -80,11 +80,11 @@ class SurveyFormalReportService {
       );
     } catch (e) {
       return SurveyFormalReportResult(
-        body: '$fallback\n\n(Note: AI unavailable â€” $e)',
+        body: '$fallback\n\n(Note: AI unavailable — $e)',
         usedAi: false,
         generatedAt: generatedAt,
         disclaimer:
-            'Metric-based draft (AI unavailable) â€” review before official use.',
+            'Metric-based draft (AI unavailable) — review before official use.',
       );
     }
   }
@@ -119,7 +119,7 @@ class SurveyFormalReportService {
         scored.add((
           answered: agg.answeredCount,
           line:
-              '${agg.prompt}: most common answer â€œ${best.key}â€ '
+              '${agg.prompt}: most common answer “${best.key}” '
               '(${best.value.toStringAsFixed(0)}% of ${agg.answeredCount} answers).',
         ));
       } else if (agg.scaleAverage != null) {
@@ -187,13 +187,13 @@ class SurveyFormalReportService {
       buf.writeln('  (No question-level aggregates available yet.)');
     } else {
       for (final f in findings) {
-        buf.writeln('  â€¢ $f');
+        buf.writeln('  • $f');
       }
     }
     buf
       ..writeln()
       ..writeln(
-        'Tone: formal institutional English. Keep roughly 450â€“800 words. '
+        'Tone: formal institutional English. Keep roughly 450–800 words. '
         'Do not invent statistics beyond the facts above.',
       );
     return buf.toString();
@@ -214,7 +214,7 @@ class SurveyFormalReportService {
       ..writeln('Purpose and Scope')
       ..writeln()
       ..writeln(
-        'This report summarizes results for â€œ$titleâ€ ($kind), created on $created. '
+        'This report summarizes results for “$title” ($kind), created on $created. '
         'It is intended for alumni office briefing and internal coordination'
         '${isChed ? ' in support of graduate tracer monitoring' : ''}.',
       )
@@ -236,7 +236,7 @@ class SurveyFormalReportService {
       );
     } else {
       for (final f in findings.take(6)) {
-        buf.writeln('â€¢ $f');
+        buf.writeln('• $f');
       }
     }
     buf

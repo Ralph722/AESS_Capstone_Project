@@ -68,7 +68,7 @@ class SurveyAccess {
   };
 }
 
-/// Surveys data access â€” Supabase only.
+/// Surveys data access — Supabase only.
 class SurveyService {
   SurveyService({
     SupabaseClient? supabase,
@@ -134,7 +134,7 @@ class SurveyService {
     return counts;
   }
 
-  /// Admin list â€” merges live submission counts into survey models.
+  /// Admin list — merges live submission counts into survey models.
   Future<List<Survey>> getAllSurveysForAdmin() async {
     final surveys = await getAllSurveys();
     final liveCounts = await countSubmittedResponsesBySurvey();
@@ -221,7 +221,7 @@ class SurveyService {
 
   /// Batch-load surveys by id (avoids N+1 on Home / assignment lists).
   ///
-  /// Creator display names are skipped unless [resolveCreators] is true â€”
+  /// Creator display names are skipped unless [resolveCreators] is true —
   /// attention badges only need schedule / kind fields.
   Future<Map<String, Survey>> getSurveysByIds(
     Iterable<String> surveyIds, {
@@ -1215,7 +1215,7 @@ class SurveyService {
     }
   }
 
-  /// Per-user CHED GTS wave progress for the admin directory: auth uid â†’
+  /// Per-user CHED GTS wave progress for the admin directory: auth uid →
   /// how many waves the member was assigned vs has submitted. A submitted
   /// response without an assignment still counts (as both assigned and
   /// submitted), and a `completed` assignment counts as submitted.
@@ -1330,7 +1330,7 @@ class SurveyService {
       }
 
       // Submitted responses the admin has not yet opened in View responses
-      // (NOT pending assignments â€” publishing must not raise this alert).
+      // (NOT pending assignments — publishing must not raise this alert).
       var unread = 0;
       try {
         final rows = await _supabase.from('surveys').select('id, data');
@@ -1412,7 +1412,7 @@ class SurveyService {
 
       if (!dirty) return;
 
-      // Update badge cursor / heal publish stamp only â€” do not bump updated_at.
+      // Update badge cursor / heal publish stamp only — do not bump updated_at.
       await _supabase.from('surveys').update({'data': data}).eq('id', surveyId);
     } catch (e) {
       throw Exception('Error marking survey responses seen: $e');

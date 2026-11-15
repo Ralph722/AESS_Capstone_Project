@@ -486,7 +486,7 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen>
         userDocId: _selectedUserDocId,
       );
     } catch (_) {
-      // ignore â€” inbox watch will refresh later
+      // ignore — inbox watch will refresh later
     } finally {
       _markingReadInFlight = false;
     }

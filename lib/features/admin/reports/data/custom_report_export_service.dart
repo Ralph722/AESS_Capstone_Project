@@ -492,7 +492,7 @@ class CustomReportExportService {
         ['Custom report'],
         ['Generated', DateFormat.yMMMd().add_jm().format(doc.generatedAt)],
         if (doc.filterSummary.isNotEmpty)
-          ['Filters', doc.filterSummary.join(' Â· ')],
+          ['Filters', doc.filterSummary.join(' · ')],
         [''],
         [
           'Data is on the following tabs: '
@@ -530,7 +530,7 @@ class CustomReportExportService {
       ]),
     );
     if (doc.filterSummary.isNotEmpty) {
-      b.writeln(_csvRow(['Filters', doc.filterSummary.join(' Â· ')]));
+      b.writeln(_csvRow(['Filters', doc.filterSummary.join(' · ')]));
     }
     b.writeln();
 
@@ -559,7 +559,7 @@ class CustomReportExportService {
     }
   }
 
-  // â€”â€” section builders â€”â€”
+  // —— section builders ——
 
   static CustomReportSectionData _executiveKpis(AdminReportsAnalytics a) {
     return CustomReportSectionData(
@@ -795,7 +795,7 @@ class CustomReportExportService {
   static CustomReportSectionData _surveyParticipation(SurveyReportPack pack) {
     final p = pack.participation;
     final rate = p.assigned == 0
-        ? 'â€”'
+        ? '—'
         : '${(100 * p.completed / p.assigned).toStringAsFixed(1)}%';
     return CustomReportSectionData(
       id: CustomReportSectionId.surveyParticipation,
@@ -804,7 +804,7 @@ class CustomReportExportService {
       rows: [
         [
           'Funnel',
-          '${p.assigned} assigned Â· ${p.notStarted + p.inProgress} pending Â· '
+          '${p.assigned} assigned · ${p.notStarted + p.inProgress} pending · '
               '${p.completed} completed ($rate completion)',
         ],
         for (final line in pack.executiveBullets) ['KPI', line],
@@ -997,7 +997,7 @@ class CustomReportExportService {
     );
   }
 
-  // â€”â€” filters â€”â€”
+  // —— filters ——
 
   static bool _matchesBatch(String batch, CustomReportFilters filters) {
     if (filters.batchYears.isEmpty) return true;
@@ -1098,9 +1098,9 @@ class CustomReportExportService {
     if (filters.hasDateRange) {
       final fmt = DateFormat('yyyy-MM-dd');
       final start =
-          filters.dateStart != null ? fmt.format(filters.dateStart!) : 'â€¦';
-      final end = filters.dateEnd != null ? fmt.format(filters.dateEnd!) : 'â€¦';
-      parts.add('Dates: $start â†’ $end');
+          filters.dateStart != null ? fmt.format(filters.dateStart!) : '…';
+      final end = filters.dateEnd != null ? fmt.format(filters.dateEnd!) : '…';
+      parts.add('Dates: $start → $end');
     }
     return parts;
   }

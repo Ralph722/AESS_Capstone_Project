@@ -628,6 +628,40 @@ abstract final class AessReportCatalog {
       bestFor: 'Guidance counselors, Alumni Office, and Student Affairs.',
     ),
     AessReportCatalogEntry(
+      id: 'downloads.professional_exams',
+      title: 'Professional exams & licensure overview',
+      subtitle:
+          'How many graduates passed board or professional exams, and which '
+          'exams they listed',
+      definition:
+          'Aggregated view of CHED item 13 (Professional Examination(s) '
+          'Passed): share who listed at least one exam, exam-name breakdown, '
+          'optional course cut, and an anonymized detail sheet (exam, date, '
+          'rating, course, batch — no alumni names).',
+      surface: ReportCatalogSurface.downloadsLibrary,
+      scope: ReportScopeKind.institutional,
+      privacy: ReportPrivacyClass.aggregated,
+      category: ReportCatalogCategory.institutionalGts,
+      status: ReportCatalogStatus.available,
+      downloadsPresetId: 'professional_exams',
+      icon: Icons.workspace_premium_outlined,
+      fileNameStem: 'AESS_Professional_Exams_Licensure',
+      scopeNote: 'Selected Official CHED waves, batches, and courses only.',
+      includeItems: [
+        'Tracer answers in scope and pass-at-least-one rate (Q13)',
+        'Exam-name breakdown with alumni counts',
+        'Optional by-course cut',
+        'Anonymized exam detail rows (date, rating, course, batch)',
+      ],
+      bestFor:
+          'Deans, program chairs, and accreditation / QA officers reviewing '
+          'licensure outcomes.',
+      limitation:
+          'Counts alumni who listed at least one exam name on Q13. Blank is '
+          '“none listed,” not “failed.” Similar exam names are grouped after '
+          'trim/case normalize. Person-level name lists stay in Builder.',
+    ),
+    AessReportCatalogEntry(
       id: 'downloads.ched_compliance_master',
       title: 'CHED compliance & accreditation master summary',
       subtitle:
@@ -656,10 +690,11 @@ abstract final class AessReportCatalog {
           'Accreditation teams (ALCUCOA, AACCUP, PAASCU) and quality assurance '
           'officers.',
       limitation:
-          'Personal fields (Q1–Q5, Q8), tables (Q12, Q13, Q15a), matrices '
+          'Personal fields (Q1–Q5, Q8), tables (Q12, Q15a), matrices '
           '(Q14, Q30), occupation text (Q19), and open suggestions (Q34) are '
-          'not in this rollup. For wave-to-wave deltas use CHED wave comparison; '
-          'for filled forms use the survey fillable PDF / Excel pack.',
+          'not in this rollup. For Q13 exams use Professional exams & '
+          'licensure overview. For wave-to-wave deltas use CHED wave '
+          'comparison; for filled forms use the survey fillable PDF / Excel pack.',
     ),
     AessReportCatalogEntry(
       id: 'downloads.gts_participation_quality',

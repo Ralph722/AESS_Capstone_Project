@@ -190,17 +190,19 @@ Evaluation runs are logged in **`dss_evaluation_events`** (counts/keys — not f
 
 Seeded in migrations. **Live thresholds may differ** if admins edited Settings.
 
+**Default enabled set (lean five):** `DATA_QUALITY_LOW`, `UNEMPLOYMENT_HIGH`, `RELATEDNESS_LOW`, `UNDEREMPLOYMENT`, `TIME_TO_JOB_LONG`. Only these appear in Program Insights → Rules. Other seeded rules remain in the DB/evaluator soft-disabled (not shown in Settings).
+
 | Rule ID | Display focus | Category | Default metric / seed threshold | Typical severity | Default enabled |
 |---|---|---|---|---|---|
 | `DATA_QUALITY_LOW` | Response rate too low | data_quality | `response_rate` **&lt; 40%** | warning | Yes |
 | `UNEMPLOYMENT_HIGH` | Not currently employed | outcome | `unemployment_rate` **≥ 25%** | critical | Yes |
-| `SEEKING_WORK_HIGH` | Looking for work (Q17-based `seeking_work_rate`) | outcome | **≥ 15%** among employed-or-looking pool | warning | **No** (seeded `enabled = false`) |
+| `SEEKING_WORK_HIGH` | Looking for work (Q17-based `seeking_work_rate`) | outcome | **≥ 15%** among employed-or-looking pool | warning | **No** |
 | `RELATEDNESS_LOW` | Course / curriculum mismatch | outcome | unrelated/irrelevant **≥ 40%** | warning | Yes |
-| `RELATEDNESS_HIGH` | Strong alignment (opportunity) | opportunity | related+relevant **≥ 75%** | info | Yes |
+| `RELATEDNESS_HIGH` | Strong alignment (opportunity) | opportunity | related+relevant **≥ 75%** | info | **No** |
 | `UNDEREMPLOYMENT` | Rank/clerical among employed | outcome | clerical share **≥ 35%** | warning | Yes |
 | `TIME_TO_JOB_LONG` | Took 1+ years to first job | outcome | long time-to-job **≥ 40%** | warning | Yes |
-| `SALARY_STAGNATION` | Salary gap vs peer programs | outcome | peer bracket gap **≥ 1** | info | Yes |
-| `UNEMPLOYMENT_TREND_UP` | Not-employed share rose vs previous wave | trend | change **≥ 10 percentage points** | warning | Yes |
+| `SALARY_STAGNATION` | Salary gap vs peer programs | outcome | peer bracket gap **≥ 1** | info | **No** |
+| `UNEMPLOYMENT_TREND_UP` | Not-employed share rose vs previous wave | trend | change **≥ 10 percentage points** | warning | **No** |
 
 Friendly labels in UI (`DssCopy`): e.g. `UNEMPLOYMENT_HIGH` → **“Not currently employed”**.
 
@@ -411,8 +413,8 @@ Confirm whether the nightly job `aess-dss-evaluate` (or equivalent) is **on** in
 2. **Thresholds are institutional choices**, not CHED law. Defaults are seeds.
 3. **Observational outcomes ≠ causation.** The product language says so; do not overclaim in defenses.
 4. **Client fallback evaluation** can diverge if server SQL and Dart engines drift — parity tests exist; keep them green.
-5. **Opportunity flags** (`RELATEDNESS_HIGH`) are successes to share, not problems to “fix.”
-6. **`SEEKING_WORK_HIGH` is off by default** — enable deliberately after understanding Q17 coverage.
+5. **Opportunity flags** (`RELATEDNESS_HIGH`) are successes to share, not problems to “fix.” Off in the lean default set; re-enable in Settings if needed.
+6. **Non-core rules are off by default** (lean five) — including `SEEKING_WORK_HIGH`, salary, placement, trend, and high-relatedness. Re-enable deliberately in Settings.
 7. **AI explanations** can fail or be blocked; rule copy remains the source of truth.
 8. **Runtime of live jobs/secrets** was not re-verified in the 2026-11-05 audit pass.
 

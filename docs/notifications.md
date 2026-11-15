@@ -14,7 +14,7 @@ alerts, and what is needed to turn on Android alerts.
 | Preferences | `public.notification_preferences` (Profile → Notifications → settings) |
 | Alerts | `push_tokens` + `notification_deliveries` (channel `push`), sent by the `send-push` edge function |
 | Email log | `notification_deliveries` rows with channel `email`, written by the `send-email` edge function |
-| Survey SMS | `send-scheduled-sms` (Semaphore): week-1 + closing-in-3-days for verified PH mobiles; preference `notification_preferences.sms.survey` (default on); logged as channel `sms` |
+| Survey SMS | `send-scheduled-sms` (Semaphore): assigned (only if `assigned_at` within 24h — no historical backfill) + week-1 + closing-in-3-days for verified PH mobiles; one text per mobile+survey+kind; hourly cron `aess-sms-scheduled`; preference `notification_preferences.sms.survey` (default on); logged as channel `sms` |
 
 ## Alert delivery
 

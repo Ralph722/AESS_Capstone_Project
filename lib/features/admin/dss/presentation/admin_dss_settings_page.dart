@@ -55,7 +55,9 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
       _error = null;
     });
     try {
-      final rules = await _repo.listRules();
+      final rules = (await _repo.listRules())
+          .where((r) => DssPolicy.isSettingsVisible(r.ruleId))
+          .toList();
       for (final c in _controllers.values) {
         c.dispose();
       }
@@ -208,7 +210,8 @@ class _AdminDssSettingsPanelState extends State<AdminDssSettingsPanel> {
           DssPageHeader(
             title: 'Rules',
             subtitle:
-                'Thresholds and minimum answers for Findings and Watch items.',
+                'Core rules for Findings and Watch. Thresholds and minimum '
+                'answers apply after Re-run analysis.',
             onBack: widget.onSubnavSelected == null
                 ? () => widget.onClose()
                 : null,

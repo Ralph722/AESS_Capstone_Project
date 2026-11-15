@@ -119,9 +119,15 @@ class _AdminDssScreenState extends State<AdminDssScreen>
       if (!mounted) return;
       final runs = results[2] as List<DssEvaluationRun>;
       final last = runs.isEmpty ? null : runs.first;
+      final allRules = results[1] as List<DssRule>;
       setState(() {
         _flags = results[0] as List<DssFlag>;
-        _rules = results[1] as List<DssRule>;
+        // Lean surface: only enabled (core) rules in the Rule filter.
+        _rules = allRules.where((r) => r.enabled).toList();
+        if (_ruleFilter.isNotEmpty &&
+            !_rules.any((r) => r.ruleId == _ruleFilter)) {
+          _ruleFilter = '';
+        }
         _lastEvaluatedAt = last?.at;
         _lastEvaluatedScheduled = last?.scheduled ?? false;
         _loading = false;

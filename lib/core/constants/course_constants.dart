@@ -10,6 +10,53 @@ class CourseConstants {
     'BTLED-HE',
   ];
 
+  /// Full program titles (and light variants) → canonical code.
+  /// Keys are produced by [_aliasKey] (uppercase, punctuation stripped,
+  /// spaces collapsed).
+  static const Map<String, String> _fullNameAliases = {
+    // BSIT
+    'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY': 'BSIT',
+    'BS INFORMATION TECHNOLOGY': 'BSIT',
+    'BACHELOR OF SCIENCE IN IT': 'BSIT',
+    // BFPT (official campus wording)
+    'BACHELOR IN FOOD PROCESSING AND TECHNOLOGY': 'BFPT',
+    'BACHELOR OF FOOD PROCESSING AND TECHNOLOGY': 'BFPT',
+    // BTLED majors
+    'BACHELOR OF TECHNOLOGY AND LIVELIHOOD EDUCATION MAJOR IN INDUSTRIAL ARTS':
+        'BTLED-IA',
+    'BACHELOR OF TECHNOLOGY AND LIVELIHOOD EDUCATION MAJOR IN INFORMATION AND COMMUNICATION TECHNOLOGY':
+        'BTLED-ICT',
+    'BACHELOR OF TECHNOLOGY AND LIVELIHOOD EDUCATION MAJOR IN HOME ECONOMICS':
+        'BTLED-HE',
+    'BTLED MAJOR IN INDUSTRIAL ARTS': 'BTLED-IA',
+    'BTLED MAJOR IN INFORMATION AND COMMUNICATION TECHNOLOGY': 'BTLED-ICT',
+    'BTLED MAJOR IN HOME ECONOMICS': 'BTLED-HE',
+  };
+
+  /// Collapse punctuation/dashes and whitespace so import cells with
+  /// inconsistent spacing or "Major in" capitalization still match.
+  static String _aliasKey(String raw) {
+    final upper = raw.toUpperCase();
+    final buf = StringBuffer();
+    var prevSpace = false;
+    for (final unit in upper.runes) {
+      final ch = String.fromCharCode(unit);
+      final isLetterOrDigit =
+          (unit >= 0x41 && unit <= 0x5A) || (unit >= 0x30 && unit <= 0x39);
+      if (isLetterOrDigit) {
+        buf.write(ch);
+        prevSpace = false;
+      } else if (!prevSpace && buf.isNotEmpty) {
+        buf.write(' ');
+        prevSpace = true;
+      }
+    }
+    return buf.toString().trim();
+  }
+
+  /// Returns the canonical course code when [raw] is a known code, typo, or
+  /// official full program name; otherwise the trimmed input (caller should
+  /// check [isValid]).
   static String? normalize(String? raw) {
     if (raw == null) return null;
     final trimmed = raw.trim();
@@ -20,7 +67,7 @@ class CourseConstants {
       if (c.toUpperCase() == upper) return c;
     }
 
-    // Legacy / common typos
+    // Legacy / common typos for codes
     switch (upper) {
       case 'BTLED HE':
       case 'BTLED- HE':
@@ -29,9 +76,12 @@ class CourseConstants {
         return 'BTLED-IA';
       case 'BTLED ICT':
         return 'BTLED-ICT';
-      default:
-        return trimmed;
     }
+
+    final alias = _fullNameAliases[_aliasKey(trimmed)];
+    if (alias != null) return alias;
+
+    return trimmed;
   }
 
   static bool isValid(String? course) =>

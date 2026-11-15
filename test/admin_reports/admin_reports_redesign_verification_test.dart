@@ -23,6 +23,7 @@ import 'package:alumni_system/features/admin/roster/models/alumni_member_model.d
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
+import 'package:alumni_system/features/surveys/models/survey_model.dart';
 
 class _FakeStore implements GtsSavedReportStore {
   final reports = <GtsSavedReport>[];
@@ -819,6 +820,100 @@ void main() {
       expect(find.text('120 rows'), findsOneWidget);
       expect(find.text('85 rows'), findsNWidgets(3));
 
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('GtsAlumniListPanel collapses and expands builder sidebar to prioritize preview space', (tester) async {
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final waves = [
+        Survey(
+          id: 'w1',
+          title: 'CHED Graduate Tracer 2026',
+          description: '',
+          status: SurveyStatus.published,
+          createdBy: 'admin',
+          createdAt: DateTime(2026),
+          kind: 'ched_gts_builtin',
+        ),
+      ];
+
+      final roster = [
+        AlumniMember(
+          id: 'm1',
+          fullName: 'Catherine Jala',
+          course: 'BSIT',
+          studentId: '2020-001',
+          authUid: 'u1',
+          isRegisteredUser: true,
+          batchYear: '2024',
+          createdAt: DateTime(2020),
+        ),
+        AlumniMember(
+          id: 'm2',
+          fullName: 'Christian Pedregosa',
+          course: 'BSIT',
+          studentId: '2020-002',
+          authUid: 'u2',
+          isRegisteredUser: true,
+          batchYear: '2024',
+          createdAt: DateTime(2020),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: GtsAlumniListPanel(
+                waves: waves,
+                roster: roster,
+                loadResponses: (_) async => <GtsListResponse>[],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Sidebar and preview are both rendered
+      expect(find.text('List Builder'), findsOneWidget);
+      expect(find.text('Scope & Template'), findsOneWidget);
+      expect(find.text('Columns'), findsOneWidget);
+      expect(find.text('Hide builder'), findsOneWidget);
+
+      // Export buttons in preview header
+      expect(find.text('Excel'), findsOneWidget);
+      expect(find.text('CSV'), findsOneWidget);
+      expect(find.text('PDF'), findsOneWidget);
+      expect(find.text('Expand view'), findsOneWidget);
+
+      // Data table rows rendered
+      expect(find.text('Catherine Jala'), findsOneWidget);
+      expect(find.text('Christian Pedregosa'), findsOneWidget);
+
+      // Tap Hide builder button to collapse builder and prioritize preview full-width
+      await tester.tap(find.text('Hide builder'));
+      await tester.pumpAndSettle();
+
+      // List Builder sidebar is completely hidden
+      expect(find.text('List Builder'), findsNothing);
+      expect(find.text('Scope & Template'), findsNothing);
+      expect(find.text('Columns'), findsNothing);
+      expect(find.text('Show builder'), findsOneWidget);
+
+      // Preview content and table remain fully interactive and visible at 100% width
+      expect(find.text('Catherine Jala'), findsOneWidget);
+      expect(find.text('Christian Pedregosa'), findsOneWidget);
+
+      // Tap Show builder button to bring the sidebar back
+      await tester.tap(find.text('Show builder'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('List Builder'), findsOneWidget);
+      expect(find.text('Hide builder'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

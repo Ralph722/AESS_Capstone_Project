@@ -253,4 +253,16 @@ void main() {
       expect(DssCopy.rosterBasisNote(f), contains("today's alumni list"));
     });
   });
+
+  group('settingsVisibleRuleIds', () {
+    test('lean five are visible; soft-disabled rules are not', () {
+      for (final id in DssPolicy.settingsVisibleRuleIds) {
+        expect(DssPolicy.isSettingsVisible(id), isTrue);
+      }
+      expect(DssPolicy.settingsVisibleRuleIds.length, 5);
+      expect(DssPolicy.isSettingsVisible('RELATEDNESS_HIGH'), isFalse);
+      expect(DssPolicy.isSettingsVisible('SEEKING_WORK_HIGH'), isFalse);
+      expect(DssPolicy.isSettingsVisible('SALARY_STAGNATION'), isFalse);
+    });
+  });
 }

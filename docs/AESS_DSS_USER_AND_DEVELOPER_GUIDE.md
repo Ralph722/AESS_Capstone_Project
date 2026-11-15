@@ -179,20 +179,22 @@ flowchart TD
 
 Values below are the **defaults written by the migrations** (seed values plus Phase 1 and Phase 2 changes). Admins can change the threshold and the minimum, and switch rules on or off, in **Rules** (Part 7.13). **The values currently saved on the live project require confirmation in the Rules page**; at the 2026-10-08 audit, live had a different unemployment threshold (0.20) and a data-quality threshold of 0 (Part 14).
 
+**Lean default enabled set:** `DATA_QUALITY_LOW`, `UNEMPLOYMENT_HIGH`, `RELATEDNESS_LOW`, `UNDEREMPLOYMENT`, `TIME_TO_JOB_LONG`. Only these appear in Rules settings. Other seeded rules stay in the DB/evaluator soft-disabled and are hidden from the Settings list.
+
 | Rule ID | Name shown in the app | Category | Measure | Operator | Default threshold | Default minimum (valid answers) | Severity | Default state |
 |---|---|---|---|---|---|---|---|---|
 | `DATA_QUALITY_LOW` | Survey data quality | Data quality | Response rate (submissions ÷ roster) | less than (`lt`) | 40% | Seed 0 → raised to the floor of 1 by Phase 1 (live was 2 after rollout, recorded) | Warning | On |
 | `UNEMPLOYMENT_HIGH` | Not currently employed | Outcome | Q16 "No" or "Never Employed" ÷ Q16 answers | at least (`gte`) | 25% | 10 (seed 20; Phase 1 floor 10) | Critical | On |
-| `SEEKING_WORK_HIGH` | Many alumni looking for work | Outcome | Looking for work ÷ (employed + looking) | at least | 15% | 10 | Warning | **Off** (inserted switched off) |
+| `SEEKING_WORK_HIGH` | Many alumni looking for work | Outcome | Looking for work ÷ (employed + looking) | at least | 15% | 10 | Warning | **Off** |
 | `RELATEDNESS_LOW` | Jobs not aligned with course | Outcome | (Q24 "No" or Q32 "No") ÷ answered either | at least | 40% | 10 | Warning | On |
 | `UNDEREMPLOYMENT` | Underemployment (job level) | Outcome | Q30 "Rank or Clerical" ÷ employed with a job level | at least | 35% | 10 | Warning | On |
-| `QUALIFICATION_MISMATCH` | Qualification mismatch (possible underemployment) | Outcome | Q24 "No" and Q30.1 Rank/Clerical ÷ answered both (tracer proxy, not CHED/PSA certified) | at least | 25% | 10 | Warning | On |
+| `QUALIFICATION_MISMATCH` | Qualification mismatch (possible underemployment) | Outcome | Q24 "No" and Q30.1 Rank/Clerical ÷ answered both (tracer proxy, not CHED/PSA certified) | at least | 25% | 10 | Warning | **Off** |
 | `TIME_TO_JOB_LONG` | Long time to first job | Outcome | Q29 longer than 6 months (7 to 11 months through 3 to less than 4 years) ÷ Q29 answers (excluding "Others") | at least | 40% | 10 | Warning | On |
-| `PLACEMENT_CHANNEL_LOW` | Low institutional placement channels | Outcome | Q28 school placement officer or Job Fair/PESO ÷ Q28 answers (excluding "Others") | less than (`lt`) | 10% | 10 | Warning | On |
-| `SALARY_LOW_ENTRY` | Low first-job salary brackets | Outcome | Q31 bottom two brackets ÷ Q31 answers | at least | 40% | 10 | Warning | On |
-| `SALARY_STAGNATION` | Salary below peer programs | Outcome | Other courses' median Q31 bracket − this group's median bracket | at least | 1.0 bracket | 10 | Info | On |
-| `RELATEDNESS_HIGH` | Strong course alignment | Opportunity | Aligned ÷ answered either (Q24/Q32) | at least | 75% | 10 | Info | On |
-| `UNEMPLOYMENT_TREND_UP` | Unemployment rising between waves | Trend | This wave's not-employed rate − previous wave's | at least | +10 percentage points | 10 (in **both** waves) | Warning | On |
+| `PLACEMENT_CHANNEL_LOW` | Low institutional placement channels | Outcome | Q28 school placement officer or Job Fair/PESO ÷ Q28 answers (excluding "Others") | less than (`lt`) | 10% | 10 | Warning | **Off** |
+| `SALARY_LOW_ENTRY` | Low first-job salary brackets | Outcome | Q31 bottom two brackets ÷ Q31 answers | at least | 40% | 10 | Warning | **Off** |
+| `SALARY_STAGNATION` | Salary below peer programs | Outcome | Other courses' median Q31 bracket − this group's median bracket | at least | 1.0 bracket | 10 | Info | **Off** |
+| `RELATEDNESS_HIGH` | Strong course alignment | Opportunity | Aligned ÷ answered either (Q24/Q32) | at least | 75% | 10 | Info | **Off** |
+| `UNEMPLOYMENT_TREND_UP` | Unemployment rising between waves | Trend | This wave's not-employed rate − previous wave's | at least | +10 percentage points | 10 (in **both** waves) | Warning | **Off** |
 
 Notes (verified in code):
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/features/admin/dss/application/dss_policy.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_alumni_list.dart';
@@ -112,6 +113,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   String _explanation = '';
   final Map<String, TracerProfile> _profiles = {};
   final Set<String> _profileMiss = {};
+  bool _builderCollapsed = false;
 
   /// Saved list the current settings were opened from or saved as.
   late GtsSavedReport? _open = widget.initialOpen;
@@ -360,49 +362,49 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     required List<Widget> children,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AdminColors.card,
-        borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
         border: Border.all(color: AdminColors.border),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+            color: Color(0x040F172A),
             blurRadius: 4,
-            offset: const Offset(0, 1),
+            offset: Offset(0, 1),
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: const BoxDecoration(
               color: AdminColors.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(AdminSurfaces.radiusSm - 1)),
               border: Border(bottom: BorderSide(color: AdminColors.border)),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
-                    color: AdminColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+                    color: UstpColors.blue,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     step,
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w800,
-                      color: AdminColors.primary,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,7 +413,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                       Text(
                         title,
                         style: const TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AdminColors.textPrimary,
                         ),
@@ -421,7 +423,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                         Text(
                           subtitle,
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             color: AdminColors.textSecondary,
                           ),
                         ),
@@ -434,7 +436,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: children,
@@ -447,11 +449,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
 
   InputDecoration _input(String label) => InputDecoration(
     labelText: label,
-    labelStyle: const TextStyle(fontSize: 12.5, color: AdminColors.textSecondary),
+    labelStyle: const TextStyle(fontSize: 12, color: AdminColors.textSecondary),
     isDense: true,
     filled: true,
     fillColor: AdminColors.surface,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
       borderSide: const BorderSide(color: AdminColors.border),
@@ -462,7 +464,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-      borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
+      borderSide: const BorderSide(color: UstpColors.blue, width: 1.5),
     ),
   );
 
@@ -1260,13 +1262,13 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: AdminColors.card,
-      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+      borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
       border: Border.all(color: AdminColors.border),
-      boxShadow: [
+      boxShadow: const [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.02),
-          blurRadius: 4,
-          offset: const Offset(0, 1),
+          color: Color(0x060F172A),
+          blurRadius: 8,
+          offset: Offset(0, 2),
         ),
       ],
     ),
@@ -1288,9 +1290,16 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 1050;
+        final preview = _card(_previewArea(canToggleBuilder: true, isWide: isWide));
+
+        if (_builderCollapsed) {
+          return preview;
+        }
+
         final settings = _card(_settings());
-        final preview = _card(_previewArea());
-        if (constraints.maxWidth < 1000) {
+
+        if (!isWide) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [settings, const SizedBox(height: 16), preview],
@@ -1299,7 +1308,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(width: 380, child: settings),
+            SizedBox(width: 300, child: settings),
             const SizedBox(width: 16),
             Expanded(child: preview),
           ],
@@ -1344,7 +1353,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     }
   }
 
-  Widget _previewArea() {
+  Widget _previewArea({bool canToggleBuilder = false, bool isWide = true}) {
     final result = _result;
     final columnCount = GtsListColumns.displayColumns(_config).length;
     return Column(
@@ -1355,18 +1364,50 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AdminColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(6),
+                color: UstpColors.blue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
               ),
-              child: const Icon(Icons.visibility_outlined, size: 18, color: AdminColors.primary),
+              child: const Icon(Icons.visibility_outlined, size: 16, color: UstpColors.blue),
             ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text(
-                'Preview',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
+            const SizedBox(width: 8),
+            const Text(
+              'Preview',
+              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
+            ),
+            if (canToggleBuilder) ...[
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: () => setState(() => _builderCollapsed = !_builderCollapsed),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: UstpColors.blue,
+                  side: BorderSide(
+                    color: _builderCollapsed
+                        ? UstpColors.blue.withValues(alpha: 0.3)
+                        : AdminColors.border,
+                  ),
+                  backgroundColor: _builderCollapsed
+                      ? UstpColors.blue.withValues(alpha: 0.06)
+                      : Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 30),
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                  ),
+                ),
+                icon: Icon(
+                  _builderCollapsed
+                      ? Icons.tune_rounded
+                      : Icons.view_sidebar_outlined,
+                  size: 14,
+                ),
+                label: Text(
+                  _builderCollapsed ? 'Show builder' : 'Hide builder',
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
+            ],
+            const Spacer(),
             for (final f in _downloadOrder)
               Padding(
                 padding: const EdgeInsets.only(left: 6),
@@ -1374,15 +1415,28 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                   onPressed: result == null || _loading || _exporting != null
                       ? null
                       : () => unawaited(_download(f)),
-                  style: AdminButtonStyles.outlined(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: UstpColors.blue,
+                    side: const BorderSide(color: AdminColors.border),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    minimumSize: const Size(0, 30),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    ),
+                  ),
                   icon: _exporting == f
                       ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: UstpColors.blue),
                         )
-                      : const Icon(Icons.download_outlined, size: 15),
-                  label: Text(f.label),
+                      : const Icon(Icons.download_outlined, size: 14),
+                  label: Text(
+                    f.label,
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             if (result != null)
@@ -1390,9 +1444,22 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                 padding: const EdgeInsets.only(left: 6),
                 child: OutlinedButton.icon(
                   onPressed: () => _showFullPreviewModal(context, result),
-                  style: AdminButtonStyles.outlined(),
-                  icon: const Icon(Icons.open_in_full_rounded, size: 15),
-                  label: const Text('Expand view'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: UstpColors.blue,
+                    side: const BorderSide(color: AdminColors.border),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    minimumSize: const Size(0, 30),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    ),
+                  ),
+                  icon: const Icon(Icons.open_in_full_rounded, size: 14),
+                  label: const Text(
+                    'Expand view',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
           ],
@@ -1553,16 +1620,18 @@ class GtsAlumniListPreview extends StatelessWidget {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AdminColors.primary,
+            letterSpacing: -0.3,
+            color: AdminColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
         Text(
           '${GtsListTables.scope(result)} · ${tally.total} alumni on the '
           'alumni list${filtered ? ' (filtered)' : ''}',
           style: const TextStyle(
             fontSize: 12,
-            color: AdminColors.textMuted,
+            fontWeight: FontWeight.w500,
+            color: AdminColors.textSecondary,
           ),
         ),
         if (result.config.description.trim().isNotEmpty)
@@ -1577,18 +1646,40 @@ class GtsAlumniListPreview extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AdminColors.surface,
+              color: UstpColors.blue.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-              border: Border.all(color: AdminColors.border),
+              border: Border.all(
+                color: AdminColors.border.withValues(alpha: 0.8),
+              ),
             ),
-            child: Text(
-              explanation,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.45,
-                color: AdminColors.textPrimary,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 3.5,
+                    decoration: const BoxDecoration(
+                      color: UstpColors.blue,
+                      borderRadius: BorderRadius.horizontal(
+                        left: Radius.circular(AdminSurfaces.radiusSm),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Text(
+                        explanation,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          height: 1.5,
+                          color: AdminColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1734,7 +1825,7 @@ class _ListTableState extends State<_ListTable> {
           width: double.infinity,
           decoration: BoxDecoration(
             color: AdminColors.card,
-            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+            borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
             border: Border.all(color: AdminColors.border),
           ),
           clipBehavior: Clip.antiAlias,
@@ -1910,7 +2001,7 @@ class _TallyTableState extends State<_TallyTable> {
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: AdminColors.card,
-                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
                     border: Border.all(color: AdminColors.border),
                   ),
                   child: _table(section, result),

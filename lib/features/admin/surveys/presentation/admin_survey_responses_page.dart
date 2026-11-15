@@ -57,10 +57,10 @@ String surveyReminderConfirmMessage({
   ].join(' + ');
   final title = surveyTitle.trim().isEmpty
       ? 'this survey'
-      : 'â€œ${surveyTitle.trim()}â€';
+      : '“${surveyTitle.trim()}”';
   final who = recipients == 1 ? 'alumnus' : 'alumni';
   final note = emailDropped
-      ? ' Email isnâ€™t set up, so these will be sent in-app only.'
+      ? ' Email isn’t set up, so these will be sent in-app only.'
       : '';
   return 'Send $channels reminders for $title to $recipients pending $who?'
       '$note';
@@ -87,18 +87,18 @@ String surveyReminderSummary(
   final summary = parts.isEmpty
       ? 'No reminders sent'
       : 'Sent: ${parts.join(', ')}';
-  return emailDropped ? '$summary Â· email isnâ€™t set up' : summary;
+  return emailDropped ? '$summary · email isn’t set up' : summary;
 }
 
 /// Export failure text: what failed, plus the reason when it reads cleanly.
 @visibleForTesting
 String surveyExportErrorMessage(String what, Object error) {
   final reason = error is Error ? '' : surveyFriendlyError(error, '');
-  final base = 'Couldnâ€™t create $what.';
+  final base = 'Couldn’t create $what.';
   return reason.isEmpty ? '$base Try again.' : '$base $reason';
 }
 
-/// Detail panel meta line: course Â· batch Â· submitted date Â· device.
+/// Detail panel meta line: course · batch · submitted date · device.
 @visibleForTesting
 String surveyResponseMetaLine(
   SurveyParticipant participant,
@@ -116,7 +116,7 @@ String surveyResponseMetaLine(
     else
       'Last saved ${DateFormat.yMMMd().format(response.updatedAt)}',
     if (device != 'Device not recorded') device,
-  ].join(' Â· ');
+  ].join(' · ');
 }
 
 class AdminSurveyResponsesScreen extends StatefulWidget {
@@ -457,7 +457,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     } catch (e) {
       if (mounted) {
         _showSnack(
-          surveyFriendlyError(e, 'Couldnâ€™t send reminders. Try again.'),
+          surveyFriendlyError(e, 'Couldn’t send reminders. Try again.'),
           color: AdminColors.danger,
         );
       }
@@ -748,7 +748,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
           child: _ExportMenuRow(
             icon: Icons.auto_awesome,
             title: 'Generate formal report',
-            subtitle: 'AI-written draft â€” check it before official use',
+            subtitle: 'AI-written draft — check it before official use',
           ),
         ),
       if (canExportFiles && _survey != null) ...[
@@ -983,7 +983,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       return AdminStateView.error(
         title: _loadErrorLooksOffline
             ? 'You appear to be offline'
-            : 'Couldnâ€™t load responses',
+            : 'Couldn’t load responses',
         message: _loadErrorLooksOffline
             ? 'Check your internet connection, then try again.'
             : surveyFriendlyError(
@@ -1016,7 +1016,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                   Expanded(
                     child: Text(
                       _loadErrorLooksOffline
-                          ? 'Refresh failed â€” you may be offline. Showing last loaded data.'
+                          ? 'Refresh failed — you may be offline. Showing last loaded data.'
                           : 'Refresh failed. Showing last loaded data.',
                       style: const TextStyle(
                         fontSize: 12,
@@ -1162,7 +1162,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                   _infoRow(
                     'Created by',
                     survey.createdByLabel.trim().isEmpty
-                        ? 'â€”'
+                        ? '—'
                         : survey.createdByLabel,
                   ),
                   _infoRow('Created date', dateFmt.format(survey.createdAt)),
@@ -1174,7 +1174,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                                 survey,
                               ) ==
                               null
-                        ? 'â€”'
+                        ? '—'
                         : dateFmt.format(
                             SurveyResponsesWorkspaceHeader.publishedAtOf(
                               survey,
@@ -1184,7 +1184,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                   _infoRow(
                     'Last updated',
                     survey.updatedAt == null
-                        ? 'â€”'
+                        ? '—'
                         : dateFmt.format(survey.updatedAt!),
                   ),
                   _infoRow('Target audience', _audienceLabel(survey)),
@@ -1222,7 +1222,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       );
       parts.add('Batches ${years.isEmpty ? batches.join(', ') : years}');
     }
-    return parts.join(' Â· ');
+    return parts.join(' · ');
   }
 
   Widget _infoRow(String label, String value, {Widget? trailing}) {
@@ -1323,7 +1323,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                       )
                     : const Icon(Icons.copy_outlined, size: 16),
                 label: Text(
-                  _duplicating ? 'Duplicatingâ€¦' : 'Duplicate',
+                  _duplicating ? 'Duplicating…' : 'Duplicate',
                   overflow: TextOverflow.ellipsis,
                 ),
                 style: AdminButtonStyles.outlined(),
@@ -1372,7 +1372,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       }
     }
 
-    setState(() => _stateActionBusy = 'Checking audienceâ€¦');
+    setState(() => _stateActionBusy = 'Checking audience…');
     try {
       final audienceCount = await _surveyService.countAudience(
         targetPrograms: survey.targetPrograms,
@@ -1385,7 +1385,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
           survey.targetBatchYears.isNotEmpty;
       if (hasFilters && audienceCount == 0) {
         _showSnack(
-          'No alumni match this surveyâ€™s courses and batch years. '
+          'No alumni match this survey’s courses and batch years. '
           'Open the editor to adjust the audience.',
           color: AdminColors.danger,
         );
@@ -1409,14 +1409,14 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       if (!confirmed || !mounted) return;
 
       setState(
-        () => _stateActionBusy = reopen ? 'Re-publishingâ€¦' : 'Publishingâ€¦',
+        () => _stateActionBusy = reopen ? 'Re-publishing…' : 'Publishing…',
       );
       final count = await _surveyService.publishSurvey(survey.id);
       if (!mounted) return;
       _showSnack(
         reopen
-            ? 'Re-published Â· $count alumni assigned'
-            : 'Published Â· $count alumni assigned',
+            ? 'Re-published · $count alumni assigned'
+            : 'Published · $count alumni assigned',
         color: AdminColors.success,
       );
       await _load();
@@ -1426,8 +1426,8 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         surveyFriendlyError(
           e,
           reopen
-              ? 'Couldnâ€™t re-publish this survey. Try again.'
-              : 'Couldnâ€™t publish this survey. Try again.',
+              ? 'Couldn’t re-publish this survey. Try again.'
+              : 'Couldn’t publish this survey. Try again.',
         ),
         color: AdminColors.danger,
       );
@@ -1445,7 +1445,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       icon: Icons.lock_outline,
     );
     if (!confirmed || !mounted) return;
-    setState(() => _stateActionBusy = 'Closingâ€¦');
+    setState(() => _stateActionBusy = 'Closing…');
     try {
       await _surveyService.closeSurvey(survey.id);
       if (!mounted) return;
@@ -1454,7 +1454,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     } catch (e) {
       if (!mounted) return;
       _showSnack(
-        surveyFriendlyError(e, 'Couldnâ€™t close this survey. Try again.'),
+        surveyFriendlyError(e, 'Couldn’t close this survey. Try again.'),
         color: AdminColors.danger,
       );
     } finally {
@@ -1476,7 +1476,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     } catch (e) {
       if (!mounted) return;
       _showSnack(
-        surveyFriendlyError(e, 'Couldnâ€™t duplicate this survey. Try again.'),
+        surveyFriendlyError(e, 'Couldn’t duplicate this survey. Try again.'),
         color: AdminColors.danger,
       );
     } finally {
@@ -2156,7 +2156,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                 title: Text(p.displayName),
                 subtitle: Text(
                   '${a.reminderCount} reminder(s)'
-                  '${last == null ? '' : ' Â· last ${DateFormat.yMMMd().add_jm().format(last)}'}',
+                  '${last == null ? '' : ' · last ${DateFormat.yMMMd().add_jm().format(last)}'}',
                 ),
                 trailing: Text(
                   p.isPending ? 'Pending' : 'Submitted',
@@ -2278,7 +2278,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                           ),
                           decoration: InputDecoration(
                             isDense: true,
-                            hintText: 'Search pending by name, email, course, or batchâ€¦',
+                            hintText: 'Search pending by name, email, course, or batch…',
                             hintStyle: const TextStyle(
                               fontSize: 13,
                               color: AdminColors.textMuted,
@@ -2877,7 +2877,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                     decoration: InputDecoration(
                       isDense: true,
                       hintText:
-                          'Search submitted responses by name, email, course, or batchâ€¦',
+                          'Search submitted responses by name, email, course, or batch…',
                       hintStyle: const TextStyle(
                         fontSize: 13,
                         color: AdminColors.textMuted,
@@ -3109,10 +3109,10 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   }
 
   String _surveyVersionLabel(Survey? survey) {
-    if (survey == null) return 'â€”';
+    if (survey == null) return '—';
     if (survey.isChedGtsBuiltin) {
       final v = survey.schemaVersion?.trim();
-      return (v == null || v.isEmpty) ? 'CHED GTS' : 'CHED GTS Â· $v';
+      return (v == null || v.isEmpty) ? 'CHED GTS' : 'CHED GTS · $v';
     }
     final template = survey.templateVersion?.trim();
     if (template != null && template.isNotEmpty) {
@@ -3270,7 +3270,7 @@ extension on _PendingSort {
   String get label => switch (this) {
     _PendingSort.assignedNewest => 'Newest assigned',
     _PendingSort.assignedOldest => 'Oldest assigned',
-    _PendingSort.nameAsc => 'Name Aâ€“Z',
+    _PendingSort.nameAsc => 'Name A–Z',
     _PendingSort.reminderRecent => 'Recent reminder',
     _PendingSort.reminderCountDesc => 'Most reminded',
   };
@@ -3282,7 +3282,7 @@ extension on _SubmittedSort {
   String get label => switch (this) {
     _SubmittedSort.newest => 'Newest submitted',
     _SubmittedSort.oldest => 'Oldest submitted',
-    _SubmittedSort.nameAsc => 'Name Aâ€“Z',
+    _SubmittedSort.nameAsc => 'Name A–Z',
   };
 }
 
@@ -3324,7 +3324,7 @@ class _SubmittedResponseCard extends StatelessWidget {
     final end = r.submittedAt ?? r.updatedAt;
     final start = p.assignment.assignedAt;
     final mins = end.difference(start).inMinutes;
-    if (mins < 0) return 'â€”';
+    if (mins < 0) return '—';
     if (mins < 60) return '$mins min';
     final hours = mins ~/ 60;
     final rem = mins % 60;
@@ -3413,11 +3413,11 @@ class _SubmittedResponseCard extends StatelessWidget {
             ),
           ),
           AdminTableTextCell(
-            p.program.isEmpty ? 'â€”' : p.program,
+            p.program.isEmpty ? '—' : p.program,
             muted: p.program.isEmpty,
           ),
           AdminTableTextCell(
-            p.batchYear.isEmpty ? 'â€”' : p.batchYear,
+            p.batchYear.isEmpty ? '—' : p.batchYear,
             muted: p.batchYear.isEmpty,
           ),
           AdminTableTextCell(submittedLabel),
@@ -3469,7 +3469,7 @@ class _PendingAlumniCard extends StatelessWidget {
     final dateFmt = DateFormat.yMMMd();
     final reminderLabel = lastReminder == null
         ? (a.reminderCount == 0 ? 'None' : '${a.reminderCount}x')
-        : '${a.reminderCount}x Â· ${dateFmt.format(lastReminder)}';
+        : '${a.reminderCount}x · ${dateFmt.format(lastReminder)}';
 
     return Semantics(
       container: true,
@@ -3501,11 +3501,11 @@ class _PendingAlumniCard extends StatelessWidget {
             ),
           ),
           AdminTableTextCell(
-            p.program.isEmpty ? 'â€”' : p.program,
+            p.program.isEmpty ? '—' : p.program,
             muted: p.program.isEmpty,
           ),
           AdminTableTextCell(
-            p.batchYear.isEmpty ? 'â€”' : p.batchYear,
+            p.batchYear.isEmpty ? '—' : p.batchYear,
             muted: p.batchYear.isEmpty,
           ),
           Align(
@@ -3517,7 +3517,7 @@ class _PendingAlumniCard extends StatelessWidget {
             ),
           ),
           AdminTableTextCell(
-            '${dateFmt.format(a.assignedAt)} Â· ${days}d',
+            '${dateFmt.format(a.assignedAt)} · ${days}d',
             muted: true,
           ),
           AdminTableTextCell(reminderLabel, muted: a.reminderCount == 0),
@@ -3577,7 +3577,7 @@ class _ParticipantAvatar extends StatelessWidget {
   }
 }
 
-/// Overview "Outputs" entry: icon Â· label Â· chevron; disabled when [onTap] is null.
+/// Overview "Outputs" entry: icon · label · chevron; disabled when [onTap] is null.
 class _OverviewLinkRow extends StatelessWidget {
   const _OverviewLinkRow({
     required this.icon,
@@ -3866,7 +3866,7 @@ class _ReminderFailuresDialog extends StatelessWidget {
   }
 }
 
-/// Simple row for export menu â€” avoid [ListTile] inside [PopupMenuItem] (swallows taps).
+/// Simple row for export menu — avoid [ListTile] inside [PopupMenuItem] (swallows taps).
 class _ExportMenuRow extends StatelessWidget {
   const _ExportMenuRow({
     required this.icon,

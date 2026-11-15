@@ -224,7 +224,7 @@ class SurveySingleResponseExportService {
       ['Survey', survey.title],
       ['Alumni name', participant.displayName],
       ['Email', participant.email],
-      ['Student ID', participant.studentId ?? 'â€”'],
+      ['Student ID', participant.studentId ?? '—'],
       ['Program', participant.program],
       ['Batch', participant.batchYear],
       ['Submitted', fmt.format(submitted)],

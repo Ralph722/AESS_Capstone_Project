@@ -403,7 +403,7 @@ class DssRepository {
     try {
       final res = await _supabase.rpc(
         'dss_evaluate_all',
-        params: {'p_trigger': 'manual'},
+        params: {'p_trigger': 'manual', 'p_dry_run': false},
       );
       return res is Map ? Map<String, dynamic>.from(res) : null;
     } on PostgrestException catch (e) {
@@ -492,6 +492,8 @@ class DssRepository {
     }
 
     for (final u in plan.updates) {
+      final updateId = u.id.trim();
+      if (updateId.isEmpty) continue;
       await _supabase
           .from('dss_flags')
           .update({
@@ -499,7 +501,7 @@ class DssRepository {
             if (u.statusTo != null) 'status': u.statusTo!.dbValue,
             'updated_by': user?.id,
           })
-          .eq('id', u.id);
+          .eq('id', updateId);
       if (u.statusTo != null) {
         await _insertNote(
           flagId: u.id,
@@ -518,6 +520,8 @@ class DssRepository {
 
     final now = DateTime.now().toUtc().toIso8601String();
     for (final s in plan.supersedes) {
+      final supersedeId = s.id.trim();
+      if (supersedeId.isEmpty) continue;
       final newer = activeIds['${s.findingKey}@${s.newerSurveyId}'];
       await _supabase
           .from('dss_flags')
@@ -527,7 +531,7 @@ class DssRepository {
             'superseded_by': newer,
             'updated_by': user?.id,
           })
-          .eq('id', s.id);
+          .eq('id', supersedeId);
       await _insertNote(
         flagId: s.id,
         note: newer == null

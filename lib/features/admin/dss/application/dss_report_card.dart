@@ -386,7 +386,7 @@ abstract final class DssReportCardPdf {
     final group = parts.length >= 4
         ? [parts[2], if (parts[3].isNotEmpty) 'Batch ${parts[3]}']
               .where((s) => s.isNotEmpty)
-              .join(' Â· ')
+              .join(' · ')
         : '';
     final stored = data.flags
         .where((f) => f.ruleId == i.ruleId && (f.ruleName ?? '').isNotEmpty)

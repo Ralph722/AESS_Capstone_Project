@@ -270,6 +270,17 @@ abstract final class ReportFilterSchemas {
       },
     ),
     ReportFilterSchema(
+      catalogId: 'downloads.professional_exams',
+      supported: {
+        ReportFilterKey.batchYear,
+        ReportFilterKey.course,
+        ReportFilterKey.surveyWaves,
+      },
+      notes:
+          'Select Official CHED waves (empty = all with submissions). Cohort '
+          'filters apply to submitted respondents used for Q13 exam tallies.',
+    ),
+    ReportFilterSchema(
       catalogId: 'downloads.ched_compliance_master',
       supported: {
         ReportFilterKey.batchYear,

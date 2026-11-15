@@ -10,6 +10,7 @@ abstract final class InstitutionalChedTemplates {
   static const industryPlacement = 'industry_placement';
   static const careerMobility = 'career_mobility';
   static const chedComplianceMaster = 'ched_compliance_master';
+  static const professionalExams = 'professional_exams';
   static const gtsParticipationQuality = 'gts_participation_quality';
 
   static const outcomePresetIds = <String>{
@@ -22,6 +23,7 @@ abstract final class InstitutionalChedTemplates {
 
   static const allPresetIds = <String>{
     ...outcomePresetIds,
+    professionalExams,
     gtsParticipationQuality,
   };
 
@@ -40,6 +42,7 @@ abstract final class InstitutionalChedTemplates {
         careerMobility => 'Career Mobility & Diagnostic',
         chedComplianceMaster =>
           'CHED Compliance & Accreditation Master Summary',
+        professionalExams => 'Professional Exams & Licensure Overview',
         gtsParticipationQuality => 'GTS Participation and Data Quality',
         _ => 'Institutional CHED Report',
       };
@@ -50,6 +53,7 @@ abstract final class InstitutionalChedTemplates {
         industryPlacement => 'Industry placement and earnings indicators',
         careerMobility => 'Mobility and retention diagnostics',
         chedComplianceMaster => 'Itemized CHED choice summaries (Q6–Q33)',
+        professionalExams => 'Professional examinations passed (Q13)',
         _ => 'Indicator distributions',
       };
 
@@ -59,6 +63,7 @@ abstract final class InstitutionalChedTemplates {
         industryPlacement => 'AESS_Industry_Economic_Placement',
         careerMobility => 'AESS_Career_Mobility_Diagnostic',
         chedComplianceMaster => 'AESS_CHED_Compliance_Master_Summary',
+        professionalExams => 'AESS_Professional_Exams_Licensure',
         gtsParticipationQuality => 'AESS_GTS_Participation_Data_Quality',
         _ => 'AESS_Institutional_CHED_Report',
       };

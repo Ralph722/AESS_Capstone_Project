@@ -99,7 +99,7 @@ class _UserMessagesScreenState extends State<UserMessagesScreen> {
 
   bool _isNearLatestMessages({double threshold = 80}) {
     if (!_scrollController.hasClients) return true;
-    // reverse:true â€” near latest when pixels are close to 0
+    // reverse:true — near latest when pixels are close to 0
     return _scrollController.position.pixels <= threshold;
   }
 

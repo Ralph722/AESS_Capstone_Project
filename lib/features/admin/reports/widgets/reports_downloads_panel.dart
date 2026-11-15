@@ -64,6 +64,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
     'curriculum_competency': <CustomReportSectionId>[],
     'industry_placement': <CustomReportSectionId>[],
     'career_mobility': <CustomReportSectionId>[],
+    'professional_exams': <CustomReportSectionId>[],
     'ched_compliance_master': <CustomReportSectionId>[],
     'gts_participation_quality': <CustomReportSectionId>[],
     'executive': [
@@ -93,6 +94,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
       'curriculum_competency',
       'industry_placement',
       'career_mobility',
+      'professional_exams',
       'ched_compliance_master',
     ],
     ReportCatalogCategory.comparisonsAndQuality: [
@@ -113,6 +115,7 @@ class ReportsDownloadsPanel extends StatelessWidget {
     'curriculum_competency',
     'industry_placement',
     'career_mobility',
+    'professional_exams',
     'ched_compliance_master',
     'ched_wave_compare',
     'gts_participation_quality',

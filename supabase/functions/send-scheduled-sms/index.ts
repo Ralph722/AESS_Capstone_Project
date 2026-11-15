@@ -1,8 +1,10 @@
-// Automated survey SMS (week-1 reminder + closing-in-3-days). Invoked by
-// pg_cron through public.scheduled_sms_dispatch with x-dispatch-secret
-// (same PUSH_DISPATCH_SECRET as send-push / send-scheduled-emails).
+// Automated survey SMS (assigned within 24h of assignment + week-1 +
+// closing-in-3-days). Invoked by pg_cron through public.scheduled_sms_dispatch
+// with x-dispatch-secret (same PUSH_DISPATCH_SECRET as send-push /
+// send-scheduled-emails).
 //
 // Selection: claim_scheduled_survey_sms / complete_scheduled_survey_sms.
+// Assigned is near-publish only (no backfill of old open assignments).
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -31,7 +33,7 @@ type ClaimedSms = {
   survey_title: string;
   is_ched: boolean;
   close_at: string | null;
-  kind: "week1" | "closing_3d";
+  kind: "assigned" | "week1" | "closing_3d";
 };
 
 serve(async (req) => {
@@ -117,6 +119,11 @@ function renderSms(item: ClaimedSms): string {
     return item.is_ched
       ? "AESS-USTP: Your Graduate Tracer Study closes in 3 days. Please finish it in the Alumni Portal. Thank you."
       : "AESS-USTP: Your alumni survey closes in 3 days. Please finish it in the Alumni Portal. Thank you.";
+  }
+  if (item.kind === "assigned") {
+    return item.is_ched
+      ? "AESS-USTP: You have been assigned the Graduate Tracer Study. Please complete it in the Alumni Portal (ustp-aess.web.app)."
+      : "AESS-USTP: You have been assigned a new alumni survey. Please complete it in the Alumni Portal (ustp-aess.web.app).";
   }
   return item.is_ched
     ? "AESS-USTP: Please complete your Graduate Tracer Study in the Alumni Portal (app or ustp-aess.web.app). Thank you."

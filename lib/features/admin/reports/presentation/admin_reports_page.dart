@@ -57,6 +57,7 @@ import 'package:alumni_system/features/admin/reports/data/gts_saved_report_servi
 import 'package:alumni_system/features/admin/reports/data/institutional_cohort_comparison_service.dart';
 import 'package:alumni_system/features/admin/reports/data/institutional_gts_participation_quality_service.dart';
 import 'package:alumni_system/features/admin/reports/data/institutional_gts_summary_service.dart';
+import 'package:alumni_system/features/admin/reports/data/institutional_professional_exams_service.dart';
 import 'package:alumni_system/features/admin/reports/models/custom_report_template.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_skeletons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
@@ -285,7 +286,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       channel.subscribe();
       _liveChannel = channel;
     } catch (_) {
-      // Realtime unavailable â€” the periodic poll below still keeps data fresh.
+      // Realtime unavailable — the periodic poll below still keeps data fresh.
     }
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -4160,6 +4161,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       return;
     }
 
+    if (preset.id == InstitutionalChedTemplates.professionalExams) {
+      await _downloadProfessionalExams(
+        a,
+        format: activeFormat,
+        printPreview: activePrint,
+        filters: selection,
+      );
+      return;
+    }
+
     final personal = preset.sections.any(
       CustomReportExportService.personalSections.contains,
     );
@@ -4421,6 +4432,100 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           summary,
           cohortComparison: cohort,
         );
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'csv',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Downloaded $title (${format.label}).')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+    } finally {
+      if (mounted) setState(() => _downloadBusy = false);
+    }
+  }
+
+  Future<void> _downloadProfessionalExams(
+    AdminReportsAnalytics a, {
+    required CustomReportFormat format,
+    required bool printPreview,
+    required ReportFilterSelection filters,
+  }) async {
+    setState(() => _downloadBusy = true);
+    try {
+      final scope = await _loadInstitutionalChedScope(a, filters);
+      if (scope == null || !mounted) return;
+
+      final report = InstitutionalProfessionalExamsService.build(
+        waves: scope.waves,
+        responsesBySurveyId: scope.responsesBySurveyId,
+        memberByAuth: scope.memberByAuth,
+        batchFilter: filters.batchYear,
+        courseFilter: filters.course,
+      );
+      final title = InstitutionalChedTemplates.reportTitle(
+        InstitutionalChedTemplates.professionalExams,
+      );
+      final stem = InstitutionalChedTemplates.fileStem(
+        InstitutionalChedTemplates.professionalExams,
+      );
+
+      if (printPreview || format == CustomReportFormat.pdf) {
+        final bytes = await InstitutionalProfessionalExamsService.toPdf(report);
+        if (!mounted) return;
+        if (printPreview) {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: title);
+          return;
+        }
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'pdf',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: 'application/pdf',
+        );
+      } else if (format == CustomReportFormat.excel) {
+        final bytes = InstitutionalProfessionalExamsService.toExcel(report);
+        if (!mounted) return;
+        tryDownloadBytesOnWeb(
+          context,
+          bytes: bytes,
+          fileName: ReportFileNames.dated(
+            stem: stem,
+            extension: 'xlsx',
+            cohortScope: ReportFileNames.cohortScopeLabel(
+              batchYear: filters.batchYear,
+              course: filters.course,
+            ),
+          ),
+          mimeType: format.mimeType,
+        );
+      } else {
+        final bytes = InstitutionalProfessionalExamsService.toCsvBytes(report);
         if (!mounted) return;
         tryDownloadBytesOnWeb(
           context,

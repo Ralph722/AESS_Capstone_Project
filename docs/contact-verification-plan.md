@@ -80,7 +80,7 @@ supabase functions deploy contact-verify
    `ContactVerificationBadge`: Verified / Demo code / Not verified.
 5. Live Semaphore SMS + optional onboarding “Confirm mobile” step (skip allowed).
    **Done (2026-10-26).**
-6. Automated survey SMS (week-1 + closing-in-3-days) via `send-scheduled-sms`.
+6. Automated survey SMS (assigned only within 24h of assignment + week-1 + closing-in-3-days) via `send-scheduled-sms`.
    **Done (2026-10-26).**
 
 ## Part 2: verified email becomes the login email

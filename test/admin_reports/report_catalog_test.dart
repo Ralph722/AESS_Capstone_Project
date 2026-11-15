@@ -29,6 +29,7 @@ void main() {
         'curriculum_competency',
         'industry_placement',
         'career_mobility',
+        'professional_exams',
         'ched_compliance_master',
         'gts_participation_quality',
         'executive',
@@ -93,6 +94,7 @@ void main() {
         'curriculum_competency',
         'industry_placement',
         'career_mobility',
+        'professional_exams',
         'ched_compliance_master',
         'gts_participation_quality',
       ]) {

@@ -29,6 +29,21 @@ abstract final class DssPolicy {
   /// Batch label for alumni list records without a batch (course level only).
   static const batchNotRecorded = 'Batch not recorded';
 
+  /// Rule IDs shown in Program Insights → Rules (lean default set).
+  /// Other seeded rules stay in DB/evaluator (soft-disabled) but are hidden
+  /// from Settings so the surface stays focused.
+  static const settingsVisibleRuleIds = <String>{
+    'DATA_QUALITY_LOW',
+    'UNEMPLOYMENT_HIGH',
+    'RELATEDNESS_LOW',
+    'UNDEREMPLOYMENT',
+    'TIME_TO_JOB_LONG',
+  };
+
+  /// Whether [ruleId] appears in the Rules settings list.
+  static bool isSettingsVisible(String ruleId) =>
+      settingsVisibleRuleIds.contains(ruleId);
+
   /// Lowest `min_n` Settings accepts. Data-quality rules use it as the
   /// "too few responses" trigger, so 1 means "fire on zero responses".
   static int minNFloor(DssRuleCategory category) =>

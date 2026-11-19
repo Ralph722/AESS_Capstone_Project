@@ -24,6 +24,9 @@ class ContactVerifyCard extends StatefulWidget {
     this.verifiedText,
     this.enabled = true,
     this.service,
+    this.allowEdit = true,
+    this.autoSend = false,
+    this.displayValue,
   });
 
   final ContactChannel channel;
@@ -41,6 +44,15 @@ class ContactVerifyCard extends StatefulWidget {
   final bool enabled;
   final ContactVerificationService? service;
 
+  /// When false, hides Edit and keeps the contact value locked.
+  final bool allowEdit;
+
+  /// When true, sends a code once after the first frame (OTP-first flows).
+  final bool autoSend;
+
+  /// Optional pretty display for [value] (e.g. spaced mobile).
+  final String? displayValue;
+
   @override
   State<ContactVerifyCard> createState() => _ContactVerifyCardState();
 }
@@ -49,6 +61,7 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
   late final ContactVerificationService _service =
       widget.service ?? ContactVerificationService();
   final _code = TextEditingController();
+  final _codeFocus = FocusNode();
   final _edit = TextEditingController();
 
   bool _editing = false;
@@ -58,8 +71,29 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
   ContactCodeSent? _sent;
   int _cooldown = 0;
   Timer? _timer;
+  var _didAutoSend = false;
 
   bool get _isEmail => widget.channel == ContactChannel.email;
+
+  String get _shownValue =>
+      (widget.displayValue ?? widget.value).trim().isEmpty
+      ? widget.value.trim()
+      : (widget.displayValue ?? widget.value).trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _codeFocus.addListener(() {
+      if (mounted) setState(() {});
+    });
+    if (widget.autoSend && !widget.verified) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _didAutoSend || widget.verified) return;
+        _didAutoSend = true;
+        unawaited(_send());
+      });
+    }
+  }
 
   @override
   void didUpdateWidget(covariant ContactVerifyCard oldWidget) {
@@ -72,6 +106,14 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
       _sent = null;
       _error = null;
       _code.clear();
+      _didAutoSend = false;
+      if (widget.autoSend && !widget.verified) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _didAutoSend || widget.verified) return;
+          _didAutoSend = true;
+          unawaited(_send());
+        });
+      }
     }
   }
 
@@ -79,6 +121,7 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
   void dispose() {
     _timer?.cancel();
     _code.dispose();
+    _codeFocus.dispose();
     _edit.dispose();
     super.dispose();
   }
@@ -112,6 +155,9 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
       setState(() => _sent = sent);
       _code.clear();
       _startCooldown(sent.resendAfterSeconds);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _codeFocus.requestFocus();
+      });
     } on ContactVerificationException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -167,6 +213,9 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
     if (text != widget.value.trim()) widget.onValueChanged(text);
   }
 
+  /// Onboarding OTP-only: no number header / status / SMS copy in the card.
+  bool get _otpOnly => !widget.allowEdit;
+
   @override
   Widget build(BuildContext context) {
     final verified = widget.verified;
@@ -185,20 +234,22 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _header(verified),
-          const SizedBox(height: 12),
-          if (_editing) _editor() else _values(verified),
-          if (!_isEmail) ...[
+          if (!_otpOnly) ...[
+            _header(verified),
             const SizedBox(height: 12),
-            const _Note(
-              icon: Icons.sms_outlined,
-              text:
-                  "We'll text a 6-digit code to this Philippine mobile "
-                  'number. Standard SMS rates may apply.',
-            ),
+            if (_editing) _editor() else _values(verified),
+            if (!_isEmail) ...[
+              const SizedBox(height: 12),
+              const _Note(
+                icon: Icons.sms_outlined,
+                text:
+                    "We'll text a 6-digit code to this Philippine mobile "
+                    'number. Standard SMS rates may apply.',
+              ),
+            ],
           ],
           if (!_editing) ...[
-            const SizedBox(height: 14),
+            if (!_otpOnly) const SizedBox(height: 14),
             if (verified) _verifiedRow() else _codeFlow(),
           ],
         ],
@@ -276,7 +327,7 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
               ),
               const SizedBox(height: 2),
               SelectableText(
-                widget.value.trim(),
+                _shownValue,
                 style: PortalTheme.body.copyWith(
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
@@ -285,12 +336,13 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
             ],
           ),
         ),
-        TextButton.icon(
-          onPressed: widget.enabled && !_busy ? _startEdit : null,
-          style: PortalTheme.ghostButton(dense: true),
-          icon: const Icon(Icons.edit_outlined, size: 18),
-          label: const Text('Edit'),
-        ),
+        if (widget.allowEdit)
+          TextButton.icon(
+            onPressed: widget.enabled && !_busy ? _startEdit : null,
+            style: PortalTheme.ghostButton(dense: true),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: const Text('Edit'),
+          ),
       ],
     );
   }
@@ -341,114 +393,89 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (sent == null)
-          FilledButton.icon(
-            onPressed: canResend ? _send : null,
-            style: PortalTheme.primaryButton(),
-            icon: _busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.send_rounded, size: 18),
-            label: Text(
-              _cooldown > 0
-                  ? 'Send code in ${_clock(_cooldown)}'
-                  : _isEmail
-                  ? 'Send code to this email'
-                  : 'Send code by text',
-            ),
-          )
-        else ...[
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              sent.isDemo
-                  ? 'Enter the 6-digit code below to confirm this number.'
-                  : _isEmail
-                  ? 'We sent a 6-digit code to ${sent.target}. It expires in '
-                        '10 minutes. Check your spam folder if you '
-                        "don't see it."
-                  : 'We texted a 6-digit code to ${sent.target}. It expires '
-                        'in 10 minutes.',
-              style: PortalTheme.bodySecondary.copyWith(fontSize: 13),
-            ),
-          ),
-          if (sent.isDemo) ...[
-            const SizedBox(height: 8),
-            _DemoCode(code: sent.demoCode!),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Semantics(
-                  label: 'Verification code, 6 digits',
-                  child: TextField(
-                    controller: _code,
-                    enabled: widget.enabled && !_busy,
-                    keyboardType: TextInputType.number,
-                    autofillHints: const [AutofillHints.oneTimeCode],
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(
-                        ContactVerificationService.codeLength,
-                      ),
-                    ],
-                    style: const TextStyle(
-                      fontSize: 18,
-                      letterSpacing: 6,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: '000000',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) => _verify(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton(
-                onPressed:
-                    widget.enabled &&
-                        !_busy &&
-                        _code.text.length ==
-                            ContactVerificationService.codeLength
-                    ? _verify
-                    : null,
-                style: PortalTheme.primaryButton(),
-                child: _busy
-                    ? const SizedBox(
+          widget.autoSend
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                        child: _busy
+                            ? const CircularProgressIndicator(strokeWidth: 2)
+                            : const Icon(
+                                Icons.sms_outlined,
+                                size: 18,
+                                color: PortalTheme.navy,
+                              ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _busy
+                              ? 'Sending code…'
+                              : _cooldown > 0
+                              ? 'Sending again in ${_clock(_cooldown)}'
+                              : 'Preparing your code…',
+                          style: PortalTheme.bodySecondary,
                         ),
-                      )
-                    : const Text('Verify'),
-              ),
-            ],
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: canResend ? _send : null,
-              style: PortalTheme.ghostButton(dense: true),
+                      ),
+                      if (!_busy && canResend)
+                        TextButton(
+                          onPressed: _send,
+                          style: PortalTheme.ghostButton(dense: true),
+                          child: const Text('Send now'),
+                        ),
+                    ],
+                  ),
+                )
+              : FilledButton.icon(
+                  onPressed: canResend ? _send : null,
+                  style: PortalTheme.primaryButton(),
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded, size: 18),
+                  label: Text(
+                    _cooldown > 0
+                        ? 'Send code in ${_clock(_cooldown)}'
+                        : _isEmail
+                        ? 'Send code to this email'
+                        : 'Send code by text',
+                  ),
+                )
+        else ...[
+          if (!_otpOnly) ...[
+            Semantics(
+              liveRegion: true,
               child: Text(
-                _cooldown > 0
-                    ? 'Resend code in ${_clock(_cooldown)}'
-                    : 'Resend code',
+                sent.isDemo
+                    ? 'Enter the 6-digit code below to confirm this number.'
+                    : _isEmail
+                    ? 'We sent a 6-digit code to ${sent.target}. It expires in '
+                          '10 minutes. Check your spam folder if you '
+                          "don't see it."
+                    : 'We texted a 6-digit code to ${sent.target}. It expires '
+                          'in 10 minutes.',
+                style: PortalTheme.bodySecondary.copyWith(fontSize: 13),
               ),
             ),
-          ),
+            if (sent.isDemo) ...[
+              const SizedBox(height: 8),
+              _DemoCode(code: sent.demoCode!),
+            ],
+            const SizedBox(height: 14),
+          ] else if (sent.isDemo) ...[
+            _DemoCode(code: sent.demoCode!),
+            const SizedBox(height: 14),
+          ],
+          _otpBoxesAndActions(canResend: canResend),
         ],
         if (_error != null) ...[
           const SizedBox(height: 6),
@@ -463,6 +490,102 @@ class _ContactVerifyCardState extends State<ContactVerifyCard> {
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _otpBoxesAndActions({required bool canResend}) {
+    const length = ContactVerificationService.codeLength;
+    const boxSize = 48.0;
+    final digits = _code.text;
+    final activeIndex = digits.length.clamp(0, length - 1);
+    final canVerify = widget.enabled && !_busy && digits.length == length;
+    final enabled = widget.enabled && !_busy;
+    final focused = enabled && _codeFocus.hasFocus;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          label: 'Verification code, $length digits',
+          textField: true,
+          child: SizedBox(
+            height: boxSize,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Captures typing / SMS autofill while boxes show the digits.
+                Opacity(
+                  opacity: 0,
+                  child: TextField(
+                    controller: _code,
+                    focusNode: _codeFocus,
+                    enabled: enabled,
+                    autofocus: true,
+                    showCursor: false,
+                    keyboardType: TextInputType.number,
+                    autofillHints: const [AutofillHints.oneTimeCode],
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(length),
+                    ],
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isCollapsed: true,
+                      // Kept for tests that locate the OTP field by hint.
+                      hintText: '000000',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _verify(),
+                  ),
+                ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: enabled ? () => _codeFocus.requestFocus() : null,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(
+                          child: _OtpDigitBox(
+                            digit: i < digits.length ? digits[i] : null,
+                            highlighted: focused && i == activeIndex,
+                            size: boxSize,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        FilledButton(
+          onPressed: canVerify ? _verify : null,
+          style: PortalTheme.primaryButton(),
+          child: _busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Verify'),
+        ),
+        const SizedBox(height: 4),
+        TextButton(
+          onPressed: canResend ? _send : null,
+          style: PortalTheme.ghostButton(dense: true),
+          child: Text(
+            _cooldown > 0
+                ? 'Resend code in ${_clock(_cooldown)}'
+                : 'Resend code',
+          ),
+        ),
       ],
     );
   }
@@ -525,6 +648,52 @@ class _Note extends StatelessWidget {
             child: Text(text, style: PortalTheme.meta.copyWith(height: 1.4)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OtpDigitBox extends StatelessWidget {
+  const _OtpDigitBox({
+    required this.digit,
+    required this.highlighted,
+    required this.size,
+  });
+
+  final String? digit;
+  final bool highlighted;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = digit != null;
+    return AnimatedContainer(
+      duration: PortalTheme.fast,
+      curve: PortalTheme.ease,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: filled || highlighted
+            ? PortalTheme.card
+            : PortalTheme.surfaceMuted,
+        borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+        border: Border.all(
+          color: highlighted
+              ? PortalTheme.navy
+              : filled
+              ? PortalTheme.navy.withValues(alpha: 0.35)
+              : PortalTheme.borderStrong,
+          width: highlighted ? 1.8 : 1.2,
+        ),
+      ),
+      child: Text(
+        digit ?? '',
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+          color: PortalTheme.navy,
+          height: 1,
+        ),
       ),
     );
   }

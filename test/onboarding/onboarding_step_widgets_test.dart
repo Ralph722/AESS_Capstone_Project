@@ -56,13 +56,13 @@ void main() {
             counted: false,
           ),
           OnboardingStepInfo(
-            label: 'About you',
-            title: 'Set up',
+            label: 'About You',
+            title: 'Set Up',
             icon: Icons.person_outline,
           ),
           OnboardingStepInfo(
-            label: 'Profile photo',
-            title: 'Set up',
+            label: 'Profile Photo',
+            title: 'Set Up',
             icon: Icons.photo_camera_outlined,
             optional: true,
           ),
@@ -71,8 +71,8 @@ void main() {
     );
 
     expect(find.text('Welcome'), findsNothing);
-    expect(find.text('About you'), findsOneWidget);
-    expect(find.text('Profile photo'), findsOneWidget);
+    expect(find.text('About You'), findsOneWidget);
+    expect(find.text('Profile Photo'), findsOneWidget);
     expect(find.text('Optional'), findsOneWidget);
   });
 
@@ -110,7 +110,7 @@ void main() {
       tester,
       OnboardingSummaryRow(
         icon: Icons.person_outline,
-        title: 'About you',
+        title: 'About You',
         summary: 'Female · Single · Mar 14, 2002',
         onEdit: () => edits++,
       ),
@@ -118,7 +118,7 @@ void main() {
 
     await tester.tap(find.text('Edit'));
     expect(edits, 1);
-    expect(find.bySemanticsLabel('Edit About you'), findsOneWidget);
+    expect(find.bySemanticsLabel('Edit About You'), findsOneWidget);
   });
 
   testWidgets('celebration settles without errors', (tester) async {

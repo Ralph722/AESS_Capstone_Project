@@ -5,28 +5,26 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:alumni_system/core/constants/gts_constants.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
+import 'package:alumni_system/core/utils/alumni_pdf_delivery.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/core/utils/avatar_image_prepare.dart';
+import 'package:alumni_system/features/alumni/membership/data/alumni_membership_form_service.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
 import 'package:alumni_system/features/contact_verification/presentation/contact_verify_card.dart';
+import 'package:alumni_system/features/contact_verification/presentation/ph_mobile_input_formatter.dart';
 import 'package:alumni_system/features/onboarding/data/onboarding_service.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
-import 'package:alumni_system/features/auth/data/auth_service.dart';
-import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
 import 'package:alumni_system/features/auth/presentation/auth_shell.dart'
     show showAuthFeedback;
 import 'package:alumni_system/features/onboarding/presentation/widgets/onboarding_chrome.dart';
 import 'package:alumni_system/features/onboarding/presentation/widgets/onboarding_step_widgets.dart';
 import 'package:alumni_system/features/shell/presentation/main_navigation.dart';
 import 'package:alumni_system/shared/widgets/gts/gts_profile_form.dart';
-import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
@@ -50,29 +48,28 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       counted: false,
     ),
     OnboardingStepInfo(
-      label: 'About you',
-      title: 'Set up your profile',
+      label: 'About You',
+      title: 'Set Up Your Profile',
       icon: Icons.person_outline,
     ),
     OnboardingStepInfo(
-      label: 'Contact & address',
-      title: 'Set up your profile',
+      label: 'Contact & Address',
+      title: 'Set Up Your Profile',
       icon: Icons.home_outlined,
     ),
     OnboardingStepInfo(
-      label: 'Confirm mobile',
-      title: 'Confirm your mobile',
+      label: 'Verify Mobile',
+      title: 'Verify Mobile',
       icon: Icons.sms_outlined,
-      optional: true,
     ),
     OnboardingStepInfo(
-      label: 'Education & work',
-      title: 'Set up your profile',
+      label: 'Education & Work',
+      title: 'Set Up Your Profile',
       icon: Icons.school_outlined,
     ),
     OnboardingStepInfo(
-      label: 'Profile photo',
-      title: 'Set up your profile',
+      label: 'Profile Photo',
+      title: 'Set Up Your Profile',
       icon: Icons.photo_camera_outlined,
       optional: true,
     ),
@@ -97,6 +94,7 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   final _profileService = UserProfileService();
   final _onboardingService = OnboardingService();
   final _auditService = AuditService();
+  final _membershipFormService = AlumniMembershipFormService();
   final _imageStorage = ImageStorageService();
   final _imagePicker = ImagePicker();
   final _formState = GtsProfileFormState();
@@ -107,7 +105,6 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   bool _forward = true;
 
   /// Set by an Edit link on Review: Continue then returns straight to Review.
-  bool _returnToReview = false;
   bool _finishing = false;
   String? _profileImageUrl;
   File? _selectedImage;
@@ -138,6 +135,9 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   /// photo step does not upload the same image twice.
   Object? _photoUploadSource;
 
+  bool _membershipFormBusy = false;
+  bool _acceptedPrivacy = false;
+
   @override
   void initState() {
     super.initState();
@@ -166,7 +166,10 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       if (!mounted) return;
 
       if (boot.profile != null) {
-        _formState.applyFromProfile(boot.profile!);
+        _formState.applyFromProfile(
+          boot.profile!,
+          blankYearGraduated: true,
+        );
         final profile = boot.profile!;
         if (profile.mobileVerified) {
           final normalized = ContactNormalizer.normalize(
@@ -205,7 +208,6 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
 
   void _goBack() {
     if (_finishing || _step == 0) return;
-    _returnToReview = false;
     // Skip the confirm-mobile step when going back if it was not offered.
     if (_step == _educationStepIndex && !_needsMobileVerifyStep) {
       _goToStep(_contactStepIndex);
@@ -216,11 +218,6 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       return;
     }
     _goToStep(_step - 1);
-  }
-
-  void _editFromReview(int step) {
-    _returnToReview = true;
-    _goToStep(step);
   }
 
   /// True when there is a PH/intl mobile that still needs an SMS check.
@@ -239,51 +236,6 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       return false;
     }
     return true;
-  }
-
-  Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text(
-          'You’ll finish setting up your profile the next time you sign in.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            style: PortalTheme.ghostButton(dense: true),
-            child: const Text('Stay'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: PortalTheme.primaryButton(dense: true),
-            child: const Text('Sign out'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    final navigator = Navigator.of(context);
-    final userId = AppSession.userId;
-    if (userId != null) {
-      // Before logout: the audit insert needs the session for RLS.
-      await _auditService.logAction(
-        action: 'LOGOUT',
-        resource: 'User',
-        resourceId: userId,
-        description: 'User logged out during onboarding',
-        status: 'SUCCESS',
-        module: 'auth',
-        category: 'security',
-      );
-    }
-    await AuthService().logout();
-    navigator.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const AuthGate()),
-      (_) => false,
-    );
   }
 
   /// Runs [work] after any earlier save so writes land in order.
@@ -317,11 +269,11 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     _queueProfileSave(userId);
 
     if (section == GtsFormSection.contact) {
-      _openMobileVerifyOrContinue();
+      unawaited(_openMobileVerifyOrContinue());
       return;
     }
 
-    if (section == GtsFormSection.personal && !_returnToReview) {
+    if (section == GtsFormSection.personal) {
       _goToStep(_contactStepIndex);
       return;
     }
@@ -340,41 +292,120 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       });
       return;
     }
-    if (_returnToReview) {
-      _returnToReview = false;
-      _goToStep(_finalStepIndex);
-      return;
-    }
     _goToStep(_photoStepIndex);
   }
 
-  void _openMobileVerifyOrContinue() {
+  Future<void> _openMobileVerifyOrContinue() async {
     if (!_needsMobileVerifyStep) {
       _continueAfterMobileVerify();
       return;
     }
+
+    final raw = _formState.mobileController.text;
+    final normalized = ContactNormalizer.normalize(ContactChannel.mobile, raw);
+    if (normalized == null) {
+      _snack(ContactNormalizer.invalidMessage(ContactChannel.mobile));
+      return;
+    }
+
+    final confirmed = await _confirmMobileNumberSheet(
+      PhMobileInputFormatter.formatDisplay(normalized),
+    );
+    if (!confirmed || !mounted) return;
+
     setState(() {
-      _mobileAtVerifyEntry = _formState.mobileController.text.trim();
-      _mobileDraft = _mobileAtVerifyEntry;
+      _formState.mobileController.text =
+          PhMobileInputFormatter.formatDisplay(normalized);
+      _mobileAtVerifyEntry = normalized;
+      _mobileDraft = normalized;
       _mobileSaveError = null;
     });
     _goToStep(_mobileVerifyStepIndex);
   }
 
-  void _continueAfterMobileVerify() {
-    if (_returnToReview) {
-      _returnToReview = false;
-      _goToStep(_finalStepIndex);
-      return;
-    }
-    _goToStep(_educationStepIndex);
+  /// Bottom sheet confirms the number before SMS — clearer than editing on
+  /// the OTP step, and keeps verification OTP-only.
+  Future<bool> _confirmMobileNumberSheet(String displayNumber) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: PortalTheme.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Confirm your mobile number',
+                  style: PortalTheme.cardTitle,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'We’ll text a 6-digit code to this number. Make sure it’s '
+                  'correct before continuing.',
+                  style: PortalTheme.bodySecondary,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: PortalTheme.surfaceMuted,
+                    borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                    border: Border.all(color: PortalTheme.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.smartphone_outlined,
+                        color: PortalTheme.navy,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          displayNumber,
+                          style: PortalTheme.body.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: PortalTheme.primaryButton(),
+                  child: const Text('Yes, send the code'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  style: PortalTheme.secondaryButton(),
+                  child: const Text('Edit number'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    return result == true;
   }
 
-  void _skipMobileVerify() {
-    if (_finishing || _mobileSaving) return;
-    _formState.mobileController.text = _mobileAtVerifyEntry;
-    _mobileDraft = _mobileAtVerifyEntry;
-    _continueAfterMobileVerify();
+  void _continueAfterMobileVerify() {
+    _goToStep(_educationStepIndex);
   }
 
   Future<void> _onMobileCodeVerified(String target) async {
@@ -388,11 +419,13 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       setState(() {
         _mobileVerified = true;
         _verifiedMobile = target;
-        _formState.mobileController.text = target;
+        _formState.mobileController.text =
+            PhMobileInputFormatter.formatDisplay(target);
         _mobileDraft = target;
         _mobileAtVerifyEntry = target;
         _mobileSaving = false;
       });
+      _continueAfterMobileVerify();
     } on ContactVerificationException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -514,7 +547,6 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     final Object? source = bytes ?? file;
 
     // Navigate first — upload in the background.
-    _returnToReview = false;
     _goToStep(_finalStepIndex);
 
     if (skipUpload || source == null || identical(source, _photoUploadSource)) {
@@ -610,15 +642,66 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     showAuthFeedback(context, message, error: isError);
   }
 
+  Future<AlumniMembershipFormPdf?> _buildMembershipForm() async {
+    final userId = AppSession.userId;
+    if (userId == null) {
+      _snack('Sign in again to download your Membership Form.');
+      return null;
+    }
+
+    // Review sits after section saves; wait for any in-flight profile write.
+    final saved = await (_profileSave ?? Future.value(true));
+    if (!saved) {
+      _snack(
+        'Your latest profile changes are still saving. Try again in a moment.',
+      );
+      return null;
+    }
+
+    final displayName = _formState.displayNameController.text.trim();
+    return _membershipFormService.buildForUser(
+      userId: userId,
+      displayName: displayName.isEmpty ? _firstName : displayName,
+    );
+  }
+
+  Future<void> _downloadMembershipForm() async {
+    if (_membershipFormBusy || _finishing) return;
+    setState(() => _membershipFormBusy = true);
+    try {
+      final pdf = await _buildMembershipForm();
+      if (pdf == null || !mounted) return;
+      await shareOrDownloadAlumniPdf(
+        context: context,
+        bytes: pdf.bytes,
+        fileName: pdf.fileName,
+      );
+      if (!mounted) return;
+      _snack(
+        kIsWeb
+            ? 'Membership Form downloaded.'
+            : 'Use the share sheet to save your Membership Form.',
+        isError: false,
+      );
+    } catch (e) {
+      debugPrint('Membership Form download failed: $e');
+      _snack(
+        'We couldn’t prepare your Membership Form. ${portalFriendlyError(e)}',
+      );
+    } finally {
+      if (mounted) setState(() => _membershipFormBusy = false);
+    }
+  }
+
   bool get _isProfileStep =>
       _step == _firstProfileStep ||
       _step == _contactStepIndex ||
       _step == _educationStepIndex;
 
   String get _overallFieldCount {
-    final total = TracerProfile.fullProfileFieldCount;
-    final filled = total - _formState.missingRequiredKeys().length;
-    return '$filled of $total fields';
+    final keys = _formState.activeRequiredKeys();
+    final filled = keys.where(_formState.isRequiredKeyFilled).length;
+    return '$filled of ${keys.length} fields';
   }
 
   /// "BSIT • Batch 2024" from the loaded record, when known.
@@ -654,48 +737,29 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        appBar: PortalAppBar(
-          title: ready ? _steps[_step].title : 'Welcome',
-          automaticallyImplyLeading: false,
-          leading: ready && !wide && _step > 0
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  tooltip: 'Previous step',
-                  onPressed: _finishing ? null : _goBack,
+        body: SafeArea(
+          bottom: false,
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: PortalTheme.navy),
                 )
-              : null,
-          actions: [
-            TextButton(
-              onPressed: _finishing ? null : _confirmSignOut,
-              style: PortalTheme.ghostButton(dense: true).copyWith(
-                foregroundColor: WidgetStateProperty.all(
-                  PortalTheme.textSecondary,
+              : _loadError != null
+              ? PortalErrorState(
+                  title: 'We Couldn’t Load Your Profile',
+                  error: _loadError,
+                  onRetry: _loadInitialData,
+                )
+              : OnboardingStepFrame(
+                  steps: _steps,
+                  currentIndex: _step,
+                  forward: _forward,
+                  panelName: _formState.displayNameController.text,
+                  panelBadge: _programBatch,
+                  progressTrailing: _isProfileStep ? _overallFieldCount : null,
+                  showCompactActionBar: false,
+                  views: views,
                 ),
-              ),
-              child: const Text('Sign out'),
-            ),
-          ],
         ),
-        body: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: PortalTheme.navy),
-              )
-            : _loadError != null
-            ? PortalErrorState(
-                title: 'We couldn’t load your profile',
-                error: _loadError,
-                onRetry: _loadInitialData,
-              )
-            : OnboardingStepFrame(
-                steps: _steps,
-                currentIndex: _step,
-                forward: _forward,
-                panelName: _formState.displayNameController.text,
-                panelBadge: _programBatch,
-                progressTrailing: _isProfileStep ? _overallFieldCount : null,
-                showCompactActionBar: false,
-                views: views,
-              ),
         bottomNavigationBar: ready && !wide
             ? OnboardingActionBar(actions: views[_step].actions, wide: false)
             : null,
@@ -728,9 +792,7 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
           if (wide)
             OnboardingSectionHeading(
               title: 'Welcome, $_firstName',
-              subtitle:
-                  'Let’s set up your Graduate Tracer profile. It keeps your '
-                  'alumni record accurate for CHED reporting.',
+              subtitle: 'Set up your Graduate Tracer profile for alumni records.',
             )
           else ...[
             OnboardingIdentityCard(
@@ -741,9 +803,10 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
             ),
             const SizedBox(height: PortalTheme.space3),
             Text(
-              'Let’s set up your Graduate Tracer profile. It keeps your alumni '
-              'record accurate for CHED reporting.',
+              'Set up your Graduate Tracer profile for alumni records.',
               style: PortalTheme.bodySecondary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
           const SizedBox(height: PortalTheme.space4),
@@ -764,30 +827,133 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
             ),
           ),
           const SizedBox(height: PortalTheme.space3),
-          Row(
-            children: [
-              const Icon(
-                Icons.lock_outline_rounded,
-                size: 16,
-                color: PortalTheme.textSecondary,
-              ),
-              const SizedBox(width: PortalTheme.space1),
-              Expanded(
-                child: Text(
-                  'Saved to your alumni record and used for CHED Graduate '
-                  'Tracer reporting.',
-                  style: PortalTheme.meta,
-                ),
-              ),
-            ],
-          ),
+          _privacyConsentCard(),
         ],
       ),
       actions: OnboardingActions(
         primaryLabel: 'Get started',
-        onPrimary: () => _goToStep(_firstProfileStep),
+        onPrimary: (!_acceptedPrivacy || _finishing)
+            ? null
+            : () => _goToStep(_firstProfileStep),
       ),
     );
+  }
+
+  Widget _privacyConsentCard() {
+    final card = Container(
+      padding: const EdgeInsets.all(PortalTheme.space3),
+      decoration: BoxDecoration(
+        color: PortalTheme.card,
+        borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
+        border: Border.all(
+          color: _acceptedPrivacy
+              ? PortalTheme.navy.withValues(alpha: 0.35)
+              : PortalTheme.border.withValues(alpha: 0.75),
+        ),
+        boxShadow: PortalTheme.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: PortalTheme.navy.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                ),
+                child: const Icon(
+                  Icons.privacy_tip_outlined,
+                  size: 22,
+                  color: PortalTheme.navy,
+                ),
+              ),
+              const SizedBox(width: PortalTheme.space2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Privacy notice',
+                      style: PortalTheme.cardTitle.copyWith(fontSize: 15),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Your details are saved to your alumni record and used '
+                      'for Graduate Tracer reporting under the Data Privacy '
+                      'Act of 2012 (RA 10173).',
+                      style: PortalTheme.bodySecondary.copyWith(
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PortalTheme.space3),
+          Material(
+            color: PortalTheme.navy.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+              onTap: _finishing
+                  ? null
+                  : () => setState(() => _acceptedPrivacy = !_acceptedPrivacy),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: _acceptedPrivacy,
+                        onChanged: _finishing
+                            ? null
+                            : (v) =>
+                                setState(() => _acceptedPrivacy = v ?? false),
+                        activeColor: PortalTheme.navy,
+                        checkColor: Colors.white,
+                        fillColor: WidgetStateProperty.resolveWith((states) {
+                          if (states.contains(WidgetState.selected)) {
+                            return PortalTheme.navy;
+                          }
+                          return Colors.white;
+                        }),
+                        side: BorderSide(
+                          color: PortalTheme.navy.withValues(alpha: 0.55),
+                          width: 1.6,
+                        ),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'I understand and agree to continue',
+                        style: PortalTheme.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: PortalTheme.navy,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return card;
   }
 
   /// Phones get a card; on desktop the frame is already one.
@@ -799,16 +965,15 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   OnboardingStepView _sectionStep(GtsFormSection section) {
     final (title, subtitle) = switch (section) {
       GtsFormSection.personal => (
-        'About you',
-        'As it appears on your CHED Graduate Tracer form. Fields marked * '
-            'are required.',
+        'About You',
+        'Tell us your name, sex, civil status, and birthday.',
       ),
       GtsFormSection.contact => (
-        'Contact & address',
+        'Contact & Address',
         'Where the alumni office can reach you.',
       ),
       GtsFormSection.education => (
-        'Education & work',
+        'Education & Work',
         'Your degree and current employment status.',
       ),
     };
@@ -830,31 +995,26 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          OnboardingSectionIntro(
-            title: title,
-            subtitle: subtitle,
-            filled: _formState.filledInSection(section),
-            total: section.requiredKeys.length,
+          _maybeCard(
+            wide: wide,
+            child: OnboardingSectionIntro(
+              title: title,
+              subtitle: subtitle,
+              filled: _formState.filledInSection(section),
+              total: _formState.activeRequiredKeys(section).length,
+            ),
           ),
           const SizedBox(height: PortalTheme.space3),
           // The desktop frame is already a card; phones get their own.
           if (wide)
             fields
           else
-            Container(
+            OnboardingContentCard(
               padding: const EdgeInsets.fromLTRB(
                 PortalTheme.space3,
                 PortalTheme.space4,
                 PortalTheme.space3,
                 PortalTheme.space1,
-              ),
-              decoration: BoxDecoration(
-                color: PortalTheme.card,
-                borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
-                border: Border.all(
-                  color: PortalTheme.border.withValues(alpha: 0.75),
-                ),
-                boxShadow: PortalTheme.softShadow,
               ),
               child: fields,
             ),
@@ -862,15 +1022,13 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
             const SizedBox(height: PortalTheme.space3),
             const OnboardingTip(
               icon: Icons.emoji_objects_outlined,
-              message: 'Almost there — just an optional photo after this.',
+              message: 'Almost there — a profile photo is next.',
             ),
           ],
         ],
       ),
       actions: OnboardingActions(
-        primaryLabel: _returnToReview
-            ? 'Save & review'
-            : section == GtsFormSection.education
+        primaryLabel: section == GtsFormSection.education
             ? 'Save & continue'
             : 'Continue',
         onPrimary: _finishing ? null : () => _continueFromSection(section),
@@ -887,40 +1045,35 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
           _verifiedMobile,
           _mobileDraft,
         );
+    final display = PhMobileInputFormatter.formatDisplay(_mobileDraft);
+    final wide = _wide;
 
     return OnboardingStepView(
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingSectionHeading(
-            title: 'Confirm your mobile number',
-            subtitle:
-                'We’ll text a 6-digit code so the alumni office knows this '
-                'number reaches you. You can skip and verify later in Profile.',
+          _maybeCard(
+            wide: wide,
+            child: OnboardingSectionHeading(
+              title: 'Enter Verification Code',
+              subtitle: display.isEmpty
+                  ? 'Enter the 6-digit code we texted you. Expires in 10 minutes.'
+                  : 'Code sent to $display. Expires in 10 minutes.',
+            ),
           ),
           const SizedBox(height: PortalTheme.space3),
           ContactVerifyCard(
             channel: ContactChannel.mobile,
             original: _mobileAtVerifyEntry,
             value: _mobileDraft,
+            displayValue: display,
             verified: draftVerified,
             enabled: !_finishing && !_mobileSaving,
             service: _contactService,
-            verifiedText: 'Number confirmed. You can continue.',
-            onValueChanged: (value) {
-              setState(() {
-                _mobileDraft = value;
-                _formState.mobileController.text = value;
-                if (!ContactNormalizer.same(
-                  ContactChannel.mobile,
-                  _verifiedMobile,
-                  value,
-                )) {
-                  _mobileVerified = false;
-                }
-                _mobileSaveError = null;
-              });
-            },
+            allowEdit: false,
+            autoSend: true,
+            verifiedText: 'Number confirmed — continuing…',
+            onValueChanged: (_) {},
             onVerified: _onMobileCodeVerified,
           ),
           if (_mobileSaving) ...[
@@ -950,19 +1103,18 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
           const OnboardingTip(
             icon: Icons.info_outline_rounded,
             message:
-                'Philippine mobile numbers only. If the text doesn’t arrive, '
-                'wait a minute and resend, or skip and verify from Profile.',
+                'Mobile verification is required. If the text doesn’t arrive, '
+                'wait a minute and resend the code.',
           ),
         ],
       ),
       actions: OnboardingActions(
-        primaryLabel: _returnToReview ? 'Save & review' : 'Continue',
+        primaryLabel: draftVerified ? 'Continue' : 'Waiting for code…',
         onPrimary: _finishing || _mobileSaving || !draftVerified
             ? null
             : _continueAfterMobileVerify,
+        showArrow: draftVerified,
         onBack: _goBack,
-        tertiaryLabel: 'Skip for now',
-        onTertiary: _finishing || _mobileSaving ? null : _skipMobileVerify,
       ),
     );
   }
@@ -971,16 +1123,19 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     final hasLocalPreview =
         _selectedImageBytes != null || _selectedImage != null;
     final image = _photoProvider;
+    final wide = _wide;
 
     return OnboardingStepView(
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingSectionHeading(
-            title: 'Add a profile photo',
-            subtitle:
-                'Optional — it helps classmates recognize you. You can change '
-                'it later from your profile.',
+          _maybeCard(
+            wide: wide,
+            child: const OnboardingSectionHeading(
+              title: 'Add a Profile Photo',
+              subtitle:
+                  'Helps classmates recognize you. Change later anytime.',
+            ),
           ),
           const SizedBox(height: PortalTheme.space5),
           Center(
@@ -1004,94 +1159,20 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
         ],
       ),
       actions: OnboardingActions(
-        primaryLabel: hasLocalPreview ? 'Upload & continue' : 'Continue',
+        // No photo yet → primary skip; after a pick → Continue (uploads).
+        primaryLabel: hasLocalPreview ? 'Continue' : 'Skip for now',
+        showArrow: hasLocalPreview,
         onPrimary: _finishing
             ? null
             : () => _continueFromPhoto(skipUpload: !hasLocalPreview),
         onBack: _goBack,
-        tertiaryLabel: 'Skip for now',
-        onTertiary: _finishing
-            ? null
-            : () => _continueFromPhoto(skipUpload: true),
       ),
     );
   }
 
   OnboardingStepView _reviewStep() {
     final wide = _wide;
-    final hasPhoto = _photoProvider != null;
-    String join(List<String> parts) {
-      final filled = parts.map((p) => p.trim()).where((p) => p.isNotEmpty);
-      return filled.isEmpty ? 'Not filled in yet' : filled.join(' · ');
-    }
-
-    final birthDate = _formState.birthDate;
-    final rows = [
-      OnboardingSummaryRow(
-        icon: Icons.person_outline,
-        title: 'About you',
-        summary: join([
-          _formState.gender,
-          _formState.civilStatus,
-          if (birthDate != null) DateFormat.yMMMd().format(birthDate),
-        ]),
-        onEdit: _finishing
-            ? null
-            : () => _editFromReview(_stepFor(GtsFormSection.personal)),
-      ),
-      OnboardingSummaryRow(
-        icon: Icons.home_outlined,
-        title: 'Contact & address',
-        summary: join([
-          _formState.provinceController.text,
-          _formState.mobileController.text,
-          if (_mobileVerified) 'Verified by text',
-        ]),
-        onEdit: _finishing
-            ? null
-            : () => _editFromReview(_stepFor(GtsFormSection.contact)),
-      ),
-      OnboardingSummaryRow(
-        icon: Icons.school_outlined,
-        title: 'Education & work',
-        summary: () {
-          final parts = <String>[
-            _formState.program,
-            _formState.yearGraduatedController.text,
-            _formState.employmentStatus,
-          ];
-          if (_formState.employmentStatus == GtsConstants.employed) {
-            if (_formState.occupationController.text.trim().isNotEmpty) {
-              parts.add(_formState.occupationController.text.trim());
-            }
-            if (_formState.employmentType.trim().isNotEmpty) {
-              parts.add('(${_formState.employmentType.trim()})');
-            }
-          } else if (_formState.employmentStatus == GtsConstants.unemployed ||
-              _formState.employmentStatus == GtsConstants.neverEmployed) {
-            if (_formState.notEmployedReasons.isNotEmpty) {
-              final first = _formState.notEmployedReasons.first;
-              if (first == GtsConstants.otherReasonSpecify &&
-                  _formState.reasonOtherController.text.trim().isNotEmpty) {
-                parts.add(_formState.reasonOtherController.text.trim());
-              } else {
-                parts.add(first);
-              }
-            }
-          }
-          return join(parts);
-        }(),
-        onEdit: _finishing
-            ? null
-            : () => _editFromReview(_stepFor(GtsFormSection.education)),
-      ),
-      OnboardingSummaryRow(
-        icon: Icons.photo_camera_outlined,
-        title: 'Profile photo',
-        summary: hasPhoto ? 'Added' : 'Not added — you can add one later',
-        onEdit: _finishing ? null : () => _editFromReview(_photoStepIndex),
-      ),
-    ];
+    final downloadLabel = kIsWeb ? 'Download PDF' : 'Share PDF';
 
     return OnboardingStepView(
       centerContent: true,
@@ -1105,7 +1186,7 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
                 : const SizedBox(height: 170),
           ),
           Text(
-            'You’re all set, $_firstName!',
+            'You’re All Set, $_firstName!',
             textAlign: TextAlign.center,
             style: PortalTheme.sectionTitle.copyWith(
               color: PortalTheme.navy,
@@ -1114,24 +1195,90 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
           ),
           const SizedBox(height: PortalTheme.space1),
           Text(
-            'Check your details, then enter the portal.',
+            'Your Graduate Tracer profile is ready. Enter the portal when you’re set.',
             textAlign: TextAlign.center,
             style: PortalTheme.bodySecondary,
           ),
           const SizedBox(height: PortalTheme.space4),
           _maybeCard(
             wide: wide,
-            child: Column(
-              children: [
-                for (var i = 0; i < rows.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: PortalTheme.border.withValues(alpha: 0.75),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: PortalTheme.navy.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(
+                            PortalTheme.radiusMd,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.description_outlined,
+                          size: 24,
+                          color: PortalTheme.navy,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Membership Form',
+                              style: PortalTheme.cardTitle.copyWith(
+                                fontSize: 17,
+                                color: PortalTheme.navy,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Download the official USTP Alumni Association '
+                              'Oroquieta Membership Form filled from your '
+                              'profile. You can also get it later from Profile.',
+                              style: PortalTheme.bodySecondary.copyWith(
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: (_membershipFormBusy || _finishing)
+                          ? null
+                          : _downloadMembershipForm,
+                      style: PortalTheme.primaryButton().copyWith(
+                        minimumSize: WidgetStateProperty.all(
+                          const Size(0, 48),
+                        ),
+                      ),
+                      icon: _membershipFormBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.download_outlined, size: 20),
+                      label: Text(downloadLabel),
                     ),
-                  rows[i],
+                  ),
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(height: PortalTheme.space3),

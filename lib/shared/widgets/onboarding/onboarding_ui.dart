@@ -103,7 +103,7 @@ class OnboardingSectionGroup extends StatelessWidget {
               Icon(icon, size: 18, color: OnboardingTheme.navy),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
+                child: onboardingLabelWithRequiredMark(
                   title,
                   style: const TextStyle(
                     fontSize: 14,
@@ -260,6 +260,34 @@ class _ProvincePickerSheetState extends State<_ProvincePickerSheet> {
   }
 }
 
+/// Label text with a trailing ` *` rendered in [PortalTheme.danger].
+Widget onboardingLabelWithRequiredMark(
+  String label, {
+  TextStyle? style,
+}) {
+  const mark = ' *';
+  final hasMark = label.endsWith(mark);
+  final base = hasMark ? label.substring(0, label.length - mark.length) : label;
+  final baseStyle = style ??
+      const TextStyle(color: PortalTheme.textSecondary, fontSize: 14);
+  if (!hasMark) return Text(base, style: baseStyle);
+  return Text.rich(
+    TextSpan(
+      style: baseStyle,
+      children: [
+        TextSpan(text: base),
+        TextSpan(
+          text: mark,
+          style: baseStyle.copyWith(
+            color: PortalTheme.danger,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 InputDecoration onboardingFieldDecoration({
   required String label,
   String? hint,
@@ -267,8 +295,19 @@ InputDecoration onboardingFieldDecoration({
   bool readOnly = false,
   String? helperText,
 }) {
+  const mark = ' *';
+  final hasMark = label.endsWith(mark);
   return InputDecoration(
-    labelText: label,
+    label: hasMark
+        ? onboardingLabelWithRequiredMark(
+            label,
+            style: const TextStyle(
+              color: PortalTheme.textSecondary,
+              fontSize: 14,
+            ),
+          )
+        : null,
+    labelText: hasMark ? null : label,
     hintText: hint,
     helperText: helperText,
     helperStyle: PortalTheme.meta,

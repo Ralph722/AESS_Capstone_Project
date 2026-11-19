@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
 import 'package:alumni_system/features/onboarding/presentation/alumni_onboarding_page.dart';
 import 'package:alumni_system/features/onboarding/presentation/widgets/onboarding_chrome.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,38 @@ final _userRow = <String, dynamic>{
 };
 
 final _requests = <http.Request>[];
+
+class _FakeContactService implements ContactVerificationService {
+  @override
+  Future<ContactCodeSent> sendCode(
+    ContactChannel channel,
+    String target,
+  ) async => ContactCodeSent(target: target, resendAfterSeconds: 60);
+
+  @override
+  Future<String> verifyCode(
+    ContactChannel channel,
+    String target,
+    String code,
+  ) async => target;
+
+  @override
+  Future<ContactSaveResult> saveVerified(
+    ContactChannel channel,
+    String target, {
+    String? password,
+  }) async => ContactSaveResult(target: target);
+
+  @override
+  bool needsPasswordRecheck() => false;
+
+  @override
+  Future<void> confirmPassword(String password) async {}
+
+  @override
+  Future<ContactSaveResult> applyEmail(String target) async =>
+      ContactSaveResult(target: target);
+}
 
 void main() {
   setUpAll(() async {
@@ -93,12 +126,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('walks every step and Edit returns to Review', (tester) async {
+  testWidgets('walks every step through to Review', (tester) async {
     tester.view.physicalSize = const Size(420, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const MaterialApp(home: AlumniOnboardingScreen()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AlumniOnboardingScreen(contactService: _FakeContactService()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     // Welcome greets the graduate from the saved record.
@@ -108,10 +145,11 @@ void main() {
       tester.getSize(find.byType(OnboardingActionBar)).height,
       lessThan(120),
     );
+    await tap(tester, find.byType(Checkbox));
     await tap(tester, button('Get started'));
 
-    // About you: the empty birthday blocks Continue.
-    expect(find.text('About you'), findsWidgets);
+    // About You: the empty birthday blocks Continue.
+    expect(find.text('About You'), findsWidgets);
     await tap(tester, button('Continue'));
     expect(find.text('1 field needs your attention.'), findsOneWidget);
     expect(find.text('Required'), findsOneWidget);
@@ -124,17 +162,26 @@ void main() {
     expect(find.text('Where the alumni office can reach you.'), findsOneWidget);
     await tap(tester, button('Continue'));
 
-    // Confirm mobile is optional — skip so the flow test needs no SMS.
+    // SMS verification is required: confirm number, then enter OTP.
     expect(find.text('Confirm your mobile number'), findsOneWidget);
-    await tap(tester, button('Skip for now'));
+    expect(find.text('Skip for now'), findsNothing);
+    await tap(tester, button('Yes, send the code'));
+    expect(find.text('Enter Verification Code'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '123456');
+    await tester.pump();
+    await tap(tester, button('Verify'));
+    await tester.pumpAndSettle();
 
-    // Education & work: employment status is still required.
+    // Education & Work: employment status is still required.
     expect(
       find.text('Your degree and current employment status.'),
       findsOneWidget,
     );
     await tap(tester, button('Save & continue'));
     expect(find.text('Choose one'), findsOneWidget);
+    // Year is blanked on onboarding load — fill it before continuing.
+    final yearHint = 'e.g. ${DateTime.now().year}';
+    await tester.enterText(find.widgetWithText(TextFormField, yearHint), '2024');
     await tap(tester, find.text('Employed'));
     await tap(tester, find.text('Regular or Permanent'));
     // Present Occupation appears after Employed is chosen.
@@ -142,29 +189,23 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, button('Save & continue'));
 
-    // Photo is optional.
-    expect(find.text('Add a profile photo'), findsOneWidget);
+    // Photo can be skipped.
+    expect(find.text('Add a Profile Photo'), findsOneWidget);
     await tap(tester, button('Skip for now'));
 
-    // Review summarises each step.
-    expect(find.text('You’re all set, Maria!'), findsOneWidget);
-    expect(find.textContaining('Employed'), findsOneWidget);
+    // Review offers Membership Form download (no preview / summary card).
+    expect(find.text('You’re All Set, Maria!'), findsOneWidget);
+    expect(find.text('Membership Form'), findsOneWidget);
+    expect(find.text('Preview'), findsNothing);
+    expect(find.textContaining('Optional'), findsNothing);
     expect(button('Enter alumni portal'), findsOneWidget);
-
-    // Edit jumps back to that step, and saving returns straight to Review.
-    await tap(tester, button('Edit').first);
-    expect(
-      find.textContaining('As it appears on your CHED Graduate Tracer form'),
-      findsOneWidget,
-    );
-    await tap(tester, button('Save & review'));
-    expect(find.text('You’re all set, Maria!'), findsOneWidget);
+    expect(find.text('Edit'), findsNothing);
 
     final upserts = _requests.where(
       (r) => r.method == 'POST' && r.url.path == '/rest/v1/users',
     );
-    // About you, Contact, Education, then About you again from Review.
-    expect(upserts.length, 4);
+    // About You, Contact, Education.
+    expect(upserts.length, 3);
     final last = jsonDecode(upserts.last.body) as Map<String, dynamic>;
     expect(last['employment_status'], 'Employed');
     expect(last['birth_date'], isNotNull);
@@ -182,7 +223,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const MaterialApp(home: AlumniOnboardingScreen()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AlumniOnboardingScreen(contactService: _FakeContactService()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(OnboardingSidePanel), findsOneWidget);
@@ -192,8 +237,9 @@ void main() {
       isNull,
     );
 
+    await tap(tester, find.byType(Checkbox));
     await tap(tester, button('Get started'));
-    expect(find.text('About you'), findsWidgets);
+    expect(find.text('About You'), findsWidgets);
     expect(button('Back'), findsOneWidget);
   });
 }

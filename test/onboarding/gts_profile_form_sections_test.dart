@@ -157,23 +157,9 @@ void main() {
       ),
     );
     expect(label('Verified at registration'), findsOneWidget);
+    expect(label('Maria Santos'), findsOneWidget);
     expect(label('From your alumni record'), findsNothing);
-    final editable = tester.widget<EditableText>(
-      find.byType(EditableText).first,
-    );
-    expect(editable.readOnly, isTrue);
-
-    state.displayNameController.text = 'Maria S. Santos';
-    await pump(
-      tester,
-      GtsProfileFormFields(
-        state: state,
-        onChanged: () {},
-        chedStyleLabels: false,
-        section: GtsFormSection.personal,
-      ),
-    );
-    expect(label('From your alumni record'), findsNothing);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsWidgets);
 
     await pump(
       tester,
@@ -186,7 +172,8 @@ void main() {
       ),
     );
     expect(label('maria@example.com'), findsOneWidget);
-    expect(label('From your account'), findsOneWidget);
+    expect(label('Verified at registration'), findsOneWidget);
+    expect(label('From your alumni record'), findsNothing);
     expect(find.byType(TextFormField), findsNWidgets(3));
   });
 
@@ -205,6 +192,33 @@ void main() {
     expect(state.filledInSection(GtsFormSection.personal), 2);
     expect(state.missingRequiredKeys(), isNot(contains('displayName')));
     expect(state.missingRequiredKeys(), contains('birthDate'));
+  });
+
+  test('education progress counts employment follow-ups', () {
+    state.program = 'BSIT';
+    state.collegeController.text = 'Test College';
+    state.yearGraduatedController.text = '2024';
+    state.employmentStatus = GtsConstants.employed;
+
+    expect(
+      state.activeRequiredKeys(GtsFormSection.education),
+      containsAll(['employmentType', 'employmentOccupation']),
+    );
+    // Base education keys filled; type + occupation still empty.
+    expect(state.filledInSection(GtsFormSection.education), 4);
+    expect(state.activeRequiredKeys(GtsFormSection.education).length, 6);
+
+    state.employmentType = GtsConstants.employmentTypes.first;
+    state.occupationController.text = 'Software Engineer';
+    expect(state.filledInSection(GtsFormSection.education), 6);
+
+    state.employmentStatus = GtsConstants.unemployed;
+    state.notEmployedReasons.clear();
+    expect(
+      state.activeRequiredKeys(GtsFormSection.education),
+      contains('notEmployedReasons'),
+    );
+    expect(state.filledInSection(GtsFormSection.education), 4);
   });
 
   testWidgets('education section includes employment only when asked', (

@@ -133,7 +133,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('confirm mobile: send code, verify, then continue', (
+  testWidgets('confirm sheet then OTP verify continues to education', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(420, 1800);
@@ -146,31 +146,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tap(tester, find.byType(Checkbox));
     await tap(tester, button('Get started'));
     await tap(tester, button('Continue')); // About you (birthday loaded)
-    await tap(tester, button('Continue')); // Contact → Confirm mobile
+    await tap(tester, button('Continue')); // Contact → confirm sheet
 
     expect(find.text('Confirm your mobile number'), findsOneWidget);
-    expect(button('Continue'), findsOneWidget);
-    // Continue stays disabled until verified.
-    expect(
-      tester.widget<ButtonStyleButton>(button('Continue')).onPressed,
-      isNull,
-    );
+    expect(find.text('Skip for now'), findsNothing);
+    await tap(tester, button('Yes, send the code'));
 
-    await tap(tester, button('Send code by text'));
+    expect(find.text('Enter Verification Code'), findsOneWidget);
+    expect(find.text('Skip for now'), findsNothing);
+    await tester.pumpAndSettle();
     expect(contact.sent, ['09171234567']);
+
     await tester.enterText(find.byType(TextField), '123456');
     await tester.pump();
     await tap(tester, button('Verify'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Number confirmed'), findsOneWidget);
-    expect(
-      tester.widget<ButtonStyleButton>(button('Continue')).onPressed,
-      isNotNull,
-    );
-    await tap(tester, button('Continue'));
     expect(
       find.text('Your degree and current employment status.'),
       findsOneWidget,

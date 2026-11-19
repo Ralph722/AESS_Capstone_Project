@@ -47,6 +47,7 @@ abstract final class AuditActions {
   static const exportIndividualInfoPdf = 'EXPORT_INDIVIDUAL_INFO_PDF';
   static const exportIndividualInfoPdfBatch =
       'EXPORT_INDIVIDUAL_INFO_PDF_BATCH';
+  static const downloadMembershipForm = 'DOWNLOAD_MEMBERSHIP_FORM';
 
   // Events
   static const createEvent = 'CREATE_EVENT';

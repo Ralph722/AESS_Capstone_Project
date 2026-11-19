@@ -236,7 +236,6 @@ class AlumniMemberService {
     required String fullName,
     required String course,
     required String studentId,
-    required String yearGraduated,
   }) async {
     final name = normalizeFullName(fullName);
     final sid = normalizeStudentId(studentId);
@@ -248,7 +247,6 @@ class AlumniMemberService {
     if (prog == null || !CourseConstants.isValid(prog)) {
       throw Exception('Select a valid course.');
     }
-    final year = normalizeGraduationYear(yearGraduated);
 
     await assertNotDuplicate(studentId: sid, course: prog, excludeMemberId: id);
 
@@ -265,8 +263,7 @@ class AlumniMemberService {
               fullName: name,
               course: prog,
               studentId: sid,
-              batchYear: year,
-              yearGraduated: year,
+              // Year graduated is collected from the alumnus during onboarding.
               updatedAt: DateTime.now(),
             );
 

@@ -56,7 +56,7 @@ class OnboardingIdentityCard extends StatelessWidget {
                   bottom: -40,
                   child: _Dot(
                     size: 90,
-                    color: PortalTheme.gold.withValues(alpha: 0.12),
+                    color: Colors.white.withValues(alpha: 0.06),
                   ),
                 ),
                 Padding(

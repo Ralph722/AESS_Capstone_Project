@@ -17,6 +17,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_directory_detail_service.dart';
 import 'package:alumni_system/features/admin/activity/models/audit_log_model.dart';
+import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 
 /// Inline admin panel: demographics, employment, and activity for one member.
 class AdminAlumniMemberDetailPanel extends StatefulWidget {
@@ -783,7 +784,9 @@ class _AdminAlumniMemberDetailPanelState
           ),
         MemberDetailInfoRow(
           label: GtsConstants.labelTelephone,
-          value: tracer.telephoneNumber,
+          value: TracerProfile.resolveTelephoneForStorage(
+            tracer.telephoneNumber,
+          ),
           icon: Icons.phone_outlined,
           emptyText: notProvided,
           changed: changed.contains('telephoneNumber'),

@@ -318,7 +318,7 @@ class _StepEntranceState extends State<_StepEntrance>
 }
 
 /// Phone / tablet progress: one segment per counted step plus
-/// "Step X of N · Label". Hidden on Welcome and the final screen.
+/// "Step X of N". Hidden on Welcome and the final screen.
 class OnboardingProgressHeader extends StatelessWidget {
   const OnboardingProgressHeader({
     super.key,
@@ -386,7 +386,7 @@ class OnboardingProgressHeader extends StatelessWidget {
                                 color: j < position
                                     ? PortalTheme.success
                                     : j == position
-                                    ? PortalTheme.navy
+                                    ? PortalTheme.gold
                                     : PortalTheme.border,
                                 borderRadius: BorderRadius.circular(999),
                               ),
@@ -398,21 +398,11 @@ class OnboardingProgressHeader extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: stepText,
-                                  style: PortalTheme.meta.copyWith(
-                                    color: PortalTheme.navy,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: '  ·  $label',
-                                  style: PortalTheme.meta,
-                                ),
-                              ],
+                          child: Text(
+                            stepText,
+                            style: PortalTheme.meta.copyWith(
+                              color: PortalTheme.navy,
+                              fontWeight: FontWeight.w700,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -476,7 +466,7 @@ class OnboardingSidePanel extends StatelessWidget {
               bottom: -36,
               child: _Circle(
                 size: 120,
-                color: PortalTheme.gold.withValues(alpha: 0.10),
+                color: Colors.white.withValues(alpha: 0.06),
               ),
             ),
             LayoutBuilder(
@@ -786,7 +776,12 @@ class OnboardingSectionHeading extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(subtitle, style: PortalTheme.bodySecondary),
+        Text(
+          subtitle,
+          style: PortalTheme.bodySecondary,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     );
   }

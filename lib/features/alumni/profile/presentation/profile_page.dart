@@ -1,16 +1,21 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
+import 'package:alumni_system/core/utils/alumni_pdf_delivery.dart';
 import 'package:alumni_system/features/alumni/card/data/alumni_card_service.dart';
 import 'package:alumni_system/features/alumni/card/models/alumni_card_data.dart';
 import 'package:alumni_system/features/alumni/card/presentation/alumni_digital_card.dart';
+import 'package:alumni_system/features/alumni/membership/data/alumni_membership_form_service.dart';
 import 'package:alumni_system/features/alumni/profile/data/user_profile_events.dart';
 import 'package:alumni_system/features/alumni/profile/presentation/change_password_page.dart';
 import 'package:alumni_system/features/alumni/profile/presentation/profile_information_page.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/auth/presentation/auth_gate.dart';
+import 'package:alumni_system/features/auth/presentation/auth_shell.dart'
+    show showAuthFeedback;
 import 'package:alumni_system/features/shell/presentation/main_navigation.dart';
 import 'package:alumni_system/features/messages/presentation/user_messages_page.dart';
 import 'package:alumni_system/features/notifications/presentation/notifications_page.dart';
@@ -19,6 +24,7 @@ import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
+import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -36,10 +42,13 @@ class ProfileScreenState extends State<ProfileScreen>
   final AuditService _auditService = AuditService();
   final AuthService _authService = AuthService();
   final AlumniCardService _cardService = AlumniCardService();
+  final AlumniMembershipFormService _membershipFormService =
+      AlumniMembershipFormService();
 
   AlumniCardLoadResult? _cardResult;
   var _cardLoading = true;
   var _showingCardBack = false;
+  var _membershipFormBusy = false;
   StreamSubscription<void>? _profileFieldsSub;
   StreamSubscription<String?>? _avatarSub;
 
@@ -103,6 +112,137 @@ class ProfileScreenState extends State<ProfileScreen>
       MaterialPageRoute(builder: (_) => const ProfileInformationScreen()),
     );
     if (mounted) await _loadHubData();
+  }
+
+  String get _membershipDisplayName {
+    final fromCard = _cardResult?.data?.fullName.trim();
+    if (fromCard != null && fromCard.isNotEmpty) return fromCard;
+    final meta = AppSession.currentUser?.userMetadata?['display_name'];
+    if (meta is String && meta.trim().isNotEmpty) return meta.trim();
+    return 'Alumni';
+  }
+
+  Future<void> _openMembershipFormSheet() async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: PortalTheme.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Membership Form', style: PortalTheme.cardTitle),
+                const SizedBox(height: 8),
+                Text(
+                  'Official USTP Alumni Association Oroquieta Membership '
+                  'Form filled from your profile.',
+                  style: PortalTheme.bodySecondary,
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _membershipFormBusy
+                      ? null
+                      : () async {
+                          Navigator.pop(sheetContext);
+                          await _previewMembershipForm();
+                        },
+                  style: PortalTheme.secondaryButton(),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: const Text('Preview'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _membershipFormBusy
+                      ? null
+                      : () async {
+                          Navigator.pop(sheetContext);
+                          await _downloadMembershipForm();
+                        },
+                  style: PortalTheme.primaryButton(),
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: Text(kIsWeb ? 'Download PDF' : 'Share PDF'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<AlumniMembershipFormPdf?> _buildMembershipForm() async {
+    final userId = AppSession.userId;
+    if (userId == null) {
+      if (mounted) {
+        showAuthFeedback(
+          context,
+          'Sign in again to download your Membership Form.',
+        );
+      }
+      return null;
+    }
+    return _membershipFormService.buildForUser(
+      userId: userId,
+      displayName: _membershipDisplayName,
+    );
+  }
+
+  Future<void> _previewMembershipForm() async {
+    if (_membershipFormBusy) return;
+    setState(() => _membershipFormBusy = true);
+    try {
+      final pdf = await _buildMembershipForm();
+      if (pdf == null || !mounted) return;
+      await previewAlumniPdf(bytes: pdf.bytes, fileName: pdf.fileName);
+    } catch (e) {
+      if (mounted) {
+        showAuthFeedback(
+          context,
+          'We couldn’t open a preview. ${portalFriendlyError(e)}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _membershipFormBusy = false);
+    }
+  }
+
+  Future<void> _downloadMembershipForm() async {
+    if (_membershipFormBusy) return;
+    setState(() => _membershipFormBusy = true);
+    try {
+      final pdf = await _buildMembershipForm();
+      if (pdf == null || !mounted) return;
+      await shareOrDownloadAlumniPdf(
+        context: context,
+        bytes: pdf.bytes,
+        fileName: pdf.fileName,
+      );
+      if (!mounted) return;
+      showAuthFeedback(
+        context,
+        kIsWeb
+            ? 'Membership Form downloaded.'
+            : 'Use the share sheet to save your Membership Form.',
+        error: false,
+      );
+    } catch (e) {
+      if (mounted) {
+        showAuthFeedback(
+          context,
+          'We couldn’t prepare your Membership Form. ${portalFriendlyError(e)}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _membershipFormBusy = false);
+    }
   }
 
   @override
@@ -245,6 +385,20 @@ class ProfileScreenState extends State<ProfileScreen>
                 title: 'Profile information',
                 subtitle: 'View and update your details',
                 onTap: _openProfileInformation,
+              ),
+              const _PortalAccountDivider(),
+              _PortalAccountRow(
+                icon: Icons.description_outlined,
+                iconColor: PortalTheme.navy,
+                title: 'Membership Form',
+                subtitle: _membershipFormBusy
+                    ? 'Preparing PDF…'
+                    : 'Preview or download your filled form',
+                onTap: () {
+                  if (!_membershipFormBusy) {
+                    unawaited(_openMembershipFormSheet());
+                  }
+                },
               ),
               const _PortalAccountDivider(),
               _PortalAccountRow(

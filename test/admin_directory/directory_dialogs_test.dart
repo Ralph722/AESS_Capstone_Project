@@ -63,30 +63,7 @@ void main() {
       expect(find.text('Enter the ID number.'), findsOneWidget);
       expect(submitted, 0);
       expect(find.text('Add to the alumni list'), findsOneWidget);
-    });
-
-    testWidgets('invalid year is caught before saving', (tester) async {
-      var submitted = 0;
-      await _openFrom(
-        tester,
-        (context) => showRosterEntryDialog(
-          context,
-          onSubmit: (_) async {
-            submitted++;
-            return null;
-          },
-        ),
-      );
-      await tester.enterText(find.byType(TextFormField).at(0), 'Ana Cruz');
-      await tester.enterText(find.byType(TextFormField).at(1), 'X1');
-      await tester.enterText(find.byType(TextFormField).at(2), '24');
-      await tester.tap(find.text('Add member'));
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Enter a 4-digit year (e.g. 2024) or leave it blank.'),
-        findsOneWidget,
-      );
-      expect(submitted, 0);
+      expect(find.text('Year graduated (optional)'), findsNothing);
     });
 
     testWidgets('save error stays in the dialog and keeps typed values', (
@@ -105,14 +82,12 @@ void main() {
       );
       await tester.enterText(find.byType(TextFormField).at(0), 'Ana Cruz');
       await tester.enterText(find.byType(TextFormField).at(1), 'X1');
-      await tester.enterText(find.byType(TextFormField).at(2), '2024');
       await tester.tap(find.text('Add member'));
       await tester.pumpAndSettle();
 
       expect(received?.fullName, 'Ana Cruz');
       expect(received?.course, 'BSIT');
       expect(received?.studentId, 'X1');
-      expect(received?.yearGraduated, '2024');
       expect(
         find.text('An alumni with this ID number and course already exists.'),
         findsOneWidget,
@@ -156,7 +131,7 @@ void main() {
       expect(results, [true]);
     });
 
-    testWidgets('edit pre-fills values', (tester) async {
+    testWidgets('edit pre-fills values without year field', (tester) async {
       await _openFrom(
         tester,
         (context) => showRosterEntryDialog(
@@ -168,7 +143,7 @@ void main() {
       expect(find.text('Edit alumni list entry'), findsOneWidget);
       expect(find.text('Juan Santos'), findsOneWidget);
       expect(find.text('2023304878'), findsOneWidget);
-      expect(find.text('2024'), findsOneWidget);
+      expect(find.text('Year graduated (optional)'), findsNothing);
       expect(find.text('Save changes'), findsOneWidget);
     });
 

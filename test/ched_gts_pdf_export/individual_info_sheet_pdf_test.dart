@@ -94,5 +94,37 @@ void main() {
       // PDF magic
       expect(String.fromCharCodes(bytes.take(4)), '%PDF');
     });
+
+    test('renders from a sparse live-profile-shaped answer map', () async {
+      // Mirrors onboarding / Profile self-download when there is no CHED wave.
+      final bytes = await IndividualInfoSheetPdf.build(
+        answers: {
+          'ched_1': 'Alex Rivera',
+          'ched_3': 'alex@example.com',
+          'ched_5': '09170001111',
+          'ched_7': 'Male',
+          'ched_10': 'Misamis Occidental',
+          'ched_12': [
+            {
+              'Degree(s) & Specialization(s)': 'BSIT',
+              'College or University': 'USTP Oroquieta',
+              'Year Graduated': '2024',
+              'Honor(s) or Award(s) Received': '',
+            },
+          ],
+        },
+        alumniName: 'Alex Rivera',
+        generatedAt: DateTime(2026, 11, 14),
+      );
+      expect(bytes.length, greaterThan(1000));
+      expect(String.fromCharCodes(bytes.take(4)), '%PDF');
+      expect(
+        IndividualInfoSheetPdf.suggestFileName(
+          displayName: 'Alex Rivera',
+          when: DateTime(2026, 11, 14),
+        ),
+        'Membership-Form-Alex-Rivera-2026-11-14.pdf',
+      );
+    });
   });
 }

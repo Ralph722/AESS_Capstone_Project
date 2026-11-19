@@ -56,8 +56,14 @@ abstract final class ContactNormalizer {
   static String invalidMessage(ContactChannel channel) => switch (channel) {
     ContactChannel.email => 'Enter a valid email address.',
     ContactChannel.mobile =>
-      'Enter a valid mobile number, like 09171234567 or +14155550123.',
+      'Enter an 11-digit Philippine mobile, like 0917 123 4567.',
   };
+
+  /// True when [value] normalizes to a local PH mobile (`09XXXXXXXXX`).
+  static bool isPhilippineMobile(String? value) {
+    final n = normalize(ContactChannel.mobile, value);
+    return n != null && _phMobile.hasMatch(n);
+  }
 }
 
 /// A code was sent (or, for mock SMS, created and returned as [demoCode]).

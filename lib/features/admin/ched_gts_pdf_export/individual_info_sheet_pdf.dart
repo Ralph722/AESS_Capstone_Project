@@ -48,139 +48,176 @@ abstract final class IndividualInfoSheetPdf {
     final eduRows = educationRows(answers['ched_12']);
 
     final doc = pw.Document();
+    // Single [Page] so the closing blocks can expand into leftover height
+    // instead of leaving a dead gap above the footer.
     doc.addPage(
-      pw.MultiPage(
+      pw.Page(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(26, 22, 26, 22),
-        header: (ctx) => AessPdfHeader.build(
-          title: reportTitle,
-          generationDate: fmt.format(when),
-          classification: 'CONFIDENTIAL',
-        ),
-        footer: (ctx) => AessPdfFooter.build(
-          ctx,
-          containsPersonalData: true,
-        ),
-        build: (ctx) => [
-          _sectionTitle('GENERAL INFORMATION'),
-          pw.SizedBox(height: 6),
-          _boxedField('Name', _text(answers['ched_1'], fallback: alumniName)),
-          pw.SizedBox(height: 4),
-          _boxedField(
-            'Permanent Address',
-            _text(answers['ched_2']),
-            minHeight: 36,
-          ),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+        build: (ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              pw.Expanded(
-                child: _boxedField('E-mail Address', _text(answers['ched_3'])),
+              AessPdfHeader.build(
+                title: reportTitle,
+                generationDate: fmt.format(when),
+                classification: 'CONFIDENTIAL',
               ),
-              pw.SizedBox(width: 4),
-              pw.Expanded(
-                child: _boxedField(
-                  'Telephone / Contact Number(s)',
-                  _text(answers['ched_4']),
-                ),
+              pw.SizedBox(height: 8),
+              _sectionTitle('GENERAL INFORMATION'),
+              pw.SizedBox(height: 6),
+              _boxedField(
+                'Name',
+                _text(answers['ched_1'], fallback: alumniName),
               ),
-            ],
-          ),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(
-                child: _boxedField('Mobile Number', _text(answers['ched_5'])),
+              pw.SizedBox(height: 4),
+              _boxedField(
+                'Permanent Address',
+                _text(answers['ched_2']),
+                minHeight: 36,
               ),
-              pw.SizedBox(width: 4),
-              pw.Expanded(
-                child: _boxedField('Civil Status', _text(answers['ched_6'])),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: _boxedField(
+                      'E-mail Address',
+                      _text(answers['ched_3']),
+                    ),
+                  ),
+                  pw.SizedBox(width: 4),
+                  pw.Expanded(
+                    child: _boxedField(
+                      'Telephone / Contact Number(s)',
+                      _text(answers['ched_4']),
+                    ),
+                  ),
+                ],
               ),
-              pw.SizedBox(width: 4),
-              pw.Expanded(
-                child: _boxedField('Sex', _text(answers['ched_7'])),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: _boxedField(
+                      'Mobile Number',
+                      _text(answers['ched_5']),
+                    ),
+                  ),
+                  pw.SizedBox(width: 4),
+                  pw.Expanded(
+                    child: _boxedField(
+                      'Civil Status',
+                      _text(answers['ched_6']),
+                    ),
+                  ),
+                  pw.SizedBox(width: 4),
+                  pw.Expanded(
+                    child: _boxedField('Sex', _text(answers['ched_7'])),
+                  ),
+                ],
               ),
-            ],
-          ),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(
-                flex: 3,
-                child: _birthdayBoxes(birth),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    flex: 3,
+                    child: _birthdayBoxes(birth),
+                  ),
+                  pw.SizedBox(width: 4),
+                  pw.Expanded(
+                    flex: 2,
+                    child: _boxedField(
+                      'Region of Origin',
+                      _text(answers['ched_9']),
+                    ),
+                  ),
+                  pw.SizedBox(width: 4),
+                  pw.Expanded(
+                    flex: 2,
+                    child: _boxedField('Province', _text(answers['ched_10'])),
+                  ),
+                ],
               ),
-              pw.SizedBox(width: 4),
-              pw.Expanded(
-                flex: 2,
-                child: _boxedField(
-                  'Region of Origin',
-                  _text(answers['ched_9']),
-                ),
+              pw.SizedBox(height: 4),
+              _boxedField(
+                'Location of Residence',
+                _text(answers['ched_11']),
               ),
-              pw.SizedBox(width: 4),
-              pw.Expanded(
-                flex: 2,
-                child: _boxedField('Province', _text(answers['ched_10'])),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 4),
-          _boxedField(
-            'Location of Residence',
-            _text(answers['ched_11']),
-          ),
-          pw.SizedBox(height: 12),
-          _sectionTitle('EDUCATIONAL BACKGROUND'),
-          pw.SizedBox(height: 6),
-          _educationTable(eduRows),
-          pw.SizedBox(height: 14),
-          _sectionTitle('DECLARATION'),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            PdfSafeText.sanitize(declarationText),
-            style: const pw.TextStyle(
-              fontSize: 8,
-              height: 1.35,
-              color: AessPdfTheme.textSecondary,
-            ),
-            textAlign: pw.TextAlign.justify,
-          ),
-          pw.SizedBox(height: 18),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
+              pw.SizedBox(height: 12),
+              _sectionTitle('EDUCATIONAL BACKGROUND'),
+              pw.SizedBox(height: 6),
+              _educationTable(eduRows),
+              // Leftover height goes between Declaration, signature, and
+              // Official Use; a small gap keeps Official Use off the footer.
               pw.Expanded(
                 child: pw.Column(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                      children: [
+                        pw.SizedBox(height: 10),
+                        pw.Center(child: _sectionTitle('DECLARATION')),
+                        pw.SizedBox(height: 6),
+                        pw.Text(
+                          PdfSafeText.sanitize(declarationText),
+                          style: const pw.TextStyle(
+                            fontSize: 8,
+                            height: 1.35,
+                            color: AessPdfTheme.textSecondary,
+                          ),
+                          textAlign: pw.TextAlign.justify,
+                        ),
+                      ],
+                    ),
+                    // Signature / date stay half-page wide (as before).
                     pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
                         pw.Expanded(
-                          flex: 3,
-                          child: _signatureBlock(
-                            'SIGNATURE OVER PRINTED NAME',
+                          child: pw.Row(
+                            crossAxisAlignment: pw.CrossAxisAlignment.end,
+                            children: [
+                              pw.Expanded(
+                                flex: 3,
+                                child: _signatureBlock(
+                                  'SIGNATURE OVER PRINTED NAME',
+                                ),
+                              ),
+                              pw.SizedBox(width: 12),
+                              pw.Expanded(
+                                flex: 2,
+                                child: _signatureBlock('DATE'),
+                              ),
+                            ],
                           ),
                         ),
-                        pw.SizedBox(width: 12),
-                        pw.Expanded(
-                          flex: 2,
-                          child: _signatureBlock('DATE'),
-                        ),
+                        pw.Expanded(child: pw.SizedBox()),
                       ],
                     ),
-                    pw.SizedBox(height: 14),
-                    _officialUseOnly(),
+                    // Official Use stays half-page wide (as before).
+                    pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Expanded(child: _officialUseOnly()),
+                        pw.Expanded(child: pw.SizedBox()),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              pw.Expanded(child: pw.SizedBox()),
+              pw.SizedBox(height: 12),
+              AessPdfFooter.build(
+                ctx,
+                containsPersonalData: true,
+              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
     return doc.save();
@@ -480,9 +517,9 @@ abstract final class IndividualInfoSheetPdf {
   }
 
   static pw.Widget _officialUseOnly() {
-    pw.Widget line(String label) {
+    pw.Widget line(String label, {bool padBelow = true}) {
       return pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 8),
+        padding: pw.EdgeInsets.only(bottom: padBelow ? 10 : 0),
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.end,
           children: [
@@ -498,7 +535,7 @@ abstract final class IndividualInfoSheetPdf {
             ),
             pw.Expanded(
               child: pw.Container(
-                height: 12,
+                height: 14,
                 decoration: const pw.BoxDecoration(
                   border: pw.Border(
                     bottom: pw.BorderSide(color: _boxBorder, width: 0.8),
@@ -511,30 +548,24 @@ abstract final class IndividualInfoSheetPdf {
       );
     }
 
-    return pw.Container(
-      padding: const pw.EdgeInsets.fromLTRB(8, 6, 8, 4),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: _boxBorder, width: 1),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-        children: [
-          pw.Text(
-            'FOR OFFICIAL USE ONLY',
-            style: pw.TextStyle(
-              fontSize: 9,
-              fontWeight: pw.FontWeight.bold,
-              color: AessPdfTheme.primaryNavy,
-              letterSpacing: 0.4,
-            ),
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Text(
+          'FOR OFFICIAL USE ONLY',
+          style: pw.TextStyle(
+            fontSize: 9,
+            fontWeight: pw.FontWeight.bold,
+            color: AessPdfTheme.primaryNavy,
+            letterSpacing: 0.4,
           ),
-          pw.SizedBox(height: 8),
-          line('Date Received'),
-          line('OR Number'),
-          line('Processed By'),
-          line('Remarks'),
-        ],
-      ),
+        ),
+        pw.SizedBox(height: 10),
+        line('Date Received'),
+        line('OR Number'),
+        line('Processed By'),
+        line('Remarks', padBelow: false),
+      ],
     );
   }
 }

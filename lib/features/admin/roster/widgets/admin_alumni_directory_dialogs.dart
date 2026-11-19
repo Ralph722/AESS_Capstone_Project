@@ -145,7 +145,8 @@ Future<void> showAlumniAddChooserDialog(
                   icon: Icons.upload_file_outlined,
                   title: 'Import from file',
                   subtitle:
-                      'Upload an Excel file (Full Name, Course, ID Number, optional Year Graduated).',
+                      'Upload an Excel file (Full Name, Course, ID Number). '
+                      'A Year Graduated column is ignored if present.',
                   onTap: () {
                     Navigator.pop(ctx);
                     onImportFile();
@@ -650,13 +651,11 @@ class RosterEntryInput {
     required this.fullName,
     required this.course,
     required this.studentId,
-    required this.yearGraduated,
   });
 
   final String fullName;
   final String course;
   final String studentId;
-  final String yearGraduated;
 }
 
 /// Add or edit one alumni list entry. [onSubmit] saves and returns null on success
@@ -689,7 +688,6 @@ class _RosterEntryDialogState extends State<RosterEntryDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _studentId;
-  late final TextEditingController _year;
   String? _course;
   bool _saving = false;
   String? _error;
@@ -702,7 +700,6 @@ class _RosterEntryDialogState extends State<RosterEntryDialog> {
     final existing = widget.existing;
     _name = TextEditingController(text: existing?.fullName ?? '');
     _studentId = TextEditingController(text: existing?.studentId ?? '');
-    _year = TextEditingController(text: existing?.effectiveBatchYear ?? '');
     final course = existing == null
         ? CourseConstants.courses.first
         : CourseConstants.normalize(existing.course);
@@ -713,7 +710,6 @@ class _RosterEntryDialogState extends State<RosterEntryDialog> {
   void dispose() {
     _name.dispose();
     _studentId.dispose();
-    _year.dispose();
     super.dispose();
   }
 
@@ -732,15 +728,6 @@ class _RosterEntryDialogState extends State<RosterEntryDialog> {
       ? 'Select a course.'
       : null;
 
-  String? _validateYear(String? value) {
-    try {
-      AlumniMemberService.normalizeGraduationYear(value ?? '');
-      return null;
-    } catch (_) {
-      return 'Enter a 4-digit year (e.g. 2024) or leave it blank.';
-    }
-  }
-
   Future<void> _submit() async {
     if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -753,7 +740,6 @@ class _RosterEntryDialogState extends State<RosterEntryDialog> {
         fullName: _name.text,
         course: _course!,
         studentId: _studentId.text,
-        yearGraduated: _year.text,
       ),
     );
     if (!mounted) return;
@@ -894,17 +880,6 @@ class _RosterEntryDialogState extends State<RosterEntryDialog> {
               enabled: !_saving,
               decoration: _decoration('ID number', Icons.badge_outlined),
               validator: _validateStudentId,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _year,
-              enabled: !_saving,
-              keyboardType: TextInputType.number,
-              decoration: _decoration(
-                'Year graduated (optional)',
-                Icons.calendar_today_outlined,
-              ),
-              validator: _validateYear,
               onFieldSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: 20),

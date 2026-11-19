@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/constants/course_constants.dart';
 import 'package:alumni_system/core/constants/gts_constants.dart';
 import 'package:alumni_system/core/constants/philippine_location_constants.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/features/contact_verification/data/contact_verification_service.dart';
+import 'package:alumni_system/features/contact_verification/presentation/ph_mobile_input_formatter.dart';
 import 'package:alumni_system/shared/widgets/onboarding/onboarding_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -108,22 +110,35 @@ class GtsProfileFormState {
     reasonOtherController.dispose();
   }
 
-  void applyFromProfile(TracerProfile profile) {
+  void applyFromProfile(
+    TracerProfile profile, {
+    /// When true (onboarding), year graduated is left blank for the user to enter.
+    bool blankYearGraduated = false,
+  }) {
     displayNameController.text = profile.displayName;
     savedDisplayName = profile.displayName.trim();
     addressController.text = profile.address;
     emailController.text = profile.email;
     contactEmailController.text = profile.preferredEmail;
     savedContactEmail = profile.preferredEmail;
-    telephoneController.text = profile.telephoneNumber;
-    mobileController.text = profile.mobileNumber;
+    telephoneController.text =
+        TracerProfile.telephoneForEditing(profile.telephoneNumber);
+    mobileController.text =
+        PhMobileInputFormatter.formatDisplay(profile.mobileNumber);
     savedMobile = profile.mobileNumber;
     provinceController.text = profile.province;
     collegeController.text = profile.collegeUniversity.isNotEmpty
         ? profile.collegeUniversity
         : GtsConstants.defaultCollegeUniversity;
-    yearGraduatedController.text = profile.yearGraduated;
-    honorsController.text = profile.honorsAwards;
+    if (blankYearGraduated) {
+      yearGraduatedController.text = '';
+      yearLocked = false;
+    } else {
+      yearGraduatedController.text = profile.yearGraduated;
+      yearLocked = profile.yearGraduated.trim().isNotEmpty;
+    }
+    honorsController.text =
+        TracerProfile.optionalTextForEditing(profile.honorsAwards);
     civilStatus = profile.civilStatus;
     gender = profile.gender;
     birthDate = profile.birthDate;
@@ -136,11 +151,11 @@ class GtsProfileFormState {
     notEmployedReasons = List<String>.from(profile.notEmployedReasons);
     reasonOtherController.text = profile.notEmployedReasonOther;
     studentId = profile.studentId;
-    yearLocked = profile.yearGraduated.trim().isNotEmpty;
 
     _loaded = _snapshot();
     // The college field falls back to a default, which is not "on record".
     if (profile.collegeUniversity.isEmpty) _loaded.remove('collegeUniversity');
+    if (blankYearGraduated) _loaded.remove('yearGraduated');
   }
 
   /// Required-field values as loaded from the saved record.
@@ -161,10 +176,53 @@ class GtsProfileFormState {
   List<String> missingRequiredKeys() =>
       TracerProfile.missingRequiredKeys(completionPayload());
 
+  /// Base section keys plus employment follow-ups that are required right now
+  /// (e.g. occupation / type when Employed).
+  List<String> activeRequiredKeys([GtsFormSection? only]) {
+    final sections = only == null ? GtsFormSection.values : [only];
+    final keys = <String>[
+      for (final section in sections) ...section.requiredKeys,
+    ];
+    if (only == null || only == GtsFormSection.education) {
+      keys.addAll(_employmentFollowupRequiredKeys());
+    }
+    return keys;
+  }
+
+  List<String> _employmentFollowupRequiredKeys() {
+    final status = employmentStatus.trim().toLowerCase();
+    if (status == GtsConstants.employed.toLowerCase()) {
+      return const ['employmentType', 'employmentOccupation'];
+    }
+    if (status == GtsConstants.unemployed.toLowerCase() ||
+        status == GtsConstants.neverEmployed.toLowerCase()) {
+      final keys = <String>['notEmployedReasons'];
+      if (notEmployedReasons.contains(GtsConstants.otherReasonSpecify)) {
+        keys.add('notEmployedReasonOther');
+      }
+      return keys;
+    }
+    return const [];
+  }
+
+  bool isRequiredKeyFilled(String key) {
+    switch (key) {
+      case 'employmentType':
+        return employmentType.trim().isNotEmpty;
+      case 'employmentOccupation':
+        return occupationController.text.trim().isNotEmpty;
+      case 'notEmployedReasons':
+        return notEmployedReasons.isNotEmpty;
+      case 'notEmployedReasonOther':
+        return reasonOtherController.text.trim().isNotEmpty;
+      default:
+        return !missingRequiredKeys().contains(key);
+    }
+  }
+
   /// Filled required fields in [section] (for "3 of 4" counters).
   int filledInSection(GtsFormSection section) {
-    final missing = missingRequiredKeys().toSet();
-    return section.requiredKeys.where((k) => !missing.contains(k)).length;
+    return activeRequiredKeys(section).where(isRequiredKeyFilled).length;
   }
 
   TracerProfile toTracerProfile({required String uid, required String email}) {
@@ -182,8 +240,10 @@ class GtsProfileFormState {
       program: program,
       batchYear: yearGraduatedController.text.trim(),
       yearGraduated: yearGraduatedController.text.trim(),
-      telephoneNumber: telephoneController.text.trim(),
-      mobileNumber: mobileController.text.trim(),
+      telephoneNumber: TracerProfile.resolveTelephoneForStorage(
+        telephoneController.text,
+      ),
+      mobileNumber: PhMobileInputFormatter.digitsOnly(mobileController.text),
       address: addressController.text.trim(),
       gender: gender,
       civilStatus: civilStatus,
@@ -192,7 +252,9 @@ class GtsProfileFormState {
       province: provinceController.text.trim(),
       locationOfResidence: locationOfResidence,
       collegeUniversity: collegeController.text.trim(),
-      honorsAwards: honorsController.text.trim(),
+      honorsAwards: TracerProfile.resolveOptionalTextForStorage(
+        honorsController.text,
+      ),
       employmentStatus: employmentStatus,
       employmentType: employmentType.trim(),
       employmentOccupation: occupationController.text.trim(),
@@ -206,8 +268,10 @@ class GtsProfileFormState {
       'displayName': displayNameController.text,
       'address': addressController.text,
       'email': emailController.text,
-      'telephoneNumber': telephoneController.text,
-      'mobileNumber': mobileController.text,
+      'telephoneNumber': TracerProfile.resolveTelephoneForStorage(
+        telephoneController.text,
+      ),
+      'mobileNumber': PhMobileInputFormatter.digitsOnly(mobileController.text),
       'civilStatus': civilStatus,
       'gender': gender,
       'birthDate': birthDate,
@@ -230,11 +294,11 @@ enum GtsFormSection {
   /// Name, sex, civil status, birthday.
   personal(['displayName', 'gender', 'civilStatus', 'birthDate']),
 
-  /// Address, email, phone numbers, region, province, residence.
+  /// Address, email, mobile, region, province, residence.
+  /// Telephone is optional and is not in [requiredKeys].
   contact([
     'address',
     'email',
-    'telephoneNumber',
     'mobileNumber',
     'regionOfOrigin',
     'province',
@@ -318,7 +382,15 @@ class GtsProfileFormFields extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: switch (only) {
           GtsFormSection.personal => [
-            _nameField(),
+            if (state.savedDisplayName.isNotEmpty)
+              _lockedRow(
+                icon: Icons.person_outline,
+                label: GtsConstants.labelName,
+                value: state.savedDisplayName,
+                caption: 'Verified at registration',
+              )
+            else
+              _nameField(),
             _sexField(),
             _civilStatusField(),
             _requiredBirthdayField(context),
@@ -330,7 +402,7 @@ class GtsProfileFormFields extends StatelessWidget {
                 icon: Icons.email_outlined,
                 label: GtsConstants.labelEmail,
                 value: state.emailController.text.trim(),
-                caption: 'From your account',
+                caption: 'Verified at registration',
               )
             else
               _emailField(),
@@ -342,7 +414,7 @@ class GtsProfileFormFields extends StatelessWidget {
           ],
           GtsFormSection.education => [
             _lockedProgramRow(),
-            _collegeField(),
+            _lockedCollegeRow(),
             if (state.yearLocked)
               _lockedRow(
                 icon: Icons.calendar_today_outlined,
@@ -359,7 +431,7 @@ class GtsProfileFormFields extends StatelessWidget {
                   top: OnboardingSpacing.xs,
                   bottom: OnboardingSpacing.sm,
                 ),
-                child: Text(
+                child: onboardingLabelWithRequiredMark(
                   _req(GtsConstants.labelEmploymentStatus),
                   style: PortalTheme.cardTitle,
                 ),
@@ -422,10 +494,9 @@ class GtsProfileFormFields extends StatelessWidget {
     );
   }
 
-  /// Step mode only: reassures that an untouched value came from the record.
-  String? _recordHint(String key) => section != null && state.isFromRecord(key)
-      ? 'From your alumni record'
-      : null;
+  /// Optional helper under fields. Onboarding steps no longer show
+  /// "From your alumni record".
+  String? _recordHint(String key) => null;
 
   Widget _nameField() => _text(
     controller: state.displayNameController,
@@ -443,6 +514,8 @@ class GtsProfileFormFields extends StatelessWidget {
     label: _req(GtsConstants.labelPermanentAddress),
     icon: Icons.home_outlined,
     maxLines: 2,
+    // Campus address as a concrete local example (clearer than abstract labels).
+    hint: 'e.g. Purok-6, Mobod, Oroquieta City',
     helperText: _recordHint('address'),
   );
 
@@ -454,7 +527,7 @@ class GtsProfileFormFields extends StatelessWidget {
     helperText: showContactEmail
         ? 'Used to sign in'
         : emailReadOnly
-        ? 'From your account'
+        ? 'Verified at registration'
         : null,
     keyboard: TextInputType.emailAddress,
   );
@@ -473,6 +546,12 @@ class GtsProfileFormFields extends StatelessWidget {
   String? _contactError(ContactChannel channel, String? value) {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'Required';
+    if (channel == ContactChannel.mobile) {
+      if (!ContactNormalizer.isPhilippineMobile(v)) {
+        return ContactNormalizer.invalidMessage(channel);
+      }
+      return null;
+    }
     if (showContactEmail &&
         state.contactChanged(channel) &&
         ContactNormalizer.normalize(channel, v) == null) {
@@ -483,10 +562,13 @@ class GtsProfileFormFields extends StatelessWidget {
 
   Widget _telephoneField() => _text(
     controller: state.telephoneController,
-    label: _req(GtsConstants.labelTelephone),
+    label: GtsConstants.labelTelephone,
     icon: Icons.phone_outlined,
     keyboard: TextInputType.phone,
-    helperText: _recordHint('telephoneNumber'),
+    required: false,
+    hint: 'Optional — leave blank for N/A',
+    helperText: _recordHint('telephoneNumber') ??
+        'Landline or other contact. Saved as N/A if empty.',
   );
 
   Widget _mobileField() => _text(
@@ -494,7 +576,8 @@ class GtsProfileFormFields extends StatelessWidget {
     label: _req(GtsConstants.labelMobile),
     icon: Icons.smartphone_outlined,
     keyboard: TextInputType.phone,
-    helperText: _recordHint('mobileNumber'),
+    hint: '0917 123 4567',
+    inputFormatters: const [PhMobileInputFormatter()],
     validator: (v) => _contactError(ContactChannel.mobile, v),
   );
 
@@ -653,7 +736,7 @@ class GtsProfileFormFields extends StatelessWidget {
         hint: 'Not set yet',
         icon: Icons.menu_book_outlined,
         readOnly: true,
-        helperText: 'Set by the alumni office',
+        helperText: 'Verified at registration',
       ),
     ),
   );
@@ -664,19 +747,42 @@ class GtsProfileFormFields extends StatelessWidget {
     icon: Icons.school_outlined,
     minLines: 1,
     maxLines: 4,
-    helperText: _recordHint('collegeUniversity'),
+    readOnly: true,
+    helperText: 'Verified at registration',
   );
+
+  /// Graduation year: 4 digits, not after the current calendar year.
+  static String? validateYearGraduated(String? value, {int? maxYear}) {
+    final t = value?.trim() ?? '';
+    if (t.isEmpty) return 'Required';
+    if (!RegExp(r'^\d{4}$').hasMatch(t)) {
+      return 'Enter a 4-digit year';
+    }
+    final y = int.parse(t);
+    final cap = maxYear ?? DateTime.now().year;
+    if (y < 1950 || y > cap) {
+      return 'Enter a year from 1950 to $cap';
+    }
+    return null;
+  }
 
   Widget _yearGraduatedField() => _text(
     controller: state.yearGraduatedController,
     label: _req(GtsConstants.labelYearGraduated),
     icon: Icons.calendar_today_outlined,
-    hint: 'e.g. 2024',
+    hint: 'e.g. ${DateTime.now().year}',
     keyboard: TextInputType.number,
     readOnly: demographicReadOnly || state.yearLocked,
     helperText: (demographicReadOnly || state.yearLocked)
         ? 'Contact the alumni office to change this'
         : null,
+    inputFormatters: [
+      FilteringTextInputFormatter.digitsOnly,
+      LengthLimitingTextInputFormatter(4),
+    ],
+    validator: (demographicReadOnly || state.yearLocked)
+        ? null
+        : (v) => validateYearGraduated(v),
   );
 
   Widget _honorsField() => _text(
@@ -684,6 +790,9 @@ class GtsProfileFormFields extends StatelessWidget {
     label: GtsConstants.labelHonorsAwards,
     icon: Icons.emoji_events_outlined,
     required: false,
+    hint: 'Optional — leave blank for N/A',
+    helperText: _recordHint('honorsAwards') ??
+        'Honors or awards. Saved as N/A if empty.',
   );
 
   Widget _employmentField() => Column(
@@ -805,7 +914,7 @@ class GtsProfileFormFields extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  onboardingLabelWithRequiredMark(
                     _req(GtsConstants.labelEmploymentType),
                     style: const TextStyle(
                       fontSize: 14,
@@ -875,7 +984,7 @@ class GtsProfileFormFields extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  onboardingLabelWithRequiredMark(
                     _req(GtsConstants.labelNotEmployedReasons),
                     style: const TextStyle(
                       fontSize: 14,
@@ -987,7 +1096,7 @@ class GtsProfileFormFields extends StatelessWidget {
     );
   }
 
-  /// Degree is set by the alumni office; an empty one blocks the step with
+  /// Degree is set at registration; an empty one blocks the step with
   /// an explanation instead of an unfixable "Required".
   Widget _lockedProgramRow() {
     final program = state.program.trim();
@@ -1004,12 +1113,24 @@ class GtsProfileFormFields extends StatelessWidget {
             icon: Icons.menu_book_outlined,
             label: GtsConstants.labelDegreeSpecialization,
             value: program.isEmpty ? 'Not set yet' : program,
-            caption: 'Set by the alumni office',
+            caption: 'Verified at registration',
             padBottom: !field.hasError,
           ),
           if (field.hasError) _fieldError(field.errorText!),
         ],
       ),
+    );
+  }
+
+  Widget _lockedCollegeRow() {
+    if (state.collegeController.text.trim().isEmpty) {
+      state.collegeController.text = GtsConstants.defaultCollegeUniversity;
+    }
+    return _lockedRow(
+      icon: Icons.school_outlined,
+      label: GtsConstants.labelCollegeUniversity,
+      value: state.collegeController.text.trim(),
+      caption: 'Verified at registration',
     );
   }
 
@@ -1165,6 +1286,7 @@ class GtsProfileFormFields extends StatelessWidget {
     bool readOnly = false,
     bool required = true,
     FormFieldValidator<String>? validator,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
@@ -1176,6 +1298,7 @@ class GtsProfileFormFields extends StatelessWidget {
         readOnly: readOnly,
         enabled: enabled,
         style: _fieldStyle,
+        inputFormatters: inputFormatters,
         validator:
             validator ??
             (required
@@ -1268,6 +1391,9 @@ class OnboardingGtsEmploymentStatus extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final narrow = constraints.maxWidth < 420;
+          // Fixed height keeps the three options equal inside a scroll view
+          // (stretch + alignment would expand to infinite height there).
+          const optionHeight = 64.0;
           final children = GtsConstants.employmentStatuses.map((status) {
             final selected = value == status;
             final radius = BorderRadius.circular(PortalTheme.radiusMd);
@@ -1284,18 +1410,18 @@ class OnboardingGtsEmploymentStatus extends StatelessWidget {
                   borderRadius: radius,
                   child: AnimatedContainer(
                     duration: PortalTheme.fast,
-                    width: narrow ? double.infinity : null,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                      horizontal: 10,
-                    ),
+                    width: double.infinity,
+                    height: optionHeight,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: BoxDecoration(
                       borderRadius: radius,
                       border: Border.all(
                         color: selected ? PortalTheme.navy : PortalTheme.border,
-                        width: selected ? 2 : 1,
+                        // Same width always so selection does not resize the card.
+                        width: 2,
                       ),
                     ),
+                    alignment: Alignment.center,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -1313,8 +1439,11 @@ class OnboardingGtsEmploymentStatus extends StatelessWidget {
                           child: Text(
                             status,
                             textAlign: TextAlign.center,
+                            maxLines: 2,
+                            softWrap: true,
                             style: PortalTheme.button.copyWith(
                               fontSize: 13,
+                              height: 1.2,
                               color: selected
                                   ? PortalTheme.navy
                                   : PortalTheme.textSecondary,

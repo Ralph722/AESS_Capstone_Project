@@ -492,7 +492,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
               fullName: input.fullName,
               course: input.course,
               studentId: input.studentId,
-              yearGraduated: input.yearGraduated,
             );
             await _auditService.logAction(
               action: 'CREATE_ROSTER_MEMBER',
@@ -510,7 +509,6 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
               fullName: input.fullName,
               course: input.course,
               studentId: input.studentId,
-              yearGraduated: input.yearGraduated,
             );
             await _auditService.logAction(
               action: 'UPDATE_ROSTER_MEMBER',
@@ -1115,7 +1113,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
           icon: Icons.groups_outlined,
           title: 'No alumni on the alumni list yet',
           message:
-              'Add members one at a time or import an Excel file with columns: Full Name, Course, ID Number, and optionally Year Graduated.',
+              'Add members one at a time or import an Excel file with columns: '
+              'Full Name, Course, and ID Number. Year Graduated is set by the '
+              'alumnus during onboarding (an Excel year column is ignored).',
           primaryAction: AdminStateAction(
             label: 'Add Alumni',
             icon: Icons.person_add_alt_1,

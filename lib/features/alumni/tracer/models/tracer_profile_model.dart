@@ -110,12 +110,15 @@ class TracerProfile {
   bool get mobileDemoConfirmed =>
       !mobileVerified && mobileVerificationMethod == 'mock';
 
+  /// Stored when the optional landline / other contact field is left blank.
+  static const telephoneNotApplicable = 'N/A';
+
   /// GTS Section A + B item 12 (employment collected separately in onboarding).
+  /// Telephone is optional and is not counted toward completion.
   static const profileRequiredFieldKeys = [
     'displayName',
     'address',
     'email',
-    'telephoneNumber',
     'mobileNumber',
     'civilStatus',
     'gender',
@@ -138,7 +141,6 @@ class TracerProfile {
         _readString(data, 'displayName').trim().isNotEmpty,
         _readString(data, 'address').trim().isNotEmpty,
         _readString(data, 'email').trim().isNotEmpty,
-        _readString(data, 'telephoneNumber').trim().isNotEmpty,
         _readContact(data).trim().isNotEmpty,
         _readString(data, 'civilStatus').trim().isNotEmpty,
         _readString(data, 'gender').trim().isNotEmpty,
@@ -150,6 +152,31 @@ class TracerProfile {
         _readString(data, 'collegeUniversity').trim().isNotEmpty,
         _readString(data, 'yearGraduated').trim().isNotEmpty,
       ];
+
+  /// Persist blank optional text fields as [telephoneNotApplicable] (`N/A`).
+  static String resolveOptionalTextForStorage(String? value) {
+    final t = (value ?? '').trim();
+    if (t.isEmpty) return telephoneNotApplicable;
+    if (t.toUpperCase() == telephoneNotApplicable) {
+      return telephoneNotApplicable;
+    }
+    return t;
+  }
+
+  /// Empty form value when the stored optional text is the N/A placeholder.
+  static String optionalTextForEditing(String? value) {
+    final t = (value ?? '').trim();
+    if (t.isEmpty || t.toUpperCase() == telephoneNotApplicable) return '';
+    return t;
+  }
+
+  /// Persist blank telephone as [telephoneNotApplicable] for records/exports.
+  static String resolveTelephoneForStorage(String? value) =>
+      resolveOptionalTextForStorage(value);
+
+  /// Empty form value when the stored telephone is the N/A placeholder.
+  static String telephoneForEditing(String? value) =>
+      optionalTextForEditing(value);
 
   static double computeProfileCompletion(Map<String, dynamic> data) {
     final checks = _profileCompletionChecks(data);
@@ -339,7 +366,8 @@ class TracerProfile {
       'student_id': studentId.trim(),
       'program': program.trim(),
       'year_graduated': year,
-      'telephone_number': telephoneNumber.trim(),
+      'telephone_number':
+          TracerProfile.resolveTelephoneForStorage(telephoneNumber),
       'mobile_number': mobile,
       'address': address.trim(),
       'gender': gender.trim(),
@@ -351,7 +379,8 @@ class TracerProfile {
       'college_university': collegeUniversity.trim().isNotEmpty
           ? collegeUniversity.trim()
           : GtsConstants.defaultCollegeUniversity,
-      'honors_awards': honorsAwards.trim(),
+      'honors_awards':
+          TracerProfile.resolveOptionalTextForStorage(honorsAwards),
       'employment_status': employmentStatus.trim(),
       'employment_type': employmentType.trim(),
       'employment_occupation': employmentOccupation.trim(),

@@ -66,7 +66,7 @@ class AlumniRosterImportService {
       } catch (_) {
         throw FormatException(
           'Could not read the Excel file. Use columns: Full Name, Course, '
-          'ID Number, and optionally Year Graduated. ($e)',
+          'and ID Number. ($e)',
         );
       }
     }
@@ -383,7 +383,6 @@ class AlumniRosterImportService {
       final name = parts.isNotEmpty ? parts[0] : '';
       final course = parts.length > 1 ? parts[1] : '';
       final id = parts.length > 2 ? parts[2] : '';
-      final year = parts.length > 3 ? parts[3] : '';
 
       if (name.isEmpty && course.isEmpty && id.isEmpty) continue;
 
@@ -393,7 +392,8 @@ class AlumniRosterImportService {
           fullName: name,
           course: course,
           studentId: id,
-          yearGraduated: year,
+          // Year Graduated column (if present) is intentionally ignored.
+          yearGraduated: '',
         ),
       );
     }
@@ -431,7 +431,6 @@ class AlumniRosterImportService {
           fullName: row.fullName,
           course: prog,
           studentId: row.studentId,
-          yearGraduated: row.yearGraduated,
           skipDuplicateCheck: true,
         );
         existingKeys.add(key);

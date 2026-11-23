@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/features/alumni/tracer/data/tracer_reminder_service.dart';
 import 'package:alumni_system/features/alumni/tracer/presentation/tracer_reminder_sheet.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_progress.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
-import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_wizard.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
@@ -32,18 +32,8 @@ class TracerIntroView extends StatelessWidget {
   final VoidCallback? onSetReminder;
   final VoidCallback? onCancelReminder;
 
-  int get _requiredPercent {
-    final visible = ChedGtsVisibility.visibleItemIds(answers);
-    final requiredCount = ChedGtsBuiltin.items
-        .where((i) => i.required && visible.contains(i.id))
-        .length;
-    if (requiredCount == 0) return 0;
-    final missing = ChedGtsVisibility.missingRequired(answers).length;
-    return (((requiredCount - missing) / requiredCount) * 100).round().clamp(
-      0,
-      100,
-    );
-  }
+  int get _requiredPercent =>
+      ChedGtsProgress.introPercent(answers, hasDraft: hasDraft);
 
   String get _startLabel => hasDraft ? 'Continue answering' : 'Answer now';
 

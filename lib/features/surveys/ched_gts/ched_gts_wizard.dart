@@ -7,6 +7,7 @@ import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
 import 'package:alumni_system/shared/widgets/user/portal_breakpoints.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_contacts.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_form.dart';
+import 'package:alumni_system/features/surveys/ched_gts/ched_gts_progress.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_schema.dart';
 import 'package:alumni_system/features/surveys/ched_gts/ched_gts_visibility.dart';
 import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
@@ -139,18 +140,10 @@ class _ChedGtsWizardState extends State<ChedGtsWizard> {
     super.dispose();
   }
 
-  int get _overallRequiredPercent {
-    final visible = ChedGtsVisibility.visibleItemIds(widget.answers);
-    final requiredCount = ChedGtsBuiltin.items
-        .where((i) => i.required && visible.contains(i.id))
-        .length;
-    if (requiredCount == 0) return 0;
-    final missing = ChedGtsVisibility.missingRequired(widget.answers).length;
-    return (((requiredCount - missing) / requiredCount) * 100).round().clamp(
-      0,
-      100,
-    );
-  }
+  int get _overallRequiredPercent => ChedGtsProgress.wizardPercent(
+    widget.answers,
+    onReviewOrVerify: _isReview || _isVerify,
+  );
 
   void _setStep(int step) {
     setState(() {

@@ -346,7 +346,7 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
     if (!hasActions) return const SizedBox.shrink();
 
     final actionCount = (_hasTracer ? 1 : 0) + (_hasSurveys ? 1 : 0);
-    final badgeLabel = dueSoon ? 'DUE SOON' : 'ACTION';
+    final badgeLabel = dueSoon ? 'DUE SOON' : 'Important';
     final title = actionCount == 1
         ? (_hasTracer
               ? 'Graduate Tracer Survey'
@@ -451,17 +451,6 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      dueSoon
-                          ? 'Due soon — needs your attention'
-                          : 'Needs attention',
-                      style: PortalTheme.meta.copyWith(
-                        color: PortalTheme.navy.withValues(alpha: 0.7),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
                     Text(
                       title,
                       style: PortalTheme.display.copyWith(

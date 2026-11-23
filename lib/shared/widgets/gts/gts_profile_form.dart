@@ -608,7 +608,7 @@ class GtsProfileFormFields extends StatelessWidget {
             label: _req(GtsConstants.labelSex),
             icon: Icons.wc_outlined,
             readOnly: true,
-            helperText: 'Verified demographic record · Read only',
+            helperText: 'Verified record · Read only',
           ),
         ),
       );
@@ -643,7 +643,7 @@ class GtsProfileFormFields extends StatelessWidget {
             label: _req(GtsConstants.labelBirthday),
             icon: Icons.cake_outlined,
             readOnly: true,
-            helperText: 'Verified demographic record · Read only',
+            helperText: 'Verified record · Read only',
           ),
         ),
       );
@@ -687,7 +687,7 @@ class GtsProfileFormFields extends StatelessWidget {
             label: _req(GtsConstants.labelRegionOfOrigin),
             icon: Icons.map_outlined,
             readOnly: true,
-            helperText: 'Verified demographic record · Read only',
+            helperText: 'Verified record · Read only',
           ),
         ),
       );

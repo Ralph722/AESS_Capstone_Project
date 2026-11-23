@@ -1033,7 +1033,7 @@ class _ItemCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Verified institutional demographic record · Read only',
+                      'Verified record · Read only',
                       style: PortalTheme.meta.copyWith(
                         fontSize: 12,
                         color: PortalTheme.textSecondary,

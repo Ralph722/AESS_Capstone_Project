@@ -496,8 +496,9 @@ abstract final class ChedGtsBuiltin {
       prompt: 'Is your first job related to the course you took up in college?',
       options: const [yes, no],
       helpText:
-          'Yes if your first job after college used the knowledge or '
-          'skills from your course.',
+          'Select Yes if your first job aligns with your college degree '
+          'program (e.g., working in IT after graduating with a BSIT '
+          'degree).',
       required: true,
     ),
     ChedGtsItem(
@@ -683,8 +684,9 @@ abstract final class ChedGtsBuiltin {
           'Was the curriculum you had in college relevant to your first job?',
       options: const [yes, no],
       helpText:
-          'Yes if what you studied in college was useful in your first '
-          'job.',
+          'Select Yes if the specific subjects, lessons, and training '
+          'included in your college program were useful in performing '
+          'your first job.',
       required: true,
     ),
     ChedGtsItem(

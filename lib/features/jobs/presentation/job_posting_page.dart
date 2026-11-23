@@ -186,6 +186,13 @@ class JobPostingScreenState extends State<JobPostingScreen> {
     }
   }
 
+  /// True when the user is searching or has narrowed the list with chips.
+  bool get _hasSearchOrFilters =>
+      _search.text.trim().isNotEmpty ||
+      _category != 'all' ||
+      _type != 'all' ||
+      _remoteOnly != null;
+
   List<JobPosting> get _filtered {
     final q = _search.text.trim().toLowerCase();
     var list = List<JobPosting>.from(_jobs);
@@ -463,6 +470,7 @@ class JobPostingScreenState extends State<JobPostingScreen> {
                 SliverToBoxAdapter(child: _closedSavedNote()),
               if (!_loading &&
                   !_showSavedOnly &&
+                  !_hasSearchOrFilters &&
                   _recommended.isNotEmpty &&
                   !_showRecommendedOnly)
                 SliverToBoxAdapter(

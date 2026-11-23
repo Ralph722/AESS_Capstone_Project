@@ -39,9 +39,9 @@ class TracerHistoryScreen extends StatelessWidget {
       body: history.isEmpty
           ? const PortalEmptyState(
               icon: Icons.history_outlined,
-              title: 'No CHED history yet',
+              title: 'No responses yet',
               subtitle:
-                  'Submitted CHED Graduate Tracer responses will appear here '
+                  'Your Graduate Tracer responses will appear here '
                   'for your records.',
             )
           : PortalContentFrame(

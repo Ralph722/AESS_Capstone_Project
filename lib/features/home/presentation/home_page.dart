@@ -217,8 +217,14 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       ]);
       final page = results[0] as ForumTopicPage;
       final todayCount = results[1] as int;
+      // Home preview is public-facing: hide pending job offers (author/admin
+      // can still open them from Community → Awaiting review).
       final topics = page.topics
-          .where((t) => !t.isAnnouncement)
+          .where(
+            (t) =>
+                !t.isAnnouncement &&
+                (!t.isJobOffer || t.isApprovedJobOffer),
+          )
           .take(3)
           .toList();
       if (mounted) {
@@ -244,12 +250,27 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
       final now = DateTime.now();
       final start = DateTime(now.year, now.month, now.day);
       final end = start.add(const Duration(days: 1));
-      return await _supabase
+      final startIso = start.toUtc().toIso8601String();
+      final endIso = end.toUtc().toIso8601String();
+
+      // Discussions count on create day; job offers only after approval (reviewed_at).
+      final discussionCount = await _supabase
           .from('forum_topics')
-          .count(CountOption.exact)
-          .gte('created_at', start.toUtc().toIso8601String())
-          .lt('created_at', end.toUtc().toIso8601String())
-          .eq('is_announcement', false);
+          .select('id')
+          .gte('created_at', startIso)
+          .lt('created_at', endIso)
+          .eq('is_announcement', false)
+          .eq('review_status', ForumReviewStatus.none.wireValue)
+          .count(CountOption.exact);
+      final approvedJobCount = await _supabase
+          .from('forum_topics')
+          .select('id')
+          .gte('reviewed_at', startIso)
+          .lt('reviewed_at', endIso)
+          .eq('post_kind', ForumPostKind.jobOffer.wireValue)
+          .eq('review_status', ForumReviewStatus.approved.wireValue)
+          .count(CountOption.exact);
+      return discussionCount.count + approvedJobCount.count;
     } catch (_) {
       return 0;
     }

@@ -84,6 +84,46 @@ class ForumStatusChip extends StatelessWidget {
     icon: Icons.mark_chat_unread_outlined,
   );
 
+  factory ForumStatusChip.jobOffer() => const ForumStatusChip(
+    label: 'Job offer',
+    foreground: ForumTheme.navy,
+    background: Color(0xFFE8EEF9),
+    icon: Icons.work_outline_rounded,
+  );
+
+  factory ForumStatusChip.jobPending() => const ForumStatusChip(
+    label: 'Awaiting review',
+    foreground: ForumTheme.needsResponse,
+    background: ForumTheme.needsResponseBg,
+    icon: Icons.hourglass_top_rounded,
+  );
+
+  factory ForumStatusChip.visibility(ForumTopic topic) {
+    final program = topic.authorProgram.trim();
+    final batch = topic.authorBatch.trim();
+    final String label;
+    switch (topic.visibility) {
+      case ForumTopicVisibility.everyone:
+        label = 'Everyone';
+      case ForumTopicVisibility.program:
+        label = program.isEmpty ? 'Program' : program;
+      case ForumTopicVisibility.programBatch:
+        if (program.isNotEmpty && batch.isNotEmpty) {
+          label = '$program · $batch';
+        } else if (program.isNotEmpty) {
+          label = program;
+        } else {
+          label = 'Program · Batch';
+        }
+    }
+    return ForumStatusChip(
+      label: label,
+      foreground: ForumTheme.navy,
+      background: ForumTheme.navy.withValues(alpha: 0.08),
+      icon: Icons.visibility_outlined,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -125,12 +165,24 @@ class ForumStatusChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = <Widget>[];
     if (topic.isAnnouncement) chips.add(ForumStatusChip.announcement());
+    if (topic.isJobOffer) {
+      chips.add(ForumStatusChip.jobOffer());
+      if (topic.isPendingJobOffer) {
+        chips.add(ForumStatusChip.jobPending());
+      }
+    }
     if (topic.isPinned && !topic.isAnnouncement) {
       chips.add(ForumStatusChip.pinned());
     }
-    if (topic.isLocked) chips.add(ForumStatusChip.locked());
+    if (topic.isLocked && !topic.isPendingJobOffer) {
+      chips.add(ForumStatusChip.locked());
+    }
     if (topic.isSolved) chips.add(ForumStatusChip.solved());
     if (topic.needsResponse) chips.add(ForumStatusChip.needsResponse());
+    if (!topic.isAnnouncement &&
+        topic.visibility != ForumTopicVisibility.everyone) {
+      chips.add(ForumStatusChip.visibility(topic));
+    }
     if (chips.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: 6, runSpacing: 6, children: chips);
   }
@@ -214,7 +266,18 @@ class ForumTopicCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (topic.isJobOffer && topic.coverImageUrl.trim().isNotEmpty)
+                AspectRatio(
+                  aspectRatio: 16 / 7,
+                  child: AppImage.widget(
+                    topic.coverImageUrl,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              Padding(
             padding: EdgeInsets.fromLTRB(
               compact ? 14 : 16,
               compact ? 14 : 16,
@@ -375,12 +438,15 @@ class ForumTopicCard extends StatelessWidget {
               ],
             ),
           ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   String _authorContext(ForumTopic topic) {
+    if (topic.isAnnouncement) return 'Community Admin';
     final parts = <String>[
       if (topic.authorProgram.isNotEmpty) topic.authorProgram,
       if (topic.authorBatch.isNotEmpty) 'Batch ${topic.authorBatch}',
@@ -390,22 +456,31 @@ class ForumTopicCard extends StatelessWidget {
 
   bool _hasStatusOrTags(ForumTopic topic) {
     return topic.isAnnouncement ||
-        topic.isPinned ||
+        topic.isJobOffer ||
         topic.isLocked ||
         topic.isSolved ||
         topic.needsResponse ||
+        (!topic.isAnnouncement &&
+            topic.visibility != ForumTopicVisibility.everyone) ||
         topic.tags.isNotEmpty;
   }
 
+  /// Status chips for the main feed card. Pinned is omitted here — the feed
+  /// already groups those topics under a "Pinned" section header. Awaiting
+  /// review is only shown on the opened topic (see [ForumStatusChipRow]).
   List<Widget> _statusChips(ForumTopic topic) {
     final chips = <Widget>[];
     if (topic.isAnnouncement) chips.add(ForumStatusChip.announcement());
-    if (topic.isPinned && !topic.isAnnouncement) {
-      chips.add(ForumStatusChip.pinned());
+    if (topic.isJobOffer) chips.add(ForumStatusChip.jobOffer());
+    if (topic.isLocked && !topic.isPendingJobOffer) {
+      chips.add(ForumStatusChip.locked());
     }
-    if (topic.isLocked) chips.add(ForumStatusChip.locked());
     if (topic.isSolved) chips.add(ForumStatusChip.solved());
     if (topic.needsResponse) chips.add(ForumStatusChip.needsResponse());
+    if (!topic.isAnnouncement &&
+        topic.visibility != ForumTopicVisibility.everyone) {
+      chips.add(ForumStatusChip.visibility(topic));
+    }
     return chips;
   }
 

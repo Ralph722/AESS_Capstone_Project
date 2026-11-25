@@ -357,4 +357,32 @@ class ImageStorageService {
       await _supabase.storage.from(bucket).remove(['jobs/$safeJobId/logo.jpg']);
     } catch (_) {}
   }
+
+  /// Cover image for a community forum job offer (alumni upload; public read).
+  /// Path is uid-scoped so storage RLS can authorize the owner.
+  Future<String> uploadForumJobCoverImage({
+    required String userId,
+    required String topicId,
+    required Uint8List bytes,
+  }) {
+    final safeUid = sanitizePathSegment(userId, label: 'userId');
+    final safeTopicId = sanitizePathSegment(topicId, label: 'topicId');
+    return uploadImage(
+      bytes: bytes,
+      path: 'forum_jobs/$safeUid/$safeTopicId/cover.jpg',
+    );
+  }
+
+  Future<void> deleteForumJobCoverImage({
+    required String userId,
+    required String topicId,
+  }) async {
+    try {
+      final safeUid = sanitizePathSegment(userId, label: 'userId');
+      final safeTopicId = sanitizePathSegment(topicId, label: 'topicId');
+      await _supabase.storage.from(bucket).remove([
+        'forum_jobs/$safeUid/$safeTopicId/cover.jpg',
+      ]);
+    } catch (_) {}
+  }
 }

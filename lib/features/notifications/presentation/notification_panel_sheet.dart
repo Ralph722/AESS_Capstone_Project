@@ -10,18 +10,40 @@ import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
-/// Alumni notification sheet (Home bell). Stays live while open.
-Future<void> showNotificationPanel(BuildContext context) {
+/// Alumni notification sheet (Home / Community bell). Stays live while open.
+///
+/// Pass [type] to scope the list (e.g. [NotificationType.forum] on Community).
+Future<void> showNotificationPanel(
+  BuildContext context, {
+  NotificationType? type,
+  String title = 'Notifications',
+  String emptySubtitle =
+      'Updates about events, jobs, and community will show up here.',
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const NotificationPanelSheet(),
+    builder: (_) => NotificationPanelSheet(
+      type: type,
+      title: title,
+      emptySubtitle: emptySubtitle,
+    ),
   );
 }
 
 class NotificationPanelSheet extends StatefulWidget {
-  const NotificationPanelSheet({super.key});
+  const NotificationPanelSheet({
+    super.key,
+    this.type,
+    this.title = 'Notifications',
+    this.emptySubtitle =
+        'Updates about events, jobs, and community will show up here.',
+  });
+
+  final NotificationType? type;
+  final String title;
+  final String emptySubtitle;
 
   @override
   State<NotificationPanelSheet> createState() => _NotificationPanelSheetState();
@@ -52,8 +74,8 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
   Future<void> _load() async {
     try {
       final results = await Future.wait([
-        _service.fetchPage(limit: _limit),
-        _service.getUnreadCount(),
+        _service.fetchPage(limit: _limit, type: widget.type),
+        _service.getUnreadCount(type: widget.type),
       ]);
       if (!mounted) return;
       setState(() {
@@ -79,12 +101,16 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
       _unread = 0;
     });
     try {
-      await _service.markAllAsRead();
+      await _service.markAllAsRead(type: widget.type);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('All notifications marked as read'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(
+            widget.type == null
+                ? 'All notifications marked as read'
+                : 'Community notifications marked as read',
+          ),
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (_) {
@@ -124,7 +150,8 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
           children: [
             _buildHeader(),
             Expanded(child: _buildBody()),
-            if (_items.isNotEmpty) _buildFooter(),
+            // Community panel is already the full forum list — no "see all".
+            if (_items.isNotEmpty && widget.type == null) _buildFooter(),
           ],
         ),
       ),
@@ -177,7 +204,7 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Notifications',
+                          widget.title,
                           style: PortalTheme.pageTitle.copyWith(fontSize: 18),
                         ),
                         const SizedBox(height: 2),
@@ -222,11 +249,10 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
       return PortalErrorState(error: _error, onRetry: _load);
     }
     if (_items.isEmpty) {
-      return const PortalEmptyState(
+      return PortalEmptyState(
         icon: Icons.notifications_none_rounded,
         title: 'No notifications',
-        subtitle:
-            'Updates about events, jobs, and community will show up here.',
+        subtitle: widget.emptySubtitle,
       );
     }
     final groups = groupNotifications(_items);
@@ -258,7 +284,9 @@ class _NotificationPanelSheetState extends State<NotificationPanelSheet> {
       child: SafeArea(
         top: false,
         child: TextButton(
-          onPressed: () => _openPage(const NotificationsScreen()),
+          onPressed: () => _openPage(
+            NotificationsScreen(initialType: widget.type),
+          ),
           style: TextButton.styleFrom(
             foregroundColor: PortalTheme.navy,
             padding: const EdgeInsets.symmetric(vertical: 14),

@@ -28,6 +28,9 @@ class ForumService {
 
   static const int titleMaxLength = 120;
   static const int bodyMaxLength = 8000;
+  static const int purposeLetterMaxLength = 2000;
+  static const int applyUrlMaxLength = 500;
+  static const int declineReasonMaxLength = 500;
 
   /// Canonical shareable URL (was the unhandled `aess://` scheme, whose
   /// copied links opened nothing).
@@ -58,12 +61,37 @@ class ForumService {
   // Tags
   // ---------------------------------------------------------------------------
 
-  Future<List<ForumTag>> fetchTags() async {
+  static const _hiddenTagSlugs = {'internship', 'scholarship'};
+
+  /// Session cache so the composer does not flash a tags loader on every open.
+  static List<ForumTag>? _tagsCache;
+
+  /// Session cache for visibility chips (program / batch enablement).
+  static ({String program, String batch})? _viewerAudienceCache;
+
+  List<ForumTag>? get cachedTags => _tagsCache;
+
+  ({String program, String batch})? get cachedViewerAudience =>
+      _viewerAudienceCache;
+
+  void cacheViewerAudience({required String program, required String batch}) {
+    _viewerAudienceCache = (program: program, batch: batch);
+  }
+
+  Future<List<ForumTag>> fetchTags({bool forceRefresh = false}) async {
+    if (!forceRefresh && _tagsCache != null) {
+      return List<ForumTag>.of(_tagsCache!);
+    }
     final rows = await _supabase
         .from('forum_tags')
         .select()
         .order('sort_order', ascending: true);
-    return rows.map(ForumTag.fromSupabaseRow).toList();
+    final tags = rows
+        .map(ForumTag.fromSupabaseRow)
+        .where((t) => !_hiddenTagSlugs.contains(t.slug.trim().toLowerCase()))
+        .toList();
+    _tagsCache = tags;
+    return List<ForumTag>.of(tags);
   }
 
   Future<void> _setTopicTags(String topicId, List<String> tagIds) async {
@@ -87,6 +115,7 @@ class ForumService {
     required String body,
     List<String> tagIds = const [],
     bool asAnnouncement = false,
+    ForumTopicVisibility visibility = ForumTopicVisibility.everyone,
   }) async {
     final userId = AppSession.userId;
     if (userId == null) return;
@@ -98,6 +127,7 @@ class ForumService {
         'body': body,
         'tagIds': tagIds,
         'asAnnouncement': asAnnouncement,
+        'visibility': visibility.wireValue,
         'savedAt': DateTime.now().toIso8601String(),
       }),
     );
@@ -435,11 +465,29 @@ class ForumService {
   // Create / edit / moderate
   // ---------------------------------------------------------------------------
 
+  ForumTopicVisibility _resolveVisibility({
+    required ForumTopicVisibility visibility,
+    required String program,
+    required String batch,
+    bool forceEveryone = false,
+  }) {
+    if (forceEveryone) return ForumTopicVisibility.everyone;
+    var resolved = visibility;
+    if (resolved != ForumTopicVisibility.everyone && program.trim().isEmpty) {
+      resolved = ForumTopicVisibility.everyone;
+    }
+    if (resolved == ForumTopicVisibility.programBatch && batch.trim().isEmpty) {
+      resolved = ForumTopicVisibility.program;
+    }
+    return resolved;
+  }
+
   Future<String> createTopic({
     required String title,
     required String body,
     List<String> tagIds = const [],
     bool asAnnouncement = false,
+    ForumTopicVisibility visibility = ForumTopicVisibility.everyone,
   }) async {
     final trimmedTitle = title.trim();
     final trimmedBody = body.trim();
@@ -457,6 +505,13 @@ class ForumService {
     final now = DateTime.now();
     final id = LocalId.generate();
 
+    final resolvedVisibility = _resolveVisibility(
+      visibility: visibility,
+      program: author.program,
+      batch: author.batch,
+      forceEveryone: asAnnouncement,
+    );
+
     final topic = ForumTopic(
       id: id,
       title: trimmedTitle,
@@ -470,6 +525,7 @@ class ForumService {
       isAnnouncement: asAnnouncement,
       isPinned: asAnnouncement,
       isSolved: false,
+      visibility: resolvedVisibility,
     );
 
     try {
@@ -488,6 +544,187 @@ class ForumService {
       return id;
     } catch (e) {
       throw Exception('Error creating topic: $e');
+    }
+  }
+
+  /// Alumni community job offer — starts as pending and locked until admin review.
+  Future<String> createJobOffer({
+    required String title,
+    required String body,
+    required String purposeLetter,
+    String applyUrl = '',
+    String coverImageUrl = '',
+    ForumTopicVisibility visibility = ForumTopicVisibility.everyone,
+    List<String> tagIds = const [],
+    String? topicId,
+  }) async {
+    final trimmedTitle = title.trim();
+    final trimmedBody = body.trim();
+    final trimmedLetter = purposeLetter.trim();
+    final trimmedApply = applyUrl.trim();
+    if (trimmedTitle.isEmpty) throw Exception('Job title is required');
+    if (trimmedBody.isEmpty) throw Exception('Job details are required');
+    if (trimmedLetter.isEmpty) throw Exception('Purpose letter is required');
+    if (trimmedTitle.length > titleMaxLength) {
+      throw Exception('Job title is too long');
+    }
+    if (trimmedBody.length > bodyMaxLength) {
+      throw Exception('Job details are too long');
+    }
+    if (trimmedLetter.length > purposeLetterMaxLength) {
+      throw Exception('Purpose letter is too long');
+    }
+    if (trimmedApply.length > applyUrlMaxLength) {
+      throw Exception('Application link is too long');
+    }
+
+    final userId = AppSession.requireUserId();
+    final author = await _authorInfo(userId);
+    final now = DateTime.now();
+    final id = (topicId != null && topicId.trim().isNotEmpty)
+        ? topicId.trim()
+        : LocalId.generate();
+    final resolvedVisibility = _resolveVisibility(
+      visibility: visibility,
+      program: author.program,
+      batch: author.batch,
+    );
+
+    final topic = ForumTopic(
+      id: id,
+      title: trimmedTitle,
+      body: trimmedBody,
+      authorUid: userId,
+      authorName: author.name,
+      authorProgram: author.program,
+      authorBatch: author.batch,
+      createdAt: now,
+      updatedAt: now,
+      isLocked: true,
+      isPinned: false,
+      isSolved: false,
+      visibility: resolvedVisibility,
+      postKind: ForumPostKind.jobOffer,
+      reviewStatus: ForumReviewStatus.pending,
+      purposeLetter: trimmedLetter,
+      coverImageUrl: coverImageUrl.trim(),
+      applyUrl: trimmedApply,
+    );
+
+    try {
+      await _supabase
+          .from('forum_topics')
+          .upsert(
+            topic.toSupabaseRow(authorSupabaseId: userId),
+            onConflict: 'id',
+          );
+      await _setTopicTags(id, tagIds);
+      notifyTopicsChanged();
+      return id;
+    } catch (e) {
+      throw Exception('Error submitting job offer: $e');
+    }
+  }
+
+  /// Author edit for pending or approved job offers.
+  Future<void> updateJobOffer({
+    required String topicId,
+    required String title,
+    required String body,
+    required String purposeLetter,
+    String applyUrl = '',
+    String coverImageUrl = '',
+    ForumTopicVisibility? visibility,
+  }) async {
+    final trimmedTitle = title.trim();
+    final trimmedBody = body.trim();
+    final trimmedLetter = purposeLetter.trim();
+    final trimmedApply = applyUrl.trim();
+    if (trimmedTitle.isEmpty) throw Exception('Job title is required');
+    if (trimmedBody.isEmpty) throw Exception('Job details are required');
+    if (trimmedLetter.isEmpty) throw Exception('Purpose letter is required');
+
+    final payload = <String, dynamic>{
+      'title': trimmedTitle,
+      'body': trimmedBody,
+      'purpose_letter': trimmedLetter,
+      'apply_url': trimmedApply,
+      'cover_image_url': coverImageUrl.trim(),
+      'edited_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (visibility != null) {
+      payload['visibility'] = visibility.wireValue;
+    }
+
+    try {
+      await _supabase.from('forum_topics').update(payload).eq('id', topicId);
+      notifyTopicsChanged();
+    } catch (e) {
+      throw Exception('Error updating job offer: $e');
+    }
+  }
+
+  Future<void> withdrawJobOffer(String topicId) async {
+    try {
+      await _supabase
+          .from('forum_topics')
+          .update({
+            'review_status': ForumReviewStatus.withdrawn.wireValue,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', topicId);
+      // Soft-withdrawn rows stay author-only; delete so they leave the queue.
+      await _supabase.from('forum_topics').delete().eq('id', topicId);
+      notifyTopicsChanged();
+    } catch (e) {
+      throw Exception('Error withdrawing job offer: $e');
+    }
+  }
+
+  Future<void> reviewJobOffer({
+    required String topicId,
+    required bool approve,
+    String? declineReason,
+  }) async {
+    try {
+      await _supabase.rpc(
+        'review_forum_job_offer',
+        params: {
+          'p_topic_id': topicId,
+          'p_approve': approve,
+          'p_decline_reason': declineReason,
+        },
+      );
+      notifyTopicsChanged();
+    } catch (e) {
+      throw Exception('Error reviewing job offer: $e');
+    }
+  }
+
+  /// Pending job offers for the admin review queue.
+  Future<List<ForumTopic>> fetchPendingJobOffers() async {
+    final rows = await _supabase
+        .from('forum_topics')
+        .select('*, forum_topic_tags(forum_tags(*))')
+        .eq('post_kind', ForumPostKind.jobOffer.wireValue)
+        .eq('review_status', ForumReviewStatus.pending.wireValue)
+        .order('created_at', ascending: false)
+        .limit(200);
+    return rows.map(ForumTopic.fromSupabaseRow).toList();
+  }
+
+  Future<int> getPendingJobOfferCount() async {
+    try {
+      final response = await _supabase
+          .from('forum_topics')
+          .select('id')
+          .eq('post_kind', ForumPostKind.jobOffer.wireValue)
+          .eq('review_status', ForumReviewStatus.pending.wireValue)
+          .count(CountOption.exact);
+      return response.count;
+    } catch (_) {
+      return 0;
     }
   }
 

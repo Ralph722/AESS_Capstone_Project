@@ -107,22 +107,40 @@ class _ForumFormattedTextState extends State<ForumFormattedText> {
         Container(
           width: double.infinity,
           margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
           decoration: BoxDecoration(
             color: PortalTheme.surfaceMuted,
             borderRadius: BorderRadius.circular(8),
-            border: const Border(
-              left: BorderSide(color: PortalTheme.navy, width: 3),
-            ),
+            border: Border.all(color: PortalTheme.border),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final q in quoteLines)
-                q.trim().isEmpty
-                    ? SizedBox(height: lineHeight * 0.5)
-                    : Text.rich(TextSpan(children: _spans(q, quoteStyle))),
-            ],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const ColoredBox(
+                    color: PortalTheme.navy,
+                    child: SizedBox(width: 3),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final q in quoteLines)
+                            q.trim().isEmpty
+                                ? SizedBox(height: lineHeight * 0.5)
+                                : Text.rich(
+                                    TextSpan(children: _spans(q, quoteStyle)),
+                                  ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -242,13 +260,20 @@ class _ForumFormattedTextState extends State<ForumFormattedText> {
     );
   }
 
+  /// Single-token `@handle` only. Multi-word names are wrapped as
+  /// `**@First Last**` when inserted so they don't swallow the next word.
+  static final _mention = RegExp(r'@[A-Za-z0-9][A-Za-z0-9._-]*');
+
+  TextStyle _mentionStyle(TextStyle style) =>
+      style.copyWith(fontWeight: FontWeight.w700);
+
   List<InlineSpan> _linkify(String text, TextStyle style) {
     final spans = <InlineSpan>[];
     var start = 0;
     for (final match in _autoLink.allMatches(text)) {
       if (match.start > start) {
-        spans.add(
-          TextSpan(text: text.substring(start, match.start), style: style),
+        spans.addAll(
+          _withMentions(text.substring(start, match.start), style),
         );
       }
       final raw = match.group(0) ?? '';
@@ -268,11 +293,32 @@ class _ForumFormattedTextState extends State<ForumFormattedText> {
           ),
         );
         if (trailing.isNotEmpty) {
-          spans.add(TextSpan(text: trailing, style: style));
+          spans.addAll(_withMentions(trailing, style));
         }
       } else {
-        spans.add(TextSpan(text: raw, style: style));
+        spans.addAll(_withMentions(raw, style));
       }
+      start = match.end;
+    }
+    if (start < text.length) {
+      spans.addAll(_withMentions(text.substring(start), style));
+    }
+    return spans;
+  }
+
+  List<InlineSpan> _withMentions(String text, TextStyle style) {
+    if (text.isEmpty) return const [];
+    final spans = <InlineSpan>[];
+    var start = 0;
+    for (final match in _mention.allMatches(text)) {
+      if (match.start > start) {
+        spans.add(
+          TextSpan(text: text.substring(start, match.start), style: style),
+        );
+      }
+      spans.add(
+        TextSpan(text: match.group(0), style: _mentionStyle(style)),
+      );
       start = match.end;
     }
     if (start < text.length) {

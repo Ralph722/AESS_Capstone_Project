@@ -43,8 +43,6 @@ create index if not exists idx_forum_topic_tags_tag on public.forum_topic_tags(t
 insert into public.forum_tags (slug, label, sort_order) values
   ('career', 'Career', 10),
   ('employment', 'Employment', 20),
-  ('internship', 'Internship', 30),
-  ('scholarship', 'Scholarship', 40),
   ('business', 'Business', 50),
   ('networking', 'Networking', 60),
   ('events', 'Events', 70),

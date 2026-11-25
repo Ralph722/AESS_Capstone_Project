@@ -783,11 +783,7 @@ class _RenderHeroSheet extends RenderBox
     final fillHeight = _viewportHeight - sheetTop;
     if (sheetHeight < fillHeight) {
       sheet.layout(
-        BoxConstraints(
-          minWidth: width,
-          maxWidth: width,
-          minHeight: fillHeight,
-        ),
+        BoxConstraints(minWidth: width, maxWidth: width, minHeight: fillHeight),
         parentUsesSize: true,
       );
       sheetHeight = sheet.size.height;

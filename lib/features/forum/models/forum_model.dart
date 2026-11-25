@@ -1,3 +1,130 @@
+/// Discussion vs community job offer (alumni-submitted, admin-reviewed).
+enum ForumPostKind {
+  discussion,
+  jobOffer;
+
+  static const discussionValue = 'discussion';
+  static const jobOfferValue = 'job_offer';
+
+  String get wireValue => switch (this) {
+    ForumPostKind.discussion => discussionValue,
+    ForumPostKind.jobOffer => jobOfferValue,
+  };
+
+  String get label => switch (this) {
+    ForumPostKind.discussion => 'Discussion',
+    ForumPostKind.jobOffer => 'Job offer',
+  };
+
+  static ForumPostKind fromWire(String? raw) {
+    switch ((raw ?? '').trim().toLowerCase()) {
+      case jobOfferValue:
+        return ForumPostKind.jobOffer;
+      default:
+        return ForumPostKind.discussion;
+    }
+  }
+}
+
+/// Review pipeline for [ForumPostKind.jobOffer] topics.
+enum ForumReviewStatus {
+  none,
+  pending,
+  approved,
+  declined,
+  withdrawn;
+
+  static const noneValue = 'none';
+  static const pendingValue = 'pending';
+  static const approvedValue = 'approved';
+  static const declinedValue = 'declined';
+  static const withdrawnValue = 'withdrawn';
+
+  String get wireValue => switch (this) {
+    ForumReviewStatus.none => noneValue,
+    ForumReviewStatus.pending => pendingValue,
+    ForumReviewStatus.approved => approvedValue,
+    ForumReviewStatus.declined => declinedValue,
+    ForumReviewStatus.withdrawn => withdrawnValue,
+  };
+
+  String get label => switch (this) {
+    ForumReviewStatus.none => '',
+    ForumReviewStatus.pending => 'Awaiting review',
+    ForumReviewStatus.approved => 'Approved',
+    ForumReviewStatus.declined => 'Declined',
+    ForumReviewStatus.withdrawn => 'Withdrawn',
+  };
+
+  bool get isAwaitingAuthorAction => this == ForumReviewStatus.pending;
+
+  static ForumReviewStatus fromWire(String? raw) {
+    switch ((raw ?? '').trim().toLowerCase()) {
+      case pendingValue:
+        return ForumReviewStatus.pending;
+      case approvedValue:
+        return ForumReviewStatus.approved;
+      case declinedValue:
+        return ForumReviewStatus.declined;
+      case withdrawnValue:
+        return ForumReviewStatus.withdrawn;
+      default:
+        return ForumReviewStatus.none;
+    }
+  }
+}
+
+/// Who can see a discussion in the alumni feed.
+enum ForumTopicVisibility {
+  everyone,
+  program,
+  programBatch;
+
+  static const everyoneValue = 'everyone';
+  static const programValue = 'program';
+  static const programBatchValue = 'program_batch';
+
+  String get wireValue => switch (this) {
+    ForumTopicVisibility.everyone => everyoneValue,
+    ForumTopicVisibility.program => programValue,
+    ForumTopicVisibility.programBatch => programBatchValue,
+  };
+
+  String get label => switch (this) {
+    ForumTopicVisibility.everyone => 'Everyone',
+    ForumTopicVisibility.program => 'Same program',
+    ForumTopicVisibility.programBatch => 'My program & batch',
+  };
+
+  String get shortLabel => switch (this) {
+    ForumTopicVisibility.everyone => 'Everyone',
+    ForumTopicVisibility.program => 'Program',
+    ForumTopicVisibility.programBatch => 'Program · Batch',
+  };
+
+  String helperText({String program = '', String batch = ''}) {
+    final p = program.trim().isEmpty ? 'your program' : program.trim();
+    final b = batch.trim().isEmpty ? 'your batch' : batch.trim();
+    return switch (this) {
+      ForumTopicVisibility.everyone =>
+        'Visible to all alumni in the community.',
+      ForumTopicVisibility.program => 'Visible to $p alumni (all batches).',
+      ForumTopicVisibility.programBatch => 'Visible to $p · Batch $b only.',
+    };
+  }
+
+  static ForumTopicVisibility fromWire(String? raw) {
+    switch ((raw ?? '').trim().toLowerCase()) {
+      case programValue:
+        return ForumTopicVisibility.program;
+      case programBatchValue:
+        return ForumTopicVisibility.programBatch;
+      default:
+        return ForumTopicVisibility.everyone;
+    }
+  }
+}
+
 class ForumTag {
   final String id;
   final String slug;
@@ -40,6 +167,15 @@ class ForumTopic {
   final bool isSolved;
   final bool isAnnouncement;
   final bool isFeatured;
+  final ForumTopicVisibility visibility;
+  final ForumPostKind postKind;
+  final ForumReviewStatus reviewStatus;
+  final String purposeLetter;
+  final String coverImageUrl;
+  final String companyName;
+  final String applyUrl;
+  final String declineReason;
+  final DateTime? reviewedAt;
   final String? moderationReason;
   final int viewCount;
   final List<ForumTag> tags;
@@ -64,14 +200,47 @@ class ForumTopic {
     this.isSolved = false,
     this.isAnnouncement = false,
     this.isFeatured = false,
+    this.visibility = ForumTopicVisibility.everyone,
+    this.postKind = ForumPostKind.discussion,
+    this.reviewStatus = ForumReviewStatus.none,
+    this.purposeLetter = '',
+    this.coverImageUrl = '',
+    this.companyName = '',
+    this.applyUrl = '',
+    this.declineReason = '',
+    this.reviewedAt,
     this.moderationReason,
     this.viewCount = 0,
     this.tags = const [],
     this.isBookmarked = false,
   });
 
+  bool get isJobOffer => postKind == ForumPostKind.jobOffer;
+
+  bool get isPendingJobOffer =>
+      isJobOffer && reviewStatus == ForumReviewStatus.pending;
+
+  bool get isDeclinedJobOffer =>
+      isJobOffer && reviewStatus == ForumReviewStatus.declined;
+
+  bool get isApprovedJobOffer =>
+      isJobOffer && reviewStatus == ForumReviewStatus.approved;
+
+  /// Author/admin-only queue item (not yet public in the main feed).
+  bool get isJobOfferInReviewQueue => isPendingJobOffer;
+
   bool get needsResponse =>
-      !isAnnouncement && !isSolved && replyCount == 0;
+      !isAnnouncement &&
+      !isJobOffer &&
+      !isSolved &&
+      replyCount == 0;
+
+  /// True when the topic carries the seeded Question tag (slug or label).
+  bool get hasQuestionTag => tags.any((t) {
+    final slug = t.slug.trim().toLowerCase();
+    final label = t.label.trim().toLowerCase();
+    return slug == 'question' || label == 'question';
+  });
 
   bool get canEditWithinWindow {
     final elapsed = DateTime.now().difference(createdAt);
@@ -89,6 +258,15 @@ class ForumTopic {
     bool? isSolved,
     bool? isAnnouncement,
     bool? isFeatured,
+    ForumTopicVisibility? visibility,
+    ForumPostKind? postKind,
+    ForumReviewStatus? reviewStatus,
+    String? purposeLetter,
+    String? coverImageUrl,
+    String? companyName,
+    String? applyUrl,
+    String? declineReason,
+    DateTime? reviewedAt,
     String? moderationReason,
     List<ForumTag>? tags,
     bool? isBookmarked,
@@ -114,6 +292,15 @@ class ForumTopic {
       isSolved: isSolved ?? this.isSolved,
       isAnnouncement: isAnnouncement ?? this.isAnnouncement,
       isFeatured: isFeatured ?? this.isFeatured,
+      visibility: visibility ?? this.visibility,
+      postKind: postKind ?? this.postKind,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
+      purposeLetter: purposeLetter ?? this.purposeLetter,
+      coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      companyName: companyName ?? this.companyName,
+      applyUrl: applyUrl ?? this.applyUrl,
+      declineReason: declineReason ?? this.declineReason,
+      reviewedAt: reviewedAt ?? this.reviewedAt,
       moderationReason: moderationReason ?? this.moderationReason,
       viewCount: viewCount,
       tags: tags ?? this.tags,
@@ -161,6 +348,17 @@ class ForumTopic {
       isSolved: row['is_solved'] == true,
       isAnnouncement: row['is_announcement'] == true,
       isFeatured: row['is_featured'] == true,
+      visibility: ForumTopicVisibility.fromWire(row['visibility'] as String?),
+      postKind: ForumPostKind.fromWire(row['post_kind'] as String?),
+      reviewStatus: ForumReviewStatus.fromWire(row['review_status'] as String?),
+      purposeLetter: row['purpose_letter'] as String? ?? '',
+      coverImageUrl: row['cover_image_url'] as String? ?? '',
+      companyName: row['company_name'] as String? ?? '',
+      applyUrl: row['apply_url'] as String? ?? '',
+      declineReason: row['decline_reason'] as String? ?? '',
+      reviewedAt: row['reviewed_at'] != null
+          ? _parseDateTime(row['reviewed_at'])
+          : null,
       moderationReason: (row['moderation_reason'] as String?)?.trim().isEmpty ==
               true
           ? null
@@ -188,6 +386,15 @@ class ForumTopic {
       'is_solved': isSolved,
       'is_announcement': isAnnouncement,
       'is_featured': isFeatured,
+      'visibility': visibility.wireValue,
+      'post_kind': postKind.wireValue,
+      'review_status': reviewStatus.wireValue,
+      'purpose_letter': purposeLetter,
+      'cover_image_url': coverImageUrl,
+      'company_name': companyName,
+      'apply_url': applyUrl,
+      'decline_reason': declineReason,
+      'reviewed_at': reviewedAt?.toUtc().toIso8601String(),
       'edited_at': editedAt?.toUtc().toIso8601String(),
       'moderation_reason': moderationReason,
       'view_count': viewCount,

@@ -149,11 +149,24 @@ class AdminForumTopicStatusBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hideLockForJobReview = topic.isJobOfferInReviewQueue;
     final badges = <Widget>[
       if (topic.isAnnouncement)
         const AdminBadge.info(
           label: 'Announcement',
           icon: Icons.campaign_outlined,
+          dense: true,
+        ),
+      if (topic.isJobOffer)
+        const AdminBadge.info(
+          label: 'Job offer',
+          icon: Icons.work_outline_rounded,
+          dense: true,
+        ),
+      if (topic.isPendingJobOffer)
+        const AdminBadge.warning(
+          label: 'Pending review',
+          icon: Icons.hourglass_top_rounded,
           dense: true,
         ),
       if (topic.isPinned && !topic.isAnnouncement)
@@ -162,7 +175,7 @@ class AdminForumTopicStatusBadges extends StatelessWidget {
           icon: Icons.push_pin_outlined,
           dense: true,
         ),
-      if (topic.isLocked)
+      if (topic.isLocked && !hideLockForJobReview)
         const AdminBadge.neutral(
           label: 'Locked',
           icon: Icons.lock_outline,

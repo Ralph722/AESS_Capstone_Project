@@ -72,9 +72,15 @@ class NotificationService {
         .toList();
   }
 
-  /// Unread count for the signed-in user. [excludeType] leaves one type out
-  /// (the admin bell already counts unread messages separately).
-  Future<int> getUnreadCount({NotificationType? excludeType}) async {
+  /// Unread count for the signed-in user.
+  ///
+  /// [type] limits to one category (e.g. Community bell → forum only).
+  /// [excludeType] leaves one type out (admin bell already counts messages
+  /// separately). Prefer [type] when both would apply.
+  Future<int> getUnreadCount({
+    NotificationType? type,
+    NotificationType? excludeType,
+  }) async {
     final userId = AppSession.userId;
     if (userId == null) return 0;
 
@@ -84,7 +90,9 @@ class NotificationService {
           .select('id')
           .eq('user_id', userId)
           .eq('is_read', false);
-      if (excludeType != null) {
+      if (type != null) {
+        query = query.eq('type', type.name);
+      } else if (excludeType != null) {
         query = query.neq('type', excludeType.name);
       }
       final response = await query.count(CountOption.exact);
@@ -94,13 +102,16 @@ class NotificationService {
     }
   }
 
-  Stream<int> getUnreadCountStream({NotificationType? excludeType}) {
+  Stream<int> getUnreadCountStream({
+    NotificationType? type,
+    NotificationType? excludeType,
+  }) {
     final userId = AppSession.userId;
     if (userId == null) return Stream.value(0);
     return _NotificationChangeHub.watch(
       _supabase,
       userId,
-      () => getUnreadCount(excludeType: excludeType),
+      () => getUnreadCount(type: type, excludeType: excludeType),
     );
   }
 
@@ -134,11 +145,11 @@ class NotificationService {
         .eq('user_id', userId);
   }
 
-  Future<void> markAllAsRead() async {
+  Future<void> markAllAsRead({NotificationType? type}) async {
     final userId = AppSession.userId;
     if (userId == null) return;
 
-    await _supabase
+    var query = _supabase
         .from('user_notifications')
         .update({
           'is_read': true,
@@ -146,6 +157,10 @@ class NotificationService {
         })
         .eq('user_id', userId)
         .eq('is_read', false);
+    if (type != null) {
+      query = query.eq('type', type.name);
+    }
+    await query;
   }
 
   Future<void> deleteNotification(String notificationId) async {

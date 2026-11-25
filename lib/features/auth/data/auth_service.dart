@@ -72,6 +72,22 @@ class AuthService {
     }
   }
 
+  /// Whether [userId] is an admin. Uses SECURITY DEFINER RPC so alumni can
+  /// check peer roles without SELECT access to other `users` rows.
+  Future<bool> isAdminUserId(String userId) async {
+    final id = userId.trim();
+    if (id.isEmpty) return false;
+    try {
+      final result = await _supabase.rpc(
+        'is_admin_user',
+        params: {'p_id': id},
+      );
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Role + onboarding flag in one round-trip (used after login).
   Future<({UserRole? role, bool onboardingComplete})> getLoginRouting(
     String userId,

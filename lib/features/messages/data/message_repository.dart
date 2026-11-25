@@ -258,13 +258,18 @@ class MessageRepository {
           .count(CountOption.exact);
       return response.count;
     } catch (_) {
-      final rows = await _supabase
-          .from('messages')
-          .select('id')
-          .eq('recipient_id', recipientSupabaseId)
-          .eq('sender_role', senderRole)
-          .eq('is_read', false);
-      return rows.length;
+      // Fallback without HEAD count; network blips must not rethrow.
+      try {
+        final rows = await _supabase
+            .from('messages')
+            .select('id')
+            .eq('recipient_id', recipientSupabaseId)
+            .eq('sender_role', senderRole)
+            .eq('is_read', false);
+        return rows.length;
+      } catch (_) {
+        return 0;
+      }
     }
   }
 

@@ -149,11 +149,17 @@ class MessageRealtime {
 
       Future<void> emit() async {
         if (cancelled || controller.isClosed) return;
-        final count = await fetchCount();
+        int count;
+        try {
+          count = await fetchCount();
+        } catch (_) {
+          // Transient browser/network failures (e.g. hot restart) — keep last.
+          return;
+        }
         if (cancelled || controller.isClosed) return;
         if (count == lastEmitted) return;
         lastEmitted = count;
-        controller.add(count);
+        if (!controller.isClosed) controller.add(count);
       }
 
       try {

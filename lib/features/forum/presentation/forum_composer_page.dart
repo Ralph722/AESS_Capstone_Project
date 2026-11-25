@@ -4,12 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:alumni_system/core/services/app_session.dart';
+import 'package:alumni_system/features/alumni/profile/data/user_profile_service.dart';
 import 'package:alumni_system/features/auth/data/auth_service.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/data/forum_content_moderation_service.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/widgets/forum_format_toolbar.dart';
-import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
 import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
 import 'package:alumni_system/features/forum/widgets/forum_rich_text_controller.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
@@ -70,8 +70,7 @@ class ForumComposerPage extends StatefulWidget {
   State<ForumComposerPage> createState() => _ForumComposerPageState();
 }
 
-class _ForumComposerPageState extends State<ForumComposerPage>
-    with SingleTickerProviderStateMixin {
+class _ForumComposerPageState extends State<ForumComposerPage> {
   final _forumService = ForumService();
   final _moderationService = ForumContentModerationService();
   final _titleController = TextEditingController();
@@ -79,15 +78,17 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   final _bodyFocus = FocusNode();
   final _formKey = GlobalKey<FormState>();
 
-  late final TabController _tabs;
   List<ForumTag> _tags = [];
   final Set<String> _selectedTagIds = {};
   bool _asAnnouncement = false;
   bool _isAdmin = false;
+  ForumTopicVisibility _visibility = ForumTopicVisibility.everyone;
+  String _viewerProgram = '';
+  String _viewerBatch = '';
   bool _saving = false;
   bool _checkingContent = false;
   bool _dirty = false;
-  bool _loadingTags = true;
+  bool _loadingTags = false;
   bool _draftRestored = false;
   Timer? _draftTimer;
 
@@ -100,11 +101,19 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
-    _tabs.addListener(() {
-      if (!_tabs.indexIsChanging) setState(() {});
-    });
     _asAnnouncement = widget.initialAsAnnouncement;
+    final cached = _forumService.cachedTags;
+    if (cached != null) {
+      _tags = List<ForumTag>.of(cached);
+      _loadingTags = false;
+    } else {
+      _loadingTags = true;
+    }
+    final audience = _forumService.cachedViewerAudience;
+    if (audience != null) {
+      _viewerProgram = audience.program;
+      _viewerBatch = audience.batch;
+    }
     _bootstrap();
     _titleController.addListener(_onTextChanged);
     _bodyController.addListener(_onTextChanged);
@@ -136,11 +145,13 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     final body = _bodyController.markdown;
     final tagIds = _selectedTagIds.toList();
     final asAnnouncement = _asAnnouncement;
+    final visibility = _visibility;
     await _forumService.saveDraft(
       title: title,
       body: body,
       tagIds: tagIds,
       asAnnouncement: asAnnouncement,
+      visibility: visibility,
     );
     // Discard raced this save — wipe the rewritten draft.
     if (epoch != _draftEpoch) {
@@ -153,6 +164,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     final body = _bodyController.markdown;
     final tagIds = Set<String>.of(_selectedTagIds);
     final asAnnouncement = _asAnnouncement;
+    final visibility = _visibility;
 
     _draftEpoch++;
     _draftTimer?.cancel();
@@ -163,6 +175,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     setState(() {
       _selectedTagIds.clear();
       _asAnnouncement = widget.initialAsAnnouncement;
+      _visibility = ForumTopicVisibility.everyone;
       _draftRestored = false;
       _dirty = false;
     });
@@ -178,6 +191,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
             setState(() {
               _selectedTagIds.addAll(tagIds);
               _asAnnouncement = asAnnouncement;
+              _visibility = visibility;
             });
             _saveDraftNow();
           },
@@ -191,6 +205,17 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     if (uid != null) {
       final role = await AuthService().getUserRole(uid);
       _isAdmin = role == UserRole.admin;
+      try {
+        final profile = await UserProfileService().getTracerProfile(uid);
+        _viewerProgram = profile?.program.trim() ?? '';
+        _viewerBatch = (profile?.batchYear.trim().isNotEmpty == true)
+            ? profile!.batchYear.trim()
+            : (profile?.yearGraduated.trim() ?? '');
+        _forumService.cacheViewerAudience(
+          program: _viewerProgram,
+          batch: _viewerBatch,
+        );
+      } catch (_) {}
     }
 
     try {
@@ -205,6 +230,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       _bodyController.loadMarkdown(t.body);
       _selectedTagIds.addAll(t.tags.map((e) => e.id));
       _asAnnouncement = t.isAnnouncement;
+      _visibility = t.visibility;
       _dirty = false;
     } else {
       final draft = await _forumService.loadDraft();
@@ -218,9 +244,22 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         if (_isAdmin && draft['asAnnouncement'] == true) {
           _asAnnouncement = true;
         }
+        _visibility = ForumTopicVisibility.fromWire(
+          draft['visibility'] as String?,
+        );
         _draftRestored = _hasContent;
         _dirty = false;
       }
+    }
+
+    if (!_canUseBatchAudience &&
+        _visibility == ForumTopicVisibility.programBatch) {
+      _visibility = _canUseProgramAudience
+          ? ForumTopicVisibility.program
+          : ForumTopicVisibility.everyone;
+    } else if (!_canUseProgramAudience &&
+        _visibility != ForumTopicVisibility.everyone) {
+      _visibility = ForumTopicVisibility.everyone;
     }
 
     if (mounted) {
@@ -241,19 +280,20 @@ class _ForumComposerPageState extends State<ForumComposerPage>
       final body = _bodyController.markdown;
       final tagIds = _selectedTagIds.toList();
       final asAnnouncement = _asAnnouncement;
+      final visibility = _visibility;
       unawaited(() async {
         await _forumService.saveDraft(
           title: title,
           body: body,
           tagIds: tagIds,
           asAnnouncement: asAnnouncement,
+          visibility: visibility,
         );
         if (epoch != _draftEpoch) {
           await _forumService.clearDraft();
         }
       }());
     }
-    _tabs.dispose();
     _titleController.dispose();
     _bodyController.dispose();
     _bodyFocus.dispose();
@@ -347,24 +387,29 @@ class _ForumComposerPageState extends State<ForumComposerPage>
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      if (_tabs.index != 0) _tabs.animateTo(0);
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
 
     setState(() => _checkingContent = true);
+    var busy = showForumBusyDialog(context, 'Checking your post…');
     ForumModerationResult moderation;
     try {
       moderation = await _moderationService.reviewTopic(
         title: _titleController.text,
         body: _bodyController.text,
       );
-    } finally {
-      if (mounted) setState(() => _checkingContent = false);
+    } catch (e) {
+      await busy.close();
+      if (mounted) {
+        setState(() => _checkingContent = false);
+        showPortalErrorSnack(context, e);
+      }
+      return;
     }
+    await busy.close();
     if (!mounted) return;
+    setState(() => _checkingContent = false);
 
     final proceed = await showForumModerationResult(
       context,
@@ -375,6 +420,10 @@ class _ForumComposerPageState extends State<ForumComposerPage>
 
     _draftTimer?.cancel();
     setState(() => _saving = true);
+    busy = showForumBusyDialog(
+      context,
+      _isEditing ? 'Saving changes…' : 'Publishing…',
+    );
     try {
       if (_isEditing) {
         await _forumService.editTopic(
@@ -383,6 +432,7 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           body: _bodyController.markdown,
           tagIds: _selectedTagIds.toList(),
         );
+        await busy.close();
         if (!mounted) return;
         Navigator.pop(context, widget.editTopic!.id);
       } else {
@@ -391,11 +441,16 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           body: _bodyController.markdown,
           tagIds: _selectedTagIds.toList(),
           asAnnouncement: _isAdmin && _asAnnouncement,
+          visibility: _asAnnouncement
+              ? ForumTopicVisibility.everyone
+              : _visibility,
         );
+        await busy.close();
         if (!mounted) return;
         Navigator.pop(context, id);
       }
     } catch (e) {
+      await busy.close();
       if (!mounted) return;
       showPortalErrorSnack(context, e);
     } finally {
@@ -419,27 +474,8 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           if (widget.asSidePanel) ...[
             _panelHeader(),
             const Divider(height: 1, color: AdminColors.border),
-            Container(
-              color: AdminColors.card,
-              child: TabBar(
-                controller: _tabs,
-                labelColor: AdminColors.primary,
-                unselectedLabelColor: AdminColors.textSecondary,
-                indicatorColor: AdminColors.primary,
-                dividerColor: AdminColors.border,
-                tabs: const [
-                  Tab(text: 'Write'),
-                  Tab(text: 'Preview'),
-                ],
-              ),
-            ),
           ],
-          Expanded(
-            child: TabBarView(
-              controller: _tabs,
-              children: [_writeTab(), _previewTab()],
-            ),
-          ),
+          Expanded(child: _writeTab()),
           if (widget.asSidePanel) _panelFooter(),
         ],
       ),
@@ -459,16 +495,6 @@ class _ForumComposerPageState extends State<ForumComposerPage>
         backgroundColor: Colors.white,
         appBar: PortalAppBar(
           title: _headerTitle,
-          bottom: TabBar(
-            controller: _tabs,
-            labelColor: PortalTheme.navy,
-            unselectedLabelColor: PortalTheme.textSecondary,
-            indicatorColor: PortalTheme.navy,
-            tabs: const [
-              Tab(text: 'Write'),
-              Tab(text: 'Preview'),
-            ],
-          ),
           actions: [
             TextButton(
               onPressed: _busy ? null : _submit,
@@ -631,7 +657,10 @@ class _ForumComposerPageState extends State<ForumComposerPage>
               ),
               value: _asAnnouncement,
               onChanged: (v) {
-                setState(() => _asAnnouncement = v);
+                setState(() {
+                  _asAnnouncement = v;
+                  if (v) _visibility = ForumTopicVisibility.everyone;
+                });
                 _onTextChanged();
               },
             ),
@@ -699,6 +728,10 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           },
           child: _bodyField(),
         ),
+        if (!_isEditing && !_asAnnouncement) ...[
+          const SizedBox(height: 16),
+          _visibilityPicker(),
+        ],
         const SizedBox(height: 16),
         const Text(
           'Tags (optional)',
@@ -709,30 +742,44 @@ class _ForumComposerPageState extends State<ForumComposerPage>
           ),
         ),
         const SizedBox(height: 8),
-        if (_loadingTags)
-          const LinearProgressIndicator()
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _tags.map((tag) {
-              final selected = _selectedTagIds.contains(tag.id);
-              return ForumTagChip(
-                label: tag.label,
-                selected: selected,
-                onTap: () {
-                  setState(() {
-                    if (selected) {
-                      _selectedTagIds.remove(tag.id);
-                    } else {
-                      _selectedTagIds.add(tag.id);
-                    }
-                  });
-                  _onTextChanged();
-                },
-              );
-            }).toList(),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _loadingTags
+              ? [
+                  for (final label in const [
+                    'Career',
+                    'Employment',
+                    'Business',
+                    'Networking',
+                    'Events',
+                    'Question',
+                  ])
+                    Opacity(
+                      opacity: 0.45,
+                      child: ForumTagChip(label: label),
+                    ),
+                ]
+              : _tags.map((tag) {
+                  final selected = _selectedTagIds.contains(tag.id);
+                  return ForumTagChip(
+                    label: tag.label,
+                    selected: selected,
+                    onTap: _busy
+                        ? null
+                        : () {
+                            setState(() {
+                              if (selected) {
+                                _selectedTagIds.remove(tag.id);
+                              } else {
+                                _selectedTagIds.add(tag.id);
+                              }
+                            });
+                            _onTextChanged();
+                          },
+                  );
+                }).toList(),
+        ),
       ],
     );
   }
@@ -810,97 +857,86 @@ class _ForumComposerPageState extends State<ForumComposerPage>
     );
   }
 
-  Widget _previewTab() {
-    final title = _titleController.text.trim();
-    final body = _bodyController.markdown.trim();
-    final selectedTags = _tags
-        .where((t) => _selectedTagIds.contains(t.id))
-        .toList();
+  bool get _canUseProgramAudience => _viewerProgram.trim().isNotEmpty;
+  bool get _canUseBatchAudience =>
+      _canUseProgramAudience && _viewerBatch.trim().isNotEmpty;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+  String get _visibilityDescription {
+    final enabled = switch (_visibility) {
+      ForumTopicVisibility.everyone => true,
+      ForumTopicVisibility.program => _canUseProgramAudience,
+      ForumTopicVisibility.programBatch => _canUseBatchAudience,
+    };
+    if (!enabled) {
+      return switch (_visibility) {
+        ForumTopicVisibility.everyone =>
+          ForumTopicVisibility.everyone.helperText(),
+        ForumTopicVisibility.program =>
+          'Add your program in Profile to enable.',
+        ForumTopicVisibility.programBatch =>
+          'Add your program and batch year in Profile to enable.',
+      };
+    }
+    return _visibility.helperText(
+      program: _viewerProgram,
+      batch: _viewerBatch,
+    );
+  }
+
+  bool _visibilityEnabled(ForumTopicVisibility option) => switch (option) {
+    ForumTopicVisibility.everyone => true,
+    ForumTopicVisibility.program => _canUseProgramAudience,
+    ForumTopicVisibility.programBatch => _canUseBatchAudience,
+  };
+
+  Widget _visibilityPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Live preview',
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: ForumTheme.textMuted,
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Visibility',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: ForumTheme.navy,
+                  fontSize: 13,
+                ),
+              ),
+              TextSpan(
+                text: ' · $_visibilityDescription',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: ForumTheme.textMuted,
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(ForumTheme.radius2xl),
-            border: Border.all(
-              color: ForumTheme.border.withValues(alpha: 0.75),
-            ),
-            boxShadow: ForumTheme.softShadow,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_asAnnouncement)
-                  Container(width: 4, color: ForumTheme.announcement),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_asAnnouncement) ...[
-                          ForumStatusChip.announcement(),
-                          const SizedBox(height: 12),
-                        ],
-                        Text(
-                          title.isEmpty ? 'Untitled discussion' : title,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: title.isEmpty
-                                ? ForumTheme.textMuted
-                                : ForumTheme.navy,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (body.isEmpty)
-                          Text(
-                            'Your message will appear here as you type.',
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              height: 1.45,
-                              color: ForumTheme.textMuted,
-                            ),
-                          )
-                        else
-                          ForumFormattedText(
-                            body,
-                            style: const TextStyle(
-                              fontSize: 14.5,
-                              height: 1.45,
-                              color: ForumTheme.textPrimary,
-                            ),
-                          ),
-                        if (selectedTags.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: selectedTags
-                                .map((t) => ForumTagChip(label: t.label))
-                                .toList(),
-                          ),
-                        ],
-                      ],
-                    ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in ForumTopicVisibility.values)
+              Opacity(
+                opacity: _visibilityEnabled(option) ? 1 : 0.45,
+                child: IgnorePointer(
+                  ignoring: _busy || !_visibilityEnabled(option),
+                  child: ForumTagChip(
+                    label: option.label,
+                    selected: _visibility == option,
+                    onTap: () {
+                      setState(() => _visibility = option);
+                      _onTextChanged();
+                    },
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+          ],
         ),
       ],
     );

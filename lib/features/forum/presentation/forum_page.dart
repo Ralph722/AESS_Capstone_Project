@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/models/forum_filters.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
+import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
+import 'package:alumni_system/features/forum/presentation/forum_job_offer_flow_page.dart';
 import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_filters.dart';
 import 'package:alumni_system/shared/widgets/user/portal_floating.dart';
+import 'package:alumni_system/shared/widgets/user/portal_menu.dart';
 import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_headers.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
@@ -150,6 +153,55 @@ class _ForumScreenState extends State<ForumScreen> {
     }
   }
 
+  Future<void> _openJobOfferFlow({ForumTopic? editTopic}) async {
+    final id = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForumJobOfferFlowPage(editTopic: editTopic),
+      ),
+    );
+    if (!mounted) return;
+    await _load(reset: true);
+    if (id != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ForumTopicScreen(topicId: id)),
+      );
+      if (mounted) await _load(reset: true, silent: true);
+    }
+  }
+
+  Future<void> _showCreateMenu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: ForumTheme.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => PortalOptionsSheet(
+        title: 'Create',
+        children: [
+          PortalSheetOption(
+            label: 'New discussion',
+            icon: Icons.forum_outlined,
+            onTap: () => Navigator.pop(ctx, 'discussion'),
+          ),
+          PortalSheetOption(
+            label: 'Share a job',
+            icon: Icons.work_outline_rounded,
+            onTap: () => Navigator.pop(ctx, 'job'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'job') {
+      await _openJobOfferFlow();
+    } else {
+      await _openComposer();
+    }
+  }
+
   Future<void> _openTopic(ForumTopic topic) async {
     await Navigator.push(
       context,
@@ -267,12 +319,12 @@ class _ForumScreenState extends State<ForumScreen> {
                   : 0.0,
         ),
         child: FloatingActionButton.extended(
-          onPressed: _openComposer,
+          onPressed: _showCreateMenu,
           backgroundColor: ForumTheme.navy,
           foregroundColor: Colors.white,
           elevation: 2,
           icon: const Icon(Icons.add_rounded),
-          label: const Text('New topic'),
+          label: const Text('Create'),
         ),
       ),
       body: RefreshIndicator(
@@ -396,49 +448,49 @@ class _ForumScreenState extends State<ForumScreen> {
       );
     }
 
-    final pinned = _topics
+    final uid = AppSession.userId;
+    final awaiting = _topics
+        .where(
+          (t) =>
+              t.isPendingJobOffer && (uid != null && t.authorUid == uid),
+        )
+        .toList();
+    final feedTopics = _topics
+        .where((t) => !t.isJobOfferInReviewQueue)
+        .toList();
+    final pinned = feedTopics
         .where((t) => t.isPinned && !t.isAnnouncement)
         .toList();
-    final regular = _topics
+    final regular = feedTopics
         .where((t) => !t.isPinned || t.isAnnouncement)
         .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (awaiting.isNotEmpty) ...[
+          _sectionHeader(
+            icon: Icons.hourglass_top_rounded,
+            label: 'Awaiting review',
+            iconColor: ForumTheme.needsResponse,
+            iconBg: ForumTheme.needsResponseBg,
+          ),
+          for (final topic in awaiting)
+            ForumTopicCard(topic: topic, onTap: () => _openTopic(topic)),
+          const SizedBox(height: PortalTheme.space2),
+        ],
         if (pinned.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: PortalTheme.space2),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: ForumTheme.pinnedBg,
-                    borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
-                  ),
-                  child: const Icon(
-                    Icons.push_pin_rounded,
-                    size: 14,
-                    color: ForumTheme.pinned,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Pinned',
-                  style: PortalTheme.sectionTitle.copyWith(
-                    fontSize: 14,
-                    color: ForumTheme.pinned,
-                  ),
-                ),
-              ],
-            ),
+          _sectionHeader(
+            icon: Icons.push_pin_rounded,
+            label: 'Pinned',
+            iconColor: ForumTheme.pinned,
+            iconBg: ForumTheme.pinnedBg,
           ),
           for (final topic in pinned)
             ForumTopicCard(topic: topic, onTap: () => _openTopic(topic)),
         ],
-        if (regular.isNotEmpty && pinned.isNotEmpty)
+        if (regular.isNotEmpty &&
+            (pinned.isNotEmpty || awaiting.isNotEmpty))
           Padding(
             padding: const EdgeInsets.only(
               top: PortalTheme.space1,
@@ -466,6 +518,38 @@ class _ForumScreenState extends State<ForumScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _sectionHeader({
+    required IconData icon,
+    required String label,
+    required Color iconColor,
+    required Color iconBg,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PortalTheme.space2),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
+            ),
+            child: Icon(icon, size: 14, color: iconColor),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: PortalTheme.sectionTitle.copyWith(
+              fontSize: 14,
+              color: iconColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

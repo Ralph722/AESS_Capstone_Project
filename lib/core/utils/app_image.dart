@@ -40,7 +40,8 @@ class AppImage {
   static void clearDecodedCache() => _decodedCache.clear();
 
   static int? _cachePixels(double? logical, double dpr) {
-    if (logical == null) return null;
+    if (logical == null || !logical.isFinite || logical <= 0) return null;
+    if (!dpr.isFinite || dpr <= 0) return null;
     return (logical * dpr).round().clamp(1, 4096);
   }
 

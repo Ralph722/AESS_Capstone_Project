@@ -10,6 +10,7 @@ import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/data/forum_bookmark_service.dart';
 import 'package:alumni_system/features/forum/data/forum_content_moderation_service.dart';
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
+import 'package:alumni_system/features/forum/presentation/forum_job_offer_flow_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
 import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
@@ -75,6 +76,9 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
   final Map<String, String> _mentionNameToId = {};
   bool _showMentions = false;
 
+  /// Cached admin check for reply authors (hide Report on admin replies).
+  final Map<String, bool> _authorIsAdmin = {};
+
   @override
   void initState() {
     super.initState();
@@ -92,6 +96,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     if (oldWidget.topicId != widget.topicId) {
       _quoting = null;
       _mentionNameToId.clear();
+      _authorIsAdmin.clear();
       _subscribe();
       _forumService.incrementViews(widget.topicId);
     }
@@ -142,7 +147,39 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     _postsSub = _forumService.watchPosts(widget.topicId).listen((posts) {
       if (!mounted) return;
       setState(() => _posts = posts);
+      unawaited(_resolveAdminAuthors(posts));
     });
+  }
+
+  Future<void> _resolveAdminAuthors(List<ForumPost> posts) async {
+    final pending = <String>{};
+    for (final post in posts) {
+      final id = post.authorUid.trim();
+      if (id.isEmpty || _authorIsAdmin.containsKey(id)) continue;
+      pending.add(id);
+    }
+    if (pending.isEmpty) return;
+
+    // Must use is_admin_user RPC — alumni cannot SELECT other users.role under RLS,
+    // so getUserRole(adminId) always looked like a normal user and Report stayed visible.
+    for (final id in pending) {
+      _authorIsAdmin[id] = await _authService.isAdminUserId(id);
+      if (!mounted) return;
+    }
+    if (mounted) setState(() {});
+  }
+
+  bool _isAdminAuthor(String authorUid) {
+    final id = authorUid.trim();
+    if (id.isEmpty) return false;
+    final topic = _topic;
+    // Fast path: announcement authors are always admins.
+    if (topic != null &&
+        topic.isAnnouncement &&
+        topic.authorUid == id) {
+      return true;
+    }
+    return _authorIsAdmin[id] == true;
   }
 
   Future<void> _loadRole() async {
@@ -272,6 +309,31 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     return ids.toList();
   }
 
+  /// Wraps known `@Name` mentions in bold markup for display, without showing
+  /// asterisks in the composer.
+  String _bodyWithBoldMentions(String body) {
+    var out = body;
+    final names = _mentionNameToId.keys.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    for (final name in names) {
+      out = out.replaceAllMapped(
+        RegExp('@${RegExp.escape(name)}', caseSensitive: false),
+        (match) {
+          final hit = match.group(0)!;
+          final start = match.start;
+          final end = match.end;
+          final alreadyWrapped =
+              start >= 2 &&
+              end + 2 <= out.length &&
+              out.substring(start - 2, start) == '**' &&
+              out.substring(end, end + 2) == '**';
+          return alreadyWrapped ? hit : '**$hit**';
+        },
+      );
+    }
+    return out;
+  }
+
   Future<void> _sendReply(ForumTopic topic) async {
     if (topic.isLocked || _sending) return;
     final text = _replyController.text.trim();
@@ -280,11 +342,17 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     FocusScope.of(context).unfocus();
 
     setState(() => _sending = true);
+    ForumBusyHandle? busy = showForumBusyDialog(
+      context,
+      'Checking your reply…',
+    );
     try {
       final moderation = await _moderationService.reviewReply(
         body: text,
         topicTitle: topic.title,
       );
+      await busy.close();
+      busy = null;
       if (!mounted) return;
       final proceed = await showForumModerationResult(
         context,
@@ -292,9 +360,11 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         subject: 'reply',
       );
       if (!proceed || !mounted) return;
+      busy = showForumBusyDialog(context, 'Publishing reply…');
+      final body = _bodyWithBoldMentions(text);
       await _forumService.createPost(
         topicId: widget.topicId,
-        body: text,
+        body: body,
         quotedPostId: _quoting?.id,
         quotedExcerpt: _quoting == null
             ? null
@@ -316,6 +386,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
         );
       }
     } finally {
+      await busy?.close();
       if (mounted) setState(() => _sending = false);
     }
   }
@@ -482,6 +553,16 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
   }
 
   Future<void> _editTopic(ForumTopic topic) async {
+    if (topic.isJobOffer) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ForumJobOfferFlowPage(editTopic: topic),
+        ),
+      );
+      await _loadAll(silent: true);
+      return;
+    }
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ForumComposerPage(editTopic: topic)),
@@ -717,9 +798,19 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
     final canModerate = _isAdmin;
     final isOwner = topic.authorUid == uid;
-    final canEditTopic = (isOwner || _isAdmin) && topic.canEditWithinWindow;
-    final canSolve = (isOwner || _isAdmin) && !topic.isAnnouncement;
-    final canDelete = _isAdmin || isOwner;
+    final canEditTopic = topic.isJobOffer
+        ? isOwner &&
+              (topic.isPendingJobOffer || topic.isApprovedJobOffer)
+        : (isOwner || _isAdmin) && topic.canEditWithinWindow;
+    final canWithdrawJob =
+        isOwner && topic.isJobOffer && topic.isJobOfferInReviewQueue;
+    final canSolve =
+        (isOwner || _isAdmin) &&
+        !topic.isAnnouncement &&
+        !topic.isJobOffer &&
+        (topic.hasQuestionTag || topic.isSolved);
+    final canDelete = _isAdmin || (isOwner && !topic.isJobOfferInReviewQueue);
+    final canReportTopic = !isOwner && !topic.isAnnouncement;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -735,38 +826,49 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
               PortalTheme.space2,
             ),
             children: [
+              if (topic.isJobOfferInReviewQueue) ...[
+                _buildJobOfferReviewBanner(topic),
+                const SizedBox(height: PortalTheme.space3),
+              ],
               _buildTopicHero(
                 topic,
                 canEdit: canEditTopic,
                 canDelete: canDelete,
                 canSolve: canSolve,
                 canModerate: canModerate,
+                canReport: canReportTopic,
+                canWithdrawJob: canWithdrawJob,
               ),
               const SizedBox(height: PortalTheme.space4),
-              Padding(
-                padding: const EdgeInsets.only(bottom: PortalTheme.space2),
-                child: Text(
-                  'Replies (${_posts.length})',
-                  style: PortalTheme.sectionTitle.copyWith(fontSize: 16),
-                ),
-              ),
-              if (_posts.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: PortalTheme.space3),
-                  child: ForumEmptyState(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    title: 'No replies yet',
-                    subtitle: 'Be the first to share a helpful response.',
-                    compact: true,
+              if (!topic.isJobOfferInReviewQueue) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: PortalTheme.space2),
+                  child: Text(
+                    'Replies (${_posts.length})',
+                    style: PortalTheme.sectionTitle.copyWith(fontSize: 16),
                   ),
-                )
-              else
-                ..._posts.map((p) => _buildPostCard(p, uid, topic)),
+                ),
+                if (_posts.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: PortalTheme.space3),
+                    child: ForumEmptyState(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'No replies yet',
+                      subtitle: 'Be the first to share a helpful response.',
+                      compact: true,
+                    ),
+                  )
+                else
+                  ..._posts.map((p) => _buildPostCard(p, uid, topic)),
+              ],
             ],
           ),
         ),
-        if (!topic.isLocked) _buildReplyBar(topic),
-        if (topic.isLocked) _buildLockedBanner(topic, inset),
+        if (!topic.isLocked && !topic.isJobOfferInReviewQueue)
+          _buildReplyBar(topic),
+        // Pending job offers already explain the lock in the top review banner.
+        if (topic.isLocked && !topic.isJobOfferInReviewQueue)
+          _buildLockedBanner(topic, inset),
       ],
     );
       },
@@ -774,6 +876,9 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
   }
 
   Widget _buildLockedBanner(ForumTopic topic, double inset) {
+    final message = topic.moderationReason?.isNotEmpty == true
+        ? 'This topic is locked. ${topic.moderationReason}'
+        : 'This topic is locked. No new replies can be added.';
     return PortalHighlightPanel(
       variant: PortalHighlightVariant.attention,
       margin: EdgeInsets.zero,
@@ -783,13 +888,15 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.lock_rounded, color: ForumTheme.pinned, size: 20),
+          const Icon(
+            Icons.lock_rounded,
+            color: ForumTheme.pinned,
+            size: 20,
+          ),
           const SizedBox(width: PortalTheme.space2),
           Expanded(
             child: Text(
-              topic.moderationReason?.isNotEmpty == true
-                  ? 'This topic is locked. ${topic.moderationReason}'
-                  : 'This topic is locked. No new replies can be added.',
+              message,
               style: PortalTheme.body.copyWith(
                 fontWeight: FontWeight.w600,
                 color: ForumTheme.pinned,
@@ -801,20 +908,176 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     );
   }
 
+  Widget _buildJobOfferReviewBanner(ForumTopic topic) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ForumTheme.needsResponseBg,
+        borderRadius: BorderRadius.circular(ForumTheme.radius),
+        border: Border.all(
+          color: ForumTheme.needsResponse.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Awaiting review',
+            style: PortalTheme.meta.copyWith(
+              fontWeight: FontWeight.w800,
+              color: ForumTheme.needsResponse,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Only you and community admins can see this until it is approved. '
+            'Replies open after approval.',
+            style: PortalTheme.bodySecondary.copyWith(height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _withdrawJobOffer(ForumTopic topic) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: PortalMenu.dialogShape,
+        title: const Text('Withdraw job offer?'),
+        content: const Text(
+          'This removes your submission from the review queue. You can share a new offer later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: PortalTheme.ghostButton(dense: true),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: PortalMenu.dangerButton(),
+            child: const Text('Withdraw'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final busy = showForumBusyDialog(context, 'Withdrawing…');
+    try {
+      await _forumService.withdrawJobOffer(topic.id);
+      if (!mounted) return;
+      if (widget.embedded) {
+        widget.onChanged?.call();
+        widget.onClose?.call();
+      } else {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) showPortalErrorSnack(context, e);
+    } finally {
+      await busy.close();
+    }
+  }
+
+  void _startQuote(ForumPost post) {
+    final name = post.authorName.trim().isEmpty
+        ? 'Alumni'
+        : post.authorName.trim();
+    final mention = '@$name ';
+    final current = _replyController.text;
+    if (!current.toLowerCase().contains('@${name.toLowerCase()}')) {
+      _replyController.value = TextEditingValue(
+        text: '$mention$current',
+        selection: TextSelection.collapsed(offset: mention.length),
+      );
+    }
+    if (post.authorUid.trim().isNotEmpty) {
+      _mentionNameToId[name.toLowerCase()] = post.authorUid;
+    }
+    setState(() => _quoting = post);
+    _replyFocus.requestFocus();
+  }
+
+  void _cancelQuote() {
+    final quoted = _quoting;
+    final name = quoted == null
+        ? ''
+        : (quoted.authorName.trim().isEmpty
+              ? 'Alumni'
+              : quoted.authorName.trim());
+    final prefix = name.isEmpty ? '' : '@$name ';
+    final text = _replyController.text;
+    if (prefix.isNotEmpty && text.startsWith(prefix)) {
+      _replyController.value = TextEditingValue(
+        text: text.substring(prefix.length),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+    }
+    setState(() => _quoting = null);
+  }
+
   Widget _buildTopicHero(
     ForumTopic topic, {
     required bool canEdit,
     required bool canDelete,
     required bool canSolve,
     required bool canModerate,
+    required bool canReport,
+    bool canWithdrawJob = false,
   }) {
-    final meta = <String>[
-      if (topic.authorProgram.isNotEmpty) topic.authorProgram,
-      if (topic.authorBatch.isNotEmpty) 'Batch ${topic.authorBatch}',
-    ].join(' · ');
+    final meta = topic.isAnnouncement
+        ? 'Community Admin'
+        : <String>[
+            if (topic.authorProgram.isNotEmpty) topic.authorProgram,
+            if (topic.authorBatch.isNotEmpty) 'Batch ${topic.authorBatch}',
+          ].join(' · ');
 
     final timeLabel = DateFormat.yMMMd().add_jm().format(topic.createdAt);
     final edited = topic.editedAt != null;
+    final menuItems = <PopupMenuEntry<String>>[
+      if (canReport)
+        portalMenuItem(
+          value: 'report',
+          label: 'Report',
+          icon: Icons.flag_outlined,
+        ),
+      if (canEdit)
+        portalMenuItem(
+          value: 'edit',
+          label: 'Edit',
+          icon: Icons.edit_outlined,
+        ),
+      if (canModerate && !topic.isJobOfferInReviewQueue) ...[
+        portalMenuItem(
+          value: 'lock',
+          label: topic.isLocked ? 'Unlock' : 'Lock',
+          icon: topic.isLocked
+              ? Icons.lock_open_rounded
+              : Icons.lock_outline,
+        ),
+        portalMenuItem(
+          value: 'pin',
+          label: topic.isPinned ? 'Unpin' : 'Pin',
+          icon: Icons.push_pin_outlined,
+        ),
+      ],
+      if (canWithdrawJob)
+        portalMenuItem(
+          value: 'withdraw',
+          label: 'Withdraw',
+          icon: Icons.undo_rounded,
+          destructive: true,
+        ),
+      if (canDelete)
+        portalMenuItem(
+          value: 'delete',
+          label: 'Delete',
+          icon: Icons.delete_outline_rounded,
+          destructive: true,
+        ),
+    ];
 
     return PortalHighlightPanel(
       variant: topic.isAnnouncement
@@ -825,27 +1088,6 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (topic.isAnnouncement)
-            Padding(
-              padding: const EdgeInsets.only(bottom: PortalTheme.space2),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.campaign_outlined,
-                    size: 16,
-                    color: ForumTheme.announcement,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Official announcement',
-                    style: PortalTheme.caption.copyWith(
-                      color: ForumTheme.announcement,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -913,106 +1155,66 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                tooltip: 'Actions',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                onSelected: (value) async {
-                  switch (value) {
-                    case 'bookmark':
-                      await _toggleBookmark(topic);
-                    case 'copy':
-                      await copyForumTopicLink(context, topic.id);
-                    case 'report':
-                      await _report();
-                    case 'edit':
-                      await _editTopic(topic);
-                    case 'solved':
-                      await _forumService.setTopicSolved(
-                        topic.id,
-                        !topic.isSolved,
-                      );
-                      await _loadAll(silent: true);
-                    case 'lock':
-                      final reason = topic.isLocked
-                          ? ''
-                          : await showForumModerationReasonDialog(
-                              context,
-                              title: 'Lock topic',
-                              confirmLabel: 'Lock',
-                            );
-                      if (reason == null && !topic.isLocked) return;
-                      await _forumService.setTopicLocked(
-                        topic.id,
-                        !topic.isLocked,
-                        reason: topic.isLocked ? null : reason,
-                      );
-                      await _loadAll(silent: true);
-                    case 'pin':
-                      await _forumService.setTopicPinned(
-                        topic.id,
-                        !topic.isPinned,
-                      );
-                      await _loadAll(silent: true);
-                    case 'delete':
-                      await _confirmDeleteTopic(topic);
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  portalMenuItem(
-                    value: 'bookmark',
-                    label: topic.isBookmarked ? 'Remove bookmark' : 'Bookmark',
-                    icon: topic.isBookmarked
-                        ? Icons.bookmark_remove_outlined
-                        : Icons.bookmark_add_outlined,
+              if (menuItems.isNotEmpty)
+                PopupMenuButton<String>(
+                  tooltip: 'Actions',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
                   ),
-                  portalMenuItem(
-                    value: 'copy',
-                    label: 'Copy link',
-                    icon: Icons.link_rounded,
-                  ),
-                  portalMenuItem(
-                    value: 'report',
-                    label: 'Report',
-                    icon: Icons.flag_outlined,
-                  ),
-                  if (canEdit)
-                    portalMenuItem(
-                      value: 'edit',
-                      label: 'Edit',
-                      icon: Icons.edit_outlined,
-                    ),
-                  if (canSolve)
-                    portalMenuItem(
-                      value: 'solved',
-                      label: topic.isSolved ? 'Unmark solved' : 'Mark solved',
-                      icon: Icons.check_circle_outline,
-                    ),
-                  if (canModerate) ...[
-                    portalMenuItem(
-                      value: 'lock',
-                      label: topic.isLocked ? 'Unlock' : 'Lock',
-                      icon: topic.isLocked
-                          ? Icons.lock_open_rounded
-                          : Icons.lock_outline,
-                    ),
-                    portalMenuItem(
-                      value: 'pin',
-                      label: topic.isPinned ? 'Unpin' : 'Pin',
-                      icon: Icons.push_pin_outlined,
-                    ),
-                  ],
-                  if (canDelete)
-                    portalMenuItem(
-                      value: 'delete',
-                      label: 'Delete',
-                      icon: Icons.delete_outline_rounded,
-                      destructive: true,
-                    ),
-                ],
-              ),
+                  onSelected: (value) async {
+                    switch (value) {
+                      case 'report':
+                        await _report();
+                      case 'edit':
+                        await _editTopic(topic);
+                      case 'lock':
+                        final reason = topic.isLocked
+                            ? ''
+                            : await showForumModerationReasonDialog(
+                                context,
+                                title: 'Lock topic',
+                                confirmLabel: 'Lock',
+                              );
+                        if (reason == null && !topic.isLocked) return;
+                        await _forumService.setTopicLocked(
+                          topic.id,
+                          !topic.isLocked,
+                          reason: topic.isLocked ? null : reason,
+                        );
+                        await _loadAll(silent: true);
+                      case 'pin':
+                        await _forumService.setTopicPinned(
+                          topic.id,
+                          !topic.isPinned,
+                        );
+                        await _loadAll(silent: true);
+                      case 'withdraw':
+                        await _withdrawJobOffer(topic);
+                      case 'delete':
+                        await _confirmDeleteTopic(topic);
+                    }
+                  },
+                  itemBuilder: (ctx) => menuItems,
+                ),
             ],
           ),
+          if (topic.isJobOffer && topic.coverImageUrl.trim().isNotEmpty) ...[
+            const SizedBox(height: PortalTheme.space3),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(ForumTheme.radius),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return AppImage.widget(
+                    topic.coverImageUrl,
+                    width: constraints.maxWidth,
+                    fit: BoxFit.fitWidth,
+                  );
+                },
+              ),
+            ),
+          ],
           const SizedBox(height: PortalTheme.space3),
           Text(
             topic.title,
@@ -1039,6 +1241,20 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
             topic.body,
             style: PortalTheme.body.copyWith(fontSize: 15, height: 1.5),
           ),
+          if (topic.isJobOffer && topic.applyUrl.trim().isNotEmpty) ...[
+            const SizedBox(height: PortalTheme.space3),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SafeLinkText(
+                topic.applyUrl.trim(),
+                style: PortalTheme.body.copyWith(
+                  color: ForumTheme.navy,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: PortalTheme.space2),
           Wrap(
             spacing: 0,
@@ -1095,6 +1311,8 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
     final canDelete = _isAdmin || post.authorUid == uid;
     final canEdit =
         (post.authorUid == uid || _isAdmin) && post.canEditWithinWindow;
+    final canReportReply =
+        post.authorUid != uid && !_isAdminAuthor(post.authorUid);
     final timeLabel = DateFormat.yMMMd().add_jm().format(post.createdAt);
 
     return Padding(
@@ -1188,8 +1406,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                     onSelected: (v) async {
                       switch (v) {
                         case 'quote':
-                          setState(() => _quoting = post);
-                          _replyFocus.requestFocus();
+                          _startQuote(post);
                         case 'report':
                           await _report(postId: post.id);
                         case 'edit':
@@ -1208,11 +1425,12 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                           label: 'Quote reply',
                           icon: Icons.format_quote_rounded,
                         ),
-                      portalMenuItem(
-                        value: 'report',
-                        label: 'Report',
-                        icon: Icons.flag_outlined,
-                      ),
+                      if (canReportReply)
+                        portalMenuItem(
+                          value: 'report',
+                          label: 'Report',
+                          icon: Icons.flag_outlined,
+                        ),
                       if (canEdit)
                         portalMenuItem(
                           value: 'edit',
@@ -1232,19 +1450,38 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
               ),
               if (post.quotedExcerpt?.trim().isNotEmpty == true) ...[
                 const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
+                DecoratedBox(
                   decoration: BoxDecoration(
                     color: ForumTheme.surfaceMuted,
                     borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
-                    border: const Border(
-                      left: BorderSide(color: ForumTheme.navy, width: 3),
+                    border: Border.all(
+                      color: ForumTheme.border.withValues(alpha: 0.75),
                     ),
                   ),
-                  child: SafeLinkText(
-                    ForumFormattedText.plain(post.quotedExcerpt!),
-                    style: PortalTheme.caption.copyWith(height: 1.35),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const ColoredBox(
+                            color: ForumTheme.navy,
+                            child: SizedBox(width: 3),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: SafeLinkText(
+                                ForumFormattedText.plain(post.quotedExcerpt!),
+                                style: PortalTheme.caption.copyWith(
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -1292,10 +1529,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
-                      onPressed: () {
-                        setState(() => _quoting = post);
-                        _replyFocus.requestFocus();
-                      },
+                      onPressed: () => _startQuote(post),
                       child: const Text(
                         'Quote',
                         style: TextStyle(fontSize: 12.5),
@@ -1320,31 +1554,52 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: PortalTheme.space2),
-                  padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
                   decoration: BoxDecoration(
                     color: ForumTheme.surfaceMuted,
                     borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
-                    border: const Border(
-                      left: BorderSide(color: ForumTheme.navy, width: 3),
+                    border: Border.all(
+                      color: ForumTheme.border.withValues(alpha: 0.75),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Quoting ${_quoting!.authorName}: '
-                          '${ForumFormattedText.plain(_quoting!.body)}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: PortalTheme.caption,
-                        ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(ForumTheme.radiusXl),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const ColoredBox(
+                            color: ForumTheme.navy,
+                            child: SizedBox(width: 3),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Quoting ${_quoting!.authorName}: '
+                                      '${ForumFormattedText.plain(_quoting!.body)}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: PortalTheme.caption,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Cancel quote',
+                                    onPressed: _cancelQuote,
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        tooltip: 'Cancel quote',
-                        onPressed: () => setState(() => _quoting = null),
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               if (_showMentions)

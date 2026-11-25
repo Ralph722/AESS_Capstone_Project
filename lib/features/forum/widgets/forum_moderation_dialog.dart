@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:alumni_system/features/forum/data/forum_content_moderation_service.dart';
@@ -164,4 +166,86 @@ Future<bool?> showForumModerationDialog(
       );
     },
   );
+}
+
+/// Non-dismissible spinner dialog while content is checked or published.
+///
+/// Always [await] [ForumBusyHandle.close] before opening another dialog.
+/// Instant work (e.g. local moderation block) can finish before the busy
+/// route mounts; awaiting close waits for mount-then-pop so the spinner
+/// cannot stick forever or dismiss the next dialog by mistake.
+ForumBusyHandle showForumBusyDialog(BuildContext context, String message) {
+  final handle = ForumBusyHandle();
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    useRootNavigator: true,
+    builder: (ctx) {
+      handle._onDialogBuilt(ctx);
+      return PopScope(
+        canPop: false,
+        child: Dialog(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: PortalTheme.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: PortalTheme.navy,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+  return handle;
+}
+
+class ForumBusyHandle {
+  bool _closed = false;
+  final _ready = Completer<BuildContext>();
+  final _dismissed = Completer<void>();
+
+  void _onDialogBuilt(BuildContext ctx) {
+    if (!_ready.isCompleted) _ready.complete(ctx);
+    if (_closed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (ctx.mounted) {
+          Navigator.of(ctx, rootNavigator: true).pop();
+        }
+        if (!_dismissed.isCompleted) _dismissed.complete();
+      });
+    }
+  }
+
+  /// Dismisses the busy dialog. Safe to call before it has mounted.
+  Future<void> close() async {
+    if (_closed) return _dismissed.future;
+    _closed = true;
+    try {
+      final ctx = await _ready.future.timeout(
+        const Duration(milliseconds: 1500),
+      );
+      if (ctx.mounted) {
+        Navigator.of(ctx, rootNavigator: true).pop();
+      }
+    } catch (_) {
+      // Dialog never appeared; nothing to pop.
+    }
+    if (!_dismissed.isCompleted) _dismissed.complete();
+    return _dismissed.future;
+  }
 }

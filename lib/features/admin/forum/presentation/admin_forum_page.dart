@@ -8,13 +8,14 @@ import 'package:intl/intl.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/models/forum_filters.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
-import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
+import 'package:alumni_system/features/admin/forum/presentation/admin_forum_topic_panel.dart';
 import 'package:alumni_system/features/admin/forum/widgets/admin_forum_ui.dart';
 import 'package:alumni_system/features/share/share_link_sheet.dart';
 import 'package:alumni_system/features/share/shareable_content.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_badge.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
@@ -38,7 +39,7 @@ class AdminForumScreen extends StatefulWidget {
   State<AdminForumScreen> createState() => _AdminForumScreenState();
 }
 
-enum _AdminForumMode { discussions, reports }
+enum _AdminForumMode { discussions, jobOffers, reports }
 
 class _AdminForumScreenState extends State<AdminForumScreen>
     with AutomaticKeepAliveClientMixin {
@@ -53,6 +54,7 @@ class _AdminForumScreenState extends State<AdminForumScreen>
   StreamSubscription<void>? _refreshSub;
   List<ForumTopic> _catalog = [];
   List<ForumTopic> _topics = [];
+  List<ForumTopic> _jobOffers = [];
   List<ForumReport> _reports = [];
   bool _loading = true;
   bool _hasLoaded = false;
@@ -73,6 +75,7 @@ class _AdminForumScreenState extends State<AdminForumScreen>
   int _statUnanswered = 0;
   int _statLocked = 0;
   int _statOpenReports = 0;
+  int _statPendingJobOffers = 0;
   List<String> _allPrograms = [];
 
   String? _selectedTopicId;
@@ -109,6 +112,7 @@ class _AdminForumScreenState extends State<AdminForumScreen>
     try {
       final catalog = await _forumService.getAllTopics();
       final openReports = await _forumService.getOpenReportCount();
+      final jobOffers = await _forumService.fetchPendingJobOffers();
       final reports = _mode == _AdminForumMode.reports
           ? await _forumService.getReports(
               status: _reportStatus == 'all' ? null : _reportStatus,
@@ -116,14 +120,18 @@ class _AdminForumScreenState extends State<AdminForumScreen>
           : _reports;
 
       if (!mounted) return;
-      _catalog = catalog;
+      _catalog = catalog.where((t) => !t.isJobOfferInReviewQueue).toList();
+      _jobOffers = jobOffers;
+      _statPendingJobOffers =
+          jobOffers.where((t) => t.isPendingJobOffer).length;
       _reports = reports;
       _statOpenReports = openReports;
       _error = null;
       _loading = false;
       _hasLoaded = true;
       if (_selectedTopicId != null &&
-          !catalog.any((t) => t.id == _selectedTopicId)) {
+          !_catalog.any((t) => t.id == _selectedTopicId) &&
+          !_jobOffers.any((t) => t.id == _selectedTopicId)) {
         _selectedTopicId = null;
       }
       _applyTopicFilters();
@@ -267,12 +275,26 @@ class _AdminForumScreenState extends State<AdminForumScreen>
     _applyTopicFilters();
   }
 
-  void _openTopic(String topicId) {
-    setState(() => _selectedTopicId = topicId);
+  ForumTopic? _topicById(String topicId) {
+    for (final t in _catalog) {
+      if (t.id == topicId) return t;
+    }
+    for (final t in _jobOffers) {
+      if (t.id == topicId) return t;
+    }
+    return null;
   }
 
-  void _closeTopic() {
-    setState(() => _selectedTopicId = null);
+  Future<void> _openTopic(String topicId, {ForumTopic? initialTopic}) async {
+    setState(() => _selectedTopicId = topicId);
+    await showAdminForumTopicDetail(
+      context: context,
+      topicId: topicId,
+      service: _forumService,
+      initialTopic: initialTopic ?? _topicById(topicId),
+      onChanged: () => _refresh(silent: true),
+    );
+    if (mounted) setState(() => _selectedTopicId = null);
   }
 
   void _showSnack(String message, {bool isError = false}) {
@@ -592,29 +614,19 @@ class _AdminForumScreenState extends State<AdminForumScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // Directory / Surveys pattern: replace the list workspace entirely with
-    // the discussion (full available area), not a side-by-side panel.
-    if (_selectedTopicId != null) {
-      return ForumTopicScreen(
-        key: ValueKey(_selectedTopicId),
-        topicId: _selectedTopicId!,
-        embedded: true,
-        service: _forumService,
-        onClose: _closeTopic,
-        onChanged: () => _refresh(silent: true),
-      );
-    }
 
-    final hasDataInActiveTab = _mode == _AdminForumMode.discussions
-        ? _catalog.isNotEmpty
-        : _reports.isNotEmpty;
+    final hasDataInActiveTab = switch (_mode) {
+      _AdminForumMode.discussions => _catalog.isNotEmpty,
+      _AdminForumMode.jobOffers => _jobOffers.isNotEmpty,
+      _AdminForumMode.reports => _reports.isNotEmpty,
+    };
 
     final refreshButton = OutlinedButton.icon(
       onPressed: _loading
           ? null
-          : () => _mode == _AdminForumMode.discussions
-              ? _refresh()
-              : _loadReportsOnly(),
+          : () => _mode == _AdminForumMode.reports
+              ? _loadReportsOnly()
+              : _refresh(),
       icon: _loading && _hasLoaded
           ? const SizedBox(
               width: 14,
@@ -675,6 +687,24 @@ class _AdminForumScreenState extends State<AdminForumScreen>
                 },
               ),
               AdminSaaSTabSpec(
+                label: 'Job offers',
+                icon: Icons.work_outline_rounded,
+                count: _statPendingJobOffers > 0
+                    ? _statPendingJobOffers
+                    : null,
+                isSelected: _mode == _AdminForumMode.jobOffers,
+                onTap: () {
+                  if (_mode == _AdminForumMode.jobOffers) return;
+                  setState(() {
+                    _mode = _AdminForumMode.jobOffers;
+                    _search = '';
+                    _searchController.clear();
+                    _error = null;
+                  });
+                  _refresh();
+                },
+              ),
+              AdminSaaSTabSpec(
                 label: 'Reports',
                 icon: Icons.flag_outlined,
                 count: _statOpenReports > 0 ? _statOpenReports : null,
@@ -704,6 +734,12 @@ class _AdminForumScreenState extends State<AdminForumScreen>
           ],
           const SizedBox(height: AdminDensity.space1),
           Expanded(child: _buildListPane()),
+        ] else if (_mode == _AdminForumMode.jobOffers) ...[
+          if (_error != null && hasDataInActiveTab) ...[
+            _buildRefreshErrorNotice(() => _refresh()),
+            const SizedBox(height: AdminDensity.space1),
+          ],
+          Expanded(child: _buildJobOffersPane()),
         ] else ...[
           _buildReportsToolbar(),
           if (_error != null && hasDataInActiveTab) ...[
@@ -786,6 +822,20 @@ class _AdminForumScreenState extends State<AdminForumScreen>
       );
     }
 
+    if (_mode == _AdminForumMode.jobOffers) {
+      return AdminMetricRibbon(
+        items: [
+          AdminMetricRibbonItem(
+            label: 'Pending',
+            value: '${_jobOffers.length}',
+            icon: Icons.hourglass_top_rounded,
+            color: AdminColors.warning,
+            tooltip: 'Job offers awaiting review',
+          ),
+        ],
+      );
+    }
+
     return AdminMetricRibbon(
       items: [
         AdminMetricRibbonItem(
@@ -819,6 +869,237 @@ class _AdminForumScreenState extends State<AdminForumScreen>
           tooltip: 'Flagged topics and replies',
         ),
       ],
+    );
+  }
+
+  List<ForumTopic> get _visibleJobOffers {
+    final q = _search.trim().toLowerCase();
+    if (q.isEmpty) return _jobOffers;
+    return _jobOffers.where((t) {
+      return t.title.toLowerCase().contains(q) ||
+          t.authorName.toLowerCase().contains(q) ||
+          t.companyName.toLowerCase().contains(q) ||
+          t.body.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  Future<void> _approveJobOffer(ForumTopic topic) async {
+    final ok = await showAdminConfirmDialog(
+      context,
+      title: 'Approve job offer?',
+      message:
+          '"${topic.title}" will become visible to alumni in the community forum.',
+      confirmLabel: 'Approve',
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busyTopicIds.add(topic.id));
+    try {
+      await _forumService.reviewJobOffer(topicId: topic.id, approve: true);
+      if (mounted) await _refresh(silent: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(forumFriendlyError(e, 'Could not approve.'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyTopicIds.remove(topic.id));
+    }
+  }
+
+  Future<void> _declineJobOffer(ForumTopic topic) async {
+    if (!topic.isPendingJobOffer) return;
+    final ok = await showAdminConfirmDialog(
+      context,
+      title: 'Decline job offer?',
+      message:
+          '"${topic.title}" will be permanently removed. '
+          'Message the alumnus separately if they should revise and submit a new offer.',
+      confirmLabel: 'Decline',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busyTopicIds.add(topic.id));
+    try {
+      await _forumService.reviewJobOffer(
+        topicId: topic.id,
+        approve: false,
+      );
+      if (mounted) await _refresh(silent: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(forumFriendlyError(e, 'Could not decline.'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyTopicIds.remove(topic.id));
+    }
+  }
+
+  Widget _buildJobOffersPane() {
+    final visible = _visibleJobOffers;
+    if (_loading && _jobOffers.isEmpty) {
+      return const AdminForumListSkeleton();
+    }
+    if (_error != null && _jobOffers.isEmpty) {
+      return AdminStateView.error(
+        title: "Couldn't load job offers",
+        message: forumFriendlyError(
+          _error!,
+          'Check your connection and try again.',
+        ),
+        details: _error,
+        onRetry: () => _refresh(),
+      );
+    }
+    if (visible.isEmpty) {
+      return AdminStateView.empty(
+        icon: Icons.work_outline_rounded,
+        title: _jobOffers.isEmpty
+            ? 'No job offers in review'
+            : 'No matching job offers',
+        message: _jobOffers.isEmpty
+            ? 'Alumni submissions for community job posts will appear here.'
+            : 'Try another search keyword.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: AdminDensity.space3),
+      itemCount: visible.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AdminDensity.listItemGap),
+      itemBuilder: (context, index) {
+        final topic = visible[index];
+        final busy = _busyTopicIds.contains(topic.id);
+        return Material(
+          color: AdminForumTheme.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AdminForumTheme.radiusMd),
+            side: BorderSide(color: AdminForumTheme.border),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AdminForumTheme.radiusMd),
+            onTap: () => _openTopic(topic.id, initialTopic: topic),
+            child: Padding(
+              padding: const EdgeInsets.all(AdminDensity.cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              topic.title,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AdminForumTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              topic.authorName.trim().isEmpty
+                                  ? 'Alumni'
+                                  : topic.authorName.trim(),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: AdminForumTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const AdminBadge(
+                        label: 'Pending',
+                        tone: AdminBadgeTone.warning,
+                      ),
+                    ],
+                  ),
+                  if (topic.purposeLetter.trim().isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Purpose letter',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AdminForumTheme.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      topic.purposeLetter.trim(),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AdminForumTheme.textSecondary,
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      topic.body.trim(),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AdminForumTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text(
+                        DateFormat.yMMMd().add_jm().format(topic.createdAt),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AdminForumTheme.textMuted,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: busy
+                            ? null
+                            : () => _openTopic(topic.id, initialTopic: topic),
+                        child: const Text('Open'),
+                      ),
+                      const SizedBox(width: 4),
+                      OutlinedButton(
+                        onPressed: busy ? null : () => _declineJobOffer(topic),
+                        style: AdminButtonStyles.outlined(),
+                        child: const Text('Decline'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: busy ? null : () => _approveJobOffer(topic),
+                        style: AdminButtonStyles.filled(),
+                        child: busy
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Approve'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -737,11 +737,13 @@ class _AdminDashboardWebState extends State<AdminDashboardWeb>
     _adminUnreadSubscription?.cancel();
     _adminUnreadSubscription = _messageService
         .watchAdminUnreadUserMessagesCount()
-        .listen((unread) {
-          if (!mounted) return;
-          setState(() => metrics = _metricsWith(unreadMessages: unread));
-        });
-
+        .listen(
+          (unread) {
+            if (!mounted) return;
+            setState(() => metrics = _metricsWith(unreadMessages: unread));
+          },
+          onError: (_) {},
+        );
   }
 
   @override

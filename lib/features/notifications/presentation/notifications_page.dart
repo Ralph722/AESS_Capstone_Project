@@ -15,7 +15,10 @@ import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Full notification history for alumni: filters, paging, swipe to delete.
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, this.initialType});
+
+  /// When set, opens already filtered to that category (e.g. forum).
+  final NotificationType? initialType;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -40,6 +43,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    _type = widget.initialType;
     _changes = _service.watchChanges().listen((_) => _reload(keepCount: true));
   }
 
@@ -120,14 +124,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _markAllRead() async {
     try {
-      await _service.markAllAsRead();
+      await _service.markAllAsRead(type: _type);
       if (!mounted) return;
       setState(() {
         _items = _filter == _Filter.unread
             ? []
             : [for (final n in _items) n.copyWith(isRead: true)];
       });
-      _snack('All notifications marked as read');
+      _snack(
+        _type == null
+            ? 'All notifications marked as read'
+            : 'Filtered notifications marked as read',
+      );
     } catch (_) {
       _snack('Could not mark notifications as read');
     }
@@ -205,7 +213,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: PortalAppBar(
-        title: 'Notifications',
+        title: widget.initialType == NotificationType.forum
+            ? 'Community activity'
+            : 'Notifications',
         actions: [
           IconButton(
             tooltip: 'Notification settings',

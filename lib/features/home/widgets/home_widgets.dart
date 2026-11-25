@@ -421,7 +421,7 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: PortalTheme.navy.withValues(alpha: 0.88),
+                        color: PortalTheme.navy,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -1397,6 +1397,7 @@ class HomeCommunityCard extends StatelessWidget {
 
   /// The one status or tag worth showing, matching the Forum list chips.
   Widget? _pill() {
+    if (topic.isJobOffer) return ForumStatusChip.jobOffer();
     if (topic.isPinned) return ForumStatusChip.pinned();
     if (topic.isSolved) return ForumStatusChip.solved();
     if (topic.needsResponse) return ForumStatusChip.needsResponse();

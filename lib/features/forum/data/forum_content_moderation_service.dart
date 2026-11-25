@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:alumni_system/core/config/ai_config.dart';
@@ -98,6 +99,9 @@ class ForumContentModerationService {
     '7': 't',
   };
 
+  /// Hard cap so a stalled Edge Function / network never leaves the UI spinning.
+  static const Duration _aiTimeout = Duration(seconds: 12);
+
   Future<ForumModerationResult> reviewTopic({
     required String title,
     required String body,
@@ -114,6 +118,30 @@ class ForumContentModerationService {
           'Review this alumni forum post.\n\n'
           'TITLE:\n$cleanTitle\n\n'
           'BODY:\n$cleanBody\n\n'
+          'Return JSON only with verdict and reasons.',
+    );
+  }
+
+  /// Job offers: title + public details + admin-only purpose letter.
+  Future<ForumModerationResult> reviewJobOffer({
+    required String title,
+    required String body,
+    required String purposeLetter,
+  }) async {
+    final cleanTitle = title.trim();
+    final cleanBody = body.trim();
+    final cleanLetter = purposeLetter.trim();
+    if (cleanTitle.isEmpty || cleanBody.isEmpty || cleanLetter.isEmpty) {
+      return ForumModerationResult.allowUnchecked;
+    }
+    return _review(
+      localText: '$cleanTitle\n$cleanBody\n$cleanLetter',
+      noun: 'job offer',
+      aiMessage:
+          'Review this alumni community job offer.\n\n'
+          'TITLE:\n$cleanTitle\n\n'
+          'DETAILS:\n$cleanBody\n\n'
+          'PURPOSE LETTER (admin-only context):\n$cleanLetter\n\n'
           'Return JSON only with verdict and reasons.',
     );
   }
@@ -151,10 +179,12 @@ class ForumContentModerationService {
     }
 
     try {
-      final raw = await _ai.sendMessage(
-        task: AiTask.forumModeration,
-        userMessage: aiMessage,
-      );
+      final raw = await _ai
+          .sendMessage(
+            task: AiTask.forumModeration,
+            userMessage: aiMessage,
+          )
+          .timeout(_aiTimeout);
       final ai = _parse(raw);
       // Prefer the stricter of local vs AI (local already allow here).
       return ai;
@@ -163,6 +193,9 @@ class ForumContentModerationService {
     } on AiQuotaException {
       // Keep local result; if clean, allow but mark unchecked.
       return local.isClean ? ForumModerationResult.allowUnchecked : local;
+    } on TimeoutException {
+      // Fail open so submit is not stuck forever when AI hangs.
+      return ForumModerationResult.allowUnchecked;
     } catch (_) {
       return local.isClean ? ForumModerationResult.allowUnchecked : local;
     }

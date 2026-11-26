@@ -26,6 +26,9 @@ AlumniCardData _data({
   email: 'juan@gmail.com',
   memberSince: DateTime(2024, 6, 1),
   campus: 'USTP Oroquieta',
+  birthDate: DateTime.utc(2000, 9, 1),
+  contactNumber: '09123456789',
+  address: 'Purok-6, Mobod, Oroquieta City',
 );
 
 AlumniCardToken _token() => AlumniCardToken(
@@ -132,6 +135,9 @@ void main() {
       expect(restored.studentId, original.studentId);
       expect(restored.email, original.email);
       expect(restored.campus, original.campus);
+      expect(restored.contactNumber, original.contactNumber);
+      expect(restored.address, original.address);
+      expect(restored.birthDate?.toUtc(), original.birthDate?.toUtc());
     });
   });
 
@@ -211,15 +217,15 @@ void main() {
       ),
     );
     await tester.pump(); // resolve token
-    expect(find.text('Lifetime Member'), findsOneWidget);
-    expect(find.text('Juan Dela Cruz'), findsOneWidget);
-    expect(find.text('SCAN TO VERIFY'), findsNothing);
+    expect(find.text('LIFETIME MEMBER'), findsOneWidget);
+    expect(find.text('JUAN DELA CRUZ'), findsOneWidget);
+    expect(find.text('PERSONAL DETAILS'), findsNothing);
 
     await tester.tap(find.byType(AlumniDigitalCard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('SCAN TO VERIFY'), findsOneWidget);
-    expect(find.text('USTP ALUMNI OFFICE'), findsOneWidget);
+    expect(find.text('PERSONAL DETAILS'), findsOneWidget);
+    expect(find.textContaining('SEX:'), findsOneWidget);
     expect(find.text('K7Q-4MZ'), findsNothing);
     expect(find.textContaining('Non-transferable'), findsNothing);
     expect(find.textContaining('Refreshes in'), findsWidgets);
@@ -227,7 +233,7 @@ void main() {
     await tester.tap(find.byType(AlumniDigitalCard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('Lifetime Member'), findsOneWidget);
+    expect(find.text('LIFETIME MEMBER'), findsOneWidget);
   });
 
   testWidgets('dialog shows unmatched status', (tester) async {
@@ -261,8 +267,8 @@ void main() {
       service: _FakeCardService(AlumniCardLoadResult.ready(_data())),
       issueToken: () async => _token(),
     );
-    expect(find.text('Juan Dela Cruz'), findsOneWidget);
-    expect(find.text('Lifetime Member'), findsOneWidget);
+    expect(find.text('JUAN DELA CRUZ'), findsOneWidget);
+    expect(find.text('LIFETIME MEMBER'), findsOneWidget);
     expect(find.text('Tap the card to switch sides'), findsOneWidget);
     expect(find.text('Show back'), findsNothing);
     expect(find.text('Done'), findsNothing);
@@ -270,7 +276,7 @@ void main() {
     await tester.tap(find.byType(AlumniDigitalCard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('SCAN TO VERIFY'), findsOneWidget);
+    expect(find.text('PERSONAL DETAILS'), findsOneWidget);
     expect(find.text('K7Q-4MZ'), findsNothing);
     expect(find.textContaining('Refreshes in'), findsWidgets);
   });
@@ -287,13 +293,13 @@ void main() {
       ),
     );
     expect(find.text('Saved copy · QR needs internet'), findsOneWidget);
-    expect(find.text('Saved copy · not live'), findsOneWidget);
+    expect(find.text('SAVED COPY'), findsOneWidget);
 
     await tester.tap(find.byType(AlumniDigitalCard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('PERSONAL DETAILS'), findsOneWidget);
     expect(find.text('OFFLINE COPY'), findsOneWidget);
-    expect(find.text('OFFLINE'), findsOneWidget);
     expect(find.text('QR needs internet'), findsOneWidget);
   });
 

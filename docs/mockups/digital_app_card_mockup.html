@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital App Card Mockup</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            // Official USTP: navy #1A1851, gold #FCB315
+            brandNavy: '#1A1851',
+            brandAmber: '#FCB315',
+            brandStroke: '#FCB315',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* 3D Card Flip Perspective & Face Visibility */
+    .card-scene {
+      perspective: 1600px;
+    }
+    .card-flipper {
+      transform-style: preserve-3d;
+      transition: transform 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .card-flipper.is-flipped {
+      transform: rotateY(180deg);
+    }
+    .card-face {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      container-type: inline-size;
+    }
+    .card-face-back {
+      transform: rotateY(180deg);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#F3F4F6] text-slate-800 flex flex-col items-center justify-center p-4 sm:p-8 selection:bg-brandAmber/30">
+
+  <!-- Main Studio Showcase Wrapper -->
+  <main class="w-full max-w-[850px] flex flex-col items-center">
+
+    <!-- Top Header & Front/Back Switcher -->
+    <div class="w-full flex flex-wrap items-center justify-between gap-2.5 mb-4 px-1">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-brandNavy"></span>
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-brandAmber -ml-1.5 ring-2 ring-[#F3F4F6]"></span>
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">3:2 Digital Alumni ID Card</span>
+      </div>
+
+      <!-- Side Switcher Pills -->
+      <div class="flex items-center gap-2">
+        <div class="inline-flex rounded-full bg-white p-1 shadow-sm border border-slate-200/80" role="group" aria-label="Card side selector">
+          <button
+            id="btnFrontSide"
+            type="button"
+            class="px-3 py-1 text-xs font-semibold rounded-full text-slate-600 hover:text-[#1A1851] transition-all cursor-pointer"
+          >
+            Front View
+          </button>
+          <button
+            id="btnBackSide"
+            type="button"
+            class="px-3 py-1 text-xs font-semibold rounded-full bg-[#1A1851] text-white transition-all cursor-pointer"
+          >
+            Back View
+          </button>
+        </div>
+
+        <button
+          id="btnFlipCard"
+          type="button"
+          title="Flip card 180°"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-white text-[#1A1851] hover:bg-slate-50 shadow-sm border border-slate-200/80 active:scale-95 transition-all cursor-pointer"
+        >
+          <svg class="w-3.5 h-3.5 text-brandAmber" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Flip</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3D Flip Digital Card Container (Exact 3:2 Aspect Ratio: 850 x 567) -->
+    <div id="cardContainer" class="card-scene relative w-full aspect-[850/567] select-none">
+      <div id="cardFlipper" class="card-flipper is-flipped relative w-full h-full">
+
+        <!-- ==================== FRONT FACE ==================== -->
+        <div
+          id="cardFrontFace"
+          class="card-face absolute inset-0 w-full h-full bg-white rounded-3xl overflow-hidden shadow-[0_24px_60px_-15px_rgba(30,25,77,0.18),0_4px_18px_-4px_rgba(0,0,0,0.06)] ring-1 ring-slate-900/5"
+        >
+          <!-- Front Background Geometric Vector Layer -->
+          <svg
+            id="cardFrontSvg"
+            viewBox="0 0 850 567"
+            preserveAspectRatio="xMidYMid slice"
+            class="absolute inset-0 w-full h-full pointer-events-none select-none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <!-- Pure White Canvas Base -->
+            <rect width="850" height="567" fill="#FFFFFF" />
+
+            <!-- 1. Top-Left Overlapping Circles -->
+            <circle cx="58" cy="124" r="41" fill="#FCB315" />
+            <circle cx="88.5" cy="89.5" r="30.5" fill="#1A1851" />
+
+            <!-- 2. Top-Center-Left Tilted Rounded Rectangle -->
+            <rect
+              x="245"
+              y="-150"
+              width="335"
+              height="325"
+              rx="44"
+              ry="44"
+              fill="#1A1851"
+              transform="rotate(-18.5 412 20)"
+            />
+
+            <!-- 3. Bottom-Left Large Circle -->
+            <circle cx="118" cy="550" r="180" fill="#FCB315" />
+
+            <!-- 4. Bottom-Right Tilted Rounded Square/Rectangle -->
+            <rect
+              x="735"
+              y="375"
+              width="260"
+              height="260"
+              rx="44"
+              ry="44"
+              fill="#FCB315"
+              transform="rotate(-43 865 505)"
+            />
+          </svg>
+
+          <!-- Front Foreground Card Layout Layer -->
+          <div class="relative z-10 w-full h-full">
+
+            <!-- 1. Top-Right Logo Placeholder Box -->
+            <div
+              id="logoBox"
+              style="top: 4.8%; right: 3.2%; width: 23.6%; height: 35.4%; border-width: 0.6cqw; border-radius: 1.2cqw;"
+              class="absolute bg-white border-solid border-[#FCB315] flex flex-col items-center justify-center box-border overflow-hidden"
+            >
+              <!-- Subtle Guide (Visible only in Placeholder Guides View) -->
+              <div
+                data-guide="true"
+                class="opacity-0 transition-opacity duration-200 w-[84%] h-[84%] border-[1.5px] border-dashed border-[#FCB315]/80 rounded-lg flex flex-col items-center justify-center text-center p-1 pointer-events-none"
+              >
+                <svg style="width: 3.4cqw; height: 3.4cqw;" class="text-[#FCB315] mb-1" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <path d="M21 15l-5-5L5 21"></path>
+                </svg>
+                <span style="font-size: 1.25cqw;" class="font-bold tracking-widest uppercase text-slate-400">LOGO SLOT</span>
+              </div>
+            </div>
+
+            <!-- 2. Bottom-Left Profile Photo Placeholder Box -->
+            <div
+              id="profileBox"
+              style="left: 1.9%; bottom: 2.8%; width: 28.4%; height: 47.4%; border-width: 0.7cqw; border-radius: 2.8cqw;"
+              class="absolute bg-white border-solid border-[#FCB315] flex flex-col items-center justify-center box-border overflow-hidden"
+            >
+              <!-- Subtle Guide (Visible only in Placeholder Guides View) -->
+              <div
+                data-guide="true"
+                class="opacity-0 transition-opacity duration-200 w-[86%] h-[88%] border-[1.5px] border-dashed border-[#FCB315]/80 rounded-2xl flex flex-col items-center justify-center text-center p-2 pointer-events-none"
+              >
+                <svg style="width: 5.5cqw; height: 5.5cqw;" class="text-slate-300 mb-1.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                </svg>
+                <span style="font-size: 1.25cqw;" class="font-bold tracking-widest uppercase text-slate-400">PROFILE PHOTO</span>
+              </div>
+            </div>
+
+            <!-- 3. Center-Right Member Typography Block -->
+            <div
+              id="memberTextBlock"
+              style="left: 37%; right: 6.5%; top: 57.5%; bottom: 11%;"
+              class="absolute flex flex-col items-center justify-center text-center text-[#1A1851]"
+            >
+              <!-- Member Name -->
+              <h1
+                id="fieldName"
+                contenteditable="false"
+                spellcheck="false"
+                style="font-size: 3.35cqw; letter-spacing: 0.025em;"
+                class="font-display font-bold uppercase leading-[1.15] text-[#1A1851] whitespace-nowrap outline-none rounded px-1.5 transition-colors"
+              >JUAN DELA CRUZ</h1>
+
+              <!-- Member ID -->
+              <p
+                id="fieldId"
+                contenteditable="false"
+                spellcheck="false"
+                style="font-size: 2.0cqw; margin-top: 1.45cqw; letter-spacing: 0.02em;"
+                class="font-display font-bold uppercase leading-tight text-[#1A1851] outline-none rounded px-1.5 transition-colors"
+              >2026IT10</p>
+
+              <!-- Membership Tier -->
+              <p
+                id="fieldTier"
+                contenteditable="false"
+                spellcheck="false"
+                style="font-size: 2.65cqw; margin-top: 0.25cqw; letter-spacing: 0.02em;"
+                class="font-display font-bold uppercase leading-[1.15] text-[#1A1851] whitespace-nowrap outline-none rounded px-1.5 transition-colors"
+              >LIFETIME MEMBER</p>
+
+              <!-- Batch Year -->
+              <p
+                id="fieldBatch"
+                contenteditable="false"
+                spellcheck="false"
+                style="font-size: 1.92cqw; margin-top: 0.7cqw; letter-spacing: 0.025em;"
+                class="font-display font-bold uppercase leading-tight text-[#1A1851] outline-none rounded px-1.5 transition-colors"
+              >BATCH 2026</p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ==================== BACK FACE ==================== -->
+        <div
+          id="cardBackFace"
+          class="card-face card-face-back absolute inset-0 w-full h-full bg-white rounded-3xl overflow-hidden shadow-[0_24px_60px_-15px_rgba(30,25,77,0.18),0_4px_18px_-4px_rgba(0,0,0,0.06)] ring-1 ring-slate-900/5"
+        >
+          <!-- Back Background Geometric Vector Layer (Exact Reference Match) -->
+          <svg
+            id="cardBackSvg"
+            viewBox="0 0 850 567"
+            preserveAspectRatio="xMidYMid slice"
+            class="absolute inset-0 w-full h-full pointer-events-none select-none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <!-- Pure White Canvas Base -->
+            <rect width="850" height="567" fill="#FFFFFF" />
+
+            <!-- 1. Top-Left Deep Navy Rounded Corner Block -->
+            <rect
+              x="-58"
+              y="-192"
+              width="302"
+              height="245"
+              rx="52"
+              ry="52"
+              fill="#1A1851"
+              transform="rotate(21.5 93 -69.5)"
+            />
+
+            <!-- 2. Bottom-Right Deep Navy Rounded Corner Block -->
+            <rect
+              x="795"
+              y="265"
+              width="290"
+              height="310"
+              rx="62"
+              ry="62"
+              fill="#1A1851"
+              transform="rotate(-26 940 420)"
+            />
+          </svg>
+
+          <!-- Back Foreground Content Layer -->
+          <div class="relative z-10 w-full h-full text-[#1A1851]">
+
+            <!-- Left Column: PERSONAL DETAILS Heading & Member Information -->
+            <div
+              id="backDetailsBlock"
+              style="left: 2.7%; top: 16.2%; right: 36%;"
+              class="absolute flex flex-col items-start text-left"
+            >
+              <!-- Section Heading -->
+              <h2
+                id="backHeading"
+                contenteditable="false"
+                spellcheck="false"
+                style="font-size: 3.85cqw; letter-spacing: 0.08em;"
+                class="font-display font-bold uppercase leading-[1.15] text-[#1A1851] outline-none rounded px-1 -ml-1 transition-colors"
+              >PERSONAL DETAILS</h2>
+
+              <!-- Personal Details List -->
+              <div
+                style="margin-top: 6.2cqw; gap: 0.95cqw;"
+                class="flex flex-col items-start w-full"
+              >
+                <div
+                  style="font-size: 2.52cqw; letter-spacing: 0.045em;"
+                  class="font-display font-bold uppercase leading-[1.22] text-[#1A1851]"
+                >
+                  <span>SEX: </span><span id="backSex" contenteditable="false" spellcheck="false" class="outline-none rounded px-1 transition-colors">MALE</span>
+                </div>
+
+                <div
+                  style="font-size: 2.52cqw; letter-spacing: 0.045em;"
+                  class="font-display font-bold uppercase leading-[1.22] text-[#1A1851]"
+                >
+                  <span>BIRTHDATE: </span><span id="backBirthdate" contenteditable="false" spellcheck="false" class="outline-none rounded px-1 transition-colors">09/01/2010</span>
+                </div>
+
+                <div
+                  style="font-size: 2.52cqw; letter-spacing: 0.045em;"
+                  class="font-display font-bold uppercase leading-[1.22] text-[#1A1851]"
+                >
+                  <span>DEGREE/PROGRAM: </span><span id="backProgram" contenteditable="false" spellcheck="false" class="outline-none rounded px-1 transition-colors">BSIT</span>
+                </div>
+
+                <div
+                  style="font-size: 2.52cqw; letter-spacing: 0.045em;"
+                  class="font-display font-bold uppercase leading-[1.22] text-[#1A1851]"
+                >
+                  <span>CONTACT NUMBER: </span><span id="backContact" contenteditable="false" spellcheck="false" class="outline-none rounded px-1 transition-colors">09123456789</span>
+                </div>
+
+                <!-- Home Address Block -->
+                <div class="flex flex-col items-start w-full">
+                  <div
+                    id="backAddressLabel"
+                    contenteditable="false"
+                    spellcheck="false"
+                    style="font-size: 2.52cqw; letter-spacing: 0.045em;"
+                    class="font-display font-bold uppercase leading-[1.22] text-[#1A1851] outline-none rounded px-1 -ml-1 transition-colors"
+                  >HOME ADDRESS:</div>
+                  <p
+                    id="backAddressValue"
+                    contenteditable="false"
+                    spellcheck="false"
+                    style="font-size: 1.98cqw; margin-top: 0.35cqw; letter-spacing: 0.015em;"
+                    class="font-display font-bold leading-[1.28] text-[#1A1851] outline-none rounded px-1 -ml-1 transition-colors"
+                  >Purok-6, Mobod, Oroquieta City, Misamis Occidental</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Clean High-Contrast QR Code Module -->
+            <div
+              id="backQrContainer"
+              style="right: 7.5%; top: 16.2%; width: 25.5%;"
+              class="absolute flex flex-col items-center"
+            >
+              <div
+                style="padding: 1.35cqw; border-width: 0.35cqw; border-radius: 2.2cqw;"
+                class="w-full aspect-square bg-white border-solid border-[#1A1851]/15 shadow-[0_10px_28px_-8px_rgba(25,21,71,0.14)] flex items-center justify-center box-border"
+              >
+                <div id="backQrSvgMount" class="w-full h-full flex items-center justify-center"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Subtle Floating Toolbar Below Card -->
+    <div class="mt-6 flex flex-wrap items-center justify-center gap-2.5 bg-white/90 backdrop-blur-md p-2 rounded-2xl shadow-md border border-slate-200/80">
+      <!-- Segmented Display Mode Toggle -->
+      <div class="inline-flex rounded-xl bg-slate-100 p-1" role="group" aria-label="Card display mode">
+        <button
+          id="btnExactMode"
+          type="button"
+          class="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-[#1A1851] text-white shadow-xs transition-all cursor-pointer"
+        >
+          Exact Reference View
+        </button>
+        <button
+          id="btnGuidesMode"
+          type="button"
+          class="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-lg text-slate-600 hover:text-[#1A1851] transition-all cursor-pointer"
+        >
+          Edit / Guides View
+        </button>
+      </div>
+
+      <!-- Divider -->
+      <div class="hidden sm:block w-px h-6 bg-slate-200 mx-0.5"></div>
+
+      <!-- Copy Standalone HTML/CSS Button -->
+      <button
+        id="btnCopyCode"
+        type="button"
+        class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-brandAmber/20 text-[#1A1851] hover:bg-brandAmber/30 active:scale-[0.98] transition-all cursor-pointer"
+      >
+        <svg class="w-4 h-4 text-[#1A1851]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <span id="copyBtnLabel">Copy Back HTML</span>
+      </button>
+    </div>
+
+    <!-- Helper hint shown below toolbar -->
+    <p id="editHint" class="mt-2.5 text-xs text-slate-400 transition-opacity duration-200 text-center">
+      Showing <span class="font-semibold text-slate-600">Back View</span> • Switch to <span class="font-medium text-slate-500">Edit / Guides View</span> to customize details &amp; auto-update the QR code.
+    </p>
+  </main>
+
+  <!-- Toast Notification Banner (No alert() used) -->
+  <div
+    id="toastNotification"
+    role="status"
+    aria-live="polite"
+    class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-16 opacity-0 pointer-events-none z-50 flex items-center gap-2.5 bg-[#1A1851] text-white text-xs sm:text-sm font-medium px-4 py-3 rounded-2xl shadow-xl transition-all duration-300"
+  >
+    <span class="w-2 h-2 rounded-full bg-brandAmber"></span>
+    <span id="toastMessage">Standalone HTML/CSS card code copied to clipboard!</span>
+  </div>
+
+  <script>
+    /**
+     * Compact, self-contained QR Code SVG generator (Version 3-L / 4-L byte mode with Reed-Solomon ECC)
+     * Renders a crisp, scannable USTP navy (#1A1851) QR matrix with finder patterns, timing tracks,
+     * alignment pattern, format info, and error-corrected data modules.
+     */
+    const QRGenerator = (() => {
+      const GF_EXP = new Uint8Array(512);
+      const GF_LOG = new Uint8Array(256);
+      (() => {
+        let x = 1;
+        for (let i = 0; i < 255; i++) {
+          GF_EXP[i] = x;
+          GF_LOG[x] = i;
+          x <<= 1;
+          if (x & 0x100) x ^= 0x11d;
+        }
+        for (let i = 255; i < 512; i++) {
+          GF_EXP[i] = GF_EXP[i - 255];
+        }
+      })();
+
+      function gfMul(a, b) {
+        if (a === 0 || b === 0) return 0;
+        return GF_EXP[GF_LOG[a] + GF_LOG[b]];
+      }
+
+      function rsGeneratorPoly(ecLen) {
+        let poly = [1];
+        for (let i = 0; i < ecLen; i++) {
+          const next = new Array(poly.length + 1).fill(0);
+          const factor = GF_EXP[i];
+          for (let j = 0; j < poly.length; j++) {
+            next[j] ^= poly[j];
+            next[j + 1] ^= gfMul(poly[j], factor);
+          }
+          poly = next;
+        }
+        return poly;
+      }
+
+      function rsEncode(dataBytes, ecLen) {
+        const gen = rsGeneratorPoly(ecLen);
+        const res = new Array(dataBytes.length + ecLen).fill(0);
+        for (let i = 0; i < dataBytes.length; i++) res[i] = dataBytes[i];
+        for (let i = 0; i < dataBytes.length; i++) {
+          const coef = res[i];
+          if (coef !== 0) {
+            for (let j = 0; j < gen.length; j++) {
+              res[i + j] ^= gfMul(gen[j], coef);
+            }
+          }
+        }
+        return res.slice(dataBytes.length);
+      }
+
+      // Version 4-L specs: size 33x33, 80 data codewords, 20 EC codewords (1 block), alignment at 26
+      function buildMatrix(text) {
+        const encoder = new TextEncoder();
+        const rawBytes = Array.from(encoder.encode(text)).slice(0, 78);
+        const totalDataCodewords = 80;
+        const ecCodewords = 20;
+        const size = 33; // Version 4
+
+        // Pack bit stream: Mode 0100 (Byte), 8-bit length, payload, terminator, pad bytes
+        const bits = [];
+        const pushBits = (val, len) => {
+          for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1);
+        };
+        pushBits(0b0100, 4);
+        pushBits(rawBytes.length, 8);
+        rawBytes.forEach((b) => pushBits(b, 8));
+        pushBits(0, Math.min(4, totalDataCodewords * 8 - bits.length));
+        while (bits.length % 8 !== 0) bits.push(0);
+
+        const dataBytes = [];
+        for (let i = 0; i < bits.length; i += 8) {
+          let byte = 0;
+          for (let b = 0; b < 8; b++) byte = (byte << 1) | bits[i + b];
+          dataBytes.push(byte);
+        }
+        const padBytes = [0xec, 0x11];
+        let padIdx = 0;
+        while (dataBytes.length < totalDataCodewords) {
+          dataBytes.push(padBytes[padIdx % 2]);
+          padIdx++;
+        }
+
+        const ecBytes = rsEncode(dataBytes, ecCodewords);
+        const allBytes = dataBytes.concat(ecBytes);
+        const streamBits = [];
+        allBytes.forEach((b) => pushBits(b, 8));
+        // Version 4 requires 7 remainder bits
+        for (let i = 0; i < 7; i++) streamBits.push(0);
+
+        const modules = Array.from({ length: size }, () => new Array(size).fill(null));
+        const isFunction = Array.from({ length: size }, () => new Array(size).fill(false));
+
+        const setFunc = (r, c, val) => {
+          if (r >= 0 && r < size && c >= 0 && c < size) {
+            modules[r][c] = val ? 1 : 0;
+            isFunction[r][c] = true;
+          }
+        };
+
+        // Finder patterns + separators
+        const placeFinder = (row, col) => {
+          for (let dr = -1; dr <= 7; dr++) {
+            for (let dc = -1; dc <= 7; dc++) {
+              const r = row + dr;
+              const c = col + dc;
+              if (r < 0 || r >= size || c < 0 || c >= size) continue;
+              const inOuter = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
+              const onBorder = dr === 0 || dr === 6 || dc === 0 || dc === 6;
+              const inInner = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
+              setFunc(r, c, inOuter && (onBorder || inInner));
+            }
+          }
+        };
+        placeFinder(0, 0);
+        placeFinder(0, size - 7);
+        placeFinder(size - 7, 0);
+
+        // Alignment pattern at (26, 26) for Version 4
+        for (let dr = -2; dr <= 2; dr++) {
+          for (let dc = -2; dc <= 2; dc++) {
+            const val = Math.max(Math.abs(dr), Math.abs(dc)) !== 1;
+            setFunc(26 + dr, 26 + dc, val);
+          }
+        }
+
+        // Timing patterns
+        for (let i = 8; i < size - 8; i++) {
+          setFunc(6, i, i % 2 === 0);
+          setFunc(i, 6, i % 2 === 0);
+        }
+
+        // Dark module & reserve format info areas
+        setFunc(size - 8, 8, true);
+        for (let i = 0; i < 9; i++) {
+          if (i !== 6) {
+            setFunc(8, i, false);
+            setFunc(i, 8, false);
+          }
+        }
+        for (let i = 0; i < 8; i++) {
+          setFunc(8, size - 1 - i, false);
+          setFunc(size - 1 - i, 8, false);
+        }
+
+        // Zig-zag data placement with Mask 0 ((r + c) % 2 === 0)
+        let bitIdx = 0;
+        let upward = true;
+        for (let col = size - 1; col >= 1; col -= 2) {
+          if (col === 6) col--;
+          for (let step = 0; step < size; step++) {
+            const r = upward ? size - 1 - step : step;
+            for (let dc = 0; dc < 2; dc++) {
+              const c = col - dc;
+              if (!isFunction[r][c]) {
+                const rawBit = bitIdx < streamBits.length ? streamBits[bitIdx++] : 0;
+                const mask = (r + c) % 2 === 0 ? 1 : 0;
+                modules[r][c] = rawBit ^ mask;
+              }
+            }
+          }
+          upward = !upward;
+        }
+
+        // Format info bits for Error Correction Level L (01) + Mask 0 (000) => 0x77C4
+        const formatBits = 0x77c4;
+        for (let i = 0; i < 15; i++) {
+          const bit = (formatBits >> i) & 1;
+          // Vertical strip
+          if (i < 6) setFunc(i, 8, bit);
+          else if (i < 8) setFunc(i + 1, 8, bit);
+          else setFunc(size - 15 + i, 8, bit);
+          // Horizontal strip
+          if (i < 8) setFunc(8, size - 1 - i, bit);
+          else if (i < 9) setFunc(8, 15 - i, bit);
+          else setFunc(8, 14 - i, bit);
+        }
+
+        return modules;
+      }
+
+      function createSvg(text, color = '#1A1851') {
+        const matrix = buildMatrix(text);
+        const size = matrix.length;
+        let rects = '';
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (matrix[r][c] === 1) {
+              rects += `<rect x="${c}" y="${r}" width="1.03" height="1.03" rx="0.16" fill="${color}"/>`;
+            }
+          }
+        }
+        return `<svg viewBox="0 0 ${size} ${size}" style="width:100%;height:100%;display:block;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alumni Verification QR Code">${rects}</svg>`;
+      }
+
+      return { createSvg };
+    })();
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const cardFlipper = document.getElementById('cardFlipper');
+      const btnFrontSide = document.getElementById('btnFrontSide');
+      const btnBackSide = document.getElementById('btnBackSide');
+      const btnFlipCard = document.getElementById('btnFlipCard');
+
+      const btnExactMode = document.getElementById('btnExactMode');
+      const btnGuidesMode = document.getElementById('btnGuidesMode');
+      const btnCopyCode = document.getElementById('btnCopyCode');
+      const copyBtnLabel = document.getElementById('copyBtnLabel');
+      const editHint = document.getElementById('editHint');
+      const toastNotification = document.getElementById('toastNotification');
+      const toastMessage = document.getElementById('toastMessage');
+      const backQrSvgMount = document.getElementById('backQrSvgMount');
+
+      const guideOverlays = document.querySelectorAll('[data-guide="true"]');
+
+      // All editable fields across Front and Back views
+      const frontEditableFields = [
+        document.getElementById('fieldName'),
+        document.getElementById('fieldId'),
+        document.getElementById('fieldTier'),
+        document.getElementById('fieldBatch')
+      ];
+
+      const backEditableFields = [
+        document.getElementById('backHeading'),
+        document.getElementById('backSex'),
+        document.getElementById('backBirthdate'),
+        document.getElementById('backProgram'),
+        document.getElementById('backContact'),
+        document.getElementById('backAddressLabel'),
+        document.getElementById('backAddressValue')
+      ];
+
+      const allEditableFields = [...frontEditableFields, ...backEditableFields];
+
+      // Start on Back View so the newly added Personal Details & QR Code are immediately visible
+      let isBackSide = true;
+      let isGuidesView = false;
+      let toastTimeout = null;
+
+      /**
+       * Builds the verification payload from the current card fields and renders the QR SVG.
+       */
+      function renderCardQrCode() {
+        const memberId = document.getElementById('fieldId').textContent.trim() || '2026IT10';
+        const memberName = document.getElementById('fieldName').textContent.trim() || 'JUAN DELA CRUZ';
+        const program = document.getElementById('backProgram').textContent.trim() || 'BSIT';
+        const payload = `${memberId} | ${memberName} | ${program} | USTP-OROQUIETA`;
+        backQrSvgMount.innerHTML = QRGenerator.createSvg(payload, '#1A1851');
+      }
+
+      /**
+       * Switches between Front View and Back View with a smooth 3D flip animation.
+       */
+      function setSide(showBack) {
+        isBackSide = showBack;
+
+        if (isBackSide) {
+          cardFlipper.classList.add('is-flipped');
+
+          btnBackSide.classList.add('bg-[#1A1851]', 'text-white');
+          btnBackSide.classList.remove('text-slate-600', 'hover:text-[#1A1851]');
+
+          btnFrontSide.classList.remove('bg-[#1A1851]', 'text-white');
+          btnFrontSide.classList.add('text-slate-600', 'hover:text-[#1A1851]');
+
+          copyBtnLabel.textContent = 'Copy Back HTML';
+        } else {
+          cardFlipper.classList.remove('is-flipped');
+
+          btnFrontSide.classList.add('bg-[#1A1851]', 'text-white');
+          btnFrontSide.classList.remove('text-slate-600', 'hover:text-[#1A1851]');
+
+          btnBackSide.classList.remove('bg-[#1A1851]', 'text-white');
+          btnBackSide.classList.add('text-slate-600', 'hover:text-[#1A1851]');
+
+          copyBtnLabel.textContent = 'Copy Front HTML';
+        }
+
+        updateHelperHint();
+      }
+
+      /**
+       * Updates helper text below toolbar based on active side & edit/guide mode.
+       */
+      function updateHelperHint() {
+        if (isGuidesView && isBackSide) {
+          editHint.innerHTML = 'Tip: Click any field on the Back View to edit live — the <span class="font-semibold text-slate-600">QR Code</span> updates automatically.';
+        } else if (isGuidesView && !isBackSide) {
+          editHint.innerHTML = 'Tip: Click any text line on the Front View to edit live, or click <span class="font-semibold text-slate-600">Flip</span> for the Back View.';
+        } else if (isBackSide) {
+          editHint.innerHTML = 'Showing <span class="font-semibold text-slate-600">Back View</span> • Switch to <span class="font-medium text-slate-500">Edit / Guides View</span> to customize details &amp; auto-update the QR code.';
+        } else {
+          editHint.innerHTML = 'Showing <span class="font-semibold text-slate-600">Front View</span> • Click <span class="font-semibold text-slate-600">Flip</span> to inspect the back design.';
+        }
+      }
+
+      /**
+       * Toggles between:
+       * 1. Exact Reference View (clean match to reference images)
+       * 2. Edit / Guides View (dashed slot guides + inline text editing on Front & Back)
+       */
+      function setMode(guidesMode) {
+        isGuidesView = guidesMode;
+
+        if (isGuidesView) {
+          btnGuidesMode.classList.add('bg-[#1A1851]', 'text-white', 'shadow-xs');
+          btnGuidesMode.classList.remove('text-slate-600', 'hover:text-[#1A1851]');
+
+          btnExactMode.classList.remove('bg-[#1A1851]', 'text-white', 'shadow-xs');
+          btnExactMode.classList.add('text-slate-600', 'hover:text-[#1A1851]');
+
+          guideOverlays.forEach((el) => {
+            el.classList.remove('opacity-0');
+            el.classList.add('opacity-100');
+          });
+
+          allEditableFields.forEach((field) => {
+            field.setAttribute('contenteditable', 'true');
+            field.classList.add('cursor-text', 'hover:bg-amber-100/60', 'focus:bg-amber-100/90', 'focus:ring-2', 'focus:ring-[#FCB315]');
+          });
+        } else {
+          btnExactMode.classList.add('bg-[#1A1851]', 'text-white', 'shadow-xs');
+          btnExactMode.classList.remove('text-slate-600', 'hover:text-[#1A1851]');
+
+          btnGuidesMode.classList.remove('bg-[#1A1851]', 'text-white', 'shadow-xs');
+          btnGuidesMode.classList.add('text-slate-600', 'hover:text-[#1A1851]');
+
+          guideOverlays.forEach((el) => {
+            el.classList.add('opacity-0');
+            el.classList.remove('opacity-100');
+          });
+
+          allEditableFields.forEach((field) => {
+            field.setAttribute('contenteditable', 'false');
+            field.classList.remove('cursor-text', 'hover:bg-amber-100/60', 'focus:bg-amber-100/90', 'focus:ring-2', 'focus:ring-[#FCB315]');
+          });
+        }
+
+        updateHelperHint();
+      }
+
+      /**
+       * Displays a sleek non-blocking toast notification.
+       */
+      function showToast(message) {
+        toastMessage.textContent = message;
+        toastNotification.classList.remove('translate-y-16', 'opacity-0');
+        toastNotification.classList.add('translate-y-0', 'opacity-100');
+
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          toastNotification.classList.add('translate-y-16', 'opacity-0');
+          toastNotification.classList.remove('translate-y-0', 'opacity-100');
+        }, 2800);
+      }
+
+      /**
+       * Generates clean, standalone, responsive HTML/CSS/SVG code for whichever side
+       * (Front View or Back View) is currently active.
+       */
+      function copyStandaloneCode() {
+        let standaloneHtml = '';
+
+        if (isBackSide) {
+          const headingText = document.getElementById('backHeading').textContent.trim();
+          const sexText = document.getElementById('backSex').textContent.trim();
+          const birthdateText = document.getElementById('backBirthdate').textContent.trim();
+          const programText = document.getElementById('backProgram').textContent.trim();
+          const contactText = document.getElementById('backContact').textContent.trim();
+          const addrLabelText = document.getElementById('backAddressLabel').textContent.trim();
+          const addrValueText = document.getElementById('backAddressValue').textContent.trim();
+          const qrSvgMarkup = backQrSvgMount.innerHTML;
+
+          standaloneHtml = `<!-- Responsive 3:2 Digital App Card Mockup (Back View) -->
+<div style="position:relative;width:100%;max-width:850px;aspect-ratio:850/567;container-type:inline-size;background:#FFFFFF;border-radius:24px;overflow:hidden;box-shadow:0 24px 60px -15px rgba(30,25,77,0.18);font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;color:#1A1851;">
+  <!-- Back Geometric Vector Background -->
+  <svg viewBox="0 0 850 567" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;" xmlns="http://www.w3.org/2000/svg">
+    <rect width="850" height="567" fill="#FFFFFF" />
+    <rect x="-58" y="-192" width="302" height="245" rx="52" ry="52" fill="#1A1851" transform="rotate(21.5 93 -69.5)" />
+    <rect x="795" y="265" width="290" height="310" rx="62" ry="62" fill="#1A1851" transform="rotate(-26 940 420)" />
+  </svg>
+
+  <!-- Back Foreground Content -->
+  <div style="position:relative;z-index:1;width:100%;height:100%;">
+    <!-- Personal Details Left Block -->
+    <div style="position:absolute;left:2.7%;top:16.2%;right:36%;display:flex;flex-direction:column;align-items:flex-start;text-align:left;">
+      <div style="font-size:3.85cqw;font-weight:700;text-transform:uppercase;line-height:1.15;letter-spacing:0.08em;">${headingText}</div>
+      <div style="margin-top:6.2cqw;display:flex;flex-direction:column;gap:0.95cqw;width:100%;">
+        <div style="font-size:2.52cqw;font-weight:700;text-transform:uppercase;line-height:1.22;letter-spacing:0.045em;">SEX: ${sexText}</div>
+        <div style="font-size:2.52cqw;font-weight:700;text-transform:uppercase;line-height:1.22;letter-spacing:0.045em;">BIRTHDATE: ${birthdateText}</div>
+        <div style="font-size:2.52cqw;font-weight:700;text-transform:uppercase;line-height:1.22;letter-spacing:0.045em;">DEGREE/PROGRAM: ${programText}</div>
+        <div style="font-size:2.52cqw;font-weight:700;text-transform:uppercase;line-height:1.22;letter-spacing:0.045em;">CONTACT NUMBER: ${contactText}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-start;">
+          <div style="font-size:2.52cqw;font-weight:700;text-transform:uppercase;line-height:1.22;letter-spacing:0.045em;">${addrLabelText}</div>
+          <div style="font-size:1.98cqw;font-weight:700;line-height:1.28;margin-top:0.35cqw;letter-spacing:0.015em;">${addrValueText}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right-Side QR Code Module -->
+    <div style="position:absolute;right:7.5%;top:16.2%;width:25.5%;display:flex;flex-direction:column;align-items:center;">
+      <div style="width:100%;aspect-ratio:1/1;background:#FFFFFF;padding:1.35cqw;border:0.35cqw solid rgba(25,21,71,0.15);border-radius:2.2cqw;box-shadow:0 10px 28px -8px rgba(25,21,71,0.14);box-sizing:border-box;">
+        ${qrSvgMarkup}
+      </div>
+    </div>
+  </div>
+</div>`;
+        } else {
+          const nameText = document.getElementById('fieldName').textContent.trim();
+          const idText = document.getElementById('fieldId').textContent.trim();
+          const tierText = document.getElementById('fieldTier').textContent.trim();
+          const batchText = document.getElementById('fieldBatch').textContent.trim();
+
+          const logoGuideHtml = isGuidesView
+            ? `\n      <div style="width:84%;height:84%;border:1.5px dashed rgba(244,184,40,0.8);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.25cqw;font-weight:700;letter-spacing:0.12em;color:#94a3b8;">LOGO SLOT</div>`
+            : '';
+
+          const profileGuideHtml = isGuidesView
+            ? `\n      <div style="width:86%;height:88%;border:1.5px dashed rgba(244,184,40,0.8);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.25cqw;font-weight:700;letter-spacing:0.12em;color:#94a3b8;">PROFILE PHOTO</div>`
+            : '';
+
+          standaloneHtml = `<!-- Responsive 3:2 Digital App Card Mockup (Front View) -->
+<div style="position:relative;width:100%;max-width:850px;aspect-ratio:850/567;container-type:inline-size;background:#FFFFFF;border-radius:24px;overflow:hidden;box-shadow:0 24px 60px -15px rgba(30,25,77,0.18);font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;">
+  <!-- Front Geometric Vector Background -->
+  <svg viewBox="0 0 850 567" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;" xmlns="http://www.w3.org/2000/svg">
+    <rect width="850" height="567" fill="#FFFFFF" />
+    <circle cx="58" cy="124" r="41" fill="#FCB315" />
+    <circle cx="88.5" cy="89.5" r="30.5" fill="#1A1851" />
+    <rect x="245" y="-150" width="335" height="325" rx="44" ry="44" fill="#1A1851" transform="rotate(-18.5 412 20)" />
+    <circle cx="118" cy="550" r="180" fill="#FCB315" />
+    <rect x="735" y="375" width="260" height="260" rx="44" ry="44" fill="#FCB315" transform="rotate(-43 865 505)" />
+  </svg>
+
+  <!-- Foreground Elements -->
+  <div style="position:relative;z-index:1;width:100%;height:100%;">
+    <!-- Top-Right Logo Placeholder -->
+    <div style="position:absolute;top:4.8%;right:3.2%;width:23.6%;height:35.4%;background:#FFFFFF;border:0.6cqw solid #FCB315;border-radius:1.2cqw;box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:hidden;">${logoGuideHtml}
+    </div>
+
+    <!-- Bottom-Left Profile Photo Placeholder -->
+    <div style="position:absolute;left:1.9%;bottom:2.8%;width:28.4%;height:47.4%;background:#FFFFFF;border:0.7cqw solid #FCB315;border-radius:2.8cqw;box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:hidden;">${profileGuideHtml}
+    </div>
+
+    <!-- Center-Right Member Text Block -->
+    <div style="position:absolute;left:37%;right:6.5%;top:57.5%;bottom:11%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#1A1851;">
+      <div style="font-size:3.35cqw;font-weight:700;text-transform:uppercase;line-height:1.15;letter-spacing:0.025em;white-space:nowrap;">${nameText}</div>
+      <div style="font-size:2.0cqw;font-weight:700;text-transform:uppercase;line-height:1.2;margin-top:1.45cqw;letter-spacing:0.02em;">${idText}</div>
+      <div style="font-size:2.65cqw;font-weight:700;text-transform:uppercase;line-height:1.15;margin-top:0.25cqw;letter-spacing:0.02em;white-space:nowrap;">${tierText}</div>
+      <div style="font-size:1.92cqw;font-weight:700;text-transform:uppercase;line-height:1.2;margin-top:0.7cqw;letter-spacing:0.025em;">${batchText}</div>
+    </div>
+  </div>
+</div>`;
+        }
+
+        const tempTextarea = document.createElement('textarea');
+        tempTextarea.value = standaloneHtml;
+        tempTextarea.setAttribute('readonly', '');
+        tempTextarea.style.position = 'fixed';
+        tempTextarea.style.left = '-9999px';
+        document.body.appendChild(tempTextarea);
+        tempTextarea.select();
+
+        try {
+          const successful = document.execCommand('copy');
+          if (successful) {
+            const sideName = isBackSide ? 'Back View' : 'Front View';
+            copyBtnLabel.textContent = 'Copied!';
+            showToast(`${sideName} standalone HTML/CSS copied to clipboard!`);
+            setTimeout(() => {
+              copyBtnLabel.textContent = isBackSide ? 'Copy Back HTML' : 'Copy Front HTML';
+            }, 2000);
+          } else {
+            showToast('Unable to copy automatically. Please try again.');
+          }
+        } catch (err) {
+          showToast('Copy failed due to browser permissions.');
+        } finally {
+          document.body.removeChild(tempTextarea);
+        }
+      }
+
+      btnFrontSide.addEventListener('click', () => setSide(false));
+      btnBackSide.addEventListener('click', () => setSide(true));
+      btnFlipCard.addEventListener('click', () => setSide(!isBackSide));
+
+      btnExactMode.addEventListener('click', () => setMode(false));
+      btnGuidesMode.addEventListener('click', () => setMode(true));
+      btnCopyCode.addEventListener('click', copyStandaloneCode);
+
+      // Dynamically regenerate the QR Code SVG whenever member details change
+      allEditableFields.forEach((field) => {
+        field.addEventListener('input', renderCardQrCode);
+      });
+
+      // Initialize QR code on page load
+      renderCardQrCode();
+    });
+  </script>
+</body>
+</html>

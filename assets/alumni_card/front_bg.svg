@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="17.363281 0 217.273438 144" preserveAspectRatio="none">
+  <rect x="17.363281" y="0" width="217.273438" height="144" fill="#ffffff"/>
+  <!-- Top-left gold disc -->
+  <g transform="translate(22, 20)">
+    <rect x="0.261719" y="0.890625" width="20.816406" height="20.816406" rx="10.4" fill="#fbb317"/>
+  </g>
+  <!-- Top-left navy disc -->
+  <g transform="translate(32, 14)">
+    <rect x="0.671875" y="0.851562" width="15.582031" height="15.585938" rx="7.8" fill="#1a1851"/>
+  </g>
+  <!-- Tilted navy slab (top) — clipped to card -->
+  <g clip-path="url(#frontClip)">
+    <defs>
+      <clipPath id="frontClip">
+        <rect x="17.363281" y="0" width="217.273438" height="144"/>
+      </clipPath>
+      <clipPath id="goldBlobClip">
+        <path d="M 2.527344 93.738281 C 2.527344 112.9 23 131 48.25 131 C 73.5 131 94 112.9 94 93.738281 L 94 144 L 2.527344 144 Z"/>
+      </clipPath>
+    </defs>
+    <g transform="translate(71, 0)">
+      <path fill="#1a1851" d="M -3.523438 -19.992188 L 74.9375 -45.832031 L 98.820312 26.683594 L 20.355469 52.523438 Z"/>
+    </g>
+    <!-- Bottom-left gold organic (behind photo) -->
+    <g clip-path="url(#goldBlobClip)">
+      <g transform="translate(2, 93)">
+        <path fill="#fbb317" d="M 0.527344 0.738281 L 92.140625 0.738281 L 92.140625 86.335938 L 0.527344 86.335938 Z"/>
+      </g>
+    </g>
+    <!-- Bottom-right gold chip -->
+    <g transform="translate(201, 81)">
+      <path fill="#fbb317" d="M -7.160156 41.378906 L 60.226562 -6.398438 L 104.382812 55.882812 L 36.992188 103.660156 Z"/>
+    </g>
+  </g>
+</svg>

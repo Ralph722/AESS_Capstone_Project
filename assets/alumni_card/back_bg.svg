@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="17.363281 0 217.273438 144" preserveAspectRatio="none">
+  <defs>
+    <clipPath id="backClip">
+      <rect x="17.363281" y="0" width="217.273438" height="144"/>
+    </clipPath>
+  </defs>
+  <rect x="17.363281" y="0" width="217.273438" height="144" fill="#ffffff"/>
+  <g clip-path="url(#backClip)">
+    <!-- Top-left navy accent -->
+    <g transform="translate(7, 0)">
+      <path fill="#1a1851" d="M -4.476562 -3.128906 L 24.738281 -79.539062 L 91.957031 -53.839844 L 62.746094 22.570312 Z"/>
+    </g>
+    <!-- Right navy accent -->
+    <g transform="translate(213, 54)">
+      <path fill="#1a1851" d="M 55.859375 -5.664062 L 93.101562 68.742188 L 30.644531 100.003906 L -6.597656 25.59375 Z"/>
+    </g>
+  </g>
+</svg>

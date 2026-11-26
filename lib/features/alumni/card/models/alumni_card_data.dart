@@ -1,4 +1,5 @@
 import 'package:alumni_system/features/admin/roster/models/alumni_member_model.dart';
+import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 
 /// Details shown on the digital alumni card (front and back).
 class AlumniCardData {
@@ -12,6 +13,9 @@ class AlumniCardData {
     required this.memberSince,
     required this.campus,
     this.profileImageUrl,
+    this.birthDate,
+    this.contactNumber = '',
+    this.address = '',
   });
 
   final String fullName;
@@ -23,6 +27,15 @@ class AlumniCardData {
   final DateTime memberSince;
   final String campus;
   final String? profileImageUrl;
+
+  /// Profile birthday (back face).
+  final DateTime? birthDate;
+
+  /// Mobile / contact number (back face).
+  final String contactNumber;
+
+  /// Home / permanent address (back face).
+  final String address;
 
   /// Initials for the photo placeholder (up to two letters).
   String get initials {
@@ -51,6 +64,9 @@ class AlumniCardData {
     DateTime? memberSince,
     String? campus,
     Object? profileImageUrl = _unset,
+    Object? birthDate = _unset,
+    String? contactNumber,
+    String? address,
   }) {
     return AlumniCardData(
       fullName: fullName ?? this.fullName,
@@ -64,6 +80,11 @@ class AlumniCardData {
       profileImageUrl: identical(profileImageUrl, _unset)
           ? this.profileImageUrl
           : profileImageUrl as String?,
+      birthDate: identical(birthDate, _unset)
+          ? this.birthDate
+          : birthDate as DateTime?,
+      contactNumber: contactNumber ?? this.contactNumber,
+      address: address ?? this.address,
     );
   }
 
@@ -77,6 +98,9 @@ class AlumniCardData {
     'memberSince': memberSince.toUtc().toIso8601String(),
     'campus': campus,
     'profileImageUrl': profileImageUrl,
+    'birthDate': birthDate?.toUtc().toIso8601String(),
+    'contactNumber': contactNumber,
+    'address': address,
   };
 
   factory AlumniCardData.fromJson(Map<String, dynamic> json) {
@@ -87,6 +111,10 @@ class AlumniCardData {
               DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
     final photo = json['profileImageUrl']?.toString().trim();
     final sexRaw = (json['sex'] ?? json['gender'] ?? '').toString();
+    final birthRaw = json['birthDate'];
+    final birth = birthRaw is DateTime
+        ? birthRaw.toUtc()
+        : DateTime.tryParse(birthRaw?.toString() ?? '')?.toUtc();
     return AlumniCardData(
       fullName: (json['fullName'] ?? 'Alumni').toString(),
       program: (json['program'] ?? '').toString(),
@@ -97,6 +125,10 @@ class AlumniCardData {
       memberSince: since,
       campus: (json['campus'] ?? 'USTP Oroquieta').toString(),
       profileImageUrl: (photo == null || photo.isEmpty) ? null : photo,
+      birthDate: birth,
+      contactNumber: (json['contactNumber'] ?? json['mobileNumber'] ?? '')
+          .toString(),
+      address: (json['address'] ?? '').toString(),
     );
   }
 
@@ -105,18 +137,24 @@ class AlumniCardData {
     String? profileImageUrl,
     String? sex,
     String campus = 'USTP Oroquieta',
+    TracerProfile? profile,
   }) {
     final email = (member.registeredEmail?.trim().isNotEmpty == true)
         ? member.registeredEmail!.trim()
         : member.emailAddress.trim();
     final sexRaw = (sex != null && sex.trim().isNotEmpty)
         ? sex
-        : member.gender;
+        : (profile?.gender.isNotEmpty == true
+              ? profile!.gender
+              : member.gender);
+    final program = (profile?.program.trim().isNotEmpty == true)
+        ? profile!.program.trim()
+        : member.course.trim();
     return AlumniCardData(
       fullName: member.fullName.trim().isEmpty
           ? 'Alumni'
           : member.fullName.trim(),
-      program: member.course.trim(),
+      program: program,
       studentId: member.studentId.trim(),
       batchYear: member.effectiveBatchYear,
       sex: _formatSex(sexRaw),
@@ -126,6 +164,9 @@ class AlumniCardData {
       profileImageUrl: profileImageUrl?.trim().isNotEmpty == true
           ? profileImageUrl!.trim()
           : member.profileImageUrl,
+      birthDate: profile?.birthDate,
+      contactNumber: profile?.mobileNumber.trim() ?? '',
+      address: profile?.address.trim() ?? '',
     );
   }
 

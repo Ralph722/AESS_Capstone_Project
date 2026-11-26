@@ -46,6 +46,7 @@ class AlumniCardService {
         member,
         profileImageUrl: photo,
         sex: bootstrap.profile?.gender,
+        profile: bootstrap.profile,
       );
       await _cache.save(uid, data);
       return AlumniCardLoadResult.ready(data);

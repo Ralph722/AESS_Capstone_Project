@@ -1,0 +1,500 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AESS Digital Alumni Card â€” new physical layout mockup</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 20px 48px;
+    background:
+      radial-gradient(1200px 500px at 10% -10%, #e8eaf8 0%, transparent 55%),
+      radial-gradient(900px 420px at 100% 0%, #fff4cc 0%, transparent 50%),
+      #f5f6fa;
+    color: #0f172a;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  }
+  .page { max-width: 980px; margin: 0 auto; }
+  .page h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+  .page .lede {
+    margin: 0 0 22px;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.45;
+    max-width: 68ch;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  }
+  .panel h2 {
+    margin: 0 0 4px;
+    font-size: 15px;
+  }
+  .panel .note {
+    margin: 0 0 14px;
+    color: #64748b;
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .map {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .map li {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 10px;
+    align-items: start;
+    font-size: 12.5px;
+    color: #334155;
+    line-height: 1.35;
+  }
+  .swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    margin-top: 1px;
+  }
+  .swatch.white { background: #fff; box-shadow: inset 0 0 0 1px #cbd5e1; }
+  .swatch.navy { background: #1A1851; }
+  .swatch.yellow { background: #FCB315; }
+  .legend {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #e2e8f0;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.45;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Digital alumni card â€” new physical layout mockup</h1>
+  <p class="lede">
+    Front/back faces match the attached Juan Dela Cruz design (layout, relative
+    sizes, new fields). QR verify sits in the open space on the back.
+    Side black export bars ignored. Demo details only â€” not live Flutter yet.
+  </p>
+
+  <div class="grid">
+    <div id="adc-root">
+<style>
+#adc-root{
+  --navy:#1A1851;
+  --gold:#FCB315;
+  --ink:#0F172A;
+  --muted:#64748B;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color:var(--ink);
+}
+#adc-root .stage{
+  position:relative;border-radius:16px;overflow:hidden;
+  background:linear-gradient(160deg,#2a2868,#1A1851 55%,#0f0e38);
+  padding:28px 16px;display:flex;justify-content:center;
+}
+#adc-root .dialog{
+  width:100%;max-width:440px;background:#ffffff;color:#0F172A;
+  border-radius:20px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:14px;
+}
+#adc-root .dhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#adc-root .dtitle{font-size:17px;font-weight:700;margin:0}
+#adc-root .dsub{font-size:12.5px;color:#64748B;margin:2px 0 0}
+#adc-root .x{
+  width:34px;height:34px;border-radius:50%;border:0;background:#F1F5F9;
+  color:inherit;font-size:18px;line-height:1;cursor:pointer;
+}
+/* Design content â‰ˆ 217Ã—144 after dropping side black bars */
+#adc-root .scene{
+  perspective:1200px;width:100%;aspect-ratio:217 / 144;
+  cursor:pointer;border:0;padding:0;background:none;display:block;
+}
+#adc-root .flipper{
+  position:relative;width:100%;height:100%;
+  transform-style:preserve-3d;transition:transform .6s cubic-bezier(.2,.7,.2,1);
+}
+#adc-root .scene[aria-pressed="true"] .flipper{transform:rotateY(180deg)}
+#adc-root .face{
+  position:absolute;inset:0;border-radius:10px;overflow:hidden;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  text-align:left;box-shadow:0 12px 28px rgba(15,23,42,.22);
+}
+#adc-root .front{background:#fff;color:var(--navy)}
+#adc-root .bg{position:absolute;inset:0;pointer-events:none;z-index:0}
+
+/* Front accents â€” matched to reference */
+#adc-root .bg .tl-yellow{
+  position:absolute;left:1.6%;top:3.8%;width:11.2%;aspect-ratio:1;border-radius:50%;
+  background:var(--gold);
+}
+#adc-root .bg .tl-navy{
+  position:absolute;left:7.2%;top:1.8%;width:7.2%;aspect-ratio:1;border-radius:50%;
+  background:var(--navy);
+}
+#adc-root .bg .top-blob{
+  position:absolute;left:38%;top:-40%;width:38%;height:78%;
+  background:var(--navy);
+  border-radius:1.35rem;
+  transform:rotate(-22deg);
+}
+#adc-root .bg .bl-yellow{
+  position:absolute;left:-18%;bottom:-58%;width:62%;aspect-ratio:1;
+  background:var(--gold);
+  border-radius:48% 52% 46% 54%;
+}
+#adc-root .bg .br-yellow{
+  position:absolute;right:-18%;bottom:-42%;width:42%;aspect-ratio:1;
+  background:var(--gold);
+  border-radius:58% 42% 48% 52%;
+  transform:rotate(12deg);
+}
+
+#adc-root .front-content{
+  position:relative;z-index:1;height:100%;
+  display:grid;
+  grid-template-columns: 32% 1fr;
+  grid-template-rows: 34% 1fr;
+  padding: 3.8% 3.4% 4.5% 4.2%;
+  column-gap: 2.5%;
+}
+#adc-root .mark-wrap{
+  grid-column:2;grid-row:1;
+  display:flex;justify-content:flex-end;align-items:flex-start;
+  padding-top:1%;
+}
+#adc-root .alumni-mark-frame{
+  width:46%;aspect-ratio:1;
+  border:1.8px solid var(--gold);
+  border-radius:2px;
+  padding:2%;
+  background:#fff;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+#adc-root .alumni-mark{
+  width:100%;height:100%;object-fit:contain;display:block;
+}
+#adc-root .photo-col{
+  grid-column:1;grid-row:1 / span 2;
+  display:flex;align-items:center;justify-content:flex-start;
+  padding-top:14%;
+}
+#adc-root .photo{
+  width:92%;aspect-ratio: 0.86;
+  border-radius:8px;
+  border:2.4px solid var(--gold);
+  background:#fff;
+  /* empty frame like the design; no initials */
+}
+#adc-root .who{
+  grid-column:2;grid-row:2;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:4px;
+  min-width:0;
+  padding: 0 1% 10% 0;
+}
+#adc-root .name{
+  margin:0;
+  font-size:clamp(12.5px,4.05vw,17.5px);
+  font-weight:800;line-height:1.08;color:var(--navy);
+  letter-spacing:.03em;text-transform:uppercase;
+}
+#adc-root .alumni-id{
+  font-size:clamp(9px,2.75vw,12px);
+  font-weight:700;color:var(--navy);letter-spacing:.03em;
+}
+#adc-root .membership{
+  margin-top:3px;
+  font-size:clamp(10px,3.15vw,13.5px);
+  font-weight:800;color:var(--navy);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+#adc-root .batch{
+  margin-top:1px;
+  font-size:clamp(8px,2.4vw,10.5px);
+  font-weight:700;color:var(--navy);
+  letter-spacing:.05em;text-transform:uppercase;
+}
+
+/* Back */
+#adc-root .back{
+  transform:rotateY(180deg);background:#fff;color:var(--navy);
+}
+#adc-root .back-bg{position:absolute;inset:0;pointer-events:none;z-index:0}
+#adc-root .back-bg .tl-navy{
+  position:absolute;left:8%;top:-34%;width:34%;height:58%;
+  background:var(--navy);
+  border-radius:46% 50% 48% 44%;
+  transform:rotate(-8deg);
+}
+#adc-root .back-bg .r-navy{
+  position:absolute;right:-16%;top:28%;width:24%;height:52%;
+  background:var(--navy);
+  border-radius:50% 40% 55% 45%;
+}
+
+#adc-root .back-content{
+  position:relative;z-index:1;height:100%;
+  display:grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 3%;
+  padding: 6.5% 5.5% 5% 7%;
+  align-items: stretch;
+}
+#adc-root .back-main{min-width:0;display:flex;flex-direction:column}
+#adc-root .back-title{
+  margin:0 0 7%;
+  font-size:clamp(11px,3.25vw,14px);
+  font-weight:800;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--navy);
+}
+#adc-root .details{
+  display:flex;flex-direction:column;gap:5.5%;
+}
+#adc-root .detail{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:0 .4em;
+  font-size:clamp(8px,2.45vw,11px);
+  color:var(--navy);line-height:1.2;
+}
+#adc-root .detail .label{
+  font-weight:800;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;
+}
+#adc-root .detail .label::after{content:":"}
+#adc-root .detail .value{
+  font-weight:700;text-transform:uppercase;letter-spacing:.01em;
+}
+#adc-root .detail.address{
+  flex-direction:column;align-items:flex-start;gap:3px;
+}
+#adc-root .detail.address .value{
+  font-size:clamp(7px,2.15vw,9.5px);
+  font-weight:600;text-transform:none;line-height:1.3;
+  max-width:100%;
+}
+
+/* QR verify block â€” digital addition in open back space */
+#adc-root .qr-panel{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;min-width:0;padding-top:4%;
+}
+#adc-root .qr-label{
+  font-size:clamp(6.5px,1.9vw,8.5px);
+  font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--navy);opacity:.85;
+}
+#adc-root .qr{
+  width:78%;max-width:118px;aspect-ratio:1;
+  background:#fff;border:1px solid #E5E7EB;border-radius:7px;padding:5%;
+}
+#adc-root .qr svg{width:100%;height:100%;display:block}
+#adc-root .code{
+  font-family:ui-monospace,Consolas,monospace;
+  font-weight:800;font-size:clamp(8px,2.4vw,11px);
+  letter-spacing:.14em;color:var(--navy);
+}
+#adc-root .ref{
+  font-size:clamp(6.5px,1.85vw,8.5px);
+  color:var(--muted);font-variant-numeric:tabular-nums;
+}
+
+#adc-root .actions{display:flex;gap:10px}
+#adc-root .btn{
+  flex:1;height:42px;border-radius:12px;font-weight:700;font-size:14px;
+  cursor:pointer;font-family:inherit;
+}
+#adc-root .btn.primary{background:var(--navy);color:#fff;border:0}
+#adc-root .btn.ghost{background:transparent;color:var(--navy);border:1px solid #c5c6d8}
+#adc-root .hint{font-size:12px;color:#64748B;text-align:center;margin:-4px 0 0}
+#adc-root .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){#adc-root .flipper{transition:none}}
+</style>
+<p class="sr">Preview of the digital alumni card dialog; flip the card to see the front and back.</p>
+<div class="stage">
+  <section class="dialog" role="dialog" aria-labelledby="adc-title">
+    <div class="dhead">
+      <div>
+        <h3 class="dtitle" id="adc-title">Your digital alumni card</h3>
+        <p class="dsub">Show this when you don't have your physical card.</p>
+      </div>
+      <button class="x" type="button" aria-label="Close">Ã—</button>
+    </div>
+
+    <div class="scene" id="adc-scene" role="button" tabindex="0" aria-pressed="true" aria-label="Alumni card, front side. Flip card">
+      <div class="flipper">
+        <div class="face front">
+          <div class="bg" aria-hidden="true">
+            <span class="tl-yellow"></span>
+            <span class="tl-navy"></span>
+            <span class="top-blob"></span>
+            <span class="bl-yellow"></span>
+            <span class="br-yellow"></span>
+          </div>
+          <div class="front-content">
+            <div class="mark-wrap">
+              <div class="alumni-mark-frame">
+                <img class="alumni-mark" src="alumni-mark-oroquieta.png" alt="USTP Alumni Association Oroquieta Campus">
+              </div>
+            </div>
+            <div class="photo-col">
+              <div class="photo" aria-label="Profile photo placeholder"></div>
+            </div>
+            <div class="who">
+              <div class="name">Juan Dela Cruz</div>
+              <div class="alumni-id">2026IT10</div>
+              <div class="membership">Lifetime Member</div>
+              <div class="batch">Batch 2026</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="face back">
+          <div class="back-bg" aria-hidden="true">
+            <span class="tl-navy"></span>
+            <span class="r-navy"></span>
+          </div>
+          <div class="back-content">
+            <div class="back-main">
+              <h4 class="back-title">Personal Details</h4>
+              <div class="details">
+                <div class="detail"><span class="label">Sex</span><span class="value">Male</span></div>
+                <div class="detail"><span class="label">Birthdate</span><span class="value">09/01/2010</span></div>
+                <div class="detail"><span class="label">Degree/Program</span><span class="value">BSIT</span></div>
+                <div class="detail"><span class="label">Contact Number</span><span class="value">09123456789</span></div>
+                <div class="detail address">
+                  <span class="label">Home Address</span>
+                  <span class="value">Purok-6, Mobod, Oroquieta City, Misamis Occidental</span>
+                </div>
+              </div>
+            </div>
+            <div class="qr-panel">
+              <div class="qr-label">Scan to verify</div>
+              <div class="qr">
+                <svg id="adc-qr" viewBox="0 0 25 25" shape-rendering="crispEdges" role="img" aria-label="Verification QR code"></svg>
+              </div>
+              <div class="code" id="adc-code">K7Q-4MZ</div>
+              <div class="ref" id="adc-ref">Refreshes in 0:60</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="hint">Tap the card to flip it</p>
+
+    <div class="actions">
+      <button class="btn ghost" type="button">Close</button>
+      <button class="btn primary" id="adc-flip" type="button">Show back</button>
+    </div>
+  </section>
+</div>
+<script>
+(function(){
+  var root=document.getElementById('adc-root');
+  var scene=root.querySelector('#adc-scene');
+  var flipBtn=root.querySelector('#adc-flip');
+  function flip(){
+    var back=scene.getAttribute('aria-pressed')!=='true';
+    scene.setAttribute('aria-pressed',back?'true':'false');
+    scene.setAttribute('aria-label','Alumni card, '+(back?'back':'front')+' side. Flip card');
+    flipBtn.textContent=back?'Show front':'Show back';
+  }
+  scene.addEventListener('click',flip);
+  scene.addEventListener('keydown',function(e){
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();flip();}
+  });
+  flipBtn.addEventListener('click',flip);
+
+  var qr=root.querySelector('#adc-qr');
+  var codeEl=root.querySelector('#adc-code');
+  var refEl=root.querySelector('#adc-ref');
+  var ns='http://www.w3.org/2000/svg';
+  var letters='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function finder(x,y,out){
+    for(var i=0;i<7;i++)for(var j=0;j<7;j++){
+      var edge=i===0||i===6||j===0||j===6, core=i>=2&&i<=4&&j>=2&&j<=4;
+      if(edge||core)out.push([x+i,y+j]);
+    }
+  }
+  function reserved(x,y){
+    return (x<8&&y<8)||(x>16&&y<8)||(x<8&&y>16);
+  }
+  function drawQr(seed){
+    while(qr.firstChild)qr.removeChild(qr.firstChild);
+    var cells=[];finder(0,0,cells);finder(18,0,cells);finder(0,18,cells);
+    var s=seed;
+    for(var x=0;x<25;x++)for(var y=0;y<25;y++){
+      if(reserved(x,y))continue;
+      s=(s*1103515245+12345)&0x7fffffff;
+      if(s%100<47)cells.push([x,y]);
+    }
+    cells.forEach(function(c){
+      var r=document.createElementNS(ns,'rect');
+      r.setAttribute('x',c[0]);r.setAttribute('y',c[1]);
+      r.setAttribute('width',1);r.setAttribute('height',1);
+      r.setAttribute('fill','#1A1851');
+      qr.appendChild(r);
+    });
+    var c='';
+    for(var k=0;k<6;k++){
+      s=(s*1103515245+12345)&0x7fffffff;
+      c+=letters[s%letters.length];
+      if(k===2)c+='-';
+    }
+    codeEl.textContent=c;
+  }
+  var seed=20261126,left=60;
+  drawQr(seed);
+  function tick(){
+    left-=1;
+    if(left<=0){left=60;seed+=7919;drawQr(seed);}
+    refEl.textContent='Refreshes in 0:'+String(Math.round(left)).padStart(2,'0');
+  }
+  tick();
+  setInterval(tick,1000);
+})();
+</script>
+    </div>
+
+    <aside class="panel">
+      <h2>Layout map (corrected)</h2>
+      <p class="note">Matched to the attached front/back references. Demo fields only.</p>
+      <ul class="map">
+        <li><span class="swatch white"></span><span><b>Base</b> â€” flat white (no side black bars)</span></li>
+        <li><span class="swatch yellow"></span><span><b>Front</b> â€” gold/navy discs, tilted navy top, organic gold bottom-left &amp; bottom-right, empty gold photo frame, mark top-right, centered name / ID / membership / batch</span></li>
+        <li><span class="swatch navy"></span><span><b>Back</b> â€” navy top &amp; right accents, PERSONAL DETAILS on the left</span></li>
+        <li><span class="swatch navy"></span><span><b>QR verify</b> â€” digital addition in the open back space (QR + short code + refresh timer)</span></li>
+      </ul>
+      <p class="legend">
+        Brand: navy <code>#1A1851</code>, gold <code>#FCB315</code>.
+        Home Address spelling corrected (design had â€œADRESSâ€).
+        Refresh and flip to review.
+      </p>
+    </aside>
+  </div>
+</div>
+</body>
+</html>
+

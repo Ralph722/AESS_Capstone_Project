@@ -289,6 +289,8 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
         (id) => surveys[id],
       );
       var customPending = 0;
+      var customStarted = false;
+      DateTime? nearestCustomClose;
       var openTracerPending = false;
       DateTime? nearestClose;
       String? tracerSubtitle;
@@ -313,10 +315,6 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
               !closeAt.isBefore(DateTime.now()) &&
               (daysLeft <= 3 || hoursLeft <= 72);
           if (isDueSoon) dueSoon = true;
-
-          if (!survey.isChedGtsBuiltin) {
-            surveySubtitle = _formatDueLabel(closeAt);
-          }
         }
 
         if (survey.isChedGtsBuiltin) {
@@ -327,8 +325,26 @@ class HomeScreenState extends State<HomeScreen> with RouteAware {
           );
         } else {
           customPending++;
-          surveySubtitle ??= 'Pending · respond when ready';
+          if (a.status == SurveyAssignmentStatus.inProgress) {
+            customStarted = true;
+          }
+          if (closeAt != null) {
+            nearestCustomClose =
+                nearestCustomClose == null ||
+                    closeAt.isBefore(nearestCustomClose)
+                ? closeAt
+                : nearestCustomClose;
+          }
         }
+      }
+
+      if (customPending > 0) {
+        surveySubtitle = homeSurveySubtitle(
+          started: customStarted,
+          dueLabel: nearestCustomClose == null
+              ? null
+              : _formatDueLabel(nearestCustomClose),
+        );
       }
 
       String? dueSoonLabel;

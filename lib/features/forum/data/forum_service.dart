@@ -31,6 +31,9 @@ class ForumService {
   static const int purposeLetterMaxLength = 2000;
   static const int applyUrlMaxLength = 500;
   static const int declineReasonMaxLength = 500;
+  static const int pollOptionMaxLength = 120;
+  static const int pollMinOptions = 2;
+  static const int pollMaxOptions = 4;
 
   /// Canonical shareable URL (was the unhandled `aess://` scheme, whose
   /// copied links opened nothing).
@@ -194,7 +197,11 @@ class ForumService {
         .maybeSingle();
     if (row == null) return null;
     final bookmarked = await _bookmarks.isBookmarked(topicId);
-    final topic = ForumTopic.fromSupabaseRow(row, isBookmarked: bookmarked);
+    var topic = ForumTopic.fromSupabaseRow(row, isBookmarked: bookmarked);
+    if (topic.isPoll) {
+      final summary = await getPollSummary(topicId);
+      if (summary != null) topic = topic.copyWith(pollSummary: summary);
+    }
     final avatars = await _authorAvatars([topic.authorUid]);
     final url = avatars[topic.authorUid];
     return url == null ? topic : topic.copyWith(authorAvatarUrl: url);
@@ -312,14 +319,90 @@ class ForumService {
         )
         .toList();
 
-    // Filter/page first, then hydrate avatars only for the visible page.
+    // Filter/page first, then hydrate avatars + poll summaries for the page.
     final page = applyTopicQuery(topics, query, authorUid: uid);
     final withAvatars = await _attachAuthorAvatars(page.topics);
+    final withPolls = await _attachPollSummaries(withAvatars);
     return ForumTopicPage(
-      topics: withAvatars,
+      topics: withPolls,
       totalCount: page.totalCount,
       hasMore: page.hasMore,
     );
+  }
+
+  Future<List<ForumTopic>> _attachPollSummaries(List<ForumTopic> topics) async {
+    final pollIds = topics
+        .where((t) => t.isPoll)
+        .map((t) => t.id)
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (pollIds.isEmpty) return topics;
+    try {
+      final raw = await _supabase.rpc(
+        'forum_poll_summaries',
+        params: {'p_topic_ids': pollIds},
+      );
+      final map = _asStringKeyedMap(raw);
+      if (map == null) return topics;
+      return topics.map((t) {
+        if (!t.isPoll) return t;
+        final row = _asStringKeyedMap(map[t.id]);
+        if (row == null) return t;
+        return t.copyWith(pollSummary: ForumPollSummary.fromJson(row));
+      }).toList();
+    } catch (_) {
+      return topics;
+    }
+  }
+
+  Future<ForumPollSummary?> getPollSummary(String topicId) async {
+    try {
+      final raw = await _supabase.rpc(
+        'forum_poll_summary',
+        params: {'p_topic_id': topicId},
+      );
+      final map = _asStringKeyedMap(raw);
+      if (map == null) return null;
+      return ForumPollSummary.fromJson(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<ForumPollSummary> votePoll({
+    required String topicId,
+    required String optionId,
+  }) async {
+    final raw = await _supabase.rpc(
+      'vote_forum_poll',
+      params: {
+        'p_topic_id': topicId,
+        'p_option_id': optionId,
+      },
+    );
+    final map = _asStringKeyedMap(raw);
+    if (map == null) {
+      throw Exception('Could not record vote');
+    }
+    notifyTopicsChanged();
+    return ForumPollSummary.fromJson(map);
+  }
+
+  /// Supabase jsonb may arrive as Map, or occasionally as an encoded String.
+  Map<String, dynamic>? _asStringKeyedMap(Object? raw) {
+    if (raw == null) return null;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 
   Future<List<ForumTopic>> _attachAuthorAvatars(List<ForumTopic> topics) async {
@@ -544,6 +627,63 @@ class ForumService {
       return id;
     } catch (e) {
       throw Exception('Error creating topic: $e');
+    }
+  }
+
+  /// Community light poll — publishes immediately (no review).
+  Future<String> createPoll({
+    required String title,
+    required List<String> options,
+    String body = '',
+    ForumTopicVisibility visibility = ForumTopicVisibility.everyone,
+  }) async {
+    final trimmedTitle = title.trim();
+    final trimmedBody = body.trim();
+    final cleaned = <String>[];
+    for (final raw in options) {
+      final o = raw.trim();
+      if (o.isEmpty) continue;
+      if (o.length > pollOptionMaxLength) {
+        throw Exception('Option is too long');
+      }
+      cleaned.add(o);
+    }
+    if (trimmedTitle.isEmpty) throw Exception('Question is required');
+    if (trimmedTitle.length > titleMaxLength) {
+      throw Exception('Question is too long');
+    }
+    if (trimmedBody.length > bodyMaxLength) {
+      throw Exception('Details are too long');
+    }
+    if (cleaned.length < pollMinOptions || cleaned.length > pollMaxOptions) {
+      throw Exception('Polls need 2 to 4 options');
+    }
+
+    final userId = AppSession.requireUserId();
+    final author = await _authorInfo(userId);
+    final resolvedVisibility = _resolveVisibility(
+      visibility: visibility,
+      program: author.program,
+      batch: author.batch,
+    );
+
+    try {
+      final id = await _supabase.rpc(
+        'create_forum_poll',
+        params: {
+          'p_title': trimmedTitle,
+          'p_body': trimmedBody,
+          'p_options': cleaned,
+          'p_visibility': resolvedVisibility.wireValue,
+        },
+      );
+      final topicId = id?.toString() ?? '';
+      if (topicId.isEmpty) throw Exception('Could not create poll');
+      await clearDraft();
+      notifyTopicsChanged();
+      return topicId;
+    } catch (e) {
+      throw Exception('Error creating poll: $e');
     }
   }
 

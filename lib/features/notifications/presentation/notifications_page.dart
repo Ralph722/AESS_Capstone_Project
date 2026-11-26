@@ -211,7 +211,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: PortalTheme.pageBg,
       appBar: PortalAppBar(
         title: widget.initialType == NotificationType.forum
             ? 'Community activity'

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/notifications/data/notification_preferences_service.dart';
 import 'package:alumni_system/features/notifications/models/notification_model.dart';
@@ -10,8 +11,7 @@ import 'package:alumni_system/shared/widgets/user/portal_skeletons.dart';
 import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
-/// Which categories reach the user in the app and as phone / browser alerts,
-/// plus quiet hours for alerts. Changes save immediately.
+/// Category toggles for in-app, email, SMS, and device alerts. Saves immediately.
 class NotificationPreferencesScreen extends StatefulWidget {
   const NotificationPreferencesScreen({super.key, this.showPushSection = true});
 
@@ -33,19 +33,19 @@ class _NotificationPreferencesScreenState
   PushDeviceState? _device;
   bool _deviceBusy = false;
 
-  static const _descriptions = <NotificationType, String>{
-    NotificationType.event: 'New events, schedule or venue changes, replies',
-    NotificationType.job: 'New openings for your program, deadlines',
-    NotificationType.message: 'Messages from the alumni office',
-    NotificationType.announcement: 'Announcements from the alumni office',
-    NotificationType.survey: 'Tracer and alumni surveys, reminders',
-    NotificationType.forum: 'Replies, mentions, and moderation',
-    NotificationType.system: 'Account and verification updates',
-  };
-
   /// Preference rows (legacy Feedback tickets removed from the product).
   static Iterable<NotificationType> get _prefTypes => NotificationType.values
       .where((t) => t != NotificationType.feedback);
+
+  /// Email toggles with a real send path (survey, announcement, event, job,
+  /// system). Messages and Forum have no email path yet — hide those stubs.
+  static const _emailTypes = <NotificationType>[
+    NotificationType.event,
+    NotificationType.job,
+    NotificationType.announcement,
+    NotificationType.survey,
+    NotificationType.system,
+  ];
 
   @override
   void initState() {
@@ -161,7 +161,7 @@ class _NotificationPreferencesScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: PortalTheme.pageBg,
       appBar: PortalAppBar(
         title: 'Notification settings',
         actions: [
@@ -198,110 +198,84 @@ class _NotificationPreferencesScreenState
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
-        _sectionTitle('In the app', 'What appears in your notification list.'),
+        _sectionTitle('In the app'),
         _card([
           for (final type in _prefTypes)
-            _switchRow(
+            _prefRow(
               type: type,
               value: _prefs.inAppEnabled(type),
               locked: NotificationPreferences.isInAppLocked(type),
               onChanged: (v) => _update(_prefs.withInApp(type, v)),
+              isLast: type == _prefTypes.last,
             ),
         ]),
-        const SizedBox(height: 20),
-        _sectionTitle(
-          'Email',
-          'Email copies sent to your address on file. Turning a category '
-              'off stops its emails (including survey reminders) but never '
-              'its in-app notices. Sign-in and password codes always arrive.',
-        ),
+        const SizedBox(height: 18),
+        _sectionTitle('Email'),
         _card([
-          for (final type in _prefTypes)
-            _switchRow(
+          for (final type in _emailTypes)
+            _prefRow(
               type: type,
               value: _prefs.emailEnabled(type),
               locked: NotificationPreferences.isEmailLocked(type),
               onChanged: (v) => _update(_prefs.withEmail(type, v)),
+              isLast: type == _emailTypes.last,
             ),
         ]),
-        const SizedBox(height: 20),
-        _sectionTitle(
-          'Text messages (SMS)',
-          'Short reminders to your verified Philippine mobile. Only tracer '
-              'and survey follow-ups are sent (about a week after assignment, '
-              'and once when a survey is closing). Verification codes always '
-              'arrive when you request them.',
-        ),
+        const SizedBox(height: 18),
+        _sectionTitle('Text messages (SMS)'),
         _card([
-          _switchRow(
+          _prefRow(
             type: NotificationType.survey,
             value: _prefs.smsEnabled(NotificationType.survey),
             locked: false,
             onChanged: (v) =>
                 _update(_prefs.withSms(NotificationType.survey, v)),
+            isLast: true,
           ),
         ]),
         if (widget.showPushSection) ...[
-          const SizedBox(height: 20),
-          _sectionTitle(
-            'Phone and browser alerts',
-            'Alerts outside the app on devices where you allowed '
-                'notifications. Urgent announcements always come through.',
-          ),
-          _card([_deviceRow()]),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
+          _sectionTitle('Phone and browser'),
           _card([
+            _deviceRow(),
+            const Divider(height: 1, indent: 56),
             for (final type in _prefTypes)
-              _switchRow(
+              _prefRow(
                 type: type,
                 value: _prefs.pushEnabled(type),
                 locked: NotificationPreferences.isPushLocked(type),
                 onChanged: (v) => _update(_prefs.withPush(type, v)),
+                isLast: type == _prefTypes.last,
               ),
           ]),
-          const SizedBox(height: 20),
-          _sectionTitle(
-            'Quiet hours',
-            'Alerts wait until quiet hours end. They still appear in the app.',
-          ),
+          const SizedBox(height: 18),
+          _sectionTitle('Quiet hours'),
           _card([
-            SwitchListTile.adaptive(
-              activeThumbColor: Colors.white,
-              activeTrackColor: PortalTheme.navy,
+            _compactToggleRow(
+              icon: Icons.bedtime_outlined,
+              iconColor: PortalTheme.navy,
+              title: 'Pause alerts',
+              trailingLabel: _prefs.quietHoursEnabled
+                  ? '${_formatMinutes(_prefs.quietStartMinutes)} – '
+                        '${_formatMinutes(_prefs.quietEndMinutes)}'
+                  : null,
               value: _prefs.quietHoursEnabled,
-              onChanged: (v) => _update(_prefs.copyWith(quietHoursEnabled: v)),
-              title: Text('Pause alerts', style: PortalTheme.cardTitle),
-              subtitle: Text(
-                '${_formatMinutes(_prefs.quietStartMinutes)} – '
-                '${_formatMinutes(_prefs.quietEndMinutes)} '
-                '(${_prefs.timezone})',
-                style: PortalTheme.meta,
-              ),
+              onChanged: (v) =>
+                  _update(_prefs.copyWith(quietHoursEnabled: v)),
             ),
             if (_prefs.quietHoursEnabled) ...[
-              const Divider(height: 1),
-              ListTile(
-                title: Text('Starts', style: PortalTheme.cardTitle),
-                trailing: Text(
-                  _formatMinutes(_prefs.quietStartMinutes),
-                  style: PortalTheme.meta.copyWith(
-                    color: PortalTheme.navy,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+              const Divider(height: 1, indent: 56),
+              _timeRow(
+                label: 'Starts',
+                value: _formatMinutes(_prefs.quietStartMinutes),
                 onTap: () => _pickTime(start: true),
               ),
-              const Divider(height: 1),
-              ListTile(
-                title: Text('Ends', style: PortalTheme.cardTitle),
-                trailing: Text(
-                  _formatMinutes(_prefs.quietEndMinutes),
-                  style: PortalTheme.meta.copyWith(
-                    color: PortalTheme.navy,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+              const Divider(height: 1, indent: 56),
+              _timeRow(
+                label: 'Ends',
+                value: _formatMinutes(_prefs.quietEndMinutes),
                 onTap: () => _pickTime(start: false),
+                isLast: true,
               ),
             ],
           ]),
@@ -310,22 +284,15 @@ class _NotificationPreferencesScreenState
     );
   }
 
-  Widget _sectionTitle(String title, String subtitle) {
+  Widget _sectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: PortalTheme.cardTitle.copyWith(
-              color: PortalTheme.navy,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(subtitle, style: PortalTheme.meta.copyWith(fontSize: 12)),
-        ],
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+      child: Text(
+        title,
+        style: PortalTheme.cardTitle.copyWith(
+          color: PortalTheme.navy,
+          fontSize: 15,
+        ),
       ),
     );
   }
@@ -335,7 +302,7 @@ class _NotificationPreferencesScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(PortalTheme.radiusXl),
-        border: Border.all(color: PortalTheme.borderStrong),
+        border: Border.all(color: PortalTheme.border.withValues(alpha: 0.9)),
         boxShadow: PortalTheme.softShadow,
       ),
       clipBehavior: Clip.antiAlias,
@@ -343,75 +310,219 @@ class _NotificationPreferencesScreenState
     );
   }
 
+  Widget _prefRow({
+    required NotificationType type,
+    required bool value,
+    required bool locked,
+    required ValueChanged<bool> onChanged,
+    bool isLast = false,
+  }) {
+    return Column(
+      children: [
+        _compactToggleRow(
+          icon: notificationIconFor(type),
+          iconColor: notificationColorFor(type),
+          title: notificationTypeLabel(type),
+          value: value,
+          locked: locked,
+          onChanged: locked || _saving ? null : onChanged,
+        ),
+        if (!isLast) const Divider(height: 1, indent: 56),
+      ],
+    );
+  }
+
+  Widget _compactToggleRow({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required bool value,
+    ValueChanged<bool>? onChanged,
+    String? trailingLabel,
+    bool locked = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: PortalTheme.cardTitle.copyWith(fontSize: 14),
+            ),
+          ),
+          if (trailingLabel != null) ...[
+            Text(
+              trailingLabel,
+              style: PortalTheme.caption.copyWith(
+                color: PortalTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (locked)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: PortalTheme.surfaceMuted,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Always on',
+                style: PortalTheme.caption.copyWith(
+                  color: PortalTheme.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            )
+          else
+            Transform.scale(
+              scale: 0.88,
+              alignment: Alignment.centerRight,
+              child: CupertinoSwitch(
+                value: value,
+                activeTrackColor: PortalTheme.navy,
+                onChanged: onChanged,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timeRow({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+    bool isLast = false,
+  }) {
+    return InkWell(
+      onTap: _saving ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(56, 12, 16, 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label, style: PortalTheme.cardTitle.copyWith(fontSize: 14)),
+            ),
+            Text(
+              value,
+              style: PortalTheme.meta.copyWith(
+                color: PortalTheme.navy,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: PortalTheme.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _deviceRow() {
     final state = _device;
-    final String subtitle;
-    switch (state) {
-      case null:
-        subtitle = 'Checking…';
-      case PushDeviceState.on:
-        subtitle = 'Alerts are on for this device.';
-      case PushDeviceState.off:
-        subtitle = 'Turn on to get alerts on this device.';
-      case PushDeviceState.blocked:
-        subtitle = 'Blocked in your browser or phone settings.';
-      case PushDeviceState.notConfigured:
-        subtitle = 'Alerts are not set up in this version of the app.';
-      case PushDeviceState.unsupported:
-        subtitle = 'This device or browser does not support alerts.';
-    }
     final canToggle =
         !_deviceBusy &&
         (state == PushDeviceState.on ||
             state == PushDeviceState.off ||
             state == PushDeviceState.blocked);
-    return SwitchListTile.adaptive(
-      value: state == PushDeviceState.on,
-      onChanged: canToggle ? _toggleDevice : null,
-      secondary: _deviceBusy
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: Padding(
-                padding: EdgeInsets.all(3),
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: PortalTheme.navy,
+
+    String? statusChip;
+    switch (state) {
+      case null:
+        statusChip = 'Checking…';
+      case PushDeviceState.on:
+        statusChip = null;
+      case PushDeviceState.off:
+        statusChip = null;
+      case PushDeviceState.blocked:
+        statusChip = 'Blocked';
+      case PushDeviceState.notConfigured:
+        statusChip = 'Unavailable';
+      case PushDeviceState.unsupported:
+        statusChip = 'Unsupported';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: PortalTheme.navy.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            ),
+            child: _deviceBusy
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: PortalTheme.navy,
+                    ),
+                  )
+                : Icon(
+                    state == PushDeviceState.on
+                        ? Icons.notifications_active_outlined
+                        : Icons.notifications_off_outlined,
+                    size: 18,
+                    color: PortalTheme.navy,
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'This device',
+              style: PortalTheme.cardTitle.copyWith(fontSize: 14),
+            ),
+          ),
+          if (statusChip != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: PortalTheme.surfaceMuted,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                statusChip,
+                style: PortalTheme.caption.copyWith(
+                  color: PortalTheme.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
                 ),
               ),
-            )
-          : Icon(
-              state == PushDeviceState.on
-                  ? Icons.notifications_active_outlined
-                  : Icons.notifications_off_outlined,
-              color: PortalTheme.navy,
             ),
-      title: Text('This device', style: PortalTheme.cardTitle),
-      subtitle: Text(subtitle, style: PortalTheme.meta.copyWith(fontSize: 12)),
-    );
-  }
-
-  Widget _switchRow({
-    required NotificationType type,
-    required bool value,
-    required bool locked,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return SwitchListTile.adaptive(
-      activeThumbColor: Colors.white,
-      activeTrackColor: PortalTheme.navy,
-      value: value,
-      onChanged: locked || _saving ? null : onChanged,
-      secondary: Icon(
-        notificationIconFor(type),
-        color: notificationColorFor(type),
-      ),
-      title: Text(notificationTypeLabel(type), style: PortalTheme.cardTitle),
-      subtitle: Text(
-        locked
-            ? '${_descriptions[type]} · Always on'
-            : _descriptions[type] ?? '',
-        style: PortalTheme.meta.copyWith(fontSize: 12),
+            const SizedBox(width: 8),
+          ],
+          if (canToggle || state == PushDeviceState.on || state == PushDeviceState.off)
+            Transform.scale(
+              scale: 0.88,
+              alignment: Alignment.centerRight,
+              child: CupertinoSwitch(
+                value: state == PushDeviceState.on,
+                activeTrackColor: PortalTheme.navy,
+                onChanged: canToggle ? _toggleDevice : null,
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -157,6 +157,12 @@ class AdminForumTopicStatusBadges extends StatelessWidget {
           icon: Icons.campaign_outlined,
           dense: true,
         ),
+      if (topic.isPoll)
+        const AdminBadge.info(
+          label: 'Poll',
+          icon: Icons.bar_chart_rounded,
+          dense: true,
+        ),
       if (topic.isJobOffer)
         const AdminBadge.info(
           label: 'Job offer',

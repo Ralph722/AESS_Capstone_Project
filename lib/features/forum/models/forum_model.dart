@@ -1,28 +1,139 @@
-/// Discussion vs community job offer (alumni-submitted, admin-reviewed).
+/// Discussion, community job offer, or light Community poll.
 enum ForumPostKind {
   discussion,
-  jobOffer;
+  jobOffer,
+  poll;
 
   static const discussionValue = 'discussion';
   static const jobOfferValue = 'job_offer';
+  static const pollValue = 'poll';
 
   String get wireValue => switch (this) {
     ForumPostKind.discussion => discussionValue,
     ForumPostKind.jobOffer => jobOfferValue,
+    ForumPostKind.poll => pollValue,
   };
 
   String get label => switch (this) {
     ForumPostKind.discussion => 'Discussion',
     ForumPostKind.jobOffer => 'Job offer',
+    ForumPostKind.poll => 'Poll',
   };
 
   static ForumPostKind fromWire(String? raw) {
     switch ((raw ?? '').trim().toLowerCase()) {
       case jobOfferValue:
         return ForumPostKind.jobOffer;
+      case pollValue:
+        return ForumPostKind.poll;
       default:
         return ForumPostKind.discussion;
     }
+  }
+}
+
+/// One choice on a Community poll, with live vote count when known.
+class ForumPollOption {
+  final String id;
+  final String label;
+  final int sortOrder;
+  final int votes;
+
+  const ForumPollOption({
+    required this.id,
+    required this.label,
+    this.sortOrder = 0,
+    this.votes = 0,
+  });
+
+  factory ForumPollOption.fromJson(Map<String, dynamic> json) {
+    return ForumPollOption(
+      id: json['id']?.toString() ?? '',
+      label: (json['label'] ?? '').toString(),
+      sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
+      votes: (json['votes'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// Vote totals for a Community poll.
+///
+/// Tallies are public once anyone has voted. [myOptionId] is only set for the
+/// current viewer (used to highlight their choice).
+class ForumPollSummary {
+  final String topicId;
+  final int total;
+  final String? myOptionId;
+  final List<ForumPollOption> options;
+
+  const ForumPollSummary({
+    required this.topicId,
+    this.total = 0,
+    this.myOptionId,
+    this.options = const [],
+  });
+
+  bool get hasVoted =>
+      myOptionId != null && myOptionId!.trim().isNotEmpty;
+
+  /// Show bars / percentages whenever the poll has at least one vote.
+  bool get showResults => total > 0;
+
+  double percentFor(String optionId) {
+    if (total <= 0) return 0;
+    for (final opt in options) {
+      if (opt.id == optionId) return opt.votes / total;
+    }
+    return 0;
+  }
+
+  factory ForumPollSummary.fromJson(Map<String, dynamic> json) {
+    final rawOptions = json['options'];
+    final options = <ForumPollOption>[];
+    if (rawOptions is List) {
+      for (final row in rawOptions) {
+        if (row is Map) {
+          options.add(
+            ForumPollOption.fromJson(Map<String, dynamic>.from(row)),
+          );
+        }
+      }
+    }
+    // Some RPC paths may only return counts[] — merge onto options if needed.
+    final rawCounts = json['counts'];
+    if (rawCounts is List && options.isNotEmpty) {
+      final byId = <String, int>{};
+      for (final row in rawCounts) {
+        if (row is! Map) continue;
+        final id = row['option_id']?.toString() ?? '';
+        final votes = (row['votes'] as num?)?.toInt() ?? 0;
+        if (id.isNotEmpty) byId[id] = votes;
+      }
+      if (byId.isNotEmpty) {
+        for (var i = 0; i < options.length; i++) {
+          final o = options[i];
+          final v = byId[o.id];
+          if (v != null && o.votes == 0) {
+            options[i] = ForumPollOption(
+              id: o.id,
+              label: o.label,
+              sortOrder: o.sortOrder,
+              votes: v,
+            );
+          }
+        }
+      }
+    }
+    options.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final mine = json['my_option_id']?.toString();
+    return ForumPollSummary(
+      topicId: json['topic_id']?.toString() ?? '',
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      myOptionId: (mine == null || mine.isEmpty || mine == 'null')
+          ? null
+          : mine,
+      options: options,
+    );
   }
 }
 
@@ -180,6 +291,7 @@ class ForumTopic {
   final int viewCount;
   final List<ForumTag> tags;
   final bool isBookmarked;
+  final ForumPollSummary? pollSummary;
 
   const ForumTopic({
     required this.id,
@@ -213,9 +325,12 @@ class ForumTopic {
     this.viewCount = 0,
     this.tags = const [],
     this.isBookmarked = false,
+    this.pollSummary,
   });
 
   bool get isJobOffer => postKind == ForumPostKind.jobOffer;
+
+  bool get isPoll => postKind == ForumPostKind.poll;
 
   bool get isPendingJobOffer =>
       isJobOffer && reviewStatus == ForumReviewStatus.pending;
@@ -232,6 +347,7 @@ class ForumTopic {
   bool get needsResponse =>
       !isAnnouncement &&
       !isJobOffer &&
+      !isPoll &&
       !isSolved &&
       replyCount == 0;
 
@@ -272,6 +388,8 @@ class ForumTopic {
     bool? isBookmarked,
     String? authorBatch,
     String? authorAvatarUrl,
+    ForumPollSummary? pollSummary,
+    bool clearPollSummary = false,
   }) {
     return ForumTopic(
       id: id,
@@ -305,6 +423,9 @@ class ForumTopic {
       viewCount: viewCount,
       tags: tags ?? this.tags,
       isBookmarked: isBookmarked ?? this.isBookmarked,
+      pollSummary: clearPollSummary
+          ? null
+          : (pollSummary ?? this.pollSummary),
     );
   }
 
@@ -312,6 +433,7 @@ class ForumTopic {
     Map<String, dynamic> row, {
     List<ForumTag> tags = const [],
     bool isBookmarked = false,
+    ForumPollSummary? pollSummary,
   }) {
     final rawTags = row['forum_topic_tags'];
     final parsedTags = <ForumTag>[];
@@ -367,6 +489,7 @@ class ForumTopic {
       tags: tags.isNotEmpty ? tags : parsedTags,
       isBookmarked: isBookmarked,
       authorAvatarUrl: null,
+      pollSummary: pollSummary,
     );
   }
 

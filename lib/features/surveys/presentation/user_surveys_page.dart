@@ -64,7 +64,7 @@ class _UserSurveysScreenState extends State<UserSurveysScreen> {
     ).copyWith(left: 16, right: 16);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: PortalTheme.pageBg,
       appBar: const PortalAppBar(title: 'My Surveys'),
       body: PortalContentFrame(
         child: StreamBuilder<List<SurveyAssignment>>(

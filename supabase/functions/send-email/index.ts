@@ -83,9 +83,7 @@ serve(async (req) => {
     // Respect the recipient's email preference for this category. The
     // in-app reminder (if any) is unaffected; Auth/verification codes
     // never pass through this function and are never opted out.
-    const preferenceType = body.preferenceType === "announcement"
-      ? "announcement"
-      : "survey";
+    const preferenceType = normalizePreferenceType(body.preferenceType);
     if (await isEmailOptedOut(toEmail, preferenceType)) {
       await logEmailDelivery({
         toEmail,
@@ -289,6 +287,17 @@ function json(data: Record<string, unknown>, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function normalizePreferenceType(value?: string): string {
+  const t = (value ?? "").trim().toLowerCase();
+  if (
+    t === "announcement" || t === "event" || t === "job" ||
+    t === "survey" || t === "system"
+  ) {
+    return t;
+  }
+  return "survey";
 }
 
 function errorMessage(error: unknown) {

@@ -315,6 +315,16 @@ String homeTracerSubtitle({required bool started, String? dueLabel}) {
       : 'Not started · about 10–15 min';
 }
 
+/// Custom-survey line on the Home attention card (mirrors Tracer wording).
+String homeSurveySubtitle({required bool started, String? dueLabel}) {
+  if (dueLabel != null && dueLabel.trim().isNotEmpty) {
+    return '$dueLabel · ${started ? 'In progress' : 'Not started'}';
+  }
+  return started
+      ? 'In progress · pick up where you left off'
+      : 'Not started · respond when ready';
+}
+
 class HomeNeedsAttentionPanel extends StatelessWidget {
   const HomeNeedsAttentionPanel({
     super.key,
@@ -493,7 +503,7 @@ class HomeNeedsAttentionPanel extends StatelessWidget {
                             : '$pendingSurveys assigned surveys waiting',
                         subtitle: surveySubtitle?.trim().isNotEmpty == true
                             ? surveySubtitle!
-                            : 'Pending · respond when ready',
+                            : homeSurveySubtitle(started: false),
                         onTap: onOpenSurveys,
                       ),
                   ],
@@ -1397,6 +1407,7 @@ class HomeCommunityCard extends StatelessWidget {
 
   /// The one status or tag worth showing, matching the Forum list chips.
   Widget? _pill() {
+    if (topic.isPoll) return ForumStatusChip.poll();
     if (topic.isJobOffer) return ForumStatusChip.jobOffer();
     if (topic.isPinned) return ForumStatusChip.pinned();
     if (topic.isSolved) return ForumStatusChip.solved();

@@ -58,8 +58,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
 
   bool get _isEditing => widget.editTopic != null;
 
-  bool get _isEditingApproved =>
-      widget.editTopic?.isApprovedJobOffer == true;
+  bool get _isEditingApproved => widget.editTopic?.isApprovedJobOffer == true;
 
   @override
   void initState() {
@@ -167,9 +166,9 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not pick image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
     }
   }
 
@@ -263,9 +262,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       await busy.close();
       if (mounted) setState(() => _submitting = false);
@@ -332,10 +329,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
       },
       child: Scaffold(
         backgroundColor: PortalTheme.pageBg,
-        appBar: PortalAppBar(
-          title: _appBarTitle,
-          subtitle: _appBarSubtitle,
-        ),
+        appBar: PortalAppBar(title: _appBarTitle, subtitle: _appBarSubtitle),
         body: SafeArea(
           child: AnimatedSwitcher(
             duration: PortalTheme.normal,
@@ -399,8 +393,9 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                       height: 48,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.14),
-                        borderRadius:
-                            BorderRadius.circular(PortalTheme.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          PortalTheme.radiusMd,
+                        ),
                       ),
                       child: const Icon(
                         Icons.work_outline_rounded,
@@ -439,7 +434,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                       Icons.visibility_outlined,
                       'Choose who sees it',
                       'Pick everyone, your program, or your batch when you '
-                          'share—and you can change it anytime after approval.',
+                          'share — and you can change it anytime after approval.',
                     ),
                     const Divider(height: 1, color: PortalTheme.border),
                     _introPoint(
@@ -520,9 +515,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
     Widget node(int step, String label) {
       final active = step == activeStep;
       final done = step < activeStep;
-      final color = active || done
-          ? PortalTheme.navy
-          : PortalTheme.textMuted;
+      final color = active || done ? PortalTheme.navy : PortalTheme.textMuted;
       return Expanded(
         child: Row(
           children: [
@@ -542,7 +535,11 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                 ),
               ),
               child: done
-                  ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    )
                   : Text(
                       '$step',
                       style: PortalTheme.meta.copyWith(
@@ -609,10 +606,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: PortalTheme.caption.copyWith(height: 1.35),
-            ),
+            Text(subtitle, style: PortalTheme.caption.copyWith(height: 1.35)),
           ],
           const SizedBox(height: 14),
           ...children,
@@ -866,10 +860,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                   color: PortalTheme.textMuted.withValues(alpha: 0.9),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'No cover selected',
-                  style: PortalTheme.caption,
-                ),
+                Text('No cover selected', style: PortalTheme.caption),
               ],
             ),
           ),
@@ -918,8 +909,9 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                         height: 36,
                         decoration: BoxDecoration(
                           color: PortalTheme.gold.withValues(alpha: 0.18),
-                          borderRadius:
-                              BorderRadius.circular(PortalTheme.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            PortalTheme.radiusMd,
+                          ),
                         ),
                         child: const Icon(
                           Icons.lock_outline_rounded,
@@ -959,7 +951,7 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                 _sectionCard(
                   title: 'Your purpose letter',
                   subtitle:
-                      'A few sentences is enough—context helps admins review faster.',
+                      'A few sentences is enough — context helps admins review faster.',
                   children: [
                     TextFormField(
                       controller: _letterController,
@@ -1022,7 +1014,9 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                         color: ForumTheme.needsResponseBg,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: ForumTheme.needsResponse.withValues(alpha: 0.3),
+                          color: ForumTheme.needsResponse.withValues(
+                            alpha: 0.3,
+                          ),
                         ),
                       ),
                       child: const Icon(
@@ -1054,8 +1048,9 @@ class _ForumJobOfferFlowPageState extends State<ForumJobOfferFlowPage> {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: PortalTheme.pageBg,
-                        borderRadius:
-                            BorderRadius.circular(PortalTheme.radiusLg),
+                        borderRadius: BorderRadius.circular(
+                          PortalTheme.radiusLg,
+                        ),
                         border: Border.all(color: PortalTheme.border),
                       ),
                       child: Row(

@@ -74,6 +74,33 @@ void main() {
     });
   });
 
+  group('homeSurveySubtitle', () {
+    test('not started without a deadline', () {
+      expect(
+        homeSurveySubtitle(started: false),
+        'Not started · respond when ready',
+      );
+    });
+
+    test('in progress without a deadline', () {
+      expect(
+        homeSurveySubtitle(started: true),
+        'In progress · pick up where you left off',
+      );
+    });
+
+    test('due date comes first when set', () {
+      expect(
+        homeSurveySubtitle(started: false, dueLabel: 'Due Oct 20'),
+        'Due Oct 20 · Not started',
+      );
+      expect(
+        homeSurveySubtitle(started: true, dueLabel: 'Due tomorrow'),
+        'Due tomorrow · In progress',
+      );
+    });
+  });
+
   group('HomeCommunityCard pill', () {
     testWidgets('pinned wins over everything', (tester) async {
       await _pump(

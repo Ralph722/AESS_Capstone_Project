@@ -415,7 +415,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
         Navigator.of(context).pop();
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: PortalTheme.pageBg,
         appBar: const PortalAppBar(
           title: 'Profile information',
           automaticallyImplyLeading: true,

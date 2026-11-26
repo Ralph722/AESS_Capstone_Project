@@ -13,8 +13,12 @@ class EmailService {
   /// Edge Function re-validates it before rendering the CTA button.
   ///
   /// [preferenceType] is the notification type whose email preference the
-  /// server checks (`survey`, `announcement`). Returns false when the
-  /// recipient opted out of that email category and nothing was sent.
+  /// server checks (`survey`, `announcement`, `event`, `job`, `system`).
+  /// Returns false when the recipient opted out and nothing was sent.
+  ///
+  /// Event/job publish and reminder emails are queued by the database
+  /// (`queue_notification_email`) and sent by
+  /// `send-queued-notification-emails` — not this client path.
   Future<bool> sendSurveyReminderEmail({
     required String toEmail,
     required String userName,

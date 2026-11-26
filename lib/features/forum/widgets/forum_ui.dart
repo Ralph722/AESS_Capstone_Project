@@ -5,6 +5,7 @@ import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/shared/widgets/user/portal_action_dialog.dart';
+import 'package:alumni_system/shared/widgets/user/portal_states.dart';
 import 'package:alumni_system/shared/widgets/user/portal_theme.dart';
 
 /// Alumni forum visual tokens — aliases [PortalTheme].
@@ -91,6 +92,13 @@ class ForumStatusChip extends StatelessWidget {
     icon: Icons.work_outline_rounded,
   );
 
+  factory ForumStatusChip.poll() => const ForumStatusChip(
+    label: 'Poll',
+    foreground: ForumTheme.navy,
+    background: Color(0xFFE8EEF9),
+    icon: Icons.bar_chart_rounded,
+  );
+
   factory ForumStatusChip.jobPending() => const ForumStatusChip(
     label: 'Awaiting review',
     foreground: ForumTheme.needsResponse,
@@ -165,6 +173,7 @@ class ForumStatusChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = <Widget>[];
     if (topic.isAnnouncement) chips.add(ForumStatusChip.announcement());
+    if (topic.isPoll) chips.add(ForumStatusChip.poll());
     if (topic.isJobOffer) {
       chips.add(ForumStatusChip.jobOffer());
       if (topic.isPendingJobOffer) {
@@ -379,6 +388,10 @@ class ForumTopicCard extends StatelessWidget {
                     ],
                   ),
                 ],
+                if (topic.isPoll && topic.pollSummary != null) ...[
+                  const SizedBox(height: 12),
+                  _FeedPollPreview(summary: topic.pollSummary!),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -420,19 +433,6 @@ class ForumTopicCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: ForumTheme.navy.withValues(alpha: 0.08),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: ForumTheme.navy,
-                      ),
-                    ),
                   ],
                 ),
               ],
@@ -457,6 +457,7 @@ class ForumTopicCard extends StatelessWidget {
   bool _hasStatusOrTags(ForumTopic topic) {
     return topic.isAnnouncement ||
         topic.isJobOffer ||
+        topic.isPoll ||
         topic.isLocked ||
         topic.isSolved ||
         topic.needsResponse ||
@@ -471,6 +472,7 @@ class ForumTopicCard extends StatelessWidget {
   List<Widget> _statusChips(ForumTopic topic) {
     final chips = <Widget>[];
     if (topic.isAnnouncement) chips.add(ForumStatusChip.announcement());
+    if (topic.isPoll) chips.add(ForumStatusChip.poll());
     if (topic.isJobOffer) chips.add(ForumStatusChip.jobOffer());
     if (topic.isLocked && !topic.isPendingJobOffer) {
       chips.add(ForumStatusChip.locked());
@@ -517,6 +519,110 @@ class ForumTopicCard extends StatelessWidget {
   }
 }
 
+/// Non-interactive poll teaser on the feed card (vote on the opened topic).
+class _FeedPollPreview extends StatelessWidget {
+  const _FeedPollPreview({required this.summary});
+
+  final ForumPollSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final showResults = summary.showResults;
+    final footer = !showResults
+        ? 'Open to vote'
+        : summary.hasVoted
+        ? (summary.total == 1
+              ? '1 vote · Open to change'
+              : '${summary.total} votes · Open to change')
+        : (summary.total == 1
+              ? '1 vote · Open to vote'
+              : '${summary.total} votes · Open to vote');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final opt in summary.options.take(4)) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: summary.myOptionId == opt.id
+                      ? ForumTheme.navy
+                      : ForumTheme.border.withValues(alpha: 0.9),
+                  width: summary.myOptionId == opt.id ? 1.4 : 1,
+                ),
+                color: ForumTheme.surfaceMuted.withValues(alpha: 0.55),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: Stack(
+                  children: [
+                    if (showResults)
+                      Positioned.fill(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: summary
+                                .percentFor(opt.id)
+                                .clamp(0.0, 1.0),
+                            child: ColoredBox(
+                              color: ForumTheme.navy.withValues(
+                                alpha: summary.myOptionId == opt.id
+                                    ? 0.14
+                                    : 0.07,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 9,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              opt.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: PortalTheme.meta.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: ForumTheme.navy,
+                              ),
+                            ),
+                          ),
+                          if (showResults)
+                            Text(
+                              '${(summary.percentFor(opt.id) * 100).round()}%',
+                              style: PortalTheme.caption.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: ForumTheme.navy,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+        Text(
+          footer,
+          style: PortalTheme.caption.copyWith(
+            color: ForumTheme.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class ForumEmptyState extends StatelessWidget {
   const ForumEmptyState({
     super.key,
@@ -537,8 +643,12 @@ class ForumEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Flat on pageBg — no card chrome (matches other portal empty states).
     final content = Padding(
-      padding: EdgeInsets.all(compact ? 16 : 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 16 : 32,
+        vertical: compact ? 16 : 24,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -575,20 +685,9 @@ class ForumEmptyState extends StatelessWidget {
       ),
     );
 
-    final card = Container(
-      margin: compact ? EdgeInsets.zero : const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ForumTheme.card,
-        borderRadius: BorderRadius.circular(ForumTheme.radius2xl),
-        border: Border.all(color: ForumTheme.border.withValues(alpha: 0.75)),
-        boxShadow: ForumTheme.softShadow,
-      ),
-      child: content,
-    );
-
-    // Avoid Center inside scrollables (unbounded height) — shrink-wrap instead.
-    if (compact) return card;
-    return Center(child: card);
+    // Avoid Center inside nested scrollables (unbounded height).
+    if (compact) return content;
+    return Center(child: content);
   }
 }
 
@@ -604,10 +703,13 @@ class ForumErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final friendly = portalFriendlyError(message);
+    final offline = friendly.toLowerCase().contains('connection') ||
+        friendly.toLowerCase().contains('internet');
     return ForumEmptyState(
-      icon: Icons.error_outline,
+      icon: offline ? Icons.wifi_off_rounded : Icons.error_outline,
       title: 'Something went wrong',
-      subtitle: message,
+      subtitle: friendly,
       actionLabel: 'Try again',
       onAction: onRetry,
     );

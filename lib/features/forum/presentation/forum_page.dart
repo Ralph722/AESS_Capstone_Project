@@ -8,6 +8,7 @@ import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
 import 'package:alumni_system/features/forum/presentation/forum_job_offer_flow_page.dart';
+import 'package:alumni_system/features/forum/presentation/forum_poll_composer_page.dart';
 import 'package:alumni_system/features/forum/presentation/forum_topic_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/shared/widgets/user/portal_filters.dart';
@@ -171,6 +172,22 @@ class _ForumScreenState extends State<ForumScreen> {
     }
   }
 
+  Future<void> _openPollComposer() async {
+    final id = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const ForumPollComposerPage()),
+    );
+    if (!mounted) return;
+    await _load(reset: true);
+    if (id != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ForumTopicScreen(topicId: id)),
+      );
+      if (mounted) await _load(reset: true, silent: true);
+    }
+  }
+
   Future<void> _showCreateMenu() async {
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -191,12 +208,19 @@ class _ForumScreenState extends State<ForumScreen> {
             icon: Icons.work_outline_rounded,
             onTap: () => Navigator.pop(ctx, 'job'),
           ),
+          PortalSheetOption(
+            label: 'Create a poll',
+            icon: Icons.bar_chart_rounded,
+            onTap: () => Navigator.pop(ctx, 'poll'),
+          ),
         ],
       ),
     );
     if (!mounted || choice == null) return;
     if (choice == 'job') {
       await _openJobOfferFlow();
+    } else if (choice == 'poll') {
+      await _openPollComposer();
     } else {
       await _openComposer();
     }
@@ -383,6 +407,19 @@ class _ForumScreenState extends State<ForumScreen> {
                               child: PortalCardListSkeleton(threeLine: true),
                             ),
                           )
+                        else if (_error != null)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: ForumErrorState(
+                              message: _error!,
+                              onRetry: () => _load(reset: true),
+                            ),
+                          )
+                        else if (_topics.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _buildEmptyState(),
+                          )
                         else ...[
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
@@ -408,46 +445,33 @@ class _ForumScreenState extends State<ForumScreen> {
     );
   }
 
-  Widget _buildListBody() {
-    // Initial load uses [SliverFillRemaining] + skeleton in [build].
-    if (_error != null) {
-      return SizedBox(
-        height: 280,
-        child: ForumErrorState(
-          message: _error!,
-          onRetry: () => _load(reset: true),
-        ),
-      );
-    }
-    if (_topics.isEmpty) {
-      final searching = _search.isNotEmpty;
-      final bookmarkedOnly =
-          _filters.contains(ForumListFilter.bookmarked) &&
-          !_filters.contains(ForumListFilter.all);
-      return SizedBox(
-        height: 320,
-        child: ForumEmptyState(
-          icon: searching
-              ? Icons.search_off
-              : bookmarkedOnly
-              ? Icons.bookmark_border
-              : Icons.forum_outlined,
-          title: searching
-              ? 'No search results'
-              : bookmarkedOnly
-              ? 'No bookmarked topics'
-              : 'No discussions yet',
-          subtitle: searching
-              ? 'Try a different keyword or clear filters.'
-              : bookmarkedOnly
-              ? 'Save discussions you want to revisit later.'
-              : 'Start the first topic and invite alumni to reply.',
-          actionLabel: searching || bookmarkedOnly ? null : 'Start discussion',
-          onAction: searching || bookmarkedOnly ? null : _openComposer,
-        ),
-      );
-    }
+  Widget _buildEmptyState() {
+    final searching = _search.isNotEmpty;
+    final bookmarkedOnly =
+        _filters.contains(ForumListFilter.bookmarked) &&
+        !_filters.contains(ForumListFilter.all);
+    return ForumEmptyState(
+      icon: searching
+          ? Icons.search_off
+          : bookmarkedOnly
+          ? Icons.bookmark_border
+          : Icons.forum_outlined,
+      title: searching
+          ? 'No search results'
+          : bookmarkedOnly
+          ? 'No bookmarked topics'
+          : 'No discussions yet',
+      subtitle: searching
+          ? 'Try a different keyword or clear filters.'
+          : bookmarkedOnly
+          ? 'Save discussions you want to revisit later.'
+          : 'Start the first topic and invite alumni to reply.',
+      actionLabel: searching || bookmarkedOnly ? null : 'Start discussion',
+      onAction: searching || bookmarkedOnly ? null : _openComposer,
+    );
+  }
 
+  Widget _buildListBody() {
     final uid = AppSession.userId;
     final awaiting = _topics
         .where(

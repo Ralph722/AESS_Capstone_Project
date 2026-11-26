@@ -13,6 +13,7 @@ import 'package:alumni_system/features/forum/presentation/forum_composer_page.da
 import 'package:alumni_system/features/forum/presentation/forum_job_offer_flow_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_formatted_text.dart';
 import 'package:alumni_system/features/forum/widgets/forum_moderation_dialog.dart';
+import 'package:alumni_system/features/forum/widgets/forum_poll_card.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
@@ -61,6 +62,7 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
 
   bool _isAdmin = false;
   bool _sending = false;
+  bool _votingPoll = false;
   bool _loading = true;
   String? _error;
   ForumTopic? _topic;
@@ -549,6 +551,27 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
       }
     } catch (e) {
       if (mounted) showPortalErrorSnack(context, e);
+    }
+  }
+
+  Future<void> _votePoll(ForumTopic topic, String optionId) async {
+    if (_votingPoll || topic.isLocked) return;
+    if (topic.pollSummary?.myOptionId == optionId) return;
+    setState(() => _votingPoll = true);
+    try {
+      final summary = await _forumService.votePoll(
+        topicId: topic.id,
+        optionId: optionId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _topic = topic.copyWith(pollSummary: summary);
+      });
+      widget.onChanged?.call();
+    } catch (e) {
+      if (mounted) showPortalErrorSnack(context, e);
+    } finally {
+      if (mounted) setState(() => _votingPoll = false);
     }
   }
 
@@ -1237,10 +1260,29 @@ class _ForumTopicScreenState extends State<ForumTopicScreen> {
             ),
           ],
           const SizedBox(height: PortalTheme.space3),
-          ForumFormattedText(
-            topic.body,
-            style: PortalTheme.body.copyWith(fontSize: 15, height: 1.5),
-          ),
+          if (topic.body.trim().isNotEmpty)
+            ForumFormattedText(
+              topic.body,
+              style: PortalTheme.body.copyWith(fontSize: 15, height: 1.5),
+            ),
+          if (topic.isPoll) ...[
+            if (topic.body.trim().isNotEmpty)
+              const SizedBox(height: PortalTheme.space3),
+            if (topic.pollSummary != null)
+              ForumPollCard(
+                summary: topic.pollSummary!,
+                voting: _votingPoll,
+                enabled: !topic.isLocked,
+                onVote: (optionId) => _votePoll(topic, optionId),
+              )
+            else
+              Text(
+                'Loading poll options…',
+                style: PortalTheme.caption.copyWith(
+                  color: ForumTheme.textSecondary,
+                ),
+              ),
+          ],
           if (topic.isJobOffer && topic.applyUrl.trim().isNotEmpty) ...[
             const SizedBox(height: PortalTheme.space3),
             Align(

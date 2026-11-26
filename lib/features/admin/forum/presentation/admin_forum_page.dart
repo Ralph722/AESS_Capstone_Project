@@ -9,6 +9,7 @@ import 'package:alumni_system/features/forum/models/forum_model.dart';
 import 'package:alumni_system/features/forum/models/forum_filters.dart';
 import 'package:alumni_system/features/forum/data/forum_service.dart';
 import 'package:alumni_system/features/forum/presentation/forum_composer_page.dart';
+import 'package:alumni_system/features/forum/presentation/forum_poll_composer_page.dart';
 import 'package:alumni_system/features/forum/widgets/forum_ui.dart';
 import 'package:alumni_system/features/admin/forum/presentation/admin_forum_topic_panel.dart';
 import 'package:alumni_system/features/admin/forum/widgets/admin_forum_ui.dart';
@@ -536,6 +537,12 @@ class _AdminForumScreenState extends State<AdminForumScreen>
     );
   }
 
+  Future<void> _newPoll() async {
+    final id = await showAdminForumPollComposer(context);
+    if (!mounted || id == null) return;
+    await _refresh();
+  }
+
   Future<void> _newAnnouncement() async {
     final id = await showAdminForumComposer(
       context: context,
@@ -651,6 +658,12 @@ class _AdminForumScreenState extends State<AdminForumScreen>
                         _visibleTopics.isEmpty || _loading ? null : _exportCsv,
                     icon: const Icon(Icons.download_outlined, size: 17),
                     label: const Text('Export'),
+                    style: AdminButtonStyles.outlined(),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _newPoll,
+                    icon: const Icon(Icons.bar_chart_rounded, size: 17),
+                    label: const Text('Create a poll'),
                     style: AdminButtonStyles.outlined(),
                   ),
                   FilledButton.icon(

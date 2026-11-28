@@ -16,7 +16,11 @@ Existing Excel / management report exports are unchanged.
 
 1. Prefer the newest **submitted** built-in CHED GTS response (`ched_*` answers)
 2. Fill empty gaps from live profile + employment
-3. If no submission exists, export from live profile (after confirm)
+3. **Directory / Survey Responses ZIP:** only alumni with a submitted tracer are
+   included (`allowLiveFallback: false`). No submission → skipped, not filled
+   from live profile alone.
+4. **Per-member PDF:** if no submission exists, export from live profile only
+   after admin confirm
 
 ## Template version
 

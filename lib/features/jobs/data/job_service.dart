@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_events.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
+import 'package:alumni_system/core/utils/local_id.dart';
 import 'package:alumni_system/features/jobs/application/job_expiration.dart';
 import 'package:alumni_system/features/jobs/models/job_posting_model.dart';
 
@@ -119,6 +121,106 @@ class JobService {
     } catch (e) {
       throw Exception('Error deleting job posting: $e');
     }
+  }
+
+  /// Soft-archive. Archive is a history bin — reuse via [duplicateJob].
+  Future<void> archiveJob(String jobId) async {
+    final job = await getJobPosting(jobId);
+    if (job == null) throw Exception('Job not found');
+    if (job.status == 'archived') return;
+    if (job.status == 'draft') {
+      throw Exception('Draft jobs cannot be archived. Delete or post them first.');
+    }
+    final archived = job.copyWith(status: 'archived', isActive: false);
+    await _supabase.from('jobs').upsert(archived.toSupabaseRow(), onConflict: 'id');
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.archiveJob,
+        resource: 'Job',
+        resourceId: jobId,
+        description: 'Archived job: ${job.jobTitle}',
+        userRole: 'admin',
+        module: AuditModules.jobs,
+        targetLabel: job.jobTitle,
+      ),
+    );
+  }
+
+  /// Posts a draft job so alumni can see it.
+  Future<void> publishJob(String jobId) async {
+    final job = await getJobPosting(jobId);
+    if (job == null) throw Exception('Job not found');
+    if (job.status != 'draft') {
+      throw Exception('Only draft jobs can be posted');
+    }
+    final posted = job.copyWith(status: 'active', isActive: true);
+    await _supabase.from('jobs').upsert(posted.toSupabaseRow(), onConflict: 'id');
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.publishJob,
+        resource: 'Job',
+        resourceId: jobId,
+        description: 'Posted job: ${job.jobTitle}',
+        userRole: 'admin',
+        module: AuditModules.jobs,
+        targetLabel: job.jobTitle,
+      ),
+    );
+  }
+
+  /// Clones a job as a new draft (template only — no interest/favorite counts).
+  Future<String> duplicateJob(String sourceId) async {
+    final source = await getJobPosting(sourceId);
+    if (source == null) throw Exception('Job not found');
+    final userId = AppSession.userId ?? source.adminId;
+    final baseTitle = source.jobTitle.trim().isEmpty
+        ? 'Untitled job'
+        : source.jobTitle.trim();
+    final copy = JobPosting(
+      id: LocalId.generate(),
+      companyName: source.companyName,
+      companyLogo: source.companyLogo,
+      coverImage: source.coverImage,
+      jobTitle: baseTitle.endsWith('(Copy)') ? baseTitle : '$baseTitle (Copy)',
+      jobType: source.jobType,
+      location: source.location,
+      salaryRange: source.salaryRange,
+      description: source.description,
+      requirements: List<String>.from(source.requirements),
+      benefits: List<String>.from(source.benefits),
+      postedDate: DateTime.now(),
+      applicationDeadline: source.applicationDeadline,
+      contactEmail: source.contactEmail,
+      applicationMethod: source.applicationMethod,
+      isActive: false,
+      views: 0,
+      applications: 0,
+      adminId: userId,
+      isRemote: source.isRemote,
+      experienceLevel: source.experienceLevel,
+      status: 'draft',
+      category: source.category,
+      targetPrograms: List<String>.from(source.targetPrograms),
+      applicationUrl: source.applicationUrl,
+    );
+    try {
+      await _supabase.from('jobs').upsert(copy.toSupabaseRow(), onConflict: 'id');
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.duplicateJob,
+          resource: 'Job',
+          resourceId: copy.id,
+          description: 'Duplicated job as draft: ${copy.jobTitle}',
+          changes: {'sourceId': sourceId},
+          userRole: 'admin',
+          module: AuditModules.jobs,
+          targetLabel: copy.jobTitle,
+        ),
+      );
+    } catch (e) {
+      throw Exception('Error duplicating job: $e');
+    }
+    return copy.id;
   }
 
   Future<int> getTotalJobsCount() async {

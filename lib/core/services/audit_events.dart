@@ -56,6 +56,7 @@ abstract final class AuditActions {
   static const cancelEvent = 'CANCEL_EVENT';
   static const archiveEvent = 'ARCHIVE_EVENT';
   static const restoreEvent = 'RESTORE_EVENT';
+  static const duplicateEvent = 'DUPLICATE_EVENT';
   static const deleteEvent = 'DELETE_EVENT';
   static const eventRsvp = 'EVENT_RSVP';
   static const eventRsvpClear = 'EVENT_RSVP_CLEAR';
@@ -63,6 +64,9 @@ abstract final class AuditActions {
   // Jobs
   static const createJob = 'CREATE_JOB';
   static const updateJob = 'UPDATE_JOB';
+  static const publishJob = 'PUBLISH_JOB';
+  static const archiveJob = 'ARCHIVE_JOB';
+  static const duplicateJob = 'DUPLICATE_JOB';
   static const deleteJob = 'DELETE_JOB';
   static const restoreJob = 'RESTORE_JOB';
   static const expireJob = 'EXPIRE_JOB';
@@ -73,6 +77,7 @@ abstract final class AuditActions {
   static const publishAnnouncement = 'PUBLISH_ANNOUNCEMENT';
   static const archiveAnnouncement = 'ARCHIVE_ANNOUNCEMENT';
   static const restoreAnnouncement = 'RESTORE_ANNOUNCEMENT';
+  static const duplicateAnnouncement = 'DUPLICATE_ANNOUNCEMENT';
   static const deleteAnnouncement = 'DELETE_ANNOUNCEMENT';
 
   // Forum (selective)

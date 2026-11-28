@@ -64,7 +64,7 @@ abstract final class GtsListTables {
   static const totalLabel = 'Total alumni';
   static const responseRateLabel = 'Response rate (answered ÷ total)';
   static const employmentRateLabel =
-      'Employment rate (answered Yes ÷ answered this question)';
+      'Employment rate (Employed ÷ answered this question)';
   static const answeredQuestionLabel = 'Answered this question';
   static const offRosterNote =
       'Graduates who answered without an active alumni list record are listed '
@@ -235,10 +235,21 @@ abstract final class GtsListTables {
   /// At most [maxCharts] charts; the tally still lists every question.
   static const maxCharts = 12;
 
+  /// Share in percent points from a tally line (`"20%"` → `20`), or null.
+  static double? sharePoints(GtsTallyLine line) {
+    final raw = line.share.trim();
+    if (raw.isEmpty || raw == '–') return null;
+    if (raw.endsWith('%')) {
+      return double.tryParse(raw.substring(0, raw.length - 1));
+    }
+    return null;
+  }
+
   static List<GtsChartData> charts(GtsAlumniListResult result) {
     if (!result.config.includeCharts || result.rows.isEmpty) return const [];
     final type = switch (result.config.chart) {
       GtsListChart.donut => GtsChartType.donut,
+      GtsListChart.pie => GtsChartType.pie,
       GtsListChart.verticalBars => GtsChartType.bar,
       GtsListChart.bars => GtsChartType.horizontalBar,
       GtsListChart.none => GtsChartType.horizontalBar,
@@ -255,6 +266,10 @@ abstract final class GtsListTables {
       final shown = capped
           ? counted.take(GtsChartData.maxLabels).toList()
           : counted;
+      final countSum = shown.fold<int>(
+        0,
+        (s, l) => s + int.parse(l.count),
+      );
       out.add(
         GtsChartData(
           type: type,
@@ -262,10 +277,14 @@ abstract final class GtsListTables {
           labels: [for (final l in shown) l.label],
           series: [
             GtsChartSeries('Alumni', [
-              for (final l in shown) int.parse(l.count).toDouble(),
+              for (final l in shown)
+                sharePoints(l) ??
+                    (countSum == 0
+                        ? 0.0
+                        : int.parse(l.count) * 100.0 / countSum),
             ]),
           ],
-          isPercent: false,
+          isPercent: true,
           omitted: capped ? counted.length - shown.length : 0,
         ),
       );
@@ -273,16 +292,20 @@ abstract final class GtsListTables {
 
     final tally = result.tally;
     add('Tracer coverage', [
-      GtsTallyLine(GtsListColumns.answeredLabel, '${tally.answered}', ''),
+      GtsTallyLine(
+        GtsListColumns.answeredLabel,
+        '${tally.answered}',
+        percent(tally.total == 0 ? null : tally.answered / tally.total),
+      ),
       GtsTallyLine(
         GtsTracerStatus.untrackedRegistered.label,
         '${tally.count(GtsTracerStatus.untrackedRegistered)}',
-        '',
+        percent(tally.share(GtsTracerStatus.untrackedRegistered)),
       ),
       GtsTallyLine(
         GtsTracerStatus.untrackedNotRegistered.label,
         '${tally.count(GtsTracerStatus.untrackedNotRegistered)}',
-        '',
+        percent(tally.share(GtsTracerStatus.untrackedNotRegistered)),
       ),
       if (tally.count(GtsTracerStatus.offRoster) > 0)
         GtsTallyLine(

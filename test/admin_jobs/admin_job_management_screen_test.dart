@@ -31,6 +31,9 @@ class _FakeJobService extends JobService {
 
   final List<JobPosting> addedJobs = [];
   final List<JobPosting> updatedJobs = [];
+  final List<String> archivedIds = [];
+  final List<String> publishedIds = [];
+  final List<String> duplicatedIds = [];
   final List<String> deletedIds = [];
 
   @override
@@ -53,6 +56,68 @@ class _FakeJobService extends JobService {
     updatedJobs.add(job);
     final idx = jobs.indexWhere((j) => j.id == job.id);
     if (idx != -1) jobs[idx] = job;
+  }
+
+  @override
+  Future<void> archiveJob(String jobId) async {
+    archivedIds.add(jobId);
+    final idx = jobs.indexWhere((j) => j.id == jobId);
+    if (idx != -1) {
+      jobs[idx] = jobs[idx].copyWith(status: 'archived', isActive: false);
+      updatedJobs.add(jobs[idx]);
+    }
+  }
+
+  @override
+  Future<void> publishJob(String jobId) async {
+    publishedIds.add(jobId);
+    final idx = jobs.indexWhere((j) => j.id == jobId);
+    if (idx != -1) {
+      jobs[idx] = jobs[idx].copyWith(status: 'active', isActive: true);
+      updatedJobs.add(jobs[idx]);
+    }
+  }
+
+  @override
+  Future<String> duplicateJob(String sourceId) async {
+    duplicatedIds.add(sourceId);
+    final source = jobs.firstWhere((j) => j.id == sourceId);
+    final copy = source.copyWith(
+      status: 'draft',
+      isActive: false,
+      interestedCount: 0,
+      favoriteCount: 0,
+    );
+    // copyWith keeps the same id — rebuild with a new id via addJobPosting path.
+    final drafted = JobPosting(
+      id: 'dup-${duplicatedIds.length}',
+      companyName: copy.companyName,
+      companyLogo: copy.companyLogo,
+      coverImage: copy.coverImage,
+      jobTitle: '${source.jobTitle} (Copy)',
+      jobType: copy.jobType,
+      location: copy.location,
+      salaryRange: copy.salaryRange,
+      description: copy.description,
+      requirements: copy.requirements,
+      benefits: copy.benefits,
+      postedDate: DateTime.now(),
+      applicationDeadline: copy.applicationDeadline,
+      contactEmail: copy.contactEmail,
+      applicationMethod: copy.applicationMethod,
+      isActive: false,
+      views: 0,
+      applications: 0,
+      adminId: copy.adminId,
+      isRemote: copy.isRemote,
+      experienceLevel: copy.experienceLevel,
+      status: 'draft',
+      category: copy.category,
+      targetPrograms: copy.targetPrograms,
+      applicationUrl: copy.applicationUrl,
+    );
+    jobs.insert(0, drafted);
+    return drafted.id;
   }
 
   @override
@@ -409,10 +474,20 @@ void main() {
         await fill('Description *', 'Lead automated Flutter test suites.');
         await fill('Contact email *', 'careers@bukidnondigital.ph');
 
-        await tester.tap(find.text('Post job'));
+        await tester.tap(find.text('Save draft'));
         await tester.pumpAndSettle();
         expect(service.addedJobs.length, 1);
         expect(service.addedJobs.single.jobTitle, 'QA Automation Engineer');
+        expect(service.addedJobs.single.status, 'draft');
+
+        Finder tab(String label) => find.descendant(
+          of: find.byType(AdminSaaSTabs),
+          matching: find.text(label),
+        );
+
+        // Drafts are on the Draft tab (default view is Active).
+        await tester.tap(tab('Draft'));
+        await tester.pumpAndSettle();
         expect(find.text('QA Automation Engineer'), findsOneWidget);
 
         Finder menuFor(String title) => find.descendant(
@@ -423,12 +498,26 @@ void main() {
           matching: find.byTooltip('Job actions'),
         );
 
-        // Archive newly created job ('QA Automation Engineer').
+        // Post the draft, then archive from Active.
+        await tester.tap(menuFor('QA Automation Engineer'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Post'));
+        await tester.pumpAndSettle();
+        expect(service.publishedIds.length, 1);
+        expect(find.text('Job posted'), findsOneWidget);
+
+        await tester.tap(tab('Active'));
+        await tester.pumpAndSettle();
+        expect(find.text('QA Automation Engineer'), findsOneWidget);
+
         await tester.tap(menuFor('QA Automation Engineer'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Archive'));
         await tester.pumpAndSettle();
-        expect(service.updatedJobs.single.status, 'archived');
+        expect(find.text('Archive job?'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Archive'));
+        await tester.pumpAndSettle();
+        expect(service.archivedIds.length, 1);
         expect(find.text('Job archived'), findsOneWidget);
         expect(find.text('QA Automation Engineer'), findsNothing);
 

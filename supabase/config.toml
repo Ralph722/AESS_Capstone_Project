@@ -420,6 +420,9 @@ verify_jwt = false
 [functions.send-scheduled-sms]
 verify_jwt = false
 
+[functions.send-survey-reminder-sms]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

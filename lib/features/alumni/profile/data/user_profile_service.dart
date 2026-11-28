@@ -106,9 +106,9 @@ class UserProfileService {
         'id': profile.uid,
       });
       await _syncAlumniDirectory(synced);
-      // Only flag the Updates tab when fields actually changed (an unknown
-      // diff — previous profile unreadable — still flags, to be safe).
-      if (hasChanges) {
+      // Only flag the Updates tab for real post-onboarding edits (profile /
+      // tracer / survey). First-time onboarding must not look like a review.
+      if (hasChanges && isReviewEligibleProfileChangeSource(source)) {
         await AlumniMemberService().flagProfileUpdatedForAuthUid(profile.uid);
       }
     } catch (_) {
@@ -116,24 +116,27 @@ class UserProfileService {
     }
   }
 
+  /// Mirrors the saved live profile onto the alumni roster after onboarding.
+  /// Does **not** set [AlumniMember.hasProfileUpdates] — initial entry is not
+  /// a review-worthy update.
   Future<void> syncRosterFromSavedProfile(String uid) async {
     final profile = await getTracerProfile(uid);
     if (profile == null) return;
     try {
       await _syncAlumniDirectory(profile);
-      await AlumniMemberService().flagProfileUpdatedForAuthUid(uid);
     } catch (_) {}
   }
 
   /// Writes the diff audit row. Returns whether the member should be flagged
-  /// for admin review: true when fields changed, or when the previous
-  /// profile could not be read (diff unknown).
+  /// for admin review: true when review-eligible fields changed, or when the
+  /// previous profile could not be read on a review-eligible source.
   Future<bool> _logProfileChanges({
     required TracerProfile? before,
     required TracerProfile after,
     required String source,
   }) async {
-    if (before == null) return true;
+    final reviewEligible = isReviewEligibleProfileChangeSource(source);
+    if (before == null) return reviewEligible;
     final fields = tracerProfileFieldDiff(before, after);
     if (fields.isEmpty) return false;
     await AuditService().logAction(
@@ -146,7 +149,8 @@ class UserProfileService {
       changes: {'source': source, 'fields': fields},
       module: 'profile',
     );
-    return true;
+    // Onboarding still gets a timeline entry; it must not flag Updates.
+    return reviewEligible;
   }
 
   Future<void> saveProfileImageUrl({

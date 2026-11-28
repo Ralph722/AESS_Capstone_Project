@@ -302,7 +302,9 @@ class GtsReportChartView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final legend = data.series.length > 1 || data.type == GtsChartType.donut;
+    final pieOrDonut =
+        data.type == GtsChartType.donut || data.type == GtsChartType.pie;
+    final legend = data.series.length > 1 || pieOrDonut;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -310,13 +312,15 @@ class GtsReportChartView extends StatelessWidget {
           GtsChartType.horizontalBar => _HorizontalBars(data),
           GtsChartType.stackedBar => _StackedBars(data),
           GtsChartType.donut => SizedBox(height: 240, child: _Donut(data)),
+          GtsChartType.pie =>
+            SizedBox(height: 240, child: _Donut(data, pie: true)),
           GtsChartType.line => SizedBox(height: 280, child: _Line(data)),
           _ => SizedBox(height: 280, child: _VerticalBars(data)),
         },
         if (legend) ...[
           const SizedBox(height: 10),
           _Legend(
-            data.type == GtsChartType.donut
+            pieOrDonut
                 ? data.labels
                 : [for (final s in data.series) s.name],
           ),
@@ -385,8 +389,11 @@ class _Legend extends StatelessWidget {
   }
 }
 
+/// Percent charts always use a 0–100 scale so 45% reads as roughly half
+/// width (not nearly full against a ~50 max). Values above 100 (multi-select
+/// shares) expand the axis.
 double _niceMax(GtsChartData data) => data.isPercent
-    ? math.min(100, math.max(10, (data.maxValue / 10).ceil() * 10.0))
+    ? math.max(100, (data.maxValue / 10).ceil() * 10.0)
     : math.max(4, data.maxValue * 1.15);
 
 Widget _bottomLabel(List<String> labels, double value) {
@@ -547,9 +554,12 @@ class _Line extends StatelessWidget {
 }
 
 class _Donut extends StatelessWidget {
-  const _Donut(this.data);
+  const _Donut(this.data, {this.pie = false});
 
   final GtsChartData data;
+
+  /// When true, draw a filled pie (no center hole).
+  final bool pie;
 
   @override
   Widget build(BuildContext context) {
@@ -557,7 +567,7 @@ class _Donut extends StatelessWidget {
     final total = values.fold<double>(0, (s, v) => s + (v ?? 0));
     return PieChart(
       PieChartData(
-        centerSpaceRadius: 56,
+        centerSpaceRadius: pie ? 0 : 56,
         sectionsSpace: 2,
         sections: [
           for (var i = 0; i < values.length; i++)
@@ -565,7 +575,7 @@ class _Donut extends StatelessWidget {
               PieChartSectionData(
                 value: values[i],
                 color: _color(i),
-                radius: 44,
+                radius: pie ? 90 : 44,
                 title: total == 0 || values[i]! / total < 0.06
                     ? ''
                     : data.format(values[i]),

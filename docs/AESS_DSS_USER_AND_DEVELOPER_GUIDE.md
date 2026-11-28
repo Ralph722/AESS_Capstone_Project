@@ -445,8 +445,10 @@ Source: `dss_finding_sync.dart` and the server equivalent in `dss_evaluate_all`.
 | An older wave's result when a newer wave checked this finding | Skipped | `newer_wave` |
 | Finding was closed in this wave | Not raised again | `closed_in_wave` |
 | Finding was superseded in this wave | Not raised again | `superseded_in_wave` |
+| Sticky rule (`TIME_TO_JOB_LONG`) already raised for this course×batch on an earlier wave | Not re-raised (Q29 is a historical first-job fact); original Open stays active | `sticky_prior_finding` |
+| Sticky rule prior wave was only Watch; this wave reaches Finding | Raise Finding; prior Watch may be superseded | `finding` / `superseded` |
 | Fewer than 5 valid answers | Not raised | `not_enough_data` |
-| Older wave's Open/Watch flag | Superseded, linked to the newer flag if any | `superseded` outcome |
+| Older wave's Open/Watch flag | Superseded, linked to the newer flag if any (not for sticky Open held by `sticky_prior_finding`) | `superseded` outcome |
 
 ### 6.5 End-to-end hypothetical example
 

@@ -124,4 +124,17 @@ abstract final class GtsListTemplates {
     }
     return null;
   }
+
+  /// Prefix for user-saved list templates in [GtsListConfig.templateKey].
+  static const savedKeyPrefix = 'saved:';
+
+  static String savedKey(String reportId) => '$savedKeyPrefix$reportId';
+
+  static String? savedReportId(String? templateKey) {
+    if (templateKey == null || !templateKey.startsWith(savedKeyPrefix)) {
+      return null;
+    }
+    final id = templateKey.substring(savedKeyPrefix.length);
+    return id.isEmpty ? null : id;
+  }
 }

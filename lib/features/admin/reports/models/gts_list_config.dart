@@ -54,6 +54,8 @@ enum GtsListChart {
   /// Vertical bars.
   verticalBars,
   donut,
+  /// Filled pie (no center hole).
+  pie,
 }
 
 /// An alumni list definition: one row per alumnus on the alumni list.
@@ -168,6 +170,7 @@ class GtsListConfig {
     bool? includeTally,
     bool? includeUntracked,
     String? templateKey,
+    bool clearTemplateKey = false,
     String? title,
     String? description,
   }) => GtsListConfig(
@@ -185,7 +188,7 @@ class GtsListConfig {
     includeTable: includeTable ?? this.includeTable,
     includeTally: includeTally ?? this.includeTally,
     includeUntracked: includeUntracked ?? this.includeUntracked,
-    templateKey: templateKey ?? this.templateKey,
+    templateKey: clearTemplateKey ? null : (templateKey ?? this.templateKey),
     title: title ?? this.title,
     description: description ?? this.description,
   );

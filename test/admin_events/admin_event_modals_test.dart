@@ -282,11 +282,11 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('New event'), findsOneWidget);
-      expect(find.text('Publish'), findsOneWidget);
+      expect(find.text('Save draft'), findsOneWidget);
       expect(find.text('Untitled event'), findsOneWidget);
       expect(find.textContaining('09/20/2026'), findsWidgets);
 
-      await tester.tap(find.text('Publish'));
+      await tester.tap(find.text('Save draft'));
       await tester.pump();
 
       expect(find.text('Please fill all required fields'), findsOneWidget);

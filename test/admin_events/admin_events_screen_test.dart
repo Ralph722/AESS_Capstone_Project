@@ -62,6 +62,7 @@ void main() {
     expect(headerWidget.countBadge, isNull);
     expect(headerWidget.subtitle, isNull);
     expect(find.text('Active'), findsWidgets);
+    expect(find.text('Draft'), findsWidgets);
     expect(find.text('Archived'), findsWidgets);
     expect(find.text('Calendar'), findsOneWidget);
     expect(find.text('List'), findsNothing);

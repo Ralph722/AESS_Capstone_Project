@@ -1,6 +1,7 @@
 import 'package:alumni_system/core/services/audit_events.dart';
 import 'package:alumni_system/features/admin/ched_gts_pdf_export/ched_gts_answer_assembler.dart';
 import 'package:alumni_system/features/admin/ched_gts_pdf_export/individual_info_sheet_pdf.dart';
+import 'package:alumni_system/features/alumni/membership/data/alumni_membership_form_service.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,6 +14,63 @@ void main() {
       AuditActions.downloadMembershipForm,
       isNot(AuditActions.exportIndividualInfoPdf),
     );
+  });
+
+  group('Profile re-download window', () {
+    final downloaded = DateTime.utc(2026, 11, 1, 12);
+
+    test('hidden when never downloaded', () {
+      expect(
+        AlumniMembershipFormService.isProfileDownloadAvailable(null),
+        isFalse,
+      );
+      expect(AlumniMembershipFormService.profileDaysRemaining(null), 0);
+    });
+
+    test('available within 30 days', () {
+      final now = downloaded.add(const Duration(days: 10));
+      expect(
+        AlumniMembershipFormService.isProfileDownloadAvailable(
+          downloaded,
+          now: now,
+        ),
+        isTrue,
+      );
+      expect(
+        AlumniMembershipFormService.profileDaysRemaining(downloaded, now: now),
+        20,
+      );
+    });
+
+    test('still available on the last day', () {
+      final now = downloaded.add(const Duration(days: 29, hours: 23));
+      expect(
+        AlumniMembershipFormService.isProfileDownloadAvailable(
+          downloaded,
+          now: now,
+        ),
+        isTrue,
+      );
+      expect(
+        AlumniMembershipFormService.profileDaysRemaining(downloaded, now: now),
+        1,
+      );
+    });
+
+    test('hidden after the window ends', () {
+      final now = downloaded.add(const Duration(days: 30, seconds: 1));
+      expect(
+        AlumniMembershipFormService.isProfileDownloadAvailable(
+          downloaded,
+          now: now,
+        ),
+        isFalse,
+      );
+      expect(
+        AlumniMembershipFormService.profileDaysRemaining(downloaded, now: now),
+        0,
+      );
+    });
   });
 
   test('live-profile assemble + Membership Form PDF is non-empty', () async {

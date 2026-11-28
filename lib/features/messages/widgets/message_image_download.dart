@@ -1,16 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
-import 'package:alumni_system/core/utils/export_platform.dart';
-import 'package:alumni_system/core/utils/web_file_download.dart';
+import 'package:alumni_system/core/utils/image_file_delivery.dart';
 import 'package:alumni_system/features/messages/data/image_storage_service.dart';
 
-/// Downloads a chat attachment (web file save) or opens it (mobile).
+/// Downloads a chat attachment to the gallery (or share sheet / browser).
 Future<void> downloadMessageImage({
   required BuildContext context,
   required String imageUrl,
@@ -45,55 +42,22 @@ Future<void> downloadMessageImage({
       }
     }
 
-    if (kIsWeb) {
-      if (!context.mounted) return;
-      final ok = tryDownloadBytesOnWeb(
-        context,
-        bytes: bytes,
-        fileName: _fileNameForMime(fileName, mime),
-        mimeType: mime,
-      );
-      if (!ok || !context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Image downloaded'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    // Mobile / desktop: open the image URL when remote; otherwise save via web-only path.
-    if (!imageUrl.startsWith('data:')) {
-      final uri = Uri.tryParse(
-        await ImageStorageService.resolveMessageImageUrl(imageUrl),
-      );
-      if (uri != null && await canLaunchUrl(uri)) {
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-        if (launched) return;
-      }
-    }
-
     if (!context.mounted) return;
-    // Fallback: still try browser download helper when available.
-    if (isWebFileDownloadSupported) {
-      downloadBytesOnWeb(
-        bytes: bytes,
-        fileName: _fileNameForMime(fileName, mime),
-        mimeType: mime,
-      );
-      return;
-    }
+    final box = context.findRenderObject() as RenderBox?;
+    final result = await shareOrSaveImageBytes(
+      bytes: bytes,
+      fileName: imageFileNameForMime(fileName, mime),
+      mimeType: mime,
+      sharePositionOrigin: box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size,
+    );
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Download is available in the web portal. '
-          'Open the image and save it from your browser.',
-        ),
-        duration: Duration(seconds: 4),
+      SnackBar(
+        content: Text(result.successMessage),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   } catch (_) {
@@ -102,19 +66,4 @@ Future<void> downloadMessageImage({
       const SnackBar(content: Text('Could not download image')),
     );
   }
-}
-
-String _fileNameForMime(String base, String mime) {
-  final lower = base.toLowerCase();
-  if (lower.endsWith('.jpg') ||
-      lower.endsWith('.jpeg') ||
-      lower.endsWith('.png') ||
-      lower.endsWith('.webp') ||
-      lower.endsWith('.gif')) {
-    return base;
-  }
-  if (mime.contains('png')) return '$base.png';
-  if (mime.contains('webp')) return '$base.webp';
-  if (mime.contains('gif')) return '$base.gif';
-  return base.endsWith('.jpg') ? base : '$base.jpg';
 }

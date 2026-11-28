@@ -205,7 +205,7 @@ void main() {
       );
     });
 
-    test('the status chart counts each tally line', () {
+    test('the status chart uses share percents for each tally line', () {
       GtsAlumniListResult build(GtsListChart chart) => GtsAlumniList.build(
         GtsListConfig(surveyId: 'w2', chart: chart),
         roster: _roster,
@@ -214,9 +214,10 @@ void main() {
       );
       final bars = GtsListTables.charts(build(GtsListChart.bars)).single;
       expect(bars.type, GtsChartType.horizontalBar);
+      expect(bars.isPercent, isTrue);
       expect(bars.title, 'Tracer coverage');
       expect(bars.labels.first, 'Answered');
-      expect(bars.series.single.values, [3, 1, 1]);
+      expect(bars.series.single.values, [60.0, 20.0, 20.0]);
       expect(
         GtsListTables.charts(build(GtsListChart.verticalBars)).single.type,
         GtsChartType.bar,
@@ -225,7 +226,16 @@ void main() {
         GtsListTables.charts(build(GtsListChart.donut)).single.type,
         GtsChartType.donut,
       );
+      expect(
+        GtsListTables.charts(build(GtsListChart.pie)).single.type,
+        GtsChartType.pie,
+      );
       expect(GtsListTables.charts(build(GtsListChart.none)), isEmpty);
+    });
+
+    test('pie chart choice round-trips in list config', () {
+      const config = GtsListConfig(surveyId: 'w2', chart: GtsListChart.pie);
+      expect(GtsListConfig.fromJson(config.toJson()).chart, GtsListChart.pie);
     });
   });
 
@@ -385,11 +395,12 @@ void main() {
         loader: (ids) async => const [],
       );
       const pageSize = GtsAlumniListPreview.previewPageSize;
+      expect(pageSize, 10);
       expect(find.text('Showing 1–$pageSize of 450'), findsOneWidget);
-      expect(find.text('Page 1 of 9'), findsOneWidget);
+      expect(find.text('Page 1 of 45'), findsOneWidget);
       expect(find.text('0 of 450'), findsOneWidget);
       expect(_inTable('Graduate 000'), findsOneWidget);
-      expect(_inTable('Graduate 050'), findsNothing);
+      expect(_inTable('Graduate 010'), findsNothing);
 
       final next = find.byTooltip('Next page');
       await tester.ensureVisible(next);
@@ -399,9 +410,9 @@ void main() {
         find.text('Showing ${pageSize + 1}–${pageSize * 2} of 450'),
         findsOneWidget,
       );
-      expect(find.text('Page 2 of 9'), findsOneWidget);
+      expect(find.text('Page 2 of 45'), findsOneWidget);
       expect(_inTable('Graduate 000'), findsNothing);
-      expect(_inTable('Graduate 050'), findsOneWidget);
+      expect(_inTable('Graduate 010'), findsOneWidget);
       expect(find.text('0 of 450'), findsOneWidget);
     });
 

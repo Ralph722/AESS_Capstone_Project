@@ -113,6 +113,7 @@ class Announcement {
     bool? notifyPush,
     bool? urgent,
     DateTime? publishedAt,
+    bool clearPublishedAt = false,
     int? recipientCount,
   }) {
     return Announcement(
@@ -129,7 +130,7 @@ class Announcement {
       urgent: urgent ?? this.urgent,
       createdBy: createdBy,
       createdAt: createdAt,
-      publishedAt: publishedAt ?? this.publishedAt,
+      publishedAt: clearPublishedAt ? null : (publishedAt ?? this.publishedAt),
       recipientCount: recipientCount ?? this.recipientCount,
     );
   }

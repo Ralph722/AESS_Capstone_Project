@@ -202,18 +202,24 @@ abstract final class GtsListExportService {
     final charts = GtsListTables.charts(result);
     final wide = headers.length > pdfWideColumns;
     final fontSize = wide ? 6.0 : 7.5;
+    // Portrait by default (full A4 height). Landscape only when the table is
+    // too wide for portrait columns — matching summary-report PDF behaviour.
+    final pageFormat =
+        wide ? PdfPageFormat.a4.landscape : PdfPageFormat.a4;
+    final margin =
+        wide ? AessPdfTheme.pageMarginLandscape : AessPdfTheme.pageMargin;
     final pdf = pw.Document();
 
     pdf.addPage(
       pw.MultiPage(
         maxPages: 400,
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: AessPdfTheme.pageMarginLandscape,
+        pageFormat: pageFormat,
+        margin: margin,
         header: (ctx) => AessPdfHeader.build(
           title: safe(GtsListTables.title(result)),
           subtitle: 'CHED Graduate Tracer Study Alumni Directory',
           classification: 'CONFIDENTIAL',
-          isLandscape: true,
+          isLandscape: wide,
         ),
         footer: (ctx) => AessPdfFooter.build(
           ctx,
@@ -429,11 +435,14 @@ abstract final class GtsListExportService {
   );
 
   static List<pw.Widget> _withHeading(String title, List<pw.Widget> body) => [
-    pw.Container(
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [_section(title), ?body.firstOrNull],
-      ),
+    pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _section(title),
+        // Extra gap under the section rule so charts are not flush to it.
+        pw.SizedBox(height: 10),
+        if (body.isNotEmpty) body.first,
+      ],
     ),
     ...body.skip(1),
   ];

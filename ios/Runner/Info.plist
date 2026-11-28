@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>AESS saves cover photos and chat images you choose to download.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AESS saves cover photos and chat images you choose to download.</string>
 </dict>
 </plist>

@@ -141,8 +141,25 @@ class DssFindingPlan {
 /// newer wave checked the same finding, older open and Watch flags are
 /// superseded and older waves are not raised again. In-progress flags are
 /// never moved or superseded.
+///
+/// Sticky once-per-cohort rules ([isStickyOncePerCohortRule], currently
+/// `TIME_TO_JOB_LONG`) are different: Q29 is a historical first-job fact, so
+/// a later tracer must not reopen the same course×batch. Prior Open /
+/// In progress / Closed / Superseded on another wave suppresses a new raise;
+/// a prior Watch alone may still upgrade to a Finding.
 class DssFindingSync {
   DssFindingSync._();
+
+  /// Rules that should raise at most once per finding key across tracer waves
+  /// (except Watch → Finding upgrades).
+  static bool isStickyOncePerCohortRule(String ruleId) =>
+      ruleId == 'TIME_TO_JOB_LONG';
+
+  static String? ruleIdFromFindingKey(String findingKey) {
+    final pipe = findingKey.indexOf('|');
+    if (pipe <= 0) return null;
+    return findingKey.substring(0, pipe);
+  }
 
   static DssFindingPlan plan({
     required List<Map<String, dynamic>> rows,
@@ -177,17 +194,23 @@ class DssFindingSync {
     }
 
     final byWave = <String, List<DssStoredFlag>>{};
+    final byKey = <String, List<DssStoredFlag>>{};
     for (final f in stored) {
       byWave.putIfAbsent('${f.findingKey}@${f.surveyId}', () => []).add(f);
+      byKey.putIfAbsent(f.findingKey, () => []).add(f);
     }
 
     final inserts = <DssFlagInsert>[];
     final updates = <DssFlagUpdate>[];
     final events = <DssEvaluationEvent>[];
+    // Sticky keys that kept an older Open/In progress instead of re-raising.
+    final stickyHeldKeys = <String>{};
 
     for (final row in rows) {
       final key = keyOfRow(row);
       final surveyId = row['survey_id'].toString();
+      final ruleId = row['rule_id']?.toString() ?? '';
+      final sticky = isStickyOncePerCohortRule(ruleId);
       final older = isOlder(key, surveyId);
       final here = byWave['$key@$surveyId'] ?? const <DssStoredFlag>[];
       final active = here.where((f) => _isActive(f.status)).firstOrNull;
@@ -237,6 +260,14 @@ class DssFindingSync {
         events.add(event('suppressed', 'superseded_in_wave'));
       } else if (here.isNotEmpty) {
         events.add(event('suppressed', 'closed_in_wave'));
+      } else if (sticky &&
+          _stickyPriorBlocksRaise(
+            prior: byKey[key] ?? const [],
+            currentSurveyId: surveyId,
+            desired: desired,
+          )) {
+        stickyHeldKeys.add(key);
+        events.add(event('suppressed', 'sticky_prior_finding'));
       } else {
         inserts.add((
           row: row,
@@ -268,7 +299,13 @@ class DssFindingSync {
       for (final f in stored)
         if ((f.status == DssFlagStatus.open ||
                 f.status == DssFlagStatus.watch) &&
-            isOlder(f.findingKey, f.surveyId))
+            isOlder(f.findingKey, f.surveyId) &&
+            !_stickyBlocksSupersede(
+              findingKey: f.findingKey,
+              from: f.status,
+              stickyHeldKeys: stickyHeldKeys,
+              inserts: inserts,
+            ))
           (
             id: f.id,
             findingKey: f.findingKey,
@@ -283,6 +320,57 @@ class DssFindingSync {
       supersedes: supersedes,
       events: events,
     );
+  }
+
+  /// Prior flags on other waves that should block a new sticky raise.
+  /// Watch-only priors still allow a Finding upgrade on a later wave.
+  static bool _stickyPriorBlocksRaise({
+    required List<DssStoredFlag> prior,
+    required String currentSurveyId,
+    required DssFlagStatus desired,
+  }) {
+    final other = prior.where((f) => f.surveyId != currentSurveyId).toList();
+    if (other.isEmpty) return false;
+
+    final hasBlocking = other.any(
+      (f) =>
+          f.status == DssFlagStatus.open ||
+          f.status == DssFlagStatus.inProgress ||
+          f.status == DssFlagStatus.resolved ||
+          f.status == DssFlagStatus.dismissed ||
+          f.status == DssFlagStatus.superseded,
+    );
+    if (hasBlocking) return true;
+
+    // Only Watch (or other non-blocking) on prior waves: allow Finding raise.
+    final onlyWatch = other.every((f) => f.status == DssFlagStatus.watch);
+    if (onlyWatch && desired == DssFlagStatus.open) return false;
+    // Prior Watch + desired Watch: no need to re-raise.
+    return onlyWatch;
+  }
+
+  /// Sticky Open/In progress should stay the active work item; do not
+  /// supersede them when the newer wave was only suppressed. Watch may still
+  /// be superseded when a Finding is raised on a later wave.
+  static bool _stickyBlocksSupersede({
+    required String findingKey,
+    required DssFlagStatus from,
+    required Set<String> stickyHeldKeys,
+    required List<DssFlagInsert> inserts,
+  }) {
+    final ruleId = ruleIdFromFindingKey(findingKey);
+    if (ruleId == null || !isStickyOncePerCohortRule(ruleId)) return false;
+    if (stickyHeldKeys.contains(findingKey)) {
+      // Newer wave suppressed: keep older Open; Watch can stay too.
+      return true;
+    }
+    final raisedOnNewer = inserts.any(
+      (i) => keyOfRow(i.row) == findingKey,
+    );
+    // Watch → Finding upgrade on newer wave: allow supersede of Watch.
+    if (from == DssFlagStatus.watch && raisedOnNewer) return false;
+    // Sticky Open without a newer insert: do not clear it away.
+    return from == DssFlagStatus.open;
   }
 
   static String keyOfRow(Map<String, dynamic> row) => dssFindingKey(

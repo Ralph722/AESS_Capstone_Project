@@ -583,11 +583,10 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
   }
 
   Widget _buildBuiltinLockCallout() {
-    final version = _survey?.schemaVersion ?? '?';
     return SurveyCallout(
       tone: SurveyCalloutTone.info,
       icon: Icons.lock_outline,
-      title: 'Official CHED GTS (built-in v$version)',
+      title: 'Official CHED GTS',
       body:
           'Question wording is locked to the official template with skip logic. '
           'Set audience below, then Publish — alumni answer it inline on Tracer. '
@@ -1590,31 +1589,91 @@ class _AdminSurveyEditorScreenState extends State<AdminSurveyEditorScreen> {
     required String clearTooltip,
     required VoidCallback onClear,
   }) {
-    return Row(
+    final hasValue = value != null;
+    final display = hasValue
+        ? DateFormat.yMMMd().add_jm().format(value)
+        : emptyText;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: DirectoryDateFilterChip(
-            label: label,
-            expand: true,
-            width: null,
-            displayText: value == null
-                ? emptyText
-                : DateFormat.yMMMd().add_jm().format(value),
-            active: value != null,
-            onTap: onPick,
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AdminColors.textSecondary,
           ),
         ),
-        if (value != null) ...[
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: clearTooltip,
-            onPressed: onClear,
-            icon: const Icon(Icons.close, size: 18),
-            style: IconButton.styleFrom(
-              foregroundColor: AdminColors.textSecondary,
+        const SizedBox(height: 6),
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusSm),
+          child: InkWell(
+            onTap: onPick,
+            borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusSm),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AdminSurveyTheme.radiusSm),
+                border: Border.all(
+                  color: hasValue
+                      ? AdminSurveyTheme.primary.withValues(alpha: 0.35)
+                      : AdminSurveyTheme.border,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    size: 18,
+                    color: hasValue
+                        ? AdminSurveyTheme.primary
+                        : AdminColors.textMuted,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      display,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight:
+                            hasValue ? FontWeight.w600 : FontWeight.w500,
+                        color: hasValue
+                            ? AdminColors.textPrimary
+                            : AdminColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  if (hasValue)
+                    IconButton(
+                      tooltip: clearTooltip,
+                      onPressed: onClear,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      style: IconButton.styleFrom(
+                        foregroundColor: AdminColors.textSecondary,
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.only(right: 8),
+                      child: Icon(
+                        Icons.edit_calendar_outlined,
+                        size: 18,
+                        color: AdminColors.textMuted,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ],
     );
   }

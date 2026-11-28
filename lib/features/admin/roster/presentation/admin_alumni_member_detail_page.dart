@@ -17,6 +17,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_tab_bar.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/features/admin/roster/data/alumni_directory_detail_service.dart';
 import 'package:alumni_system/features/admin/activity/models/audit_log_model.dart';
+import 'package:alumni_system/features/alumni/profile/data/profile_change_diff.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 
 /// Inline admin panel: demographics, employment, and activity for one member.
@@ -164,30 +165,21 @@ class _AdminAlumniMemberDetailPanelState
   }
 
   /// Profile fields touched by the latest unreviewed change, used for the
-  /// "changed" markers in Profile info. Empty once reviewed.
+  /// "changed" markers in Profile info. Empty once reviewed. Ignores
+  /// onboarding-only audits so first portal entry does not light orange dots.
   Set<String> get _unreviewedChangedFields {
-    if (!_member.hasProfileUpdates) return const {};
     final logs = _detail?.activityLogs ?? const <AuditLog>[];
-    final keys = <String>{};
-    DateTime? latestProfileUpdateAt;
-    for (final log in logs) {
-      if (log.action != 'PROFILE_UPDATE') continue;
-      final fields = log.changes?['fields'];
-      if (fields is Map) {
-        keys.addAll(fields.keys.map((k) => k.toString()));
-      }
-      latestProfileUpdateAt = log.timestamp;
-      break;
-    }
-    for (final log in logs) {
-      if (log.action != 'NAME_CHANGE') continue;
-      if (latestProfileUpdateAt == null ||
-          !log.timestamp.isBefore(latestProfileUpdateAt)) {
-        keys.add('displayName');
-      }
-      break;
-    }
-    return keys;
+    return unreviewedChangedProfileFields(
+      hasProfileUpdates: _member.hasProfileUpdates,
+      logs: [
+        for (final log in logs)
+          (
+            action: log.action,
+            timestamp: log.timestamp,
+            changes: log.changes,
+          ),
+      ],
+    );
   }
 
   Future<Survey?> _cachedSurvey(String surveyId) {

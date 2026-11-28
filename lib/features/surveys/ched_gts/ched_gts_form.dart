@@ -631,80 +631,132 @@ class _Q20Recommendation extends StatelessWidget {
         ? 'Others: ${suggestion.specifyText}'
         : line;
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: PortalTheme.gold.withValues(alpha: 0.12),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(PortalTheme.radiusLg),
-        border: Border.all(color: PortalTheme.gold.withValues(alpha: 0.45)),
+        border: Border.all(
+          color: PortalTheme.navy.withValues(alpha: 0.25),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: PortalTheme.navy.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 1),
-                child: Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 16,
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
                   color: PortalTheme.navy,
+                  borderRadius: BorderRadius.circular(PortalTheme.radiusSm),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 14,
+                  color: PortalTheme.gold,
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Based on your job, your line of business may be:',
-                      style: PortalTheme.meta.copyWith(
-                        color: PortalTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      value,
-                      style: PortalTheme.cardTitle.copyWith(
-                        fontSize: 14,
-                        height: 1.3,
-                      ),
-                    ),
-                    if (suggestion.reason.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        suggestion.reason,
-                        style: PortalTheme.meta.copyWith(height: 1.35),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Text(
-                      'This is only a suggestion and might be wrong. Choose '
-                      'the option that matches what your company does.',
-                      style: PortalTheme.meta.copyWith(
-                        height: 1.35,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
+              const Expanded(
+                child: Text(
+                  'AI RECOMMENDATION FOR QUESTION 20',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: PortalTheme.navy,
+                  ),
                 ),
               ),
             ],
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onUse,
-              style: TextButton.styleFrom(
-                foregroundColor: PortalTheme.navy,
-                minimumSize: const Size(0, 36),
-                textStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: PortalTheme.navy.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+            ),
+            child: Text(
+              value,
+              style: PortalTheme.cardTitle.copyWith(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: PortalTheme.navyDeep,
+                height: 1.3,
+              ),
+            ),
+          ),
+          if (suggestion.reason.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.tips_and_updates_outlined,
+                    size: 13,
+                    color: PortalTheme.navyMid,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    suggestion.reason,
+                    style: PortalTheme.caption.copyWith(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: PortalTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Suggestion only · choose what best matches.',
+                  style: PortalTheme.caption.copyWith(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ),
-              child: const Text('Use this'),
-            ),
+              FilledButton.tonalIcon(
+                onPressed: onUse,
+                style: FilledButton.styleFrom(
+                  backgroundColor: PortalTheme.navy.withValues(alpha: 0.08),
+                  foregroundColor: PortalTheme.navy,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  minimumSize: const Size(0, 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(PortalTheme.radiusMd),
+                  ),
+                ),
+                icon: const Icon(Icons.check_rounded, size: 14),
+                label: const Text(
+                  'Use this',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -723,28 +775,39 @@ class _HelpMeAnswerPill extends StatelessWidget {
     return Material(
       color: Colors.white,
       shape: StadiumBorder(
-        side: BorderSide(color: PortalTheme.navy.withValues(alpha: 0.18)),
+        side: BorderSide(
+          color: PortalTheme.navy.withValues(alpha: 0.22),
+          width: 1.2,
+        ),
       ),
       child: InkWell(
         onTap: onPressed,
         customBorder: const StadiumBorder(),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.auto_awesome_rounded,
-                size: 15,
-                color: PortalTheme.navy,
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: PortalTheme.navy.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 13,
+                  color: PortalTheme.navy,
+                ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: PortalTheme.navy,
+                  letterSpacing: 0.1,
                 ),
               ),
             ],

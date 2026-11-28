@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -94,12 +93,13 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   late GtsListResponseLoader _load;
   late GtsListProfileLoader _loadProfiles;
   late GtsListConfig _config;
-  final _title = TextEditingController();
   late final Map<String, List<GtsListResponse>> _cache =
       widget.responseCache ?? {};
   bool _loading = false;
   bool _reloadAfterLoad = false;
   CustomReportFormat? _exporting;
+  bool _savingTemplate = false;
+  List<GtsSavedReport> _savedTemplates = const [];
 
   /// Excel first: it suits wide lists best.
   static const _downloadOrder = [
@@ -113,9 +113,8 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   String _explanation = '';
   final Map<String, TracerProfile> _profiles = {};
   final Set<String> _profileMiss = {};
-  bool _builderCollapsed = false;
 
-  /// Saved list the current settings were opened from or saved as.
+  /// Saved list template the current settings were opened from or saved as.
   late GtsSavedReport? _open = widget.initialOpen;
 
   void _setOpen(GtsSavedReport? report) {
@@ -126,18 +125,6 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   void _message(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
-  /// Settings differ from the opened saved list.
-  bool get _hasUnsavedChanges {
-    final open = _open;
-    if (open == null) return false;
-    try {
-      return jsonEncode(_config.copyWith(title: open.name).toJson()) !=
-          jsonEncode(open.listSettings.copyWith(title: open.name).toJson());
-    } on FormatException {
-      return true;
-    }
   }
 
   /// [config] with a wave that still exists: the newest when its own wave
@@ -156,6 +143,35 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     );
   }
 
+  Future<void> _loadSavedTemplates() async {
+    final store = widget.savedReports;
+    if (store == null) return;
+    try {
+      final list = await store.list();
+      if (!mounted) return;
+      setState(() {
+        _savedTemplates = [for (final r in list) if (r.isList) r];
+      });
+    } catch (_) {
+      if (!mounted) return;
+      _message('Saved templates could not be loaded.');
+    }
+  }
+
+  /// Keeps the ready-made dropdown in sync before a network refresh finishes.
+  List<GtsSavedReport> _withSavedTemplate(
+    List<GtsSavedReport> current,
+    GtsSavedReport saved,
+  ) {
+    final next = [
+      for (final r in current)
+        if (r.id != saved.id) r,
+      saved,
+    ];
+    next.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return next;
+  }
+
   void _openSaved(GtsSavedReport report) {
     final GtsListConfig settings;
     try {
@@ -165,10 +181,12 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
       return;
     }
     final (next, replaced) = _withKnownWave(
-      settings.copyWith(title: report.name),
+      settings.copyWith(
+        title: report.name,
+        templateKey: GtsListTemplates.savedKey(report.id),
+      ),
     );
     _setOpen(report);
-    _title.text = report.name;
     _update(next);
     if (replaced) {
       _message(
@@ -186,9 +204,108 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   }
 
   void _applyTemplate(GtsListTemplate template) {
-    final next = template.forWave(_config.surveyId);
-    _title.text = next.title;
-    _update(next);
+    _setOpen(null);
+    _update(template.forWave(_config.surveyId));
+  }
+
+  void _clearTemplate() {
+    _setOpen(null);
+    _update(_config.copyWith(clearTemplateKey: true, title: ''));
+  }
+
+  /// Only returns keys that exist in the ready-made dropdown items. Returning
+  /// a [saved:] key before it is in [_savedTemplates] crashes DropdownButton.
+  String? get _selectedTemplateKey {
+    final key = _config.templateKey;
+    if (key == null) return null;
+    if (GtsListTemplates.byKey(key) != null) return key;
+    final savedId = GtsListTemplates.savedReportId(key);
+    if (savedId != null &&
+        _savedTemplates.any((r) => r.id == savedId)) {
+      return key;
+    }
+    return null;
+  }
+
+  String? get _selectedTemplateSummary {
+    final key = _selectedTemplateKey;
+    if (key == null) return null;
+    if (GtsListTemplates.byKey(key) case final t?) return t.summary;
+    final id = GtsListTemplates.savedReportId(key);
+    if (id == null) return null;
+    for (final r in _savedTemplates) {
+      if (r.id == id) return 'Your saved list template.';
+    }
+    return null;
+  }
+
+  Future<void> _saveTemplate() async {
+    final store = widget.savedReports;
+    if (store == null || _savingTemplate) return;
+    final open = _open;
+    String name;
+    if (open == null) {
+      final suggested = _config.title.trim();
+      final asked = await showDialog<String>(
+        context: context,
+        builder: (_) => GtsSavedNameDialog(
+          initial: suggested,
+          title: 'Save Template',
+          subtitle:
+              'Name this list setup. It will appear under Ready-made list.',
+          fieldLabel: 'Template name *',
+          helperText: 'Saved templates are available to all administrators.',
+        ),
+      );
+      if (asked == null || !mounted) return;
+      name = asked;
+    } else {
+      name = open.name;
+    }
+    setState(() => _savingTemplate = true);
+    try {
+      var keyed = _config.copyWith(
+        title: name,
+        templateKey: open == null
+            ? null
+            : GtsListTemplates.savedKey(open.id),
+      );
+      var saved = await store.save(
+        id: open?.id,
+        name: name,
+        settings: keyed.toJson(),
+      );
+      if (open == null) {
+        keyed = keyed.copyWith(
+          templateKey: GtsListTemplates.savedKey(saved.id),
+        );
+        saved = await store.save(
+          id: saved.id,
+          name: name,
+          settings: keyed.toJson(),
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _open = saved;
+        _config = keyed;
+        _savedTemplates = _withSavedTemplate(_savedTemplates, saved);
+      });
+      widget.onOpenChanged?.call(saved);
+      widget.onConfigChanged?.call(keyed);
+      _message('Saved template "${saved.name}".');
+      await _loadSavedTemplates();
+    } on GtsSavedReportNameTaken catch (e) {
+      _message(
+        'A template named "${e.name}" already exists. Choose another name.',
+      );
+    } catch (_) {
+      _message(
+        'Could not save the template. Check your connection and try again.',
+      );
+    } finally {
+      if (mounted) setState(() => _savingTemplate = false);
+    }
   }
 
   Map<String, String> get _waveLabels => {
@@ -210,7 +327,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     _config = initial == null
         ? GtsListConfig(surveyId: widget.waves.firstOrNull?.id)
         : _withKnownWave(initial).$1;
-    _title.text = _config.title;
+    unawaited(_loadSavedTemplates());
     unawaited(_refresh());
   }
 
@@ -218,12 +335,9 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
   void didUpdateWidget(GtsAlumniListPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.roster, widget.roster)) unawaited(_refresh());
-  }
-
-  @override
-  void dispose() {
-    _title.dispose();
-    super.dispose();
+    if (!identical(oldWidget.savedReports, widget.savedReports)) {
+      unawaited(_loadSavedTemplates());
+    }
   }
 
   void _update(GtsListConfig next) {
@@ -452,8 +566,8 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     labelStyle: const TextStyle(fontSize: 12, color: AdminColors.textSecondary),
     isDense: true,
     filled: true,
-    fillColor: AdminColors.surface,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
       borderSide: const BorderSide(color: AdminColors.border),
@@ -557,28 +671,6 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
           ],
         ),
         const SizedBox(height: 8),
-        if (widget.savedReports case final store?) ...[
-          GtsSavedReportsBar(
-            store: store,
-            isList: true,
-            open: _open,
-            name: _title.text,
-            settingsNamed: (name) => _config.copyWith(title: name).toJson(),
-            canSave: true,
-            unsavedChanges: _hasUnsavedChanges,
-            onOpen: _openSaved,
-            onOpenOther: widget.onOpenSummary,
-            onSaved: (saved) {
-              _title.text = saved.name;
-              final next = _config.copyWith(title: saved.name);
-              setState(() => _config = next);
-              _setOpen(saved);
-              widget.onConfigChanged?.call(next);
-            },
-            onDeleted: () => _setOpen(null),
-          ),
-          const SizedBox(height: 14),
-        ],
         _stepCard(
           step: '1',
           title: 'Scope & Template',
@@ -588,7 +680,12 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
               key: ValueKey('wave-${_config.surveyId}'),
               initialValue: _config.surveyId,
               isExpanded: true,
-              dropdownColor: AdminColors.card,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AdminColors.textPrimary,
+              ),
               decoration: _input('Answers from'),
               items: [
                 for (final w in widget.waves)
@@ -616,35 +713,78 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                 ),
               ),
             const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              key: ValueKey('list-template-${_config.templateKey}'),
-              initialValue: GtsListTemplates.byKey(_config.templateKey)?.key,
-              isExpanded: true,
-              dropdownColor: AdminColors.card,
-              hint: const Text('Custom list'),
-              decoration: _input('Start from a ready-made list'),
-              items: [
-                for (final t in GtsListTemplates.all)
-                  DropdownMenuItem(
-                    value: t.key,
-                    child: Text(t.name, overflow: TextOverflow.ellipsis),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String?>(
+                    key: ValueKey(
+                      'list-template-$_selectedTemplateKey-'
+                      '${_savedTemplates.length}',
+                    ),
+                    initialValue: _selectedTemplateKey,
+                    isExpanded: true,
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AdminColors.textPrimary,
+                    ),
+                    decoration: _input('Start from a ready-made list'),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Custom list'),
+                      ),
+                      for (final t in GtsListTemplates.all)
+                        DropdownMenuItem(
+                          value: t.key,
+                          child: Text(t.name, overflow: TextOverflow.ellipsis),
+                        ),
+                      for (final r in _savedTemplates)
+                        DropdownMenuItem(
+                          value: GtsListTemplates.savedKey(r.id),
+                          child: Text(r.name, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (k) {
+                      if (k == null) {
+                        _clearTemplate();
+                        return;
+                      }
+                      if (GtsListTemplates.byKey(k) case final t?) {
+                        _applyTemplate(t);
+                        return;
+                      }
+                      final id = GtsListTemplates.savedReportId(k);
+                      for (final r in _savedTemplates) {
+                        if (r.id == id) {
+                          _openSaved(r);
+                          return;
+                        }
+                      }
+                    },
                   ),
+                ),
+                if (_selectedTemplateKey != null) ...[
+                  const SizedBox(width: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: IconButton(
+                      tooltip: 'Back to custom list',
+                      onPressed: _clearTemplate,
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      color: AdminColors.textSecondary,
+                    ),
+                  ),
+                ],
               ],
-              onChanged: (k) {
-                if (GtsListTemplates.byKey(k) case final t?) _applyTemplate(t);
-              },
             ),
-            if (GtsListTemplates.byKey(_config.templateKey) case final t?)
+            if (_selectedTemplateSummary case final summary?)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(t.summary, style: _muted),
+                child: Text(summary, style: _muted),
               ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _title,
-              decoration: _input('Report name (optional)'),
-              onChanged: (v) => _update(_config.copyWith(title: v)),
-            ),
           ],
         ),
         _stepCard(
@@ -686,13 +826,6 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
           subtitle: 'Filter by tracer status, course, batch, or answers',
           children: [
             _label('Tracer status'),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Text(
-                'These filters still use item 16. The Tracer status column shows Answered once a tracer is submitted.',
-                style: _muted,
-              ),
-            ),
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -775,6 +908,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
             _label('Subtotals'),
             Wrap(
               spacing: 6,
+              runSpacing: 6,
               children: [
                 for (final s in GtsListSubtotal.values)
                   ChoiceChip(
@@ -857,16 +991,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Turn the table, the tally, and the chart on or off separately. '
-              'Charts only, the table and tally only, or both, all export the same figures.',
-              style: _muted,
-            ),
             const SizedBox(height: 10),
             _label('Chart'),
             Wrap(
               spacing: 6,
+              runSpacing: 6,
               children: [
                 for (final c in GtsListChart.values)
                   ChoiceChip(
@@ -877,6 +1006,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                       GtsListChart.bars => 'Horizontal bars',
                       GtsListChart.verticalBars => 'Vertical bars',
                       GtsListChart.donut => 'Donut',
+                      GtsListChart.pie => 'Pie chart',
                     }),
                     labelStyle: TextStyle(
                       fontSize: 12,
@@ -900,6 +1030,28 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
             ),
           ],
         ),
+        if (widget.savedReports != null) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _savingTemplate
+                  ? null
+                  : () => unawaited(_saveTemplate()),
+              style: AdminButtonStyles.filled(),
+              icon: _savingTemplate
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined, size: 16),
+              label: Text(
+                _open == null ? 'Save template' : 'Save template changes',
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -952,6 +1104,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
         style: _muted,
       );
     }
+    final radius = BorderRadius.circular(AdminSurfaces.radiusSm);
     return ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -963,64 +1116,93 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
         keys.insert(to, keys.removeAt(from));
         _update(_config.copyWith(columns: keys));
       },
+      // Default drag proxy is a sharp Material rect; clip + round so the
+      // floating chip matches the resting card corners.
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            final t = Curves.easeInOut.transform(animation.value);
+            return Material(
+              elevation: 1 + 5 * t,
+              color: Colors.transparent,
+              shadowColor: const Color(0x330F172A),
+              surfaceTintColor: Colors.transparent,
+              borderRadius: radius,
+              clipBehavior: Clip.antiAlias,
+              child: child,
+            );
+          },
+          child: child,
+        );
+      },
       itemBuilder: (context, i) {
         final c = columns[i];
-        return Container(
+        return Padding(
           key: ValueKey(c.key),
-          margin: const EdgeInsets.only(bottom: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Material(
             color: AdminColors.surface,
-            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-            border: Border.all(color: AdminColors.border),
-          ),
-          child: Row(
-            children: [
-              ReorderableDragStartListener(
-                index: i,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                  child: Icon(
-                    Icons.drag_indicator,
-                    size: 16,
-                    color: AdminColors.textSecondary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Tooltip(
-                  message: c.description,
-                  child: Text(
-                    c.header,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AdminColors.textPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: radius,
+              side: const BorderSide(color: AdminColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  ReorderableDragStartListener(
+                    index: i,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                      child: Icon(
+                        Icons.drag_indicator,
+                        size: 16,
+                        color: AdminColors.textSecondary,
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ),
-              if (c.personal)
-                const Tooltip(
-                  message: 'Personal data',
-                  child: Padding(
-                    padding: EdgeInsets.only(right: 4),
-                    child: Icon(
-                      Icons.badge_outlined,
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Tooltip(
+                      message: c.description,
+                      child: Text(
+                        c.header,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AdminColors.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  if (c.personal)
+                    const Tooltip(
+                      message: 'Personal data',
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 4),
+                        child: Icon(
+                          Icons.badge_outlined,
+                          size: 16,
+                          color: AdminColors.warning,
+                        ),
+                      ),
+                    ),
+                  IconButton(
+                    tooltip: 'Remove column',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _removeColumn(columns, c.key),
+                    icon: const Icon(
+                      Icons.close,
                       size: 16,
-                      color: AdminColors.warning,
+                      color: AdminColors.textSecondary,
                     ),
                   ),
-                ),
-              IconButton(
-                  tooltip: 'Remove column',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => _removeColumn(columns, c.key),
-                  icon: const Icon(Icons.close, size: 16, color: AdminColors.textSecondary),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -1076,6 +1258,11 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
           initialValue: current,
           isExpanded: true,
           dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+          style: const TextStyle(
+            fontSize: 13,
+            color: AdminColors.textPrimary,
+          ),
           decoration: _input('Sort by'),
           items: [
             const DropdownMenuItem(
@@ -1176,6 +1363,12 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
                   key: ValueKey('answer-filter-$index-${filter.field}'),
                   initialValue: filter.field,
                   isExpanded: true,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AdminColors.textPrimary,
+                  ),
                   decoration: _input('Only graduates whose'),
                   items: [
                     for (final f in _answerFilterFields)
@@ -1258,22 +1451,32 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
 
   // ---- Layout -------------------------------------------------------------
 
-  Widget _card(Widget child) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: AdminColors.card,
-      borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
-      border: Border.all(color: AdminColors.border),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x060F172A),
-          blurRadius: 8,
-          offset: Offset(0, 2),
-        ),
-      ],
-    ),
-    child: child,
-  );
+  Widget _card(Widget child, {bool scroll = false}) {
+    final body = scroll
+        ? SizedBox.expand(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: child,
+            ),
+          )
+        : Padding(padding: const EdgeInsets.all(16), child: child);
+    return Container(
+      decoration: BoxDecoration(
+        color: AdminColors.card,
+        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
+        border: Border.all(color: AdminColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: body,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1291,24 +1494,34 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 1050;
-        final preview = _card(_previewArea(canToggleBuilder: true, isWide: isWide));
-
-        if (_builderCollapsed) {
-          return preview;
-        }
-
-        final settings = _card(_settings());
+        final bounded = constraints.hasBoundedHeight;
+        final settings = _card(_settings(), scroll: bounded);
+        final preview = _card(_previewArea(), scroll: bounded);
 
         if (!isWide) {
+          if (!bounded) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [settings, const SizedBox(height: 16), preview],
+            );
+          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [settings, const SizedBox(height: 16), preview],
+            children: [
+              Expanded(flex: 5, child: settings),
+              const SizedBox(height: 16),
+              Expanded(flex: 6, child: preview),
+            ],
           );
         }
+        // Stretch only when height is bounded (Reports tab viewport). In
+        // unbounded scroll hosts (tests / nested scroll), start-align.
         return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: bounded
+              ? CrossAxisAlignment.stretch
+              : CrossAxisAlignment.start,
           children: [
-            SizedBox(width: 300, child: settings),
+            SizedBox(width: 320, child: settings),
             const SizedBox(width: 16),
             Expanded(child: preview),
           ],
@@ -1353,7 +1566,7 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     }
   }
 
-  Widget _previewArea({bool canToggleBuilder = false, bool isWide = true}) {
+  Widget _previewArea() {
     final result = _result;
     final columnCount = GtsListColumns.displayColumns(_config).length;
     return Column(
@@ -1374,39 +1587,6 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
               'Preview',
               style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
             ),
-            if (canToggleBuilder) ...[
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: () => setState(() => _builderCollapsed = !_builderCollapsed),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: UstpColors.blue,
-                  side: BorderSide(
-                    color: _builderCollapsed
-                        ? UstpColors.blue.withValues(alpha: 0.3)
-                        : AdminColors.border,
-                  ),
-                  backgroundColor: _builderCollapsed
-                      ? UstpColors.blue.withValues(alpha: 0.06)
-                      : Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  minimumSize: const Size(0, 30),
-                  visualDensity: VisualDensity.compact,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-                  ),
-                ),
-                icon: Icon(
-                  _builderCollapsed
-                      ? Icons.tune_rounded
-                      : Icons.view_sidebar_outlined,
-                  size: 14,
-                ),
-                label: Text(
-                  _builderCollapsed ? 'Show builder' : 'Hide builder',
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
             const Spacer(),
             for (final f in _downloadOrder)
               Padding(
@@ -1504,67 +1684,45 @@ class _GtsAlumniListPanelState extends State<GtsAlumniListPanel> {
     showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: AdminColors.card,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
-          side: const BorderSide(color: AdminColors.border),
-        ),
+        backgroundColor: AdminDialogStandards.backgroundColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: AdminDialogStandards.elevation,
+        insetPadding: AdminDialogStandards.defaultInsetPadding,
+        shape: AdminDialogStandards.shape,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200, maxHeight: 850),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AdminColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(Icons.fullscreen_rounded, size: 20, color: AdminColors.primary),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            GtsListTables.title(result),
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AdminColors.textPrimary),
+                AdminModalHeader(
+                  title: GtsListTables.title(result),
+                  subtitle:
+                      'Full-screen preview · ${result.rows.length} records · '
+                      '${GtsListColumns.displayColumns(result.config).length} columns',
+                  icon: Icons.fullscreen_rounded,
+                  onClose: () => Navigator.of(ctx).pop(),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final f in _downloadOrder)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              unawaited(_download(f));
+                            },
+                            style: AdminButtonStyles.outlined(),
+                            icon: const Icon(Icons.download_outlined, size: 15),
+                            label: Text(f.label),
                           ),
-                          Text(
-                            'Full-screen preview · ${result.rows.length} records · ${GtsListColumns.displayColumns(result.config).length} columns',
-                            style: const TextStyle(fontSize: 12, color: AdminColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    for (final f in _downloadOrder)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            unawaited(_download(f));
-                          },
-                          style: AdminButtonStyles.outlined(),
-                          icon: const Icon(Icons.download_outlined, size: 15),
-                          label: Text(f.label),
                         ),
-                      ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Close full view',
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      icon: const Icon(Icons.close_rounded, size: 20, color: AdminColors.textSecondary),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 const Divider(height: 1, color: AdminColors.border),
                 const SizedBox(height: 12),
                 Expanded(
@@ -1595,7 +1753,11 @@ class GtsAlumniListPreview extends StatelessWidget {
     this.profileWarning,
   });
 
-  static const previewPageSize = GtsReportPreview.previewPageSize;
+  /// Default rows per page for the list preview (Directory stays at its own default).
+  static const previewPageSize = 10;
+
+  /// Page-size choices for this preview only.
+  static const previewPageSizeOptions = [10, 25, 50, 100];
 
   final GtsAlumniListResult result;
   final String explanation;
@@ -1829,50 +1991,68 @@ class _ListTableState extends State<_ListTable> {
             border: Border.all(color: AdminColors.border),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Scrollbar(
-            controller: _hScrollController,
-            thumbVisibility: true,
-            trackVisibility: true,
-            child: SingleChildScrollView(
-              controller: _hScrollController,
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: math.max(600, widget.columns.length * 130.0),
-                ),
-                child: DataTable(
-                  headingRowColor: const WidgetStatePropertyAll(AdminColors.surface),
-                  headingRowHeight: 38,
-                  dataRowMinHeight: 32,
-                  dataRowMaxHeight: 48,
-                  columnSpacing: 20,
-                  headingTextStyle: _headingStyle,
-                  dataTextStyle: _cellStyle,
-                  columns: [
-                    for (final c in widget.columns)
-                      DataColumn(
-                        label: Tooltip(message: c.description, child: Text(c.header)),
-                      ),
-                  ],
-                  rows: [
-                    for (final r in shown)
-                      DataRow(
-                        color: r.status.untracked
-                            ? const WidgetStatePropertyAll(_untrackedTint)
-                            : r.member == null
-                            ? const WidgetStatePropertyAll(AdminColors.surface)
-                            : null,
-                        cells: [
-                          for (final c in widget.columns)
-                            DataCell(
-                              _cell(GtsListColumns.cell(c, r, waveLabels: labels)),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final minWidth = math.max(
+                constraints.maxWidth,
+                math.max(600.0, widget.columns.length * 130.0),
+              );
+              return Scrollbar(
+                controller: _hScrollController,
+                thumbVisibility: true,
+                trackVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _hScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: minWidth),
+                    child: DataTable(
+                      headingRowColor:
+                          const WidgetStatePropertyAll(AdminColors.surface),
+                      headingRowHeight: 38,
+                      dataRowMinHeight: 32,
+                      dataRowMaxHeight: 48,
+                      columnSpacing: 20,
+                      headingTextStyle: _headingStyle,
+                      dataTextStyle: _cellStyle,
+                      columns: [
+                        for (final c in widget.columns)
+                          DataColumn(
+                            label: Tooltip(
+                              message: c.description,
+                              child: Text(c.header),
                             ),
-                        ],
-                      ),
-                  ],
+                          ),
+                      ],
+                      rows: [
+                        for (final r in shown)
+                          DataRow(
+                            color: r.status.untracked
+                                ? const WidgetStatePropertyAll(_untrackedTint)
+                                : r.member == null
+                                ? const WidgetStatePropertyAll(
+                                    AdminColors.surface,
+                                  )
+                                : null,
+                            cells: [
+                              for (final c in widget.columns)
+                                DataCell(
+                                  _cell(
+                                    GtsListColumns.cell(
+                                      c,
+                                      r,
+                                      waveLabels: labels,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
         if (rows.isNotEmpty) ...[
@@ -1881,6 +2061,7 @@ class _ListTableState extends State<_ListTable> {
             totalItems: rows.length,
             page: safePage,
             pageSize: _pageSize,
+            pageSizeOptions: GtsAlumniListPreview.previewPageSizeOptions,
             onPageChanged: (p) => setState(() => _page = p),
             onPageSizeChanged: (s) => setState(() {
               _pageSize = s;
@@ -2130,18 +2311,25 @@ class _GtsListColumnPickerState extends State<GtsListColumnPicker> {
                 prefixIcon: const Icon(Icons.search, size: 18),
                 hintText: 'Search, e.g. occupation or 16',
                 filled: true,
-                fillColor: AdminColors.surface,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
                   borderSide: const BorderSide(color: AdminColors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
                   borderSide: const BorderSide(color: AdminColors.border),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AdminColors.primary, width: 1.5),
+                  borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
+                  borderSide: const BorderSide(
+                    color: AdminColors.primary,
+                    width: 1.5,
+                  ),
                 ),
               ),
               onChanged: (_) => setState(() {}),

@@ -8,7 +8,6 @@ import 'package:alumni_system/features/admin/reports/models/report_catalog.dart'
 import 'package:alumni_system/features/admin/reports/models/report_filter_config.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
-import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 typedef ReportsPresetDownload =
@@ -18,6 +17,66 @@ typedef ReportsPresetDownload =
       required bool printPreview,
     });
 
+/// Title Case for Downloads card titles (first/last/principal words).
+String reportsDownloadTitleCase(String input) {
+  const small = {
+    'a',
+    'an',
+    'the',
+    'and',
+    'but',
+    'or',
+    'nor',
+    'for',
+    'on',
+    'at',
+    'to',
+    'from',
+    'by',
+    'of',
+    'in',
+    'with',
+    'as',
+    'vs',
+    'via',
+  };
+  final words = input.trim().split(RegExp(r'\s+'));
+  if (words.isEmpty) return input;
+  final last = words.length - 1;
+  return [
+    for (var i = 0; i < words.length; i++)
+      _titleCaseToken(words[i], forceCap: i == 0 || i == last, small: small),
+  ].join(' ');
+}
+
+String _titleCaseToken(
+  String raw, {
+  required bool forceCap,
+  required Set<String> small,
+}) {
+  if (raw.isEmpty) return raw;
+  if (raw.contains('-')) {
+    final parts = raw.split('-');
+    return [
+      for (var i = 0; i < parts.length; i++)
+        _titleCaseToken(
+          parts[i],
+          forceCap: forceCap || i == 0 || i == parts.length - 1,
+          small: small,
+        ),
+    ].join('-');
+  }
+  // Keep short all-caps tokens (CHED, GTS, KPI, PDF, …).
+  if (raw.length >= 2 &&
+      raw.length <= 5 &&
+      RegExp(r'^[A-Z0-9&]+$').hasMatch(raw)) {
+    return raw;
+  }
+  final lower = raw.toLowerCase();
+  if (!forceCap && small.contains(lower)) return lower;
+  return '${lower[0].toUpperCase()}${lower.substring(1)}';
+}
+
 /// Ready-to-download preset reports laid out as responsive download cards.
 class ReportsDownloadsPanel extends StatelessWidget {
   const ReportsDownloadsPanel({
@@ -26,7 +85,6 @@ class ReportsDownloadsPanel extends StatelessWidget {
     required this.rowCounts,
     required this.filterLabel,
     required this.chedWaveCount,
-    this.onClearFilters,
     this.busy = false,
     this.busyPresetId,
     this.fitHeight,
@@ -43,14 +101,10 @@ class ReportsDownloadsPanel extends StatelessWidget {
   /// Official CHED GTS waves with submitted responses.
   final int chedWaveCount;
 
-  /// Shown when a batch or course filter is set.
-  final VoidCallback? onClearFilters;
-
   final bool busy;
   final String? busyPresetId;
   final double? fitHeight;
 
-  static const double _barHeight = AdminDensity.buttonHeight; // 36px
   static const double _cardHeight = 275;
 
   /// Sections that honour the batch / course filters.
@@ -195,32 +249,17 @@ class ReportsDownloadsPanel extends StatelessWidget {
       },
     );
 
-    final chrome = <Widget>[
-      _scopeBar(),
-      const SizedBox(height: AdminReportsTheme.gutter),
-    ];
-
     final maxH = fitHeight;
     // When the page passes a viewport budget, bound the panel first — then
     // SingleChildScrollView inside Expanded is safe.
-    if (maxH != null && maxH.isFinite && maxH > _barHeight) {
+    if (maxH != null && maxH.isFinite && maxH > 0) {
       return SizedBox(
         height: maxH,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ...chrome,
-            Expanded(child: SingleChildScrollView(child: body)),
-          ],
-        ),
+        child: SingleChildScrollView(child: body),
       );
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [...chrome, body],
-    );
+    return body;
   }
 
   Widget _categoryHeader(ReportCatalogCategory category) {
@@ -289,73 +328,6 @@ class ReportsDownloadsPanel extends StatelessWidget {
       out.add(ids.sublist(i, i + size > ids.length ? ids.length : i + size));
     }
     return out;
-  }
-
-  Widget _scopeBar() {
-    final clear = onClearFilters;
-    return Container(
-      height: _barHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AdminColors.card,
-        borderRadius: BorderRadius.circular(AdminSurfaces.radiusMd),
-        border: Border.all(color: AdminColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x060F172A),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.filter_list_rounded,
-            size: 14,
-            color: UstpColors.blue,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Tooltip(
-              message:
-                  '${AessReportCatalog.downloadsIntro} '
-                  'Alumni list and employment extracts use these filters. '
-                  'Change them on the Tracer or Survey tab.',
-              waitDuration: const Duration(milliseconds: 500),
-              child: Text(
-                'Exports use: $filterLabel',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AdminColors.textPrimary,
-                ),
-              ),
-            ),
-          ),
-          if (clear != null) ...[
-            const SizedBox(width: 8),
-            TextButton.icon(
-              onPressed: clear,
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                foregroundColor: UstpColors.blue,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              ),
-              icon: const Icon(Icons.filter_alt_off_outlined, size: 14),
-              label: const Text(
-                'Clear filters',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 
   String _details(ReportsDownloadPreset preset) {
@@ -701,13 +673,16 @@ class ReportsDownloadCard extends StatelessWidget {
                 badge!,
               ],
               const Spacer(),
-              ReportsDetailsButton(title: preset.title, body: details),
+              ReportsDetailsButton(
+                title: reportsDownloadTitleCase(preset.title),
+                body: details,
+              ),
             ],
           ),
           const SizedBox(height: 10),
           // Title (maxLines: 2, softWrap: true)
           Text(
-            preset.title,
+            reportsDownloadTitleCase(preset.title),
             maxLines: 2,
             softWrap: true,
             overflow: TextOverflow.ellipsis,

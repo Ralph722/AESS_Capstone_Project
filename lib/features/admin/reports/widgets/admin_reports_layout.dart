@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
-import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 
 /// Design tokens for Reports & Analytics — mirrors the admin portal system.
@@ -500,7 +499,6 @@ class ReportsChartSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final detailsText = details?.trim();
     return Container(
       height: height,
       padding: padding,
@@ -542,8 +540,6 @@ class ReportsChartSurface extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (detailsText != null && detailsText.isNotEmpty)
-                  ReportsDetailsButton(title: title!, body: detailsText),
               ],
             ),
             if (subtitle != null && subtitle!.trim().isNotEmpty) ...[

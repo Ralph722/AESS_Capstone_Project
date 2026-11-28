@@ -6,19 +6,23 @@ import 'package:alumni_system/core/utils/pdf_safe_text.dart';
 import 'package:alumni_system/features/admin/reports/application/gts_report_chart.dart';
 import 'package:alumni_system/features/admin/reports/models/gts_report_config.dart';
 
-/// PDF drawing of [GtsChartData]. Bars are drawn horizontally so long CHED
-/// answers stay readable on paper; lines and donuts use the pdf charts.
+/// PDF drawing of [GtsChartData]. Vertical and horizontal bars match the
+/// on-screen chart type; lines and donuts/pies use the pdf chart widgets.
 abstract final class GtsReportPdfChart {
-  /// Bar charts come back one bar row per widget, so a long chart can
-  /// continue on the next page.
+  /// Bar charts come back one bar row/column group per widget so a long chart
+  /// can continue on the next page.
   static List<pw.Widget> build(GtsChartData data) {
+    final pieOrDonut =
+        data.type == GtsChartType.donut || data.type == GtsChartType.pie;
     final chart = switch (data.type) {
       GtsChartType.donut => _donut(data),
+      GtsChartType.pie => _donut(data, pie: true),
       GtsChartType.line when data.labels.length > 1 => _line(data),
       GtsChartType.stackedBar => _stacked(data),
+      GtsChartType.bar || GtsChartType.groupedBar => _verticalBars(data),
       _ => _bars(data),
     };
-    final legendNames = data.type == GtsChartType.donut
+    final legendNames = pieOrDonut
         ? [
             for (var i = 0; i < data.labels.length; i++)
               '${data.labels[i]} (${data.format(data.series.first.values[i])})',
@@ -26,9 +30,12 @@ abstract final class GtsReportPdfChart {
         : [for (final s in data.series) s.name];
     return [
       ...chart,
-      if (data.series.length > 1 || data.type == GtsChartType.donut) ...[
-        pw.SizedBox(height: 6),
-        _legend(legendNames),
+      if (data.series.length > 1 || pieOrDonut) ...[
+        pw.SizedBox(height: 8),
+        if (pieOrDonut)
+          pw.Center(child: _legend(legendNames))
+        else
+          _legend(legendNames),
       ],
       if (data.hasHiddenValues)
         pw.Padding(
@@ -55,7 +62,7 @@ abstract final class GtsReportPdfChart {
   static String _safe(String s) => PdfSafeText.sanitize(s);
 
   static double _max(GtsChartData data) => data.isPercent
-      ? math.min(100, math.max(10, (data.maxValue / 10).ceil() * 10.0))
+      ? math.max(100, (data.maxValue / 10).ceil() * 10.0)
       : math.max(4, (data.maxValue / 4).ceil() * 4.0);
 
   static pw.Widget _legend(List<String> names) => pw.Wrap(
@@ -89,6 +96,7 @@ abstract final class GtsReportPdfChart {
     );
   }
 
+  /// Horizontal bars (best for long category labels).
   static List<pw.Widget> _bars(GtsChartData data) {
     final max = _max(data);
     final single = data.series.length == 1;
@@ -139,6 +147,77 @@ abstract final class GtsReportPdfChart {
             ],
           ),
         ),
+    ];
+  }
+
+  /// Vertical column bars matching on-screen [GtsChartType.bar].
+  static List<pw.Widget> _verticalBars(GtsChartData data) {
+    final max = _max(data);
+    const chartHeight = 200.0;
+    final single = data.series.length == 1;
+    final barWidth = single
+        ? 28.0
+        : math.max(6.0, 28.0 / data.series.length);
+
+    return [
+      pw.SizedBox(
+        height: chartHeight + 48,
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            for (var i = 0; i < data.labels.length; i++)
+              pw.Expanded(
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 3),
+                  child: pw.Column(
+                    mainAxisAlignment: pw.MainAxisAlignment.end,
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          for (var s = 0; s < data.series.length; s++) ...[
+                            if (s > 0) pw.SizedBox(width: 2),
+                            pw.Column(
+                              mainAxisSize: pw.MainAxisSize.min,
+                              children: [
+                                pw.Text(
+                                  _safe(
+                                    data.format(data.series[s].values[i]),
+                                  ),
+                                  style: const pw.TextStyle(fontSize: 6.5),
+                                  textAlign: pw.TextAlign.center,
+                                ),
+                                pw.SizedBox(height: 2),
+                                pw.Container(
+                                  width: barWidth,
+                                  height: math.max(
+                                    2,
+                                    ((data.series[s].values[i] ?? 0) / max) *
+                                        chartHeight,
+                                  ),
+                                  color: single ? _color(i) : _color(s),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        _safe(data.labels[i]),
+                        style: const pw.TextStyle(fontSize: 7),
+                        textAlign: pw.TextAlign.center,
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     ];
   }
 
@@ -246,24 +325,40 @@ abstract final class GtsReportPdfChart {
     ];
   }
 
-  static List<pw.Widget> _donut(GtsChartData data) {
+  static List<pw.Widget> _donut(GtsChartData data, {bool pie = false}) {
     final values = data.series.first.values;
+    final total = values.fold<double>(0, (s, v) => s + (v ?? 0));
+    const size = 220.0;
     final datasets = <pw.Dataset>[
       for (var i = 0; i < values.length; i++)
         if ((values[i] ?? 0) > 0)
           pw.PieDataSet(
             value: values[i]!,
             color: _color(i),
-            innerRadius: 35,
-            legendPosition: pw.PieLegendPosition.none,
+            innerRadius: pie ? 0 : 48,
+            // Slice label (percent), matching the on-screen preview.
+            legend: total == 0 || values[i]! / total < 0.06
+                ? null
+                : _safe(data.format(values[i])),
+            legendPosition: total == 0 || values[i]! / total < 0.06
+                ? pw.PieLegendPosition.none
+                : pw.PieLegendPosition.inside,
+            legendStyle: pw.TextStyle(
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+              color: i == 3 || i == 5 ? PdfColors.grey800 : PdfColors.white,
+            ),
+            legendAlign: pw.TextAlign.center,
           ),
     ];
     if (datasets.isEmpty) return _bars(data);
     return [
-      pw.SizedBox(
-        height: 160,
-        width: 160,
-        child: pw.Chart(grid: pw.PieGrid(), datasets: datasets),
+      pw.Center(
+        child: pw.SizedBox(
+          height: size,
+          width: size,
+          child: pw.Chart(grid: pw.PieGrid(), datasets: datasets),
+        ),
       ),
     ];
   }

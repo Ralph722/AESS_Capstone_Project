@@ -156,7 +156,7 @@ void main() {
         section: GtsFormSection.personal,
       ),
     );
-    expect(label('Verified at registration'), findsOneWidget);
+    expect(label('Verified record · Read only'), findsOneWidget);
     expect(label('Maria Santos'), findsOneWidget);
     expect(label('From your alumni record'), findsNothing);
     expect(find.byIcon(Icons.lock_outline_rounded), findsWidgets);
@@ -172,7 +172,7 @@ void main() {
       ),
     );
     expect(label('maria@example.com'), findsOneWidget);
-    expect(label('Verified at registration'), findsOneWidget);
+    expect(label('Verified record · Read only'), findsOneWidget);
     expect(label('From your alumni record'), findsNothing);
     expect(find.byType(TextFormField), findsNWidgets(3));
   });

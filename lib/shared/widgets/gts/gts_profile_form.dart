@@ -91,8 +91,17 @@ class GtsProfileFormState {
   /// alone does not count; a cleared field is caught by validation).
   bool contactChanged(ContactChannel channel) {
     final now = currentContact(channel);
-    return now.isNotEmpty &&
-        !ContactNormalizer.same(channel, now, savedContact(channel));
+    if (now.isEmpty) return false;
+    final saved = savedContact(channel);
+    if (ContactNormalizer.same(channel, now, saved)) return false;
+    // Legacy / invalid mobiles won't normalize; digit compare so grouping
+    // alone (e.g. `088-123` vs `0881 23`) is not treated as an edit.
+    if (channel == ContactChannel.mobile) {
+      final nowDigits = PhMobileInputFormatter.digitsOnly(now);
+      final savedDigits = PhMobileInputFormatter.digitsOnly(saved);
+      if (nowDigits == savedDigits) return false;
+    }
+    return true;
   }
 
   void dispose() {
@@ -333,6 +342,7 @@ class GtsProfileFormFields extends StatelessWidget {
     this.section,
     this.showContactEmail = false,
     this.contactFooter,
+    this.contactSuffix,
   });
 
   final GtsProfileFormState state;
@@ -349,8 +359,11 @@ class GtsProfileFormFields extends StatelessWidget {
   final bool showContactEmail;
 
   /// Full-form mode: shown under the contact email and mobile fields
-  /// (verification status).
+  /// (pending / not-verified status). Verified state uses [contactSuffix].
   final Widget? Function(ContactChannel channel)? contactFooter;
+
+  /// Optional in-field suffix for contact email / mobile (e.g. Verified badge).
+  final Widget? Function(ContactChannel channel)? contactSuffix;
   final bool showEmploymentStatus;
   final bool enabled;
 
@@ -387,7 +400,7 @@ class GtsProfileFormFields extends StatelessWidget {
                 icon: Icons.person_outline,
                 label: GtsConstants.labelName,
                 value: state.savedDisplayName,
-                caption: 'Verified at registration',
+                caption: 'Verified record · Read only',
               )
             else
               _nameField(),
@@ -402,7 +415,7 @@ class GtsProfileFormFields extends StatelessWidget {
                 icon: Icons.email_outlined,
                 label: GtsConstants.labelEmail,
                 value: state.emailController.text.trim(),
-                caption: 'Verified at registration',
+                caption: 'Verified record · Read only',
               )
             else
               _emailField(),
@@ -420,7 +433,6 @@ class GtsProfileFormFields extends StatelessWidget {
                 icon: Icons.calendar_today_outlined,
                 label: GtsConstants.labelYearGraduated,
                 value: state.yearGraduatedController.text.trim(),
-                caption: 'Contact the alumni office to change this',
               )
             else
               _yearGraduatedField(),
@@ -505,7 +517,7 @@ class GtsProfileFormFields extends StatelessWidget {
     // Locked once a verified name is on file (empty record can still fill it).
     readOnly: state.savedDisplayName.isNotEmpty,
     helperText: state.savedDisplayName.isNotEmpty
-        ? 'Verified at registration'
+        ? 'Verified record · Read only'
         : _recordHint('displayName'),
   );
 
@@ -527,7 +539,7 @@ class GtsProfileFormFields extends StatelessWidget {
     helperText: showContactEmail
         ? 'Used to sign in'
         : emailReadOnly
-        ? 'Verified at registration'
+        ? 'Verified record · Read only'
         : null,
     keyboard: TextInputType.emailAddress,
   );
@@ -540,6 +552,7 @@ class GtsProfileFormFields extends StatelessWidget {
     helperText:
         'This is also how you sign in. Changing it needs a one-time code.',
     validator: (v) => _contactError(ContactChannel.email, v),
+    suffix: contactSuffix?.call(ContactChannel.email),
   );
 
   /// Required; a changed value must be one that can be verified.
@@ -547,6 +560,8 @@ class GtsProfileFormFields extends StatelessWidget {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'Required';
     if (channel == ContactChannel.mobile) {
+      // Profile mode: don't re-fail a legacy saved number until the user edits it.
+      if (showContactEmail && !state.contactChanged(channel)) return null;
       if (!ContactNormalizer.isPhilippineMobile(v)) {
         return ContactNormalizer.invalidMessage(channel);
       }
@@ -567,8 +582,7 @@ class GtsProfileFormFields extends StatelessWidget {
     keyboard: TextInputType.phone,
     required: false,
     hint: 'Optional — leave blank for N/A',
-    helperText: _recordHint('telephoneNumber') ??
-        'Landline or other contact. Saved as N/A if empty.',
+    helperText: _recordHint('telephoneNumber'),
   );
 
   Widget _mobileField() => _text(
@@ -579,6 +593,7 @@ class GtsProfileFormFields extends StatelessWidget {
     hint: '0917 123 4567',
     inputFormatters: const [PhMobileInputFormatter()],
     validator: (v) => _contactError(ContactChannel.mobile, v),
+    suffix: contactSuffix?.call(ContactChannel.mobile),
   );
 
   Widget _civilStatusField() => _dropdown(
@@ -736,7 +751,6 @@ class GtsProfileFormFields extends StatelessWidget {
         hint: 'Not set yet',
         icon: Icons.menu_book_outlined,
         readOnly: true,
-        helperText: 'Verified at registration',
       ),
     ),
   );
@@ -748,7 +762,6 @@ class GtsProfileFormFields extends StatelessWidget {
     minLines: 1,
     maxLines: 4,
     readOnly: true,
-    helperText: 'Verified at registration',
   );
 
   /// Graduation year: 4 digits, not after the current calendar year.
@@ -773,9 +786,6 @@ class GtsProfileFormFields extends StatelessWidget {
     hint: 'e.g. ${DateTime.now().year}',
     keyboard: TextInputType.number,
     readOnly: demographicReadOnly || state.yearLocked,
-    helperText: (demographicReadOnly || state.yearLocked)
-        ? 'Contact the alumni office to change this'
-        : null,
     inputFormatters: [
       FilteringTextInputFormatter.digitsOnly,
       LengthLimitingTextInputFormatter(4),
@@ -790,9 +800,10 @@ class GtsProfileFormFields extends StatelessWidget {
     label: GtsConstants.labelHonorsAwards,
     icon: Icons.emoji_events_outlined,
     required: false,
-    hint: 'Optional — leave blank for N/A',
-    helperText: _recordHint('honorsAwards') ??
-        'Honors or awards. Saved as N/A if empty.',
+    // Profile locks this with demographicReadOnly for now.
+    readOnly: demographicReadOnly,
+    hint: demographicReadOnly ? null : 'Optional — leave blank for N/A',
+    helperText: _recordHint('honorsAwards'),
   );
 
   Widget _employmentField() => Column(
@@ -1113,7 +1124,6 @@ class GtsProfileFormFields extends StatelessWidget {
             icon: Icons.menu_book_outlined,
             label: GtsConstants.labelDegreeSpecialization,
             value: program.isEmpty ? 'Not set yet' : program,
-            caption: 'Verified at registration',
             padBottom: !field.hasError,
           ),
           if (field.hasError) _fieldError(field.errorText!),
@@ -1130,7 +1140,6 @@ class GtsProfileFormFields extends StatelessWidget {
       icon: Icons.school_outlined,
       label: GtsConstants.labelCollegeUniversity,
       value: state.collegeController.text.trim(),
-      caption: 'Verified at registration',
     );
   }
 
@@ -1154,7 +1163,7 @@ class GtsProfileFormFields extends StatelessWidget {
     required IconData icon,
     required String label,
     required String value,
-    required String caption,
+    String? caption,
     bool padBottom = true,
   }) {
     return Padding(
@@ -1162,7 +1171,9 @@ class GtsProfileFormFields extends StatelessWidget {
         bottom: padBottom ? OnboardingSpacing.fieldGap : 0,
       ),
       child: Semantics(
-        label: '$label: $value. $caption',
+        label: caption == null || caption.isEmpty
+            ? '$label: $value'
+            : '$label: $value. $caption',
         child: ExcludeSemantics(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1188,8 +1199,10 @@ class GtsProfileFormFields extends StatelessWidget {
                           color: PortalTheme.navy,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(caption, style: PortalTheme.caption),
+                      if (caption != null && caption.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(caption, style: PortalTheme.caption),
+                      ],
                     ],
                   ),
                 ),
@@ -1287,6 +1300,7 @@ class GtsProfileFormFields extends StatelessWidget {
     bool required = true,
     FormFieldValidator<String>? validator,
     List<TextInputFormatter>? inputFormatters,
+    Widget? suffix,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: OnboardingSpacing.fieldGap),
@@ -1299,6 +1313,7 @@ class GtsProfileFormFields extends StatelessWidget {
         enabled: enabled,
         style: _fieldStyle,
         inputFormatters: inputFormatters,
+        onChanged: (enabled && !readOnly) ? (_) => onChanged() : null,
         validator:
             validator ??
             (required
@@ -1310,6 +1325,10 @@ class GtsProfileFormFields extends StatelessWidget {
           icon: icon,
           readOnly: readOnly,
           helperText: helperText,
+          suffixIcon: suffix,
+          suffixIconConstraints: suffix == null
+              ? null
+              : const BoxConstraints(minWidth: 0, minHeight: 0),
         ),
       ),
     );

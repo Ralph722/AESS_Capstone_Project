@@ -162,27 +162,52 @@ class AnnouncementService {
     );
   }
 
-  /// Restores an archived announcement to published (visible to alumni again).
-  Future<void> restoreAnnouncement(String id) async {
-    final item = await getAnnouncement(id);
-    if (item == null) throw Exception('Announcement not found');
-    if (item.status != AnnouncementStatus.archived) {
-      throw Exception('Only archived announcements can be restored');
-    }
-
-    final restored = item.copyWith(status: AnnouncementStatus.published);
-    await updateAnnouncement(restored, audit: false);
-    unawaited(
-      _audit.logAction(
-        action: AuditActions.restoreAnnouncement,
-        resource: 'Announcement',
-        resourceId: id,
-        description: 'Restored announcement: ${item.title}',
-        userRole: 'admin',
-        module: AuditModules.announcements,
-        targetLabel: item.title,
-      ),
+  /// Clones an announcement as a new draft (template only — no publish history).
+  Future<String> duplicateAnnouncement(String sourceId) async {
+    final source = await getAnnouncement(sourceId);
+    if (source == null) throw Exception('Announcement not found');
+    final userId = AppSession.requireUserId();
+    final baseTitle = source.title.trim().isEmpty
+        ? 'Untitled announcement'
+        : source.title.trim();
+    final copy = Announcement(
+      id: LocalId.generate(),
+      title: baseTitle.endsWith('(Copy)') ? baseTitle : '$baseTitle (Copy)',
+      body: source.body,
+      status: AnnouncementStatus.draft,
+      priority: source.priority,
+      targetPrograms: List<String>.from(source.targetPrograms),
+      targetBatchYears: List<String>.from(source.targetBatchYears),
+      notifyInApp: source.notifyInApp,
+      notifyEmail: source.notifyEmail,
+      notifyPush: source.notifyPush,
+      urgent: source.urgent,
+      createdBy: userId,
+      createdAt: DateTime.now(),
+      publishedAt: null,
+      recipientCount: 0,
     );
+    try {
+      await _supabase.from('announcements').upsert(
+            copy.toSupabaseRow(),
+            onConflict: 'id',
+          );
+      unawaited(
+        _audit.logAction(
+          action: AuditActions.duplicateAnnouncement,
+          resource: 'Announcement',
+          resourceId: copy.id,
+          description: 'Duplicated announcement as draft: ${copy.title}',
+          changes: {'sourceId': sourceId},
+          userRole: 'admin',
+          module: AuditModules.announcements,
+          targetLabel: copy.title,
+        ),
+      );
+    } catch (e) {
+      throw Exception('Error duplicating announcement: $e');
+    }
+    return copy.id;
   }
 
   Future<List<TracerProfile>> _fetchEligibleAlumni() async {

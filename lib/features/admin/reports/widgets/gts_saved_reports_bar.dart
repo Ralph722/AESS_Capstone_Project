@@ -109,7 +109,13 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
           : name;
       final asked = await showDialog<String>(
         context: context,
-        builder: (_) => _ReportNameDialog(initial: suggested),
+        builder: (_) => GtsSavedNameDialog(
+          initial: suggested,
+          title: 'Save Report',
+          subtitle: 'Enter a name for this custom GTS report.',
+          fieldLabel: 'Report name *',
+          helperText: 'Saved reports are available to all administrators.',
+        ),
       );
       if (asked == null || !mounted) return;
       name = asked;
@@ -312,17 +318,28 @@ class _GtsSavedReportsBarState extends State<GtsSavedReportsBar> {
   }
 }
 
-/// Asks for a saved report name; pops the trimmed name, or null.
-class _ReportNameDialog extends StatefulWidget {
-  const _ReportNameDialog({required this.initial});
+/// Asks for a name; pops the trimmed name, or null.
+class GtsSavedNameDialog extends StatefulWidget {
+  const GtsSavedNameDialog({
+    super.key,
+    required this.initial,
+    this.title = 'Save Report',
+    this.subtitle = 'Enter a name for this custom GTS report.',
+    this.fieldLabel = 'Report name *',
+    this.helperText = 'Saved reports are available to all administrators.',
+  });
 
   final String initial;
+  final String title;
+  final String subtitle;
+  final String fieldLabel;
+  final String helperText;
 
   @override
-  State<_ReportNameDialog> createState() => _ReportNameDialogState();
+  State<GtsSavedNameDialog> createState() => _GtsSavedNameDialogState();
 }
 
-class _ReportNameDialogState extends State<_ReportNameDialog> {
+class _GtsSavedNameDialogState extends State<GtsSavedNameDialog> {
   late final _name = TextEditingController(text: widget.initial);
 
   @override
@@ -349,8 +366,8 @@ class _ReportNameDialogState extends State<_ReportNameDialog> {
       title: Padding(
         padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
         child: AdminModalHeader(
-          title: 'Save Report',
-          subtitle: 'Enter a name for this custom GTS report.',
+          title: widget.title,
+          subtitle: widget.subtitle,
           icon: Icons.bookmark_add_outlined,
           onClose: () => Navigator.of(context).pop(),
         ),
@@ -368,8 +385,8 @@ class _ReportNameDialogState extends State<_ReportNameDialog> {
               autofocus: true,
               maxLength: 120,
               decoration: InputDecoration(
-                labelText: 'Report name *',
-                helperText: 'Saved reports are available to all administrators.',
+                labelText: widget.fieldLabel,
+                helperText: widget.helperText,
                 filled: true,
                 fillColor: AdminColors.surface,
                 border: OutlineInputBorder(

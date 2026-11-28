@@ -294,6 +294,8 @@ InputDecoration onboardingFieldDecoration({
   IconData? icon,
   bool readOnly = false,
   String? helperText,
+  Widget? suffixIcon,
+  BoxConstraints? suffixIconConstraints,
 }) {
   const mark = ' *';
   final hasMark = label.endsWith(mark);
@@ -314,6 +316,8 @@ InputDecoration onboardingFieldDecoration({
     prefixIcon: icon != null
         ? Icon(icon, color: PortalTheme.navy, size: 20)
         : null,
+    suffixIcon: suffixIcon,
+    suffixIconConstraints: suffixIconConstraints,
     filled: true,
     fillColor: readOnly ? PortalTheme.surfaceMuted : PortalTheme.card,
     labelStyle: const TextStyle(color: PortalTheme.textSecondary, fontSize: 14),

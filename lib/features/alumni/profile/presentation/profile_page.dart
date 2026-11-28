@@ -49,6 +49,8 @@ class ProfileScreenState extends State<ProfileScreen>
   var _cardLoading = true;
   var _showingCardBack = false;
   var _membershipFormBusy = false;
+  DateTime? _membershipFormDownloadedAt;
+  var _membershipFormMetaLoading = true;
   StreamSubscription<void>? _profileFieldsSub;
   StreamSubscription<String?>? _avatarSub;
 
@@ -80,7 +82,46 @@ class ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _loadHubData() async {
     if (!mounted) return;
-    await _loadCard();
+    await Future.wait([_loadCard(), _loadMembershipFormMeta()]);
+  }
+
+  Future<void> _loadMembershipFormMeta() async {
+    final userId = AppSession.userId;
+    if (userId == null) {
+      if (mounted) {
+        setState(() {
+          _membershipFormDownloadedAt = null;
+          _membershipFormMetaLoading = false;
+        });
+      }
+      return;
+    }
+    if (mounted) setState(() => _membershipFormMetaLoading = true);
+    final at = await _membershipFormService.fetchDownloadedAt(userId);
+    if (!mounted) return;
+    setState(() {
+      _membershipFormDownloadedAt = at;
+      _membershipFormMetaLoading = false;
+    });
+  }
+
+  bool get _showMembershipFormRow {
+    if (_membershipFormMetaLoading) return false;
+    return AlumniMembershipFormService.isProfileDownloadAvailable(
+      _membershipFormDownloadedAt,
+    );
+  }
+
+  String get _membershipFormSubtitle {
+    if (_membershipFormBusy) return 'Preparing PDF…';
+    final days = AlumniMembershipFormService.profileDaysRemaining(
+      _membershipFormDownloadedAt,
+    );
+    if (days <= 0) return 'Download your filled form';
+    if (days == 1) {
+      return 'Re-download available for 1 more day';
+    }
+    return 'Re-download available for $days more days';
   }
 
   Future<void> _loadCard() async {
@@ -122,62 +163,6 @@ class ProfileScreenState extends State<ProfileScreen>
     return 'Alumni';
   }
 
-  Future<void> _openMembershipFormSheet() async {
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: PortalTheme.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Membership Form', style: PortalTheme.cardTitle),
-                const SizedBox(height: 8),
-                Text(
-                  'Official USTP Alumni Association Oroquieta Membership '
-                  'Form filled from your profile.',
-                  style: PortalTheme.bodySecondary,
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _membershipFormBusy
-                      ? null
-                      : () async {
-                          Navigator.pop(sheetContext);
-                          await _previewMembershipForm();
-                        },
-                  style: PortalTheme.secondaryButton(),
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
-                  label: const Text('Preview'),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: _membershipFormBusy
-                      ? null
-                      : () async {
-                          Navigator.pop(sheetContext);
-                          await _downloadMembershipForm();
-                        },
-                  style: PortalTheme.primaryButton(),
-                  icon: const Icon(Icons.download_outlined, size: 18),
-                  label: Text(kIsWeb ? 'Download PDF' : 'Share PDF'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Future<AlumniMembershipFormPdf?> _buildMembershipForm() async {
     final userId = AppSession.userId;
     if (userId == null) {
@@ -193,25 +178,6 @@ class ProfileScreenState extends State<ProfileScreen>
       userId: userId,
       displayName: _membershipDisplayName,
     );
-  }
-
-  Future<void> _previewMembershipForm() async {
-    if (_membershipFormBusy) return;
-    setState(() => _membershipFormBusy = true);
-    try {
-      final pdf = await _buildMembershipForm();
-      if (pdf == null || !mounted) return;
-      await previewAlumniPdf(bytes: pdf.bytes, fileName: pdf.fileName);
-    } catch (e) {
-      if (mounted) {
-        showAuthFeedback(
-          context,
-          'We couldn’t open a preview. ${portalFriendlyError(e)}',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _membershipFormBusy = false);
-    }
   }
 
   Future<void> _downloadMembershipForm() async {
@@ -386,20 +352,20 @@ class ProfileScreenState extends State<ProfileScreen>
                 subtitle: 'View and update your details',
                 onTap: _openProfileInformation,
               ),
-              const _PortalAccountDivider(),
-              _PortalAccountRow(
-                icon: Icons.description_outlined,
-                iconColor: PortalTheme.navy,
-                title: 'Membership Form',
-                subtitle: _membershipFormBusy
-                    ? 'Preparing PDF…'
-                    : 'Preview or download your filled form',
-                onTap: () {
-                  if (!_membershipFormBusy) {
-                    unawaited(_openMembershipFormSheet());
-                  }
-                },
-              ),
+              if (_showMembershipFormRow) ...[
+                const _PortalAccountDivider(),
+                _PortalAccountRow(
+                  icon: Icons.description_outlined,
+                  iconColor: PortalTheme.navy,
+                  title: 'Membership Form',
+                  subtitle: _membershipFormSubtitle,
+                  onTap: () {
+                    if (!_membershipFormBusy) {
+                      unawaited(_downloadMembershipForm());
+                    }
+                  },
+                ),
+              ],
               const _PortalAccountDivider(),
               _PortalAccountRow(
                 icon: Icons.poll_outlined,

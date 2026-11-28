@@ -14,6 +14,7 @@ import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/alumni/tracer/models/tracer_profile_model.dart';
 import 'package:alumni_system/core/config/email_delivery_config.dart';
+import 'package:alumni_system/core/config/sms_delivery_config.dart';
 import 'package:alumni_system/core/services/app_session.dart';
 import 'package:alumni_system/core/services/audit_events.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
@@ -1444,25 +1445,33 @@ class SurveyService {
     }
   }
 
-  /// Soft-archive via `surveys.data.archived` (keeps status for restore).
+  /// Soft-archive via `surveys.data.archived`.
+  ///
+  /// Archive is a history bin (responses stay on this survey). Reuse a
+  /// template via [duplicateSurvey] — unarchive/restore is not supported.
   Future<void> setSurveyArchived(
     String surveyId, {
     required bool archived,
   }) async {
     final survey = await getSurvey(surveyId);
     if (survey == null) throw Exception('Survey not found');
-    await updateSurvey(survey.copyWith(archived: archived), audit: false);
+
+    if (!archived) {
+      throw Exception(
+        'Archived surveys cannot be restored. '
+        'Duplicate to create a new draft from this template.',
+      );
+    }
+
+    await updateSurvey(survey.copyWith(archived: true), audit: false);
+
     _notifyCatalogChanged();
     unawaited(
       _audit.logAction(
-        action: archived
-            ? AuditActions.archiveSurvey
-            : AuditActions.restoreSurvey,
+        action: AuditActions.archiveSurvey,
         resource: 'Survey',
         resourceId: surveyId,
-        description: archived
-            ? 'Archived survey: ${survey.title}'
-            : 'Restored survey: ${survey.title}',
+        description: 'Archived survey: ${survey.title}',
         userRole: 'admin',
         module: AuditModules.surveys,
         targetLabel: survey.title,
@@ -1630,6 +1639,7 @@ class SurveyService {
     required List<String> userIds,
     bool inApp = true,
     bool email = true,
+    bool sms = false,
   }) async {
     if (userIds.isEmpty) {
       return const SurveyReminderResult();
@@ -1647,8 +1657,15 @@ class SurveyService {
     var emailSent = 0;
     var emailSkippedNoAddress = 0;
     var emailSkippedOptedOut = 0;
+    var smsSent = 0;
+    var smsSkippedNoMobile = 0;
+    var smsSkippedOptedOut = 0;
     final emailEnabled = email && EmailDeliveryConfig.isConfigured;
     final emailSkippedNotConfigured = email && !EmailDeliveryConfig.isConfigured
+        ? userIds.length
+        : 0;
+    final smsEnabled = sms && SmsDeliveryConfig.isConfigured;
+    final smsSkippedNotConfigured = sms && !SmsDeliveryConfig.isConfigured
         ? userIds.length
         : 0;
     final failures = <String>[];
@@ -1685,6 +1702,39 @@ class SurveyService {
         inAppSent = (sent as num?)?.toInt() ?? 0;
       } catch (e) {
         failures.add('In-app reminders: $e');
+      }
+    }
+
+    var smsModeDisabled = false;
+    if (smsEnabled) {
+      try {
+        final response = await _supabase.functions.invoke(
+          SmsDeliveryConfig.functionName,
+          body: {
+            'surveyId': surveyId,
+            'userIds': userIds,
+          },
+        );
+        final data = response.data;
+        if (data is Map) {
+          if (data['skipped'] == 'sms_disabled') {
+            smsModeDisabled = true;
+          } else {
+            smsSent = (data['sent'] as num?)?.toInt() ?? 0;
+            smsSkippedNoMobile =
+                (data['skippedNoMobile'] as num?)?.toInt() ?? 0;
+            smsSkippedOptedOut =
+                (data['skippedOptedOut'] as num?)?.toInt() ?? 0;
+            final remoteFailures = data['failures'];
+            if (remoteFailures is List) {
+              for (final f in remoteFailures) {
+                failures.add('SMS: $f');
+              }
+            }
+          }
+        }
+      } catch (e) {
+        failures.add('SMS reminders: $e');
       }
     }
 
@@ -1754,6 +1804,12 @@ class SurveyService {
       emailSkippedNoAddress: emailSkippedNoAddress,
       emailSkippedNotConfigured: emailSkippedNotConfigured,
       emailSkippedOptedOut: emailSkippedOptedOut,
+      smsSent: smsSent,
+      smsSkippedNoMobile: smsSkippedNoMobile,
+      smsSkippedOptedOut: smsSkippedOptedOut,
+      smsSkippedNotConfigured: smsModeDisabled
+          ? userIds.length
+          : smsSkippedNotConfigured,
       failures: failures,
     );
     unawaited(
@@ -1762,11 +1818,13 @@ class SurveyService {
         resource: 'Survey',
         resourceId: surveyId,
         description:
-            'Sent survey reminders (in-app: $inAppSent, email: $emailSent)',
+            'Sent survey reminders (in-app: $inAppSent, email: $emailSent, '
+            'sms: $smsSent)',
         changes: {
           'recipientCount': userIds.length,
           'inAppSent': inAppSent,
           'emailSent': emailSent,
+          'smsSent': smsSent,
           'failureCount': failures.length,
         },
         status: failures.isEmpty

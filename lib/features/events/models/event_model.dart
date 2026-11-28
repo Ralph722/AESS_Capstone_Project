@@ -55,7 +55,7 @@ class AlumniEvent {
       venueLongitude!.isFinite;
 
   bool get isRegistrationOpen {
-    if (cancelled || status == 'Archived') return false;
+    if (cancelled || status == 'Archived' || status == 'Draft') return false;
     if (registrationDeadline == null) return true;
     return DateTime.now().isBefore(registrationDeadline!);
   }

@@ -81,5 +81,89 @@ void main() {
         'photo': {'from': '', 'to': ''},
       });
     });
+
+    test('only profile/tracer/survey sources are review-eligible', () {
+      expect(isReviewEligibleProfileChangeSource('profile'), isTrue);
+      expect(isReviewEligibleProfileChangeSource('tracer'), isTrue);
+      expect(isReviewEligibleProfileChangeSource('survey'), isTrue);
+      expect(isReviewEligibleProfileChangeSource('onboarding'), isFalse);
+      expect(isReviewEligibleProfileChangeSource('admin'), isFalse);
+      expect(isReviewEligibleProfileChangeSource(null), isFalse);
+    });
+  });
+
+  group('unreviewedChangedProfileFields', () {
+    test('empty when the review flag is off', () {
+      expect(
+        unreviewedChangedProfileFields(
+          hasProfileUpdates: false,
+          logs: [
+            (
+              action: 'PROFILE_UPDATE',
+              timestamp: DateTime(2026, 11, 1),
+              changes: {
+                'source': 'tracer',
+                'fields': {
+                  'civilStatus': {'from': 'Single', 'to': 'Married'},
+                },
+              },
+            ),
+          ],
+        ),
+        isEmpty,
+      );
+    });
+
+    test('ignores onboarding audits so first entry has no orange dots', () {
+      expect(
+        unreviewedChangedProfileFields(
+          hasProfileUpdates: true,
+          logs: [
+            (
+              action: 'PROFILE_UPDATE',
+              timestamp: DateTime(2026, 11, 2),
+              changes: {
+                'source': 'onboarding',
+                'fields': {
+                  'yearGraduated': {'from': '', 'to': '2024'},
+                  'honorsAwards': {'from': '', 'to': 'Cum Laude'},
+                },
+              },
+            ),
+          ],
+        ),
+        isEmpty,
+      );
+    });
+
+    test('uses the newest review-eligible PROFILE_UPDATE fields', () {
+      final keys = unreviewedChangedProfileFields(
+        hasProfileUpdates: true,
+        logs: [
+          (
+            action: 'PROFILE_UPDATE',
+            timestamp: DateTime(2026, 11, 3),
+            changes: {
+              'source': 'onboarding',
+              'fields': {
+                'yearGraduated': {'from': '', 'to': '2024'},
+              },
+            },
+          ),
+          (
+            action: 'PROFILE_UPDATE',
+            timestamp: DateTime(2026, 11, 2),
+            changes: {
+              'source': 'tracer',
+              'fields': {
+                'employmentStatus': {'from': '', 'to': 'Employed'},
+                'photo': {'from': '', 'to': ''},
+              },
+            },
+          ),
+        ],
+      );
+      expect(keys, {'employmentStatus'});
+    });
   });
 }

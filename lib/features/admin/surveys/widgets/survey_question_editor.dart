@@ -59,6 +59,57 @@ String surveyQuestionTypeLabel(SurveyQuestionType t) {
   }
 }
 
+IconData surveyQuestionTypeIcon(SurveyQuestionType t) {
+  switch (t) {
+    case SurveyQuestionType.text:
+      return Icons.short_text_rounded;
+    case SurveyQuestionType.longText:
+      return Icons.notes_rounded;
+    case SurveyQuestionType.singleChoice:
+      return Icons.radio_button_checked_outlined;
+    case SurveyQuestionType.multipleChoice:
+      return Icons.checklist_rtl_rounded;
+    case SurveyQuestionType.scale:
+      return Icons.linear_scale_rounded;
+    case SurveyQuestionType.date:
+      return Icons.event_outlined;
+  }
+}
+
+Widget _surveyQuestionTypeMenuRow(
+  SurveyQuestionType type, {
+  required bool selected,
+}) {
+  return Row(
+    children: [
+      Icon(
+        surveyQuestionTypeIcon(type),
+        size: 18,
+        color: selected ? AdminSurveyTheme.primary : AdminColors.textSecondary,
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          surveyQuestionTypeLabel(type),
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected
+                ? AdminSurveyTheme.primary
+                : AdminColors.textPrimary,
+          ),
+        ),
+      ),
+      if (selected)
+        const Icon(
+          Icons.check_rounded,
+          size: 18,
+          color: AdminSurveyTheme.primary,
+        ),
+    ],
+  );
+}
+
 /// Editable options list for single/multiple choice questions.
 class SurveyOptionsEditor extends StatefulWidget {
   const SurveyOptionsEditor({
@@ -434,17 +485,55 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                   DropdownButtonFormField<SurveyQuestionType>(
                     key: ValueKey('type-${q.id}-${q.type.name}'),
                     initialValue: q.type,
+                    isExpanded: true,
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(
+                      AdminSurveyTheme.radiusMd,
+                    ),
+                    menuMaxHeight: 360,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AdminColors.textSecondary,
+                    ),
+                    selectedItemBuilder: (context) => [
+                      for (final t in SurveyQuestionType.values)
+                        Row(
+                          children: [
+                            Icon(
+                              surveyQuestionTypeIcon(t),
+                              size: 18,
+                              color: AdminSurveyTheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                surveyQuestionTypeLabel(t),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AdminColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
                     decoration: AdminSurveyTheme.fieldDecoration(
                       label: 'Type',
+                    ).copyWith(
+                      fillColor: Colors.white,
                     ),
-                    items: SurveyQuestionType.values
-                        .map(
-                          (t) => DropdownMenuItem(
-                            value: t,
-                            child: Text(surveyQuestionTypeLabel(t)),
+                    items: [
+                      for (final t in SurveyQuestionType.values)
+                        DropdownMenuItem(
+                          value: t,
+                          child: _surveyQuestionTypeMenuRow(
+                            t,
+                            selected: t == q.type,
                           ),
-                        )
-                        .toList(),
+                        ),
+                    ],
                     onChanged: (t) {
                       if (t == null) return;
                       var next = q.copyWith(type: t);
@@ -515,9 +604,13 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                           child: DropdownButtonFormField<int>(
                             key: ValueKey('scale-min-${q.id}-${q.scaleMin}'),
                             initialValue: q.scaleMin ?? 1,
+                            dropdownColor: Colors.white,
+                            borderRadius: BorderRadius.circular(
+                              AdminSurveyTheme.radiusMd,
+                            ),
                             decoration: AdminSurveyTheme.fieldDecoration(
                               label: 'Scale min',
-                            ),
+                            ).copyWith(fillColor: Colors.white),
                             items: List.generate(
                               10,
                               (i) => DropdownMenuItem(
@@ -535,9 +628,13 @@ class _SurveyQuestionEditorCardState extends State<SurveyQuestionEditorCard> {
                           child: DropdownButtonFormField<int>(
                             key: ValueKey('scale-max-${q.id}-${q.scaleMax}'),
                             initialValue: q.scaleMax ?? 5,
+                            dropdownColor: Colors.white,
+                            borderRadius: BorderRadius.circular(
+                              AdminSurveyTheme.radiusMd,
+                            ),
                             decoration: AdminSurveyTheme.fieldDecoration(
                               label: 'Scale max',
-                            ),
+                            ).copyWith(fillColor: Colors.white),
                             items: List.generate(
                               10,
                               (i) => DropdownMenuItem(

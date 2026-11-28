@@ -454,7 +454,8 @@ class _CardBack extends StatelessWidget {
               Positioned(
                 left: w * 0.027,
                 top: h * 0.162,
-                right: w * 0.36,
+                // Leave the right half for the QR + side margin.
+                right: w * 0.52,
                 bottom: h * 0.06,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -522,9 +523,10 @@ class _CardBack extends StatelessWidget {
                 ),
               ),
               Positioned(
-                right: w * 0.075,
+                // Center in the open band between details (~48%) and right edge.
+                left: w * 0.60,
                 top: h * 0.162,
-                width: w * 0.255,
+                width: w * 0.26,
                 child: Column(
                   children: [
                     AspectRatio(
@@ -544,13 +546,6 @@ class _CardBack extends StatelessWidget {
                               color: PortalTheme.navy.withValues(alpha: 0.15),
                               width: math.max(1, 0.35 * cqw),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: PortalTheme.navy.withValues(alpha: 0.14),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
                           ),
                           child: offline
                               ? const Center(

@@ -8,6 +8,7 @@ import 'package:alumni_system/shared/widgets/personal_data_export_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:alumni_system/core/config/email_delivery_config.dart';
+import 'package:alumni_system/core/config/sms_delivery_config.dart';
 import 'package:alumni_system/core/constants/audience_targeting.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/features/surveys/data/survey_service.dart';
@@ -32,6 +33,7 @@ import 'package:alumni_system/shared/widgets/admin/admin_surface.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_pagination.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_saas_toolbar.dart';
 import 'package:alumni_system/core/utils/export_platform.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
 import 'package:alumni_system/features/surveys/data/survey_single_response_export_service.dart';
@@ -41,8 +43,8 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-/// Reminder confirmation text; [emailDropped] = email was requested but
-/// isn't configured, so only in-app goes out.
+/// Reminder confirmation text. [emailDropped]/[smsDropped] = channel was
+/// requested but isn’t configured client-side.
 @visibleForTesting
 String surveyReminderConfirmMessage({
   required String surveyTitle,
@@ -50,44 +52,68 @@ String surveyReminderConfirmMessage({
   required bool inApp,
   required bool email,
   required bool emailDropped,
+  bool sms = false,
+  bool smsDropped = false,
 }) {
   final channels = <String>[
     if (inApp) 'in-app',
     if (email) 'email',
+    if (sms) 'SMS',
   ].join(' + ');
   final title = surveyTitle.trim().isEmpty
       ? 'this survey'
       : '“${surveyTitle.trim()}”';
   final who = recipients == 1 ? 'alumnus' : 'alumni';
-  final note = emailDropped
-      ? ' Email isn’t set up, so these will be sent in-app only.'
-      : '';
-  return 'Send $channels reminders for $title to $recipients pending $who?'
-      '$note';
+  final notes = <String>[
+    if (emailDropped && smsDropped)
+      ' Email and SMS aren’t set up, so these will use the remaining channels only.'
+    else if (emailDropped)
+      ' Email isn’t set up, so these will skip email.'
+    else if (smsDropped)
+      ' SMS isn’t set up, so these will skip SMS.',
+  ];
+  final channelLabel = channels.isEmpty ? 'reminder' : '$channels reminders';
+  return 'Send $channelLabel for $title to $recipients pending $who?'
+      '${notes.join()}';
 }
 
-/// Result line after `sendReminders`, including skipped emails.
+/// Result line after `sendReminders`, including skipped email/SMS.
 @visibleForTesting
 String surveyReminderSummary(
   SurveyReminderResult result, {
   required bool inApp,
   required bool email,
   required bool emailDropped,
+  bool sms = false,
+  bool smsDropped = false,
 }) {
   final parts = <String>[
     if (inApp) '${result.inAppSent} in-app',
     if (email) '${result.emailSent} email',
+    if (sms) '${result.smsSent} SMS',
     if (result.emailSkippedNoAddress > 0)
       '${result.emailSkippedNoAddress} skipped (no email)',
     if (result.emailSkippedOptedOut > 0)
       '${result.emailSkippedOptedOut} skipped (opted out of email)',
     if (result.emailSkippedNotConfigured > 0)
       '${result.emailSkippedNotConfigured} email skipped (not set up)',
+    if (result.smsSkippedNoMobile > 0)
+      '${result.smsSkippedNoMobile} skipped (no verified mobile)',
+    if (result.smsSkippedOptedOut > 0)
+      '${result.smsSkippedOptedOut} skipped (opted out of SMS)',
+    if (result.smsSkippedNotConfigured > 0)
+      '${result.smsSkippedNotConfigured} SMS skipped (not set up)',
   ];
   final summary = parts.isEmpty
       ? 'No reminders sent'
       : 'Sent: ${parts.join(', ')}';
-  return emailDropped ? '$summary · email isn’t set up' : summary;
+  final footnotes = <String>[
+    if (emailDropped) 'email isn’t set up',
+    if (smsDropped) 'SMS isn’t set up',
+  ];
+  return footnotes.isEmpty
+      ? summary
+      : '$summary · ${footnotes.join(' · ')}';
 }
 
 /// Export failure text: what failed, plus the reason when it reads cleanly.
@@ -389,6 +415,7 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
   Future<void> _sendReminders({
     required bool inApp,
     required bool email,
+    bool sms = false,
   }) async {
     final targets = _selectedUserIds.isEmpty
         ? _pending.map((p) => p.assignment.userId).toList()
@@ -401,15 +428,32 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
     }
 
     final emailDropped = email && !EmailDeliveryConfig.isConfigured;
-    if (emailDropped && !inApp) {
+    final smsDropped = sms && !SmsDeliveryConfig.isConfigured;
+    if (emailDropped && !inApp && !sms) {
       _showSnack(
         'Email reminders are not configured. Check Gmail SMTP / '
-        'Supabase secrets or use In-app.',
+        'Supabase secrets or use In-app / SMS.',
+        color: AdminColors.warning,
+      );
+      return;
+    }
+    if (smsDropped && !inApp && !email) {
+      _showSnack(
+        'SMS reminders are not configured. Check Semaphore / SMS_MODE '
+        'secrets or use In-app / Email.',
         color: AdminColors.warning,
       );
       return;
     }
     if (emailDropped) email = false;
+    if (smsDropped) sms = false;
+    if (!inApp && !email && !sms) {
+      _showSnack(
+        'No reminder channels are available for this send.',
+        color: AdminColors.warning,
+      );
+      return;
+    }
 
     final confirmed = await showAdminConfirmDialog(
       context,
@@ -420,6 +464,8 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         inApp: inApp,
         email: email,
         emailDropped: emailDropped,
+        sms: sms,
+        smsDropped: smsDropped,
       ),
       confirmLabel: 'Send',
       icon: Icons.send_outlined,
@@ -433,18 +479,23 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
         userIds: targets,
         inApp: inApp,
         email: email,
+        sms: sms,
       );
       if (!mounted) return;
+      final softFail = emailDropped ||
+          smsDropped ||
+          result.smsSkippedNotConfigured > 0 ||
+          result.failures.isNotEmpty;
       _showSnack(
         surveyReminderSummary(
           result,
           inApp: inApp,
           email: email,
           emailDropped: emailDropped,
+          sms: sms || result.smsSkippedNotConfigured > 0,
+          smsDropped: smsDropped,
         ),
-        color: result.failures.isEmpty && !emailDropped
-            ? AdminColors.success
-            : AdminColors.warning,
+        color: softFail ? AdminColors.warning : AdminColors.success,
       );
       if (result.failures.isNotEmpty) {
         showAdminDialogSurface<void>(
@@ -2250,170 +2301,90 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AdminColors.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AdminColors.border),
-              boxShadow: AdminSurfaces.cardShadow,
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 38,
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (_) => setState(() {
-                            _pendingPage = 0;
-                            _selectedUserIds.clear();
-                          }),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AdminColors.textPrimary,
-                          ),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            hintText: 'Search pending by name, email, course, or batch…',
-                            hintStyle: const TextStyle(
-                              fontSize: 13,
-                              color: AdminColors.textMuted,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.search,
-                              size: 18,
-                              color: AdminColors.textMuted,
-                            ),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 16),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _pendingPage = 0;
-                                        _selectedUserIds.clear();
-                                      });
-                                    },
-                                  )
-                                : null,
-                            filled: true,
-                            fillColor: AdminColors.surface,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AdminColors.border),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AdminColors.border),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: AdminColors.primary,
-                                width: 1.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: pageList.isEmpty
-                          ? null
-                          : () {
-                              setState(() {
-                                if (allVisibleSelected) {
-                                  for (final p in pageList) {
-                                    _selectedUserIds.remove(p.assignment.userId);
-                                  }
-                                } else {
-                                  _selectedUserIds.addAll(
-                                    pageList.map((p) => p.assignment.userId),
-                                  );
-                                }
-                              });
-                            },
-                      icon: Icon(
-                        allVisibleSelected
-                            ? Icons.check_box_outlined
-                            : Icons.check_box_outline_blank,
-                        size: 16,
-                      ),
-                      label: Text(
-                        allVisibleSelected ? 'Deselect page' : 'Select page',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      style: AdminButtonStyles.outlined(),
-                    ),
-                  ],
+          child: AdminSaaSToolbar(
+            searchController: _searchController,
+            onSearchChanged: (_) => setState(() {
+              _pendingPage = 0;
+              _selectedUserIds.clear();
+            }),
+            onClearSearch: () {
+              _searchController.clear();
+              setState(() {
+                _pendingPage = 0;
+                _selectedUserIds.clear();
+              });
+            },
+            searchHint: 'Search pending by name, email, course, or batch…',
+            searchWidth: 280,
+            filters: [
+              _pendingFilterChip(
+                label: _pendingStatusFilter == null
+                    ? 'Status: All'
+                    : 'Status: ${_statusLabel(_pendingStatusFilter!)}',
+                selected: _pendingStatusFilter != null,
+                onTap: _pickPendingStatusFilter,
+              ),
+              _pendingFilterChip(
+                label: _pendingProgramFilter == null
+                    ? 'Course: All'
+                    : 'Course: $_pendingProgramFilter',
+                selected: _pendingProgramFilter != null,
+                onTap: _pickPendingProgramFilter,
+              ),
+              _pendingFilterChip(
+                label: _pendingBatchFilter == null
+                    ? 'Batch: All'
+                    : 'Batch: $_pendingBatchFilter',
+                selected: _pendingBatchFilter != null,
+                onTap: _pickPendingBatchFilter,
+              ),
+              _pendingFilterChip(
+                label: 'Sort: ${_pendingSort.label}',
+                selected: false,
+                onTap: _pickPendingSort,
+              ),
+            ],
+            hasActiveFilters: hasFilters || hasQuery,
+            onResetFilters: () {
+              setState(() {
+                _searchController.clear();
+                _pendingStatusFilter = null;
+                _pendingProgramFilter = null;
+                _pendingBatchFilter = null;
+                _pendingPage = 0;
+                _selectedUserIds.clear();
+              });
+            },
+            trailingActions: [
+              OutlinedButton.icon(
+                onPressed: pageList.isEmpty
+                    ? null
+                    : () {
+                        setState(() {
+                          if (allVisibleSelected) {
+                            for (final p in pageList) {
+                              _selectedUserIds.remove(p.assignment.userId);
+                            }
+                          } else {
+                            _selectedUserIds.addAll(
+                              pageList.map((p) => p.assignment.userId),
+                            );
+                          }
+                        });
+                      },
+                icon: Icon(
+                  allVisibleSelected
+                      ? Icons.check_box_outlined
+                      : Icons.check_box_outline_blank,
+                  size: 16,
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _pendingFilterChip(
-                      label: _pendingStatusFilter == null
-                          ? 'Status: All'
-                          : 'Status: ${_statusLabel(_pendingStatusFilter!)}',
-                      selected: _pendingStatusFilter != null,
-                      onTap: _pickPendingStatusFilter,
-                    ),
-                    _pendingFilterChip(
-                      label: _pendingProgramFilter == null
-                          ? 'Course: All'
-                          : 'Course: $_pendingProgramFilter',
-                      selected: _pendingProgramFilter != null,
-                      onTap: _pickPendingProgramFilter,
-                    ),
-                    _pendingFilterChip(
-                      label: _pendingBatchFilter == null
-                          ? 'Batch: All'
-                          : 'Batch: $_pendingBatchFilter',
-                      selected: _pendingBatchFilter != null,
-                      onTap: _pickPendingBatchFilter,
-                    ),
-                    _pendingFilterChip(
-                      label: 'Sort: ${_pendingSort.label}',
-                      selected: false,
-                      onTap: _pickPendingSort,
-                    ),
-                    if (hasFilters || hasQuery)
-                      TextButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _searchController.clear();
-                            _pendingStatusFilter = null;
-                            _pendingProgramFilter = null;
-                            _pendingBatchFilter = null;
-                            _pendingPage = 0;
-                            _selectedUserIds.clear();
-                          });
-                        },
-                        icon: const Icon(Icons.refresh_rounded, size: 14),
-                        label: const Text(
-                          'Reset',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AdminColors.textSecondary,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                  ],
+                label: Text(
+                  allVisibleSelected ? 'Deselect page' : 'Select page',
+                  style: const TextStyle(fontSize: 12),
                 ),
-              ],
-            ),
+                style: AdminButtonStyles.outlined(),
+              ),
+            ],
           ),
         ),
         if (_selectedUserIds.isNotEmpty)
@@ -2471,7 +2442,11 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                   FilledButton.icon(
                     onPressed: _isSendingReminders
                         ? null
-                        : () => _sendReminders(inApp: true, email: true),
+                        : () => _sendReminders(
+                              inApp: true,
+                              email: true,
+                              sms: true,
+                            ),
                     icon: const Icon(Icons.send_outlined, size: 16),
                     label: const Text('Send reminder'),
                     style: surveyFilledButtonStyle(),
@@ -2482,6 +2457,18 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
                         : () => _sendReminders(inApp: false, email: true),
                     icon: const Icon(Icons.email_outlined, size: 16),
                     label: const Text('Send email'),
+                    style: surveyOutlinedButtonStyle(),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _isSendingReminders
+                        ? null
+                        : () => _sendReminders(
+                              inApp: false,
+                              email: false,
+                              sms: true,
+                            ),
+                    icon: const Icon(Icons.sms_outlined, size: 16),
+                    label: const Text('Send SMS'),
                     style: surveyOutlinedButtonStyle(),
                   ),
                   OutlinedButton.icon(
@@ -2854,123 +2841,46 @@ class _AdminSurveyResponsesScreenState extends State<AdminSurveyResponsesScreen>
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AdminColors.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AdminColors.border),
-              boxShadow: AdminSurfaces.cardShadow,
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: 38,
-                  child: TextField(
-                    controller: _submittedSearchController,
-                    onChanged: (_) => setState(() => _submittedPage = 0),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AdminColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText:
-                          'Search submitted responses by name, email, course, or batch…',
-                      hintStyle: const TextStyle(
-                        fontSize: 13,
-                        color: AdminColors.textMuted,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        size: 18,
-                        color: AdminColors.textMuted,
-                      ),
-                      suffixIcon: _submittedSearchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 16),
-                              onPressed: () {
-                                _submittedSearchController.clear();
-                                setState(() => _submittedPage = 0);
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: AdminColors.surface,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: AdminColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: AdminColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(
-                          color: AdminColors.primary,
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _pendingFilterChip(
-                      label: _submittedProgramFilter == null
-                          ? 'Course: All'
-                          : 'Course: $_submittedProgramFilter',
-                      selected: _submittedProgramFilter != null,
-                      onTap: _pickSubmittedProgramFilter,
-                    ),
-                    _pendingFilterChip(
-                      label: _submittedBatchFilter == null
-                          ? 'Batch: All'
-                          : 'Batch: $_submittedBatchFilter',
-                      selected: _submittedBatchFilter != null,
-                      onTap: _pickSubmittedBatchFilter,
-                    ),
-                    _pendingFilterChip(
-                      label: 'Sort: ${_submittedSort.label}',
-                      selected: false,
-                      onTap: _pickSubmittedSort,
-                    ),
-                    if (hasFilters || hasQuery)
-                      TextButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _submittedSearchController.clear();
-                            _submittedProgramFilter = null;
-                            _submittedBatchFilter = null;
-                            _submittedPage = 0;
-                          });
-                        },
-                        icon: const Icon(Icons.refresh_rounded, size: 14),
-                        label: const Text(
-                          'Reset',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AdminColors.textSecondary,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
+          child: AdminSaaSToolbar(
+            searchController: _submittedSearchController,
+            onSearchChanged: (_) => setState(() => _submittedPage = 0),
+            onClearSearch: () {
+              _submittedSearchController.clear();
+              setState(() => _submittedPage = 0);
+            },
+            searchHint:
+                'Search submitted responses by name, email, course, or batch…',
+            searchWidth: 280,
+            filters: [
+              _pendingFilterChip(
+                label: _submittedProgramFilter == null
+                    ? 'Course: All'
+                    : 'Course: $_submittedProgramFilter',
+                selected: _submittedProgramFilter != null,
+                onTap: _pickSubmittedProgramFilter,
+              ),
+              _pendingFilterChip(
+                label: _submittedBatchFilter == null
+                    ? 'Batch: All'
+                    : 'Batch: $_submittedBatchFilter',
+                selected: _submittedBatchFilter != null,
+                onTap: _pickSubmittedBatchFilter,
+              ),
+              _pendingFilterChip(
+                label: 'Sort: ${_submittedSort.label}',
+                selected: false,
+                onTap: _pickSubmittedSort,
+              ),
+            ],
+            hasActiveFilters: hasFilters || hasQuery,
+            onResetFilters: () {
+              setState(() {
+                _submittedSearchController.clear();
+                _submittedProgramFilter = null;
+                _submittedBatchFilter = null;
+                _submittedPage = 0;
+              });
+            },
           ),
         ),
         Padding(

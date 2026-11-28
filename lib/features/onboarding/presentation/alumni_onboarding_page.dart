@@ -136,6 +136,10 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
   Object? _photoUploadSource;
 
   bool _membershipFormBusy = false;
+  /// True after a successful download this session or a prior DB timestamp.
+  bool _membershipFormDownloaded = false;
+  /// Explicit confirm that the alumnus saved the PDF (required with download).
+  bool _membershipFormSavedConfirm = false;
   bool _acceptedPrivacy = false;
 
   @override
@@ -163,6 +167,9 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
 
     try {
       final boot = await _profileService.getOnboardingBootstrap(uid: userId);
+      final downloadedAt = await _membershipFormService.fetchDownloadedAt(
+        userId,
+      );
       if (!mounted) return;
 
       if (boot.profile != null) {
@@ -186,6 +193,9 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
 
       setState(() {
         _profileImageUrl = boot.imageUrl;
+        _membershipFormDownloaded = downloadedAt != null;
+        // Returning alumni who already downloaded can confirm immediately.
+        _membershipFormSavedConfirm = downloadedAt != null;
         _loading = false;
       });
     } catch (e) {
@@ -574,9 +584,19 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
     });
   }
 
+  bool get _canEnterPortal =>
+      _membershipFormDownloaded && _membershipFormSavedConfirm && !_finishing;
+
   Future<void> _finishOnboarding() async {
     final userId = AppSession.userId;
     if (userId == null) return;
+    if (!_membershipFormDownloaded || !_membershipFormSavedConfirm) {
+      _snack(
+        'Download your Membership Form and confirm you saved it before '
+        'entering the portal.',
+      );
+      return;
+    }
 
     setState(() => _finishing = true);
     try {
@@ -676,11 +696,16 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
         bytes: pdf.bytes,
         fileName: pdf.fileName,
       );
+      final userId = AppSession.userId;
+      if (userId != null) {
+        await _membershipFormService.markDownloaded(userId);
+      }
       if (!mounted) return;
+      setState(() => _membershipFormDownloaded = true);
       _snack(
         kIsWeb
-            ? 'Membership Form downloaded.'
-            : 'Use the share sheet to save your Membership Form.',
+            ? 'Membership Form downloaded. Confirm below that you saved it.'
+            : 'Use the share sheet to save your form, then confirm below.',
         isError: false,
       );
     } catch (e) {
@@ -1172,7 +1197,9 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
 
   OnboardingStepView _reviewStep() {
     final wide = _wide;
-    final downloadLabel = kIsWeb ? 'Download PDF' : 'Share PDF';
+    final downloadLabel = _membershipFormDownloaded
+        ? (kIsWeb ? 'Download again' : 'Share again')
+        : (kIsWeb ? 'Download PDF' : 'Share PDF');
 
     return OnboardingStepView(
       centerContent: true,
@@ -1195,7 +1222,8 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
           ),
           const SizedBox(height: PortalTheme.space1),
           Text(
-            'Your Graduate Tracer profile is ready. Enter the portal when you’re set.',
+            'Download your Membership Form to finish. You can re-download '
+            'from Profile for 30 days.',
             textAlign: TextAlign.center,
             style: PortalTheme.bodySecondary,
           ),
@@ -1240,9 +1268,9 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Download the official USTP Alumni Association '
-                              'Oroquieta Membership Form filled from your '
-                              'profile. You can also get it later from Profile.',
+                              'Required by the Alumni Office. Download the '
+                              'official USTP Alumni Association Oroquieta '
+                              'Membership Form filled from your profile.',
                               style: PortalTheme.bodySecondary.copyWith(
                                 height: 1.4,
                               ),
@@ -1273,8 +1301,40 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.download_outlined, size: 20),
+                          : Icon(
+                              _membershipFormDownloaded
+                                  ? Icons.check_circle_outline
+                                  : Icons.download_outlined,
+                              size: 20,
+                            ),
                       label: Text(downloadLabel),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    value: _membershipFormSavedConfirm,
+                    onChanged: (!_membershipFormDownloaded || _finishing)
+                        ? null
+                        : (v) => setState(
+                            () => _membershipFormSavedConfirm = v ?? false,
+                          ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: PortalTheme.navy,
+                    title: Text(
+                      'I saved my Membership Form',
+                      style: PortalTheme.body.copyWith(
+                        color: _membershipFormDownloaded
+                            ? PortalTheme.navy
+                            : PortalTheme.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _membershipFormDownloaded
+                          ? 'Required before entering the portal'
+                          : 'Download the form first',
+                      style: PortalTheme.meta,
                     ),
                   ),
                 ],
@@ -1292,7 +1352,7 @@ class _AlumniOnboardingScreenState extends State<AlumniOnboardingScreen> {
       ),
       actions: OnboardingActions(
         primaryLabel: 'Enter alumni portal',
-        onPrimary: _finishing ? null : _finishOnboarding,
+        onPrimary: _canEnterPortal ? _finishOnboarding : null,
         primaryLoading: _finishing,
         showArrow: false,
         onBack: _goBack,

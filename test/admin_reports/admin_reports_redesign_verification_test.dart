@@ -120,7 +120,7 @@ void main() {
       expect(pillText.style?.height, 1.15);
     });
 
-    testWidgets('ReportsDownloadsPanel renders scope bar, presets, and export buttons', (tester) async {
+    testWidgets('ReportsDownloadsPanel renders presets and export buttons', (tester) async {
       tester.view.physicalSize = const Size(1400, 1000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -148,28 +148,28 @@ void main() {
         ),
       );
 
-      expect(find.text('Exports use: Batch 2024 · BSIT'), findsOneWidget);
+      expect(find.textContaining('Exports use:'), findsNothing);
       expect(
-        find.text('Institutional employment & employability overview'),
+        find.text('Institutional Employment & Employability Overview'),
         findsOneWidget,
       );
       expect(
-        find.text('Program curriculum & competency audit'),
+        find.text('Program Curriculum & Competency Audit'),
         findsOneWidget,
       );
       expect(
-        find.text('Industry linkages & economic placement'),
+        find.text('Industry Linkages & Economic Placement'),
         findsOneWidget,
       );
-      expect(find.text('Career mobility & diagnostic'), findsOneWidget);
+      expect(find.text('Career Mobility & Diagnostic'), findsOneWidget);
       expect(
-        find.text('CHED compliance & accreditation master summary'),
+        find.text('CHED Compliance & Accreditation Master Summary'),
         findsOneWidget,
       );
-      expect(find.text('GTS participation and data quality'), findsOneWidget);
-      expect(find.text('Portal executive snapshot'), findsOneWidget);
-      expect(find.text('CHED wave comparison'), findsOneWidget);
-      expect(find.text('Active alumni list extract'), findsOneWidget);
+      expect(find.text('GTS Participation and Data Quality'), findsOneWidget);
+      expect(find.text('Portal Executive Snapshot'), findsOneWidget);
+      expect(find.text('CHED Wave Comparison'), findsOneWidget);
+      expect(find.text('Active Alumni List Extract'), findsOneWidget);
       expect(find.text('INSTITUTIONAL GTS'), findsOneWidget);
       expect(find.text('COMPARISONS AND DATA QUALITY'), findsOneWidget);
       expect(find.text('OPERATIONS'), findsOneWidget);
@@ -210,10 +210,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(
-        find.text('Institutional employment & employability overview'),
+        find.text('Institutional Employment & Employability Overview'),
         findsOneWidget,
       );
-      expect(find.text('GTS participation and data quality'), findsOneWidget);
+      expect(find.text('GTS Participation and Data Quality'), findsOneWidget);
     });
 
     testWidgets('GtsSavedReportsBar shows unsaved changes and action buttons', (tester) async {
@@ -767,7 +767,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('Institutional employment & employability overview'),
+        find.text('Institutional Employment & Employability Overview'),
         findsOneWidget,
       );
       expect(
@@ -823,7 +823,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('GtsAlumniListPanel collapses and expands builder sidebar to prioritize preview space', (tester) async {
+    testWidgets('GtsAlumniListPanel keeps builder and preview visible with pie chart chips', (tester) async {
       tester.view.physicalSize = const Size(1400, 1000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -878,11 +878,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Sidebar and preview are both rendered
+      // Sidebar and preview stay visible together (no Hide builder control)
       expect(find.text('List Builder'), findsOneWidget);
       expect(find.text('Scope & Template'), findsOneWidget);
       expect(find.text('Columns'), findsOneWidget);
-      expect(find.text('Hide builder'), findsOneWidget);
+      expect(find.text('Hide builder'), findsNothing);
+      expect(find.text('Show builder'), findsNothing);
 
       // Export buttons in preview header
       expect(find.text('Excel'), findsOneWidget);
@@ -894,26 +895,17 @@ void main() {
       expect(find.text('Catherine Jala'), findsOneWidget);
       expect(find.text('Christian Pedregosa'), findsOneWidget);
 
-      // Tap Hide builder button to collapse builder and prioritize preview full-width
-      await tester.tap(find.text('Hide builder'));
-      await tester.pumpAndSettle();
+      // Chart chips include pie; Step 3/4 helper copy is gone
+      expect(find.text('Pie chart'), findsOneWidget);
+      expect(
+        find.textContaining('These filters still use item 16'),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Turn the table, the tally, and the chart'),
+        findsNothing,
+      );
 
-      // List Builder sidebar is completely hidden
-      expect(find.text('List Builder'), findsNothing);
-      expect(find.text('Scope & Template'), findsNothing);
-      expect(find.text('Columns'), findsNothing);
-      expect(find.text('Show builder'), findsOneWidget);
-
-      // Preview content and table remain fully interactive and visible at 100% width
-      expect(find.text('Catherine Jala'), findsOneWidget);
-      expect(find.text('Christian Pedregosa'), findsOneWidget);
-
-      // Tap Show builder button to bring the sidebar back
-      await tester.tap(find.text('Show builder'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('List Builder'), findsOneWidget);
-      expect(find.text('Hide builder'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

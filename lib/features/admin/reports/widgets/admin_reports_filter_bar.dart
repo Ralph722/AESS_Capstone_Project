@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:alumni_system/core/constants/course_constants.dart';
 import 'package:alumni_system/features/admin/reports/models/reports_dashboard_filters.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
-import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/features/admin/roster/widgets/alumni_directory_ui.dart';
 import 'package:alumni_system/features/surveys/models/survey_model.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
@@ -50,7 +49,6 @@ class ReportsCohortFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hint = reportsAudienceHint(_selectedSurvey);
     final activeCount = [
       if (showWaveFilter && includeAllWavesOption) filters.surveyId,
       filters.batchYear,
@@ -59,12 +57,6 @@ class ReportsCohortFilterBar extends StatelessWidget {
     final active = activeCount > 0;
     final fields = _fields();
     final actions = <Widget>[
-      if (hint != null)
-        ReportsDetailsButton(
-          title: 'Audience',
-          body: hint,
-          tooltip: 'Audience details',
-        ),
       if (active)
         OutlinedButton.icon(
           onPressed: _resetFilters,

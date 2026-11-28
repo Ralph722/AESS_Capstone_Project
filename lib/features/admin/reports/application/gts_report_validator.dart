@@ -206,13 +206,17 @@ abstract final class GtsReportValidator {
     }
     switch (chart) {
       case GtsChartType.donut:
+      case GtsChartType.pie:
+        final kind = chart == GtsChartType.pie ? 'pie' : 'donut';
         if (multi) {
-          return 'A donut needs answers that add up to 100%. Graduates can '
+          return 'A $kind needs answers that add up to 100%. Graduates can '
               'pick several answers here; use a bar chart.';
         }
-        if (groups > 0) return 'A donut shows one group; use grouped bars.';
+        if (groups > 0) {
+          return 'A $kind shows one group; use grouped bars.';
+        }
         if (config.calculation == GtsCalculation.answeredCount) {
-          return 'A donut needs answer categories; use a bar chart.';
+          return 'A $kind needs answer categories; use a bar chart.';
         }
       case GtsChartType.line:
         final first = groups == 0

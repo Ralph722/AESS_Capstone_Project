@@ -52,7 +52,7 @@ void main() {
     test('in progress without a deadline', () {
       expect(
         homeTracerSubtitle(started: true),
-        'In progress · pick up where you left off',
+        'In progress · continue',
       );
     });
 
@@ -85,7 +85,7 @@ void main() {
     test('in progress without a deadline', () {
       expect(
         homeSurveySubtitle(started: true),
-        'In progress · pick up where you left off',
+        'In progress · continue',
       );
     });
 

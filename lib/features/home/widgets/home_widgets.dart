@@ -311,7 +311,7 @@ String homeTracerSubtitle({required bool started, String? dueLabel}) {
     return '$dueLabel · ${started ? 'In progress' : 'Not started'}';
   }
   return started
-      ? 'In progress · pick up where you left off'
+      ? 'In progress · continue'
       : 'Not started · about 10–15 min';
 }
 
@@ -321,7 +321,7 @@ String homeSurveySubtitle({required bool started, String? dueLabel}) {
     return '$dueLabel · ${started ? 'In progress' : 'Not started'}';
   }
   return started
-      ? 'In progress · pick up where you left off'
+      ? 'In progress · continue'
       : 'Not started · respond when ready';
 }
 

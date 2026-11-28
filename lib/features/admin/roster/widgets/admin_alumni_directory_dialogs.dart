@@ -261,15 +261,23 @@ class _ChooserOptionCardState extends State<_ChooserOptionCard> {
 }
 
 /// Opens the filtered directory ZIP export dialog. Returns null if cancelled.
+///
+/// For [DirectoryBulkReportKind.chedGtsPdf], pass [chedProgress] so only
+/// alumni with at least one submitted tracer wave are eligible.
 Future<ChedBulkExportChoice?> showChedBulkExportDialog(
   BuildContext context, {
   required List<AlumniMember> members,
   DirectoryBulkReportKind kind = DirectoryBulkReportKind.chedGtsPdf,
+  Map<String, ChedGtsProgress> chedProgress = const {},
 }) {
   return showDialog<ChedBulkExportChoice>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => _ChedBulkExportDialog(members: members, kind: kind),
+    builder: (ctx) => _ChedBulkExportDialog(
+      members: members,
+      kind: kind,
+      chedProgress: chedProgress,
+    ),
   );
 }
 
@@ -277,10 +285,12 @@ class _ChedBulkExportDialog extends StatefulWidget {
   const _ChedBulkExportDialog({
     required this.members,
     required this.kind,
+    this.chedProgress = const {},
   });
 
   final List<AlumniMember> members;
   final DirectoryBulkReportKind kind;
+  final Map<String, ChedGtsProgress> chedProgress;
 
   @override
   State<_ChedBulkExportDialog> createState() => _ChedBulkExportDialogState();
@@ -327,9 +337,14 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
     }).toList();
   }
 
-  List<AlumniMember> get _eligible => _filtered
-      .where((m) => m.isRegisteredUser && (m.authUid?.isNotEmpty ?? false))
-      .toList();
+  List<AlumniMember> get _eligible => _filtered.where(_isEligible).toList();
+
+  bool _isEligible(AlumniMember m) {
+    if (!m.isRegisteredUser || (m.authUid?.isEmpty ?? true)) return false;
+    if (!_isChed) return true;
+    final submitted = widget.chedProgress[m.authUid!]?.submitted ?? 0;
+    return submitted > 0;
+  }
 
   int get _skippedUnregistered => _filtered.length - _eligible.length;
 
@@ -385,8 +400,9 @@ class _ChedBulkExportDialogState extends State<_ChedBulkExportDialog> {
                         const SizedBox(height: 3),
                         Text(
                           _isChed
-                              ? 'Build a ZIP of filled official forms. Members '
-                                  'without a registered account are skipped.'
+                              ? 'Build a ZIP of filled official forms. Only '
+                                  'registered alumni who have submitted a '
+                                  'tracer survey are included.'
                               : 'Build a ZIP of Section A + Q12 information '
                                   'sheets. Only registered alumni are included.',
                           style: const TextStyle(

@@ -84,7 +84,7 @@ class _AdminSurveyTemplatePickerDialog extends StatelessWidget {
               const SizedBox(height: 20),
               _ChoiceCard(
                 recommended: true,
-                badge: 'Official · v${ChedGtsBuiltin.schemaVersion}',
+                badge: 'Official',
                 badgeTone: _BadgeTone.official,
                 title: ChedGtsBuiltin.defaultTitle,
                 body:

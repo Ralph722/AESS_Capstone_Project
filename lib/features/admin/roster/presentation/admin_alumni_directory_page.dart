@@ -13,6 +13,7 @@ import 'package:alumni_system/features/admin/roster/widgets/admin_alumni_directo
 import 'package:alumni_system/features/admin/dashboard/widgets/admin_instant_content.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_buttons.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_compact_header.dart';
+import 'package:alumni_system/shared/widgets/admin/admin_confirm_dialog.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_data_table.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 import 'package:alumni_system/core/constants/ustp_colors.dart';
@@ -63,6 +64,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
   int _viewIndex = 0;
   AlumniMember? _selectedMember;
   bool _exportingReportsBatch = false;
+  bool _markingAllReviewed = false;
   int _page = 0;
   int _pageSize = 25;
 
@@ -298,6 +300,7 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       context,
       members: _allMembers,
       kind: kind,
+      chedProgress: _chedProgress,
     );
     if (choice == null || !mounted) return;
 
@@ -371,6 +374,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
         final result = await batch.buildZip(
           members: selected,
           flatten: flattenFields,
+          // Directory ZIP must match Survey Responses: no live-profile PDFs
+          // for alumni who never submitted a tracer.
+          allowLiveFallback: false,
           onProgress: (done, total, name) {
             progress.value = (done, total, name);
           },
@@ -700,6 +706,45 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
       }
       _recomputeDerivedStats();
     });
+  }
+
+  Future<void> _markAllProfilesReviewed() async {
+    if (_markingAllReviewed || _profileUpdatesCount <= 0) return;
+    final confirmed = await showAdminConfirmDialog(
+      context,
+      title: 'Mark all as reviewed?',
+      message:
+          'Clear the Updates queue for $_profileUpdatesCount '
+          '${_profileUpdatesCount == 1 ? 'member' : 'members'}? '
+          'Orange “Profile updated” markers will disappear. '
+          'Activity history is kept.',
+      confirmLabel: 'Mark all as reviewed',
+      icon: Icons.done_all_outlined,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _markingAllReviewed = true);
+    try {
+      final cleared = await _memberService.markAllProfilesReviewed();
+      if (!mounted) return;
+      _showSnack(
+        cleared == 0
+            ? 'No unreviewed profile updates left'
+            : 'Marked $cleared profile update${cleared == 1 ? '' : 's'} as reviewed',
+      );
+      await _loadMembers();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(
+        _friendlyError(
+          e,
+          "Couldn't mark all updates as reviewed. Please try again.",
+        ),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _markingAllReviewed = false);
+    }
   }
 
   @override
@@ -1203,6 +1248,9 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                   },
                 );
 
+          final showMarkAll =
+              _view == AlumniDirectoryView.updates && _profileUpdatesCount > 0;
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1216,6 +1264,34 @@ class _AdminAlumniDirectoryScreenState extends State<AdminAlumniDirectoryScreen>
                   _pageSize = s;
                   _page = 0;
                 }),
+                leading: showMarkAll
+                    ? TextButton.icon(
+                        onPressed: _markingAllReviewed
+                            ? null
+                            : _markAllProfilesReviewed,
+                        icon: _markingAllReviewed
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.done_all_outlined, size: 16),
+                        label: Text(
+                          _markingAllReviewed
+                              ? 'Marking…'
+                              : 'Mark all as reviewed',
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AdminDirectoryTheme.primary,
+                          textStyle: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      )
+                    : null,
               ),
             ],
           );

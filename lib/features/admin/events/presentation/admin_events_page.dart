@@ -57,6 +57,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   final _supabase = Supabase.instance.client;
 
   List<AlumniEvent> _active = [];
+  List<AlumniEvent> _drafts = [];
   List<AlumniEvent> _archived = [];
   List<AlumniEvent> _filtered = [];
   Map<String, EventRsvpCounts> _counts = {};
@@ -66,6 +67,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   String? _loadErrorDetails;
   bool _showCalendar = false;
   bool _showArchived = false;
+  bool _showDrafts = false;
   String? _batchYear;
   String? _venue;
   String? _category;
@@ -138,7 +140,13 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final events = await _eventService.getActiveEvents(runAutoArchive: false);
+      List<AlumniEvent> drafts = const [];
       List<AlumniEvent> archived = const [];
+      try {
+        drafts = await _eventService.getDraftEvents();
+      } catch (_) {
+        drafts = const [];
+      }
       try {
         archived = await _eventService.getArchivedEvents();
       } catch (_) {
@@ -147,12 +155,14 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       }
       final countIds = {
         ...events.map((e) => e.id),
+        ...drafts.map((e) => e.id),
         ...archived.map((e) => e.id),
       }.toList();
       final counts = await _rsvpService.getCountsForEvents(countIds);
       if (!mounted) return;
       setState(() {
         _active = events;
+        _drafts = drafts;
         _archived = archived;
         _counts = counts;
         _loading = false;
@@ -198,7 +208,16 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
   void _applyFilters() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final source = _showArchived && !_showCalendar ? _archived : _active;
+    final List<AlumniEvent> source;
+    if (_showCalendar) {
+      source = _active;
+    } else if (_showArchived) {
+      source = _archived;
+    } else if (_showDrafts) {
+      source = _drafts;
+    } else {
+      source = _active;
+    }
     var results = List<AlumniEvent>.from(source);
 
     switch (_quickFilter) {
@@ -328,8 +347,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       context,
       title: 'Archive event?',
       message:
-          '“${event.theme}” will move to the Archived list on this screen. '
-          'You can restore it anytime.',
+          '“${event.theme}” will move to Archived. To reuse it later, '
+          'use Duplicate to create a new draft.',
       confirmLabel: 'Archive',
       icon: Icons.archive_outlined,
     );
@@ -337,16 +356,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     try {
       await _eventService.archiveEvent(event.id);
       if (!mounted) return;
-      _showSnack(
-        'Event archived',
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () async {
-            await _eventService.restoreEvent(event.id);
-            await _load();
-          },
-        ),
-      );
+      _showSnack('Event archived');
       await _load();
     } catch (e) {
       _showSnack(
@@ -356,25 +366,55 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
     }
   }
 
-  Future<void> _restore(AlumniEvent event) async {
+  Future<void> _publish(AlumniEvent event) async {
     try {
-      await _eventService.restoreEvent(event.id);
+      await _eventService.publishEvent(event.id);
       if (!mounted) return;
-      _showSnack('Event restored');
+      _showSnack('Event published');
       await _load();
     } catch (e) {
       _showSnack(
-        eventFriendlyError(e, "Couldn't restore the event. Please try again."),
+        eventFriendlyError(e, "Couldn't publish the event. Please try again."),
         isError: true,
       );
     }
   }
 
-  void _selectBrowseMode({required bool archived, required bool calendar}) {
+  Future<void> _duplicate(AlumniEvent event) async {
+    final ok = await showAdminConfirmDialog(
+      context,
+      title: 'Duplicate event?',
+      message:
+          'Create a new draft from “${event.theme}”? The original and its '
+          'RSVPs stay unchanged.',
+      confirmLabel: 'Duplicate',
+      icon: Icons.content_copy_outlined,
+    );
+    if (!ok || !mounted) return;
+    try {
+      await _eventService.duplicateEvent(event.id);
+      if (!mounted) return;
+      _showSnack('Event duplicated as draft');
+      _selectBrowseMode(archived: false, calendar: false, drafts: true);
+      await _load();
+    } catch (e) {
+      _showSnack(
+        eventFriendlyError(e, "Couldn't duplicate the event. Please try again."),
+        isError: true,
+      );
+    }
+  }
+
+  void _selectBrowseMode({
+    required bool archived,
+    required bool calendar,
+    bool drafts = false,
+  }) {
     setState(() {
       _showArchived = archived;
       _showCalendar = calendar;
-      if (archived) {
+      _showDrafts = drafts;
+      if (archived || drafts) {
         _quickFilter = 0;
         _selectedCalendarDay = null;
       }
@@ -491,8 +531,19 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
                 label: 'Active',
                 icon: Icons.view_agenda_outlined,
                 count: _hasLoaded ? _active.length : null,
-                isSelected: !_showCalendar && !_showArchived,
+                isSelected: !_showCalendar && !_showArchived && !_showDrafts,
                 onTap: () => _selectBrowseMode(archived: false, calendar: false),
+              ),
+              AdminSaaSTabSpec(
+                label: 'Draft',
+                icon: Icons.edit_note_outlined,
+                count: _hasLoaded ? _drafts.length : null,
+                isSelected: _showDrafts && !_showCalendar,
+                onTap: () => _selectBrowseMode(
+                  archived: false,
+                  calendar: false,
+                  drafts: true,
+                ),
               ),
               AdminSaaSTabSpec(
                 label: 'Archived',
@@ -878,7 +929,20 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
       return const AdminStateView.empty(
         icon: Icons.archive_outlined,
         title: 'No archived events',
-        message: 'Archived events will appear here so you can restore or delete them.',
+        message:
+            'Archived events stay here for history — duplicate to reuse as a draft.',
+      );
+    }
+    if (_showDrafts && !_hasAnyFilters) {
+      return AdminStateView.empty(
+        icon: Icons.edit_note_outlined,
+        title: 'No draft events',
+        message: 'Save a new event as a draft, or duplicate an existing one.',
+        primaryAction: AdminStateAction(
+          label: 'Create event',
+          icon: Icons.add_rounded,
+          onPressed: () => _openEditor(),
+        ),
       );
     }
     return AdminStateView.empty(
@@ -1090,10 +1154,12 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         await _openDetails(event);
       case 'edit':
         await _openEditor(event: event);
+      case 'duplicate':
+        await _duplicate(event);
+      case 'publish':
+        await _publish(event);
       case 'archive':
         await _archive(event);
-      case 'restore':
-        await _restore(event);
       case 'cancel':
         await _cancel(event);
       case 'delete':
@@ -1103,7 +1169,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
 
   List<PopupMenuEntry<String>> _menuItemsFor(AlumniEvent event) {
     final isArchived = event.status.trim().toLowerCase() == 'archived';
-    final canShare = !event.cancelled && !isArchived;
+    final isDraft = event.status.trim().toLowerCase() == 'draft';
+    final canShare = !event.cancelled && !isArchived && !isDraft;
     if (isArchived) {
       return [
         adminEventMenuItem(
@@ -1112,9 +1179,40 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
           icon: Icons.visibility_outlined,
         ),
         adminEventMenuItem(
-          value: 'restore',
-          label: 'Restore',
-          icon: Icons.unarchive_outlined,
+          value: 'duplicate',
+          label: 'Duplicate',
+          icon: Icons.content_copy_outlined,
+        ),
+        const PopupMenuDivider(height: 8),
+        adminEventMenuItem(
+          value: 'delete',
+          label: 'Delete',
+          icon: Icons.delete_outline_rounded,
+          destructive: true,
+        ),
+      ];
+    }
+    if (isDraft) {
+      return [
+        adminEventMenuItem(
+          value: 'details',
+          label: 'View details',
+          icon: Icons.visibility_outlined,
+        ),
+        adminEventMenuItem(
+          value: 'edit',
+          label: 'Edit event',
+          icon: Icons.edit_outlined,
+        ),
+        adminEventMenuItem(
+          value: 'duplicate',
+          label: 'Duplicate',
+          icon: Icons.content_copy_outlined,
+        ),
+        adminEventMenuItem(
+          value: 'publish',
+          label: 'Publish',
+          icon: Icons.publish_outlined,
         ),
         const PopupMenuDivider(height: 8),
         adminEventMenuItem(
@@ -1135,6 +1233,11 @@ class _AdminEventsScreenState extends State<AdminEventsScreen>
         value: 'edit',
         label: 'Edit event',
         icon: Icons.edit_outlined,
+      ),
+      adminEventMenuItem(
+        value: 'duplicate',
+        label: 'Duplicate',
+        icon: Icons.content_copy_outlined,
       ),
       if (canShare)
         adminEventMenuItem(

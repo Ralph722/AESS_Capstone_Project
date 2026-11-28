@@ -155,9 +155,9 @@ void main() {
       );
     });
 
-    testWidgets('official CHED shows kind chip with version', (tester) async {
+    testWidgets('official CHED shows kind chip without version', (tester) async {
       await _pumpCard(tester, _survey(kind: 'ched_gts_builtin'));
-      expect(find.text('Official CHED · v3.0.0'), findsOneWidget);
+      expect(find.text('Official CHED'), findsOneWidget);
     });
 
     testWidgets(
@@ -189,7 +189,7 @@ void main() {
 
       await _pumpCard(tester, _survey(kind: 'ched_gts_builtin'));
       final chedPillText = tester.widget<Text>(
-        find.text('Official CHED · v3.0.0'),
+        find.text('Official CHED'),
       );
       expect(chedPillText.style?.fontSize, 10.5);
       expect(chedPillText.style?.height, 1.15);

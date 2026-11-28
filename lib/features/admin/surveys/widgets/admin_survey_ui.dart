@@ -214,18 +214,15 @@ class SurveyKindChip extends StatelessWidget {
   const SurveyKindChip({
     super.key,
     required this.kind,
-    this.schemaVersion,
     this.dense = true,
   });
 
   final SurveyKindLabel kind;
-  final String? schemaVersion;
   final bool dense;
 
   factory SurveyKindChip.fromSurvey(Survey survey, {bool dense = true}) {
     return SurveyKindChip(
       kind: surveyKindLabelFor(survey),
-      schemaVersion: survey.schemaVersion ?? survey.templateVersion,
       dense: dense,
     );
   }
@@ -234,11 +231,8 @@ class SurveyKindChip extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (kind) {
       case SurveyKindLabel.officialChed:
-        final ver = schemaVersion != null && schemaVersion!.isNotEmpty
-            ? ' · v$schemaVersion'
-            : '';
         return _SurveyChip(
-          label: 'Official CHED$ver',
+          label: 'Official CHED',
           bg: const Color(0xFFFFF7ED),
           fg: const Color(0xFFC2410C),
           icon: Icons.school_outlined,

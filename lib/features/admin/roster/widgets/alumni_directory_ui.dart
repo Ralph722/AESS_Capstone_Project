@@ -778,69 +778,170 @@ class DirectoryFilterField<T> extends StatelessWidget {
 
 /// Shared themed date / time / range pickers for admin chrome.
 abstract final class DirectoryDateTimePickers {
+  static WidgetStateProperty<Color?> _selected(Color on, Color? off) =>
+      WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? on : off,
+      );
+
+  static ButtonStyle get _pickerGhostButton => TextButton.styleFrom(
+        foregroundColor: AdminDirectoryTheme.textSecondary,
+        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+      );
+
+  static ButtonStyle get _pickerPrimaryButton => FilledButton.styleFrom(
+        backgroundColor: AdminDirectoryTheme.primary,
+        foregroundColor: Colors.white,
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      );
+
+  static InputDecorationTheme get _pickerInput => InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusMd),
+          borderSide: const BorderSide(color: AdminDirectoryTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusMd),
+          borderSide: const BorderSide(color: AdminDirectoryTheme.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusMd),
+          borderSide: const BorderSide(
+            color: AdminDirectoryTheme.primary,
+            width: 1.5,
+          ),
+        ),
+      );
+
+  /// Pure-white calendar / clock dialogs with navy selection.
   static ThemeData _theme(BuildContext context) {
     final base = Theme.of(context);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusLg),
+      side: const BorderSide(color: AdminDirectoryTheme.border),
+    );
     return base.copyWith(
       colorScheme: base.colorScheme.copyWith(
         primary: AdminDirectoryTheme.primary,
         onPrimary: Colors.white,
-        surface: AdminDirectoryTheme.card,
+        secondary: AdminDirectoryTheme.gold,
+        onSecondary: AdminDirectoryTheme.primary,
+        surface: Colors.white,
+        surfaceTint: Colors.transparent,
         onSurface: AdminDirectoryTheme.textPrimary,
+        onSurfaceVariant: AdminDirectoryTheme.textSecondary,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: shape,
       ),
       datePickerTheme: DatePickerThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusLg),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        shadowColor: AdminDirectoryTheme.primary.withValues(alpha: 0.18),
+        shape: shape,
+        headerBackgroundColor: Colors.white,
+        headerForegroundColor: AdminDirectoryTheme.primary,
+        headerHelpStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AdminDirectoryTheme.textSecondary,
         ),
-        headerBackgroundColor: AdminDirectoryTheme.primary,
-        headerForegroundColor: Colors.white,
-        todayForegroundColor: const WidgetStatePropertyAll(
-          AdminDirectoryTheme.primary,
+        headerHeadlineStyle: const TextStyle(
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
+          color: AdminDirectoryTheme.primary,
         ),
-        todayBackgroundColor: WidgetStatePropertyAll(
-          AdminDirectoryTheme.primary.withValues(alpha: 0.08),
+        dividerColor: AdminDirectoryTheme.border,
+        weekdayStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AdminDirectoryTheme.textSecondary,
         ),
-      ),
-      timePickerTheme: TimePickerThemeData(
-        backgroundColor: AdminDirectoryTheme.card,
-        dialHandColor: AdminDirectoryTheme.primary,
-        dialBackgroundColor: AdminDirectoryTheme.surface,
-        dialTextColor: WidgetStateColor.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return Colors.white;
+        dayStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          if (states.contains(WidgetState.disabled)) {
+            return AdminDirectoryTheme.textMuted;
           }
           return AdminDirectoryTheme.textPrimary;
         }),
+        dayBackgroundColor: _selected(AdminDirectoryTheme.primary, null),
+        dayOverlayColor: WidgetStatePropertyAll(
+          AdminDirectoryTheme.primary.withValues(alpha: 0.08),
+        ),
+        todayForegroundColor: _selected(Colors.white, AdminDirectoryTheme.primary),
+        todayBackgroundColor: _selected(AdminDirectoryTheme.primary, null),
+        todayBorder: const BorderSide(
+          color: AdminDirectoryTheme.gold,
+          width: 2,
+        ),
+        yearForegroundColor: _selected(
+          Colors.white,
+          AdminDirectoryTheme.textPrimary,
+        ),
+        yearBackgroundColor: _selected(AdminDirectoryTheme.primary, null),
+        yearOverlayColor: WidgetStatePropertyAll(
+          AdminDirectoryTheme.primary.withValues(alpha: 0.08),
+        ),
+        cancelButtonStyle: _pickerGhostButton,
+        confirmButtonStyle: _pickerPrimaryButton,
+        inputDecorationTheme: _pickerInput,
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: Colors.white,
+        elevation: 6,
+        shape: shape,
+        helpTextStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AdminDirectoryTheme.textSecondary,
+        ),
+        hourMinuteShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusMd),
+        ),
         hourMinuteColor: WidgetStateColor.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return AdminDirectoryTheme.primary;
           }
-          return AdminDirectoryTheme.infoBg;
+          return Colors.white;
         }),
         hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return Colors.white;
-          }
+          if (states.contains(WidgetState.selected)) return Colors.white;
           return AdminDirectoryTheme.textPrimary;
         }),
-        dayPeriodColor: WidgetStateColor.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return AdminDirectoryTheme.primary;
-          }
-          return AdminDirectoryTheme.card;
-        }),
-        dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return Colors.white;
-          }
-          return AdminDirectoryTheme.textSecondary;
-        }),
+        dayPeriodShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusMd),
+        ),
         dayPeriodBorderSide: const BorderSide(
           color: AdminDirectoryTheme.border,
         ),
-        entryModeIconColor: AdminDirectoryTheme.primary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AdminDirectoryTheme.radiusLg),
-        ),
+        dayPeriodColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AdminDirectoryTheme.gold;
+          }
+          return Colors.white;
+        }),
+        dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AdminDirectoryTheme.primary;
+          }
+          return AdminDirectoryTheme.textSecondary;
+        }),
+        dialBackgroundColor: const Color(0xFFF8FAFC),
+        dialHandColor: AdminDirectoryTheme.primary,
+        dialTextColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return AdminDirectoryTheme.textPrimary;
+        }),
+        entryModeIconColor: AdminDirectoryTheme.textSecondary,
+        cancelButtonStyle: _pickerGhostButton,
+        confirmButtonStyle: _pickerPrimaryButton,
+        inputDecorationTheme: _pickerInput,
       ),
     );
   }

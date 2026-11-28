@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:alumni_system/core/services/audit_events.dart';
 import 'package:alumni_system/core/services/audit_service.dart';
+import 'package:alumni_system/core/utils/local_id.dart';
+import 'package:alumni_system/features/events/models/event_agenda_item.dart';
 import 'package:alumni_system/features/events/models/event_model.dart';
 
 /// Events data access — Supabase only.
@@ -132,7 +134,8 @@ class EventService {
     if (!audit) return;
     final action = switch (newStatus) {
       'Archived' => AuditActions.archiveEvent,
-      'Active' => AuditActions.restoreEvent,
+      'Active' => AuditActions.publishEvent,
+      'Draft' => AuditActions.updateEvent,
       _ => AuditActions.updateEvent,
     };
     unawaited(
@@ -164,12 +167,26 @@ class EventService {
   }
 
   Future<void> archiveEvent(String eventId) async {
+    final event = await getEventById(eventId);
+    if (event == null) throw Exception('Event not found');
+    if (event.status == 'Archived') return;
+    if (event.status == 'Draft') {
+      throw Exception(
+        'Draft events cannot be archived. Delete or publish them first.',
+      );
+    }
     await updateEventStatus(eventId, 'Archived');
   }
 
   Future<List<AlumniEvent>> getArchivedEvents() async {
     final events = await _fetchArchivedFromSupabase();
     events.sort((a, b) => b.date.compareTo(a.date));
+    return events;
+  }
+
+  Future<List<AlumniEvent>> getDraftEvents() async {
+    final events = await _fetchDraftFromSupabase();
+    events.sort((a, b) => a.date.compareTo(b.date));
     return events;
   }
 
@@ -215,8 +232,65 @@ class EventService {
     );
   }
 
-  Future<void> restoreEvent(String eventId) async {
+  /// Publishes a draft event so alumni can see it.
+  Future<void> publishEvent(String eventId) async {
+    final event = await getEventById(eventId);
+    if (event == null) throw Exception('Event not found');
+    if (event.status != 'Draft') {
+      throw Exception(
+        'Archived events cannot be restored. '
+        'Duplicate to create a new draft from this template.',
+      );
+    }
     await updateEventStatus(eventId, 'Active');
+  }
+
+  /// Clones an event as a new draft (template only — no RSVPs).
+  Future<String> duplicateEvent(String sourceId) async {
+    final source = await getEventById(sourceId);
+    if (source == null) throw Exception('Event not found');
+    final baseTheme = source.theme.trim().isEmpty
+        ? 'Untitled event'
+        : source.theme.trim();
+    final copy = AlumniEvent(
+      id: LocalId.generate(),
+      theme: baseTheme.endsWith('(Copy)') ? baseTheme : '$baseTheme (Copy)',
+      batchYear: source.batchYear,
+      date: source.date,
+      venue: source.venue,
+      status: 'Draft',
+      comments: 0,
+      startTime: source.startTime,
+      endTime: source.endTime,
+      description: source.description,
+      createdAt: DateTime.now(),
+      coverImageUrl: source.coverImageUrl,
+      category: source.category,
+      capacity: source.capacity,
+      registrationDeadline: source.registrationDeadline,
+      agenda: [
+        for (final item in source.agenda)
+          EventAgendaItem(time: item.time, title: item.title),
+      ],
+      viewsCount: 0,
+      cancelled: false,
+      venueLatitude: source.venueLatitude,
+      venueLongitude: source.venueLongitude,
+    );
+    await _supabase.from('events').upsert(copy.toSupabaseRow(), onConflict: 'id');
+    unawaited(
+      _audit.logAction(
+        action: AuditActions.duplicateEvent,
+        resource: 'Event',
+        resourceId: copy.id,
+        description: 'Duplicated event as draft: ${copy.theme}',
+        changes: {'sourceId': sourceId},
+        userRole: 'admin',
+        module: AuditModules.events,
+        targetLabel: copy.theme,
+      ),
+    );
+    return copy.id;
   }
 
   Future<void> cancelEvent(String eventId) async {
@@ -308,6 +382,20 @@ class EventService {
           .select(eventSelectColumns)
           .eq('status', 'Archived')
           .order('date', ascending: false)
+          .limit(100);
+      return rows.map(AlumniEvent.fromSupabaseRow).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<AlumniEvent>> _fetchDraftFromSupabase() async {
+    try {
+      final rows = await _supabase
+          .from('events')
+          .select(eventSelectColumns)
+          .eq('status', 'Draft')
+          .order('date', ascending: true)
           .limit(100);
       return rows.map(AlumniEvent.fromSupabaseRow).toList();
     } catch (_) {

@@ -224,6 +224,8 @@ class JobStatusBadge extends StatelessWidget {
     final s = status.toLowerCase();
     final PortalChipTone tone;
     switch (s) {
+      case 'draft':
+        tone = PortalChipTone.warning;
       case 'active':
         tone = PortalChipTone.success;
       case 'expired':

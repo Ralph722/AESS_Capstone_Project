@@ -32,13 +32,20 @@ Future<List<Object?>> _openFrom(
   return results;
 }
 
-AlumniMember _member({bool registered = true}) => AlumniMember(
-  id: 'm1',
-  fullName: 'Juan Santos',
+AlumniMember _member({
+  bool registered = true,
+  String id = 'm1',
+  String fullName = 'Juan Santos',
+  String studentId = '2023304878',
+  String? authUid = 'uid-1',
+}) => AlumniMember(
+  id: id,
+  fullName: fullName,
   course: 'BSIT',
-  studentId: '2023304878',
+  studentId: studentId,
   batchYear: '2024',
   isRegisteredUser: registered,
+  authUid: registered ? authUid : null,
 );
 
 void main() {
@@ -163,6 +170,65 @@ void main() {
       await tester.pumpAndSettle();
       expect(results, [false]);
       expect(submitted, 0);
+    });
+  });
+
+  group('CHED bulk export dialog', () {
+    testWidgets('excludes registered alumni with no tracer submission', (
+      tester,
+    ) async {
+      final withTracer = _member(
+        id: 'm-answered',
+        fullName: 'Answered Alumni',
+        studentId: 'A1',
+        authUid: 'uid-answered',
+      );
+      final noTracer = _member(
+        id: 'm-new',
+        fullName: 'New Alumni',
+        studentId: 'A2',
+        authUid: 'uid-new',
+      );
+      final results = await _openFrom(
+        tester,
+        (context) => showChedBulkExportDialog(
+          context,
+          members: [withTracer, noTracer],
+          chedProgress: {
+            'uid-answered': (assigned: 1, submitted: 1),
+            'uid-new': (assigned: 1, submitted: 0),
+          },
+        ),
+      );
+
+      expect(find.textContaining('submitted a tracer survey'), findsOneWidget);
+      expect(find.text('Will export'), findsOneWidget);
+      expect(find.text('1'), findsWidgets);
+
+      await tester.tap(find.textContaining('Export ZIP'));
+      await tester.pumpAndSettle();
+
+      expect(results, hasLength(1));
+      final choice = results.single as ChedBulkExportChoice;
+      expect(choice.members.map((m) => m.id), ['m-answered']);
+    });
+
+    testWidgets('individual info sheet still exports registered without tracer', (
+      tester,
+    ) async {
+      final results = await _openFrom(
+        tester,
+        (context) => showChedBulkExportDialog(
+          context,
+          members: [_member()],
+          kind: DirectoryBulkReportKind.individualInfoSheet,
+          chedProgress: const {},
+        ),
+      );
+      await tester.tap(find.textContaining('Export ZIP'));
+      await tester.pumpAndSettle();
+      final choice = results.single as ChedBulkExportChoice;
+      expect(choice.members, hasLength(1));
     });
   });
 

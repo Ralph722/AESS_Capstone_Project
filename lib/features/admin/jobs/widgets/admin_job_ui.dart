@@ -142,6 +142,12 @@ class AdminJobStatusBadges extends StatelessWidget {
 
     final AdminBadge statusBadge;
     switch (normalized) {
+      case 'draft':
+        statusBadge = const AdminBadge.warning(
+          label: 'Draft',
+          icon: Icons.edit_note_outlined,
+          dense: true,
+        );
       case 'active':
         statusBadge = const AdminBadge.success(
           label: 'Active',
@@ -209,8 +215,10 @@ class AdminJobCard extends StatefulWidget {
     required this.onEdit,
     required this.onDetails,
     required this.onInterested,
-    required this.onToggleArchive,
+    required this.onDuplicate,
     required this.onDelete,
+    this.onArchive,
+    this.onPost,
     this.onShare,
     this.busy = false,
   });
@@ -221,8 +229,10 @@ class AdminJobCard extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onDetails;
   final VoidCallback onInterested;
-  final VoidCallback onToggleArchive;
+  final VoidCallback onDuplicate;
   final VoidCallback onDelete;
+  final VoidCallback? onArchive;
+  final VoidCallback? onPost;
   final VoidCallback? onShare;
   final bool busy;
 
@@ -457,8 +467,12 @@ class _AdminJobCardState extends State<AdminJobCard> {
             widget.onShare?.call();
           case 'edit':
             widget.onEdit();
+          case 'duplicate':
+            widget.onDuplicate();
+          case 'post':
+            widget.onPost?.call();
           case 'archive':
-            widget.onToggleArchive();
+            widget.onArchive?.call();
           case 'delete':
             widget.onDelete();
         }
@@ -487,12 +501,22 @@ class _AdminJobCardState extends State<AdminJobCard> {
           icon: Icons.edit_outlined,
         ),
         adminJobMenuItem(
-          value: 'archive',
-          label: job.status == 'archived' ? 'Activate' : 'Archive',
-          icon: job.status == 'archived'
-              ? Icons.unarchive_outlined
-              : Icons.archive_outlined,
+          value: 'duplicate',
+          label: 'Duplicate',
+          icon: Icons.content_copy_outlined,
         ),
+        if (widget.onPost != null)
+          adminJobMenuItem(
+            value: 'post',
+            label: 'Post',
+            icon: Icons.publish_outlined,
+          ),
+        if (widget.onArchive != null)
+          adminJobMenuItem(
+            value: 'archive',
+            label: 'Archive',
+            icon: Icons.archive_outlined,
+          ),
         const PopupMenuDivider(height: 8),
         adminJobMenuItem(
           value: 'delete',

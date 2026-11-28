@@ -296,7 +296,7 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
         batchYear: _batchYear.text.trim(),
         date: _parseDate(_date.text.trim()),
         venue: _venue.text.trim(),
-        status: widget.event?.status ?? 'Active',
+        status: widget.event?.status ?? 'Draft',
         comments: widget.event?.comments ?? 0,
         startTime: _start.text.trim(),
         endTime: _end.text.trim(),
@@ -346,7 +346,7 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
           title: _isEdit ? 'Edit event' : 'New event',
           subtitle: _isEdit
               ? 'Update schedule, venue, and details'
-              : 'Create an alumni event for the portal',
+              : 'Save a draft, then publish when ready',
           icon: _isEdit ? Icons.edit_calendar_outlined : Icons.event_outlined,
           onClose: _saving ? null : () => Navigator.pop(context, false),
         ),
@@ -913,8 +913,11 @@ class _AdminEventEditorDialogState extends State<AdminEventEditorDialog> {
                         color: Colors.white,
                       ),
                     )
-                  : Icon(_isEdit ? Icons.save_outlined : Icons.publish, size: 18),
-              label: Text(_isEdit ? 'Save' : 'Publish'),
+                  : Icon(
+                      _isEdit ? Icons.save_outlined : Icons.edit_note_outlined,
+                      size: 18,
+                    ),
+              label: Text(_isEdit ? 'Save' : 'Save draft'),
               style: AdminButtonStyles.filled(),
             ),
           ],

@@ -1,6 +1,7 @@
 -- Phase 23: scheduled survey SMS 'assigned' is near-publish only (24h),
--- hourly cron, and does not backfill stale assignments. Seeds throwaway
--- rows, claims as service_role, asserts, then rolls back.
+-- hourly cron, publish kick via notify_survey_published, and does not
+-- backfill stale assignments. Seeds throwaway rows, claims as
+-- service_role, asserts, then rolls back.
 begin;
 
 create temp table t (n int, test text, expected text, actual text);
@@ -27,6 +28,20 @@ select 3,
   'true',
   (pg_get_functiondef('public.claim_scheduled_survey_sms(integer)'::regprocedure)
      like '%interval ''24 hours''%')::text;
+
+insert into t
+select 7,
+  'notify_survey_published kicks scheduled_sms_dispatch',
+  'true',
+  (pg_get_functiondef('public.notify_survey_published()'::regprocedure)
+     like '%scheduled_sms_dispatch%')::text;
+
+insert into t
+select 8,
+  'notify_survey_published kicks scheduled_email_dispatch',
+  'true',
+  (pg_get_functiondef('public.notify_survey_published()'::regprocedure)
+     like '%scheduled_email_dispatch%')::text;
 
 set local role service_role;
 

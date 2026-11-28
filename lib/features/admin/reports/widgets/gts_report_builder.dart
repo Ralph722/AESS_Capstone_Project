@@ -1101,14 +1101,18 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
     final canCount = measure?.allows(GtsCalculation.count) ?? false;
     final unavailable = [
       for (final t in GtsChartType.values)
-        if (GtsReportValidator.chartIssue(_config, t) case final reason?)
-          '${_chartLabel(t)}: $reason',
+        if (t != GtsChartType.pie)
+          if (GtsReportValidator.chartIssue(_config, t) case final reason?)
+            '${_chartLabel(t)}: $reason',
     ];
     return [
       Wrap(
         spacing: 6,
         runSpacing: 6,
-        children: [for (final t in GtsChartType.values) _chartTile(t)],
+        children: [
+          for (final t in GtsChartType.values)
+            if (t != GtsChartType.pie) _chartTile(t),
+        ],
       ),
       if (unavailable.isNotEmpty) ...[
         const SizedBox(height: 6),
@@ -1334,6 +1338,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
     GtsChartType.bar => 'Bars',
     GtsChartType.horizontalBar => 'Horizontal bars',
     GtsChartType.donut => 'Donut',
+    GtsChartType.pie => 'Pie chart',
     GtsChartType.line => 'Line',
     GtsChartType.groupedBar => 'Grouped bars',
     GtsChartType.stackedBar => 'Stacked bars',
@@ -1344,6 +1349,7 @@ class _GtsReportBuilderPanelState extends State<GtsReportBuilderPanel> {
     GtsChartType.bar => Icons.bar_chart,
     GtsChartType.horizontalBar => Icons.align_horizontal_left,
     GtsChartType.donut => Icons.donut_large,
+    GtsChartType.pie => Icons.pie_chart_outline,
     GtsChartType.line => Icons.show_chart,
     GtsChartType.groupedBar => Icons.insert_chart_outlined,
     GtsChartType.stackedBar => Icons.stacked_bar_chart,

@@ -122,8 +122,21 @@ Finder _savedDropdown() => find.byWidgetPredicate(
       (w.key as ValueKey<String>?)?.value.startsWith('saved-') == true,
 );
 
+Finder _readyMadeDropdown() => find.widgetWithText(
+  DropdownButtonFormField<String?>,
+  'Start from a ready-made list',
+);
+
 Future<void> _openSaved(WidgetTester tester, String name) async {
   await tester.tap(_savedDropdown());
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(name).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openReadyMade(WidgetTester tester, String name) async {
+  await tester.ensureVisible(_readyMadeDropdown());
+  await tester.tap(_readyMadeDropdown());
   await tester.pumpAndSettle();
   await tester.tap(find.text(name).last);
   await tester.pumpAndSettle();
@@ -206,7 +219,7 @@ void main() {
     });
   });
 
-  group('alumni list saved reports', () {
+  group('alumni list saved templates', () {
     testWidgets('saving stores list settings under the given name', (
       tester,
     ) async {
@@ -214,9 +227,12 @@ void main() {
       final changes = <GtsListConfig>[];
       final opened = <GtsSavedReport?>[];
       await _pumpList(tester, store: store, changes: changes, opened: opened);
-      expect(find.text('No saved reports yet'), findsOneWidget);
+      expect(find.text('Saved reports'), findsNothing);
+      expect(find.text('Report name (optional)'), findsNothing);
+      expect(find.text('Save template'), findsOneWidget);
 
-      await tester.tap(find.text('Save report'));
+      await tester.ensureVisible(find.text('Save template'));
+      await tester.tap(find.text('Save template'));
       await tester.pumpAndSettle();
       await _nameAndSave(tester, '  Batch 2023 list ');
 
@@ -225,12 +241,17 @@ void main() {
       expect(saved.isList, isTrue);
       expect(saved.listSettings.surveyId, 'w2');
       expect(saved.listSettings.title, 'Batch 2023 list');
+      expect(
+        saved.listSettings.templateKey,
+        GtsListTemplates.savedKey(saved.id),
+      );
       expect(changes.last.title, 'Batch 2023 list');
       expect(opened.last?.id, saved.id);
-      expect(find.text('Save changes'), findsOneWidget);
+      expect(find.text('Save template changes'), findsOneWidget);
+      expect(find.text('Batch 2023 list'), findsWidgets);
     });
 
-    testWidgets('opening applies the settings; edits show unsaved changes', (
+    testWidgets('opening a saved template from ready-made applies settings', (
       tester,
     ) async {
       final store = _FakeStore()
@@ -242,28 +263,24 @@ void main() {
         );
       final changes = <GtsListConfig>[];
       await _pumpList(tester, store: store, changes: changes);
-      await _openSaved(tester, 'Job details');
+      await _openReadyMade(tester, 'Job details');
 
       expect(changes.last.surveyId, 'w1');
       expect(changes.last.columns, contains('ched_19'));
       expect(changes.last.title, 'Job details');
-      expect(find.text('Unsaved changes'), findsNothing);
-
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Report name (optional)'),
-        'Renamed',
+      expect(
+        changes.last.templateKey,
+        GtsListTemplates.savedKey(store.reports.single.id),
       );
-      await tester.pumpAndSettle();
+      expect(find.byTooltip('Back to custom list'), findsOneWidget);
+
       await tester.tap(find.widgetWithText(FilterChip, 'BSIT').first);
       await tester.pumpAndSettle();
-      expect(find.text('Unsaved changes'), findsOneWidget);
-
-      await tester.tap(find.text('Save changes'));
+      await tester.ensureVisible(find.text('Save template changes'));
+      await tester.tap(find.text('Save template changes'));
       await tester.pumpAndSettle();
       expect(store.reports, hasLength(1));
-      expect(store.reports.single.name, 'Renamed');
       expect(store.reports.single.listSettings.courses, ['BSIT']);
-      expect(find.text('Unsaved changes'), findsNothing);
     });
 
     testWidgets('a missing wave falls back to the newest with a message', (
@@ -276,30 +293,21 @@ void main() {
         );
       final changes = <GtsListConfig>[];
       await _pumpList(tester, store: store, changes: changes);
-      await _openSaved(tester, 'Old list');
+      await _openReadyMade(tester, 'Old list');
 
       expect(changes.last.surveyId, 'w2');
       expect(
         find.textContaining('no longer available; the newest wave'),
         findsOneWidget,
       );
-      expect(find.text('Unsaved changes'), findsOneWidget);
     });
 
-    testWidgets('a template fills in the settings and keeps the wave', (
+    testWidgets('a builtin template fills settings; exit returns to custom', (
       tester,
     ) async {
       final changes = <GtsListConfig>[];
       await _pumpList(tester, store: _FakeStore(), changes: changes);
-      await tester.tap(
-        find.widgetWithText(
-          DropdownButtonFormField<String>,
-          'Start from a ready-made list',
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Untracked alumni for follow-up').last);
-      await tester.pumpAndSettle();
+      await _openReadyMade(tester, 'Untracked alumni for follow-up');
 
       final t = GtsListTemplates.byKey('list_untracked_follow_up')!;
       expect(changes.last.templateKey, t.key);
@@ -307,40 +315,21 @@ void main() {
       expect(changes.last.columns, t.config.columns);
       expect(changes.last.statuses, t.config.statuses);
       expect(find.textContaining(t.summary), findsOneWidget);
-      expect(
-        tester
-            .widget<TextField>(
-              find.widgetWithText(TextField, 'Report name (optional)'),
-            )
-            .controller!
-            .text,
-        t.name,
-      );
+      expect(find.byTooltip('Back to custom list'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Back to custom list'));
+      await tester.pumpAndSettle();
+      expect(changes.last.templateKey, isNull);
+      expect(find.byTooltip('Back to custom list'), findsNothing);
+      expect(find.text('Custom list'), findsWidgets);
     });
 
-    testWidgets('summary reports are listed and handed to the other mode', (
-      tester,
-    ) async {
-      final store = _FakeStore()
-        ..add('A summary', _summaryJson('A summary'))
-        ..add('A list', const GtsListConfig(surveyId: 'w2').toJson());
-      final others = <GtsSavedReport>[];
-      final changes = <GtsListConfig>[];
-      await _pumpList(tester, store: store, others: others, changes: changes);
-      await _openSaved(tester, 'A summary');
-
-      expect(others.single.name, 'A summary');
-      expect(changes, isEmpty);
-    });
-
-    testWidgets('summary reports are hidden without the other mode', (
-      tester,
-    ) async {
+    testWidgets('summary reports are not listed in ready-made', (tester) async {
       final store = _FakeStore()
         ..add('A summary', _summaryJson('A summary'))
         ..add('A list', const GtsListConfig(surveyId: 'w2').toJson());
       await _pumpList(tester, store: store);
-      await tester.tap(_savedDropdown());
+      await tester.tap(_readyMadeDropdown());
       await tester.pumpAndSettle();
       expect(find.text('A list'), findsWidgets);
       expect(find.text('A summary'), findsNothing);

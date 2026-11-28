@@ -427,8 +427,9 @@ void main() {
           inApp: true,
           email: true,
           emailDropped: false,
+          sms: true,
         ),
-        'Send in-app + email reminders for “Tracer 2026” to 3 pending alumni?',
+        'Send in-app + email + SMS reminders for “Tracer 2026” to 3 pending alumni?',
       );
     });
 
@@ -442,15 +443,18 @@ void main() {
       );
       expect(message, startsWith('Send in-app reminders for this survey to 1 '
           'pending alumnus?'));
-      expect(message, contains('sent in-app only'));
+      expect(message, contains('skip email'));
     });
 
-    test('summary lists skipped emails, including not configured', () {
+    test('summary lists skipped emails and SMS, including not configured', () {
       const result = SurveyReminderResult(
         inAppSent: 4,
         emailSent: 2,
         emailSkippedNoAddress: 1,
         emailSkippedNotConfigured: 2,
+        smsSent: 3,
+        smsSkippedNoMobile: 1,
+        smsSkippedNotConfigured: 2,
       );
       expect(
         surveyReminderSummary(
@@ -458,9 +462,11 @@ void main() {
           inApp: true,
           email: true,
           emailDropped: false,
+          sms: true,
         ),
-        'Sent: 4 in-app, 2 email, 1 skipped (no email), '
-        '2 email skipped (not set up)',
+        'Sent: 4 in-app, 2 email, 3 SMS, 1 skipped (no email), '
+        '2 email skipped (not set up), 1 skipped (no verified mobile), '
+        '2 SMS skipped (not set up)',
       );
     });
 

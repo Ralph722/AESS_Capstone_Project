@@ -56,4 +56,22 @@ void main() {
     expect(next.onPressed, isNull);
     expect(changed, isFalse);
   });
+
+  testWidgets('leading action sits beside the page range label', (tester) async {
+    await pumpAdmin(
+      tester,
+      AdminPaginationBar(
+        totalItems: 8,
+        page: 0,
+        pageSize: 25,
+        onPageChanged: (_) {},
+        leading: TextButton(
+          onPressed: () {},
+          child: const Text('Mark all as reviewed'),
+        ),
+      ),
+    );
+    expect(find.text('Mark all as reviewed'), findsOneWidget);
+    expect(find.text('Showing 1–8 of 8'), findsOneWidget);
+  });
 }

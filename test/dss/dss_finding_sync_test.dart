@@ -186,6 +186,59 @@ void main() {
     expect(reasonOf(_row(_w3, rule: 'DATA_QUALITY_LOW')), 'data_quality');
   });
 
+  group('sticky once-per-cohort TIME_TO_JOB_LONG', () {
+    final stickyKey = dssFindingKey(
+      'TIME_TO_JOB_LONG',
+      'batch',
+      'BSIT',
+      '2024',
+    );
+
+    DssStoredFlag stickyFlag(
+      String id,
+      String surveyId,
+      DssFlagStatus status,
+    ) => (id: id, findingKey: stickyKey, surveyId: surveyId, status: status);
+
+    test('open on an earlier wave blocks re-raise and supersede', () {
+      final plan = _plan(
+        rows: [_row(_w3, rule: 'TIME_TO_JOB_LONG')],
+        stored: [stickyFlag('a', _w1, DssFlagStatus.open)],
+      );
+      expect(plan.inserts, isEmpty);
+      expect(plan.supersedes, isEmpty);
+      expect(plan.events.single.reason, 'sticky_prior_finding');
+    });
+
+    test('closed on an earlier wave blocks re-raise', () {
+      final plan = _plan(
+        rows: [_row(_w3, rule: 'TIME_TO_JOB_LONG')],
+        stored: [stickyFlag('a', _w1, DssFlagStatus.resolved)],
+      );
+      expect(plan.inserts, isEmpty);
+      expect(plan.events.single.reason, 'sticky_prior_finding');
+    });
+
+    test('Watch on an earlier wave may upgrade to a Finding', () {
+      final plan = _plan(
+        rows: [_row(_w3, rule: 'TIME_TO_JOB_LONG')],
+        stored: [stickyFlag('w', _w1, DssFlagStatus.watch)],
+      );
+      expect(plan.inserts.single.row['survey_id'], _w3);
+      expect(plan.supersedes.single.id, 'w');
+      expect(plan.supersedes.single.from, DssFlagStatus.watch);
+    });
+
+    test('unemployment still re-raises and supersedes across waves', () {
+      final plan = _plan(
+        rows: [_row(_w3)],
+        stored: [_flag('a', _w1, DssFlagStatus.open)],
+      );
+      expect(plan.inserts.single.row['survey_id'], _w3);
+      expect(plan.supersedes.single.id, 'a');
+    });
+  });
+
   test('waves without a known date are never treated as older', () {
     final plan = DssFindingSync.plan(
       rows: [_row('archived'), _row(_w3)],

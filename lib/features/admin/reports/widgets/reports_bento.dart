@@ -7,7 +7,6 @@ import 'package:alumni_system/core/constants/ustp_colors.dart';
 import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_kpi.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
-import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_theme.dart';
 
 /// Category colours for bento charts grounded in official USTP system colours.
@@ -225,7 +224,6 @@ class ReportsBentoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final captionText = caption;
-    final detailsText = details;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
       decoration: _bentoDecoration(),
@@ -265,8 +263,6 @@ class ReportsBentoCard extends StatelessWidget {
                 ),
               ),
               if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-              if (detailsText != null && detailsText.isNotEmpty)
-                ReportsDetailsButton(title: title, body: detailsText),
             ],
           ),
           const SizedBox(height: 10),
@@ -358,7 +354,6 @@ class ReportsStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final pill = pillLabel;
     final pillTint = pillColor ?? AdminReportsTheme.textSecondary;
-    final detailsText = details;
 
     return Container(
       decoration: _bentoDecoration(),
@@ -395,8 +390,6 @@ class ReportsStatCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (detailsText != null && detailsText.isNotEmpty)
-                  ReportsDetailsButton(title: label, body: detailsText),
               ],
             ),
             const SizedBox(height: 4),

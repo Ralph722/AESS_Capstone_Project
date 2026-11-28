@@ -55,7 +55,7 @@ abstract final class GtsListNarrative {
       if (employment != null) {
         buffer.write(
           'The employment rate is ${employment.share}, calculated by '
-          'dividing the number who answered Yes by the number who answered '
+          'dividing the number marked Employed by the number who answered '
           'this question (${employment.count}). ',
         );
       }

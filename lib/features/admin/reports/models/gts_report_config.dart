@@ -5,6 +5,8 @@ enum GtsChartType {
   bar,
   horizontalBar,
   donut,
+  /// Filled pie (no center hole).
+  pie,
   line,
   groupedBar,
   stackedBar,

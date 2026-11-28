@@ -193,13 +193,18 @@ void main() {
     expect(find.text('Add a Profile Photo'), findsOneWidget);
     await tap(tester, button('Skip for now'));
 
-    // Review offers Membership Form download (no preview / summary card).
+    // Review requires Membership Form download + save confirm before Enter.
     expect(find.text('You’re All Set, Maria!'), findsOneWidget);
     expect(find.text('Membership Form'), findsOneWidget);
+    expect(find.text('I saved my Membership Form'), findsOneWidget);
+    expect(find.textContaining('from Profile for 30 days'), findsOneWidget);
     expect(find.text('Preview'), findsNothing);
     expect(find.textContaining('Optional'), findsNothing);
-    expect(button('Enter alumni portal'), findsOneWidget);
     expect(find.text('Edit'), findsNothing);
+    final enter = tester.widget<ButtonStyleButton>(
+      button('Enter alumni portal'),
+    );
+    expect(enter.onPressed, isNull);
 
     final upserts = _requests.where(
       (r) => r.method == 'POST' && r.url.path == '/rest/v1/users',

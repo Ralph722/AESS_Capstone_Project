@@ -376,6 +376,17 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
   }
 
   Future<void> _duplicate(Survey s) async {
+    final ok = await showAdminConfirmDialog(
+      context,
+      title: 'Duplicate survey?',
+      message:
+          '${surveyIdentityText(s)}\n\n'
+          'Creates a new draft from this template. The original and its '
+          'response history stay unchanged.',
+      confirmLabel: 'Duplicate',
+      icon: Icons.content_copy_outlined,
+    );
+    if (!ok) return;
     try {
       final id = await _surveyService.duplicateSurvey(s.id);
       if (!mounted) return;
@@ -389,32 +400,26 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
     }
   }
 
-  Future<void> _archive(Survey s, {required bool archived}) async {
+  Future<void> _archive(Survey s) async {
     final ok = await showAdminConfirmDialog(
       context,
-      title: archived ? 'Archive survey?' : 'Restore survey?',
+      title: 'Archive survey?',
       message:
           '${surveyIdentityText(s)}\n\n'
-          '${archived ? 'Archived surveys are hidden from the active list. You can restore them later.' : 'This survey will return to the active list with its previous status.'}',
-      confirmLabel: archived ? 'Archive' : 'Restore',
-      icon: archived ? Icons.archive_outlined : Icons.unarchive_outlined,
+          'Archived surveys leave the active list but keep their response '
+          'history. To reuse this template, use Duplicate.',
+      confirmLabel: 'Archive',
+      icon: Icons.archive_outlined,
     );
     if (!ok) return;
     try {
-      await _surveyService.setSurveyArchived(s.id, archived: archived);
-      _showSnack(
-        archived ? 'Survey archived' : 'Survey restored',
-        tone: _SnackTone.success,
-      );
+      await _surveyService.setSurveyArchived(s.id, archived: true);
+      if (!mounted) return;
+      _showSnack('Survey archived', tone: _SnackTone.success);
       _load();
     } catch (e) {
       _showSnack(
-        _friendlyError(
-          e,
-          archived
-              ? "Couldn't archive the survey. Please try again."
-              : "Couldn't restore the survey. Please try again.",
-        ),
+        _friendlyError(e, "Couldn't archive the survey. Please try again."),
         tone: _SnackTone.danger,
       );
     }
@@ -434,7 +439,7 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
         context,
         title: 'Send reminders?',
         message:
-            'Send in-app and email reminders to ${pendingIds.length} '
+            'Send in-app, email, and SMS reminders to ${pendingIds.length} '
             'pending alumni?\n\n${surveyIdentityText(s)}',
         confirmLabel: 'Send reminders',
         icon: Icons.notifications_active_outlined,
@@ -445,6 +450,7 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
         userIds: pendingIds,
         inApp: true,
         email: true,
+        sms: true,
       );
       if (!mounted) return;
       final skipped = <String>[
@@ -452,10 +458,15 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
           '${result.emailSkippedNoAddress} without an email address',
         if (result.emailSkippedNotConfigured > 0)
           '${result.emailSkippedNotConfigured} because email is not configured',
+        if (result.smsSkippedNoMobile > 0)
+          '${result.smsSkippedNoMobile} without a verified mobile',
+        if (result.smsSkippedNotConfigured > 0)
+          '${result.smsSkippedNotConfigured} because SMS is not configured',
       ];
       final message = StringBuffer(
         'Reminders sent: ${result.inAppSent} in-app'
-        '${result.emailSent > 0 ? ', ${result.emailSent} email' : ''}.',
+        '${result.emailSent > 0 ? ', ${result.emailSent} email' : ''}'
+        '${result.smsSent > 0 ? ', ${result.smsSent} SMS' : ''}.',
       );
       if (skipped.isNotEmpty) {
         message.write(' Email skipped: ${skipped.join('; ')}.');
@@ -502,10 +513,8 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
         s.status == SurveyStatus.published &&
         !s.archived) {
       await _remindPending(s);
-    } else if (value == 'archive') {
-      await _archive(s, archived: true);
-    } else if (value == 'unarchive') {
-      await _archive(s, archived: false);
+    } else if (value == 'archive' && !s.archived) {
+      await _archive(s);
     } else if (value == 'reassign' &&
         s.status == SurveyStatus.published &&
         !s.archived) {
@@ -651,26 +660,22 @@ class _AdminSurveysScreenState extends State<AdminSurveysScreen>
           icon: Icons.group_add_outlined,
         ),
       ],
-      const PopupMenuDivider(height: 8),
-      if (live)
-        surveyMenuItem(
-          value: 'close',
-          label: 'Close survey',
-          icon: Icons.lock_outline,
-          destructive: true,
-        ),
-      if (s.archived)
-        surveyMenuItem(
-          value: 'unarchive',
-          label: 'Restore from archive',
-          icon: Icons.unarchive_outlined,
-        )
-      else
-        surveyMenuItem(
-          value: 'archive',
-          label: 'Archive',
-          icon: Icons.archive_outlined,
-        ),
+      if (live || !s.archived) ...[
+        const PopupMenuDivider(height: 8),
+        if (live)
+          surveyMenuItem(
+            value: 'close',
+            label: 'Close survey',
+            icon: Icons.lock_outline,
+            destructive: true,
+          ),
+        if (!s.archived)
+          surveyMenuItem(
+            value: 'archive',
+            label: 'Archive',
+            icon: Icons.archive_outlined,
+          ),
+      ],
       const PopupMenuDivider(height: 8),
       surveyMenuItem(
         value: 'delete',

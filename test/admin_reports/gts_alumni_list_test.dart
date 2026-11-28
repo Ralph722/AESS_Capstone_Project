@@ -540,20 +540,23 @@ void main() {
         const GtsListConfig(surveyId: 'w2', columns: ['ched_16']),
       );
       final item16 = GtsListTables.sections(withItem16).firstWhere(
-        (section) => section.title == 'Presently employed',
+        (section) => section.title == 'Employment status',
       );
-      expect(item16.line('Yes')!.count, '${withItem16.tally.count(GtsTracerStatus.employed)}');
+      expect(
+        item16.line('Employed')!.count,
+        '${withItem16.tally.count(GtsTracerStatus.employed)}',
+      );
       expect(
         item16.line(GtsListTables.employmentRateLabel)!.share,
         GtsListTables.percent(withItem16.tally.employmentRate),
       );
       final note = GtsListNarrative.compose(withItem16);
       expect(note, contains(GtsListTables.percent(withItem16.tally.responseRate)));
-      expect(note, contains(item16.line('Yes')!.count));
+      expect(note, contains(item16.line('Employed')!.count));
       expect(note, isNot(contains('Juan')));
     });
 
-    test('a chart count is the tally count for that category', () {
+    test('a chart value is the tally share percent for that category', () {
       final result = _build(
         const GtsListConfig(
           surveyId: 'w2',
@@ -562,15 +565,16 @@ void main() {
         ),
       );
       final chart = GtsListTables.charts(result).firstWhere(
-        (chart) => chart.title == 'Presently employed',
+        (chart) => chart.title == 'Employment status',
       );
+      expect(chart.isPercent, isTrue);
       final section = GtsListTables.sections(result).firstWhere(
-        (section) => section.title == 'Presently employed',
+        (section) => section.title == 'Employment status',
       );
       for (var i = 0; i < chart.labels.length; i++) {
         expect(
           chart.series.single.values[i],
-          int.parse(section.line(chart.labels[i])!.count),
+          GtsListTables.sharePoints(section.line(chart.labels[i])!),
         );
       }
     });

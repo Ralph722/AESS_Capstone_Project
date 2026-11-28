@@ -80,6 +80,7 @@ class _AdminJobManagementState extends State<AdminJobManagement>
     return _totalInterest / _jobs.length;
   }
 
+  int get _draftCount => _jobs.where((j) => j.status == 'draft').length;
   int get _activeCount => _jobs.where((j) => j.status == 'active').length;
   int get _expiredCount => _jobs.where((j) => j.status == 'expired').length;
   int get _archivedCount => _jobs.where((j) => j.status == 'archived').length;
@@ -214,6 +215,8 @@ class _AdminJobManagementState extends State<AdminJobManagement>
 
   String _statusLabel(String value) {
     switch (value) {
+      case 'draft':
+        return 'Draft';
       case 'active':
         return 'Active';
       case 'expired':
@@ -353,18 +356,77 @@ class _AdminJobManagementState extends State<AdminJobManagement>
       );
   }
 
-  Future<void> _toggleArchive(JobPosting job) async {
-    if (_busyJobIds.contains(job.id)) return;
-    final next = job.status == 'archived' ? 'active' : 'archived';
-    final updated = job.copyWith(status: next, isActive: next == 'active');
+  Future<void> _archive(JobPosting job) async {
+    if (_busyJobIds.contains(job.id) || job.status == 'archived') return;
+    final label = job.jobTitle.trim().isEmpty
+        ? 'this job posting'
+        : '“${job.jobTitle.trim()}”';
+    final ok = await showAdminConfirmDialog(
+      context,
+      title: 'Archive job?',
+      message:
+          'Archive $label? It leaves the active board but stays viewable '
+          'in Archived. To reuse it, use Duplicate.',
+      confirmLabel: 'Archive',
+      icon: Icons.archive_outlined,
+    );
+    if (!ok || !mounted) return;
     setState(() => _busyJobIds.add(job.id));
     try {
-      await _jobService.updateJobPosting(updated);
-      _showSnack(next == 'archived' ? 'Job archived' : 'Job activated');
+      await _jobService.archiveJob(job.id);
+      _showSnack('Job archived');
       await _load();
     } catch (e) {
       _showSnack(
-        jobFriendlyError(e, 'Could not update job status.'),
+        jobFriendlyError(e, 'Could not archive this job.'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busyJobIds.remove(job.id));
+    }
+  }
+
+  Future<void> _post(JobPosting job) async {
+    if (_busyJobIds.contains(job.id) || job.status != 'draft') return;
+    setState(() => _busyJobIds.add(job.id));
+    try {
+      await _jobService.publishJob(job.id);
+      _showSnack('Job posted');
+      await _load();
+    } catch (e) {
+      _showSnack(
+        jobFriendlyError(e, 'Could not post this job.'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busyJobIds.remove(job.id));
+    }
+  }
+
+  Future<void> _duplicate(JobPosting job) async {
+    if (_busyJobIds.contains(job.id)) return;
+    final label = job.jobTitle.trim().isEmpty
+        ? 'this job posting'
+        : '“${job.jobTitle.trim()}”';
+    final ok = await showAdminConfirmDialog(
+      context,
+      title: 'Duplicate job?',
+      message:
+          'Create a new draft from $label? The original and its interest '
+          'history stay unchanged.',
+      confirmLabel: 'Duplicate',
+      icon: Icons.content_copy_outlined,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busyJobIds.add(job.id));
+    try {
+      await _jobService.duplicateJob(job.id);
+      _showSnack('Job duplicated as draft');
+      setState(() => _status = 'draft');
+      await _load();
+    } catch (e) {
+      _showSnack(
+        jobFriendlyError(e, 'Could not duplicate this job.'),
         isError: true,
       );
     } finally {
@@ -444,6 +506,16 @@ class _AdminJobManagementState extends State<AdminJobManagement>
             isSelected: _status == 'active',
             onTap: () => setState(() {
               _status = 'active';
+              _page = 0;
+            }),
+          ),
+          AdminSaaSTabSpec(
+            label: 'Draft',
+            icon: Icons.edit_note_outlined,
+            count: _hasLoaded ? _draftCount : null,
+            isSelected: _status == 'draft',
+            onTap: () => setState(() {
+              _status = 'draft';
               _page = 0;
             }),
           ),
@@ -681,7 +753,7 @@ class _AdminJobManagementState extends State<AdminJobManagement>
             ? 'Post a career opportunity to share it with alumni.'
             : (_hasFilters
                   ? 'Try clearing filters or searching with a different keyword.'
-                  : 'Switch to All to review expired or archived job postings.'),
+                  : 'Switch to Draft, Expired, or Archived to review other postings.'),
         primaryAction: catalogEmpty
             ? AdminStateAction(
                 label: 'Post new job',
@@ -738,7 +810,12 @@ class _AdminJobManagementState extends State<AdminJobManagement>
                       ShareableContent.fromJob(job),
                     ),
                     onInterested: () => _openInterested(job),
-                    onToggleArchive: () => _toggleArchive(job),
+                    onDuplicate: () => _duplicate(job),
+                    onPost: job.status == 'draft' ? () => _post(job) : null,
+                    onArchive:
+                        job.status != 'archived' && job.status != 'draft'
+                        ? () => _archive(job)
+                        : null,
                     onDelete: () => _delete(job),
                   ),
                 ),

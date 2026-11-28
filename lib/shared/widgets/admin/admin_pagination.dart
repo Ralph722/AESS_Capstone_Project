@@ -47,6 +47,7 @@ class AdminPaginationBar extends StatelessWidget {
     this.onPageSizeChanged,
     this.pageSizeOptions = kAdminPageSizeOptions,
     this.dense = false,
+    this.leading,
   });
 
   final int totalItems;
@@ -58,6 +59,9 @@ class AdminPaginationBar extends StatelessWidget {
   final ValueChanged<int>? onPageSizeChanged;
   final List<int> pageSizeOptions;
   final bool dense;
+
+  /// Optional action beside the range label (e.g. Mark all as reviewed).
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +114,8 @@ class AdminPaginationBar extends StatelessWidget {
                           ? pageSize
                           : pageSizeOptions.first,
                       isDense: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -156,11 +162,21 @@ class AdminPaginationBar extends StatelessWidget {
               ],
             );
 
+            final left = Row(
+              children: [
+                if (leading != null) ...[
+                  leading!,
+                  const SizedBox(width: 12),
+                ],
+                Flexible(child: rangeLabel),
+              ],
+            );
+
             if (narrow) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  rangeLabel,
+                  left,
                   const SizedBox(height: 6),
                   Align(alignment: Alignment.centerRight, child: controls),
                 ],
@@ -169,7 +185,7 @@ class AdminPaginationBar extends StatelessWidget {
 
             return Row(
               children: [
-                Expanded(child: rangeLabel),
+                Expanded(child: left),
                 controls,
               ],
             );

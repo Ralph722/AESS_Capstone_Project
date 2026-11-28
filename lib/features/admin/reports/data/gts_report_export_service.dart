@@ -265,14 +265,15 @@ abstract final class GtsReportExportService {
     return (longest / 15).clamp(1, 3).toDouble();
   }
 
-  /// Keeps a heading on the same page as the first item under it. A bare
-  /// Column may split across pages; a Container may not.
+  /// Keeps a heading on the same page as the first item under it.
   static List<pw.Widget> _withHeading(String title, List<pw.Widget> body) => [
-    pw.Container(
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [_section(title), ?body.firstOrNull],
-      ),
+    pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _section(title),
+        pw.SizedBox(height: 10),
+        if (body.isNotEmpty) body.first,
+      ],
     ),
     ...body.skip(1),
   ];

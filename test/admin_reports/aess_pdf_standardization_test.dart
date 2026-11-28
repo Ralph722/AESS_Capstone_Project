@@ -496,7 +496,7 @@ Findings support the continued enhancement of technical curriculum components.
           .writeAsBytesSync(bytes);
     });
 
-    test('GTS Alumni List PDF renders in landscape with confidential badge and privacy footer', () async {
+    test('GTS Alumni List PDF renders in portrait with confidential badge and privacy footer', () async {
       final roster = [
         AlumniMember(
           id: 'm1',
@@ -543,7 +543,7 @@ Findings support the continued enhancement of technical curriculum components.
 
       expect(
         latin1.decode(bytes),
-        matches(RegExp(r'/MediaBox\s*\[\s*0\s+0\s+841\.8')),
+        matches(RegExp(r'/MediaBox\s*\[\s*0\s+0\s+595\.2')),
       );
 
       final text = _extractText(bytes);

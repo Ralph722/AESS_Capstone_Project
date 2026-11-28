@@ -2,13 +2,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:alumni_system/core/utils/app_image.dart';
-import 'package:alumni_system/core/utils/web_file_download.dart';
+import 'package:alumni_system/core/utils/image_file_delivery.dart';
 
-/// Saves a photo: a browser download on web; on phones the photo opens in the
-/// browser/viewer where it can be saved. [baseName] becomes the file name
-/// (e.g. "Job_Title_cover").
+/// Saves a photo: browser download on web; gallery (or share sheet) on device.
+/// [baseName] becomes the file name (e.g. "Job_Title_cover").
 Future<void> downloadPhoto(
   BuildContext context, {
   required String url,
@@ -23,17 +21,6 @@ Future<void> downloadPhoto(
 
   final value = url.trim();
   if (value.isEmpty) return;
-
-  if (!isWebFileDownloadSupported) {
-    final uri = Uri.tryParse(value);
-    if (AppImage.isDataUrl(value) || uri == null || !uri.hasScheme) {
-      show('This photo can be saved from the web portal.');
-      return;
-    }
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened) show('Could not open the photo.');
-    return;
-  }
 
   try {
     final Uint8List bytes;
@@ -54,23 +41,29 @@ Future<void> downloadPhoto(
           response.headers['content-type']?.split(';').first.trim() ??
           'image/jpeg';
     }
-    final ext = switch (mime) {
-      'image/png' => 'png',
-      'image/webp' => 'webp',
-      'image/gif' => 'gif',
-      _ => 'jpg',
-    };
-    final safeName = baseName
-        .replaceAll(RegExp(r'[^\w\s-]'), '')
-        .trim()
-        .replaceAll(RegExp(r'\s+'), '_');
-    downloadBytesOnWeb(
-      bytes: bytes,
-      fileName: '${safeName.isEmpty ? 'photo' : safeName}.$ext',
-      mimeType: mime,
+
+    final fileName = imageFileNameForMime(
+      baseName
+          .replaceAll(RegExp(r'[^\w\s-]'), '')
+          .trim()
+          .replaceAll(RegExp(r'\s+'), '_'),
+      mime,
     );
-    show('Photo downloaded');
+
+    if (!context.mounted) return;
+    final box = context.findRenderObject() as RenderBox?;
+    final result = await shareOrSaveImageBytes(
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: mime,
+      sharePositionOrigin: box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size,
+    );
+    if (!context.mounted) return;
+    show(result.successMessage);
   } catch (e) {
+    if (!context.mounted) return;
     show('Could not download the photo: $e');
   }
 }

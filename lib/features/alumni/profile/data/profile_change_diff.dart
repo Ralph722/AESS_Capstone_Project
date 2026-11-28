@@ -33,8 +33,70 @@ const profileChangeSourceLabels = <String, String>{
   'admin': 'Admin',
 };
 
+/// Sources that put a member in the directory Updates tab / orange field dots.
+/// Onboarding writes timeline diffs but is not review-worthy.
+const reviewEligibleProfileChangeSources = <String>{
+  'profile',
+  'tracer',
+  'survey',
+};
+
 String profileChangeSourceLabel(String? source) =>
     profileChangeSourceLabels[source] ?? 'Profile';
+
+bool isReviewEligibleProfileChangeSource(String? source) =>
+    reviewEligibleProfileChangeSources.contains(source);
+
+/// Field keys from a `PROFILE_UPDATE` audit payload when the source is
+/// review-eligible. Empty for onboarding / unknown / photo-only payloads that
+/// should not paint orange "changed" markers.
+Set<String> reviewEligibleProfileFieldKeys(Map<String, dynamic>? changes) {
+  if (changes == null) return const {};
+  if (!isReviewEligibleProfileChangeSource(changes['source']?.toString())) {
+    return const {};
+  }
+  final fields = changes['fields'];
+  if (fields is! Map) return const {};
+  return fields.keys
+      .map((k) => k.toString())
+      .where((k) => k != 'photo')
+      .toSet();
+}
+
+/// One activity row for [unreviewedChangedProfileFields] (newest-first).
+typedef ProfileUpdateActivityRow = ({
+  String action,
+  DateTime timestamp,
+  Map<String, dynamic>? changes,
+});
+
+/// Resolves orange "changed" field keys from newest-first activity logs.
+/// [hasProfileUpdates] must be true; onboarding audits are skipped.
+Set<String> unreviewedChangedProfileFields({
+  required bool hasProfileUpdates,
+  required Iterable<ProfileUpdateActivityRow> logs,
+}) {
+  if (!hasProfileUpdates) return const {};
+  final keys = <String>{};
+  DateTime? latestProfileUpdateAt;
+  for (final log in logs) {
+    if (log.action != 'PROFILE_UPDATE') continue;
+    final fieldKeys = reviewEligibleProfileFieldKeys(log.changes);
+    if (fieldKeys.isEmpty) continue;
+    keys.addAll(fieldKeys);
+    latestProfileUpdateAt = log.timestamp;
+    break;
+  }
+  for (final log in logs) {
+    if (log.action != 'NAME_CHANGE') continue;
+    if (latestProfileUpdateAt == null ||
+        !log.timestamp.isBefore(latestProfileUpdateAt)) {
+      keys.add('displayName');
+    }
+    break;
+  }
+  return keys;
+}
 
 final _birthDateFormat = DateFormat.yMMMd();
 

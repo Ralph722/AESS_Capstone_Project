@@ -265,6 +265,19 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
     if (_busyIds.contains(a.id)) return;
 
     if (value == 'archive' && a.status == AnnouncementStatus.published) {
+      final label = a.title.trim().isEmpty
+          ? 'this announcement'
+          : '“${a.title.trim()}”';
+      final confirm = await showAdminConfirmDialog(
+        context,
+        title: 'Archive announcement?',
+        message:
+            'Archive $label? It leaves the active feed but stays viewable '
+            'in Archived. To reuse it, use Duplicate.',
+        confirmLabel: 'Archive',
+        icon: Icons.archive_outlined,
+      );
+      if (!confirm || !mounted) return;
       setState(() => _busyIds.add(a.id));
       try {
         await _service.archiveAnnouncement(a.id);
@@ -285,18 +298,32 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
       return;
     }
 
-    if (value == 'restore' && a.status == AnnouncementStatus.archived) {
+    if (value == 'duplicate') {
+      final label = a.title.trim().isEmpty
+          ? 'this announcement'
+          : '“${a.title.trim()}”';
+      final confirm = await showAdminConfirmDialog(
+        context,
+        title: 'Duplicate announcement?',
+        message:
+            'Create a new draft from $label? The original and its publish '
+            'history stay unchanged.',
+        confirmLabel: 'Duplicate',
+        icon: Icons.content_copy_outlined,
+      );
+      if (!confirm || !mounted) return;
       setState(() => _busyIds.add(a.id));
       try {
-        await _service.restoreAnnouncement(a.id);
+        await _service.duplicateAnnouncement(a.id);
         if (!mounted) return;
-        _showSnack('Announcement restored');
+        _showSnack('Announcement duplicated as draft');
+        setState(() => _statusFilter = _AnnouncementStatusFilter.draft);
         await _load();
       } catch (e) {
         _showSnack(
           announcementFriendlyError(
             e,
-            'Could not restore this announcement. Please try again.',
+            'Could not duplicate this announcement. Please try again.',
           ),
           isError: true,
         );
@@ -349,17 +376,16 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
             : 'Open details',
         icon: Icons.edit_outlined,
       ),
+      adminAnnouncementMenuItem(
+        value: 'duplicate',
+        label: 'Duplicate',
+        icon: Icons.content_copy_outlined,
+      ),
       if (a.status == AnnouncementStatus.published)
         adminAnnouncementMenuItem(
           value: 'archive',
           label: 'Archive',
           icon: Icons.archive_outlined,
-        ),
-      if (a.status == AnnouncementStatus.archived)
-        adminAnnouncementMenuItem(
-          value: 'restore',
-          label: 'Restore',
-          icon: Icons.unarchive_outlined,
         ),
       const PopupMenuDivider(height: 8),
       adminAnnouncementMenuItem(
@@ -393,7 +419,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen>
           value: '$_archivedCount',
           icon: Icons.archive_outlined,
           color: AdminColors.textSecondary,
-          tooltip: 'Retired notices available to restore',
+          tooltip: 'Retired notices kept for history — duplicate to reuse',
         ),
         AdminMetricRibbonItem(
           label: 'Total reach',

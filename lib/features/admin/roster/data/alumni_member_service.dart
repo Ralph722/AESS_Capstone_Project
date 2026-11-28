@@ -372,6 +372,26 @@ class AlumniMemberService {
     }
   }
 
+  /// Clears the profile-update flag for every currently flagged member.
+  /// Returns how many rows were updated.
+  Future<int> markAllProfilesReviewed() async {
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final rows = await _supabase
+          .from('alumni_members')
+          .update({
+            'has_profile_updates': false,
+            'admin_viewed_at': now,
+            'updated_at': now,
+          })
+          .eq('has_profile_updates', true)
+          .select('id');
+      return rows.length;
+    } catch (e) {
+      throw Exception('Error marking all profile updates reviewed: $e');
+    }
+  }
+
   /// Looks up the roster member linked to a Supabase auth user via their
   /// `users` row course + student ID (replaces the old Firestore doc-ref path).
   Future<AlumniMember?> findRosterMemberForAuthUid(String authUid) async {

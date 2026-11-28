@@ -100,7 +100,7 @@ void main() {
     });
 
     test('headers use the question label, and the number stays searchable', () {
-      expect(_col('ched_16').header, 'Presently employed');
+      expect(_col('ched_16').header, 'Employment status');
       expect(_col('ched_19').header, 'Present occupation');
       expect(_col('ched_20').header, 'Line of business');
       expect(_col('ched_16').header, isNot(contains('16.')));
@@ -194,10 +194,13 @@ void main() {
       expect(table['Juan Dela Cruz'], [
         '2023',
         'Juan Dela Cruz',
-        'Yes',
+        'Employed',
         'AI engineer',
       ]);
-      expect(table['Maria Santos'], ['2023', 'Maria Santos', 'No', 'Not asked']);
+      expect(
+        table['Maria Santos'],
+        ['2023', 'Maria Santos', 'Not Employed', 'Not asked'],
+      );
       expect(table['Ana Lopez'], ['2023', 'Ana Lopez', '', '']);
       expect(table['Jose Rizal'], ['2023', 'Jose Rizal', '', '']);
     });
@@ -331,7 +334,7 @@ void main() {
         _cell('ched_16', {
           'ched_16': [ChedGtsBuiltin.yes],
         }),
-        'Yes',
+        'Employed',
       );
     });
   });
@@ -356,7 +359,7 @@ void main() {
       expect(cell('Juan Dela Cruz', GtsListConfig.nameColumn), 'Juan Dela Cruz');
       expect(cell('Juan Dela Cruz', 'student_id'), 'S-Juan Dela Cruz');
       expect(cell('Juan Dela Cruz', 'tracer_status'), 'Answered');
-      expect(cell('Juan Dela Cruz', 'ched_16'), 'Yes');
+      expect(cell('Juan Dela Cruz', 'ched_16'), 'Employed');
       expect(cell('Jose Rizal', GtsListConfig.nameColumn), 'Jose Rizal');
       expect(cell('Jose Rizal', 'ched_1'), '');
       expect(cell('Jose Rizal', 'ched_3'), '');

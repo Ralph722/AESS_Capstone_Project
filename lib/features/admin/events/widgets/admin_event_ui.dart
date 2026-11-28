@@ -273,6 +273,7 @@ class AdminEventStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = deriveEventDisplayStatus(event);
     final tone = switch (status) {
+      EventDisplayStatus.draft => AdminBadgeTone.warning,
       EventDisplayStatus.upcoming => AdminBadgeTone.info,
       EventDisplayStatus.today => AdminBadgeTone.warning,
       EventDisplayStatus.ongoing => AdminBadgeTone.success,

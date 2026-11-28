@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:alumni_system/features/admin/reports/application/report_percent_format.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
-import 'package:alumni_system/features/admin/reports/widgets/reports_details_button.dart';
 import 'package:alumni_system/shared/widgets/admin/admin_density.dart';
 
 enum ReportsKpiStatus { positive, neutral, watch, attention }
@@ -66,7 +65,6 @@ class _ReportsKpiCardState extends State<ReportsKpiCard> {
     final spark = (widget.sparkline != null && widget.sparkline!.length >= 2)
         ? widget.sparkline!
         : null;
-    final details = widget.details?.trim();
     final micro = widget.comparisonLabel?.trim();
 
     final content = Column(
@@ -101,8 +99,6 @@ class _ReportsKpiCardState extends State<ReportsKpiCard> {
                 ),
               ),
             ),
-            if (details != null && details.isNotEmpty)
-              ReportsDetailsButton(title: widget.label, body: details),
             if (status != null && (widget.statusLabel?.isNotEmpty ?? false))
               _StatusBadge(status: status, label: widget.statusLabel!),
           ],

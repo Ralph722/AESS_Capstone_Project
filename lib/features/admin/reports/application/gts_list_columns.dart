@@ -264,6 +264,15 @@ abstract final class GtsListColumns {
     return choiceLabels(item, row.sectionA[item.id]);
   }
 
+  /// List/tally display for item 16 so alumni lists read as employment status
+  /// rather than the raw Yes/No questionnaire wording.
+  static String employmentStatusLabel(String raw) => switch (raw.trim()) {
+    ChedGtsBuiltin.yes => 'Employed',
+    ChedGtsBuiltin.no => 'Not Employed',
+    ChedGtsBuiltin.neverEmployed => 'Never Employed',
+    _ => raw.trim(),
+  };
+
   /// One label per selected choice. "Others, please specify" becomes
   /// "Others: …" when the specify box has text, matching [formatAnswer].
   static List<String> choiceLabels(
@@ -274,7 +283,8 @@ abstract final class GtsListColumns {
     String choice(String v) {
       final t = v.trim();
       if (t.isEmpty) return '';
-      return others != null && _isOthersChoice(t) ? 'Others: $others' : t;
+      final base = others != null && _isOthersChoice(t) ? 'Others: $others' : t;
+      return item.id == 'ched_16' ? employmentStatusLabel(base) : base;
     }
 
     if (value == null) return const [];
@@ -374,7 +384,8 @@ abstract final class GtsListColumns {
     final field = GtsFieldDictionary.byKey(item.id)!;
     return GtsListColumn(
       key: item.id,
-      header: field.label,
+      // Item 16 cells show Employed / Not Employed; name the column to match.
+      header: item.id == 'ched_16' ? 'Employment status' : field.label,
       group: item.sectionTitle,
       description: item.prompt,
       personal: field.isPersonal,

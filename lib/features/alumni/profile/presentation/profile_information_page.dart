@@ -347,6 +347,20 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
     } catch (_) {}
   }
 
+  /// In-field badge when the saved contact is verified and unchanged.
+  Widget? _contactSuffix(ContactChannel channel) {
+    final profile = _profile;
+    if (profile == null || _formState.contactChanged(channel)) return null;
+    if (_formState.savedContact(channel).trim().isEmpty) return null;
+
+    final verified = channel == ContactChannel.email
+        ? profile.contactEmailVerified
+        : profile.mobileVerified;
+    if (!verified) return null;
+    return const _VerifiedFieldBadge();
+  }
+
+  /// Status under the field for pending / not-verified / demo states only.
   Widget? _contactFooter(ContactChannel channel) {
     final profile = _profile;
     if (profile == null) return null;
@@ -366,26 +380,15 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
     if (_formState.savedContact(channel).trim().isEmpty) return null;
 
     if (isEmail) {
-      return profile.contactEmailVerified
-          ? const _ContactStatusLine(
-              icon: Icons.verified_rounded,
-              color: PortalTheme.success,
-              text: 'Verified',
-            )
-          : _ContactStatusLine(
-              icon: Icons.info_outline_rounded,
-              color: PortalTheme.textSecondary,
-              text: 'Not verified',
-              onVerify: _isSaving ? null : () => _verifySaved(channel),
-            );
-    }
-    if (profile.mobileVerified) {
-      return const _ContactStatusLine(
-        icon: Icons.verified_rounded,
-        color: PortalTheme.success,
-        text: 'Verified by text message',
+      if (profile.contactEmailVerified) return null;
+      return _ContactStatusLine(
+        icon: Icons.info_outline_rounded,
+        color: PortalTheme.textSecondary,
+        text: 'Not verified',
+        onVerify: _isSaving ? null : () => _verifySaved(channel),
       );
     }
+    if (profile.mobileVerified) return null;
     if (profile.mobileDemoConfirmed) {
       return const _ContactStatusLine(
         icon: Icons.check_circle_outline_rounded,
@@ -447,6 +450,7 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                           demographicReadOnly: true,
                           showContactEmail: true,
                           contactFooter: _contactFooter,
+                          contactSuffix: _contactSuffix,
                           showEmploymentStatus: false,
                           chedStyleLabels: false,
                           enabled: !_isSaving,
@@ -455,21 +459,6 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                             setState(() {});
                           },
                         ),
-                      ),
-                      const SizedBox(height: PortalTheme.space3),
-                      FilledButton(
-                        onPressed: _isSaving ? null : _save,
-                        style: PortalTheme.primaryButton(),
-                        child: _isSaving
-                            ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Save profile'),
                       ),
                     ],
                   ),
@@ -634,6 +623,36 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
               Icons.camera_alt_rounded,
               color: Colors.white,
               size: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact verified chip shown inside the email / mobile field.
+class _VerifiedFieldBadge extends StatelessWidget {
+  const _VerifiedFieldBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.verified_rounded,
+            size: 16,
+            color: PortalTheme.success,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Verified',
+            style: PortalTheme.meta.copyWith(
+              color: PortalTheme.success,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

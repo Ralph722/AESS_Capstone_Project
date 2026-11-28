@@ -292,19 +292,20 @@ class _AddJobDialogState extends State<AddJobDialog> {
         applicationDeadline: _applicationDeadline,
         contactEmail: _contactEmailController.text.trim(),
         applicationMethod: 'email',
-        isActive: true,
+        isActive: (widget.job?.status ?? 'draft') == 'active',
         views: widget.job?.views ?? 0,
         applications: widget.job?.applications ?? 0,
         adminId: AppSession.userId ?? 'admin',
         isRemote: _isRemote,
         experienceLevel: _selectedExperienceLevel,
-        status: widget.job?.status ?? 'active',
+        status: widget.job?.status ?? 'draft',
         category: _selectedCategory,
         targetPrograms: _targetPrograms.toList()..sort(),
         applicationUrl: _applicationUrlController.text.trim(),
       );
 
-      // Alumni notices come from the jobs table trigger (notify_job_changes).
+      // Alumni notices come from the jobs table trigger (notify_job_changes)
+      // only when status is active — drafts do not notify.
       final service = widget.service ?? JobService();
       if (_isEditing) {
         await service.updateJobPosting(posting);
@@ -320,7 +321,13 @@ class _AddJobDialogState extends State<AddJobDialog> {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text(_isEditing ? 'Job updated' : 'Job posted')),
+          SnackBar(
+            content: Text(
+              _isEditing
+                  ? 'Job updated'
+                  : 'Job saved as draft — use Post when ready',
+            ),
+          ),
         );
     } catch (e) {
       if (!mounted) return;
@@ -713,7 +720,7 @@ class _AddJobDialogState extends State<AddJobDialog> {
                           color: Colors.white,
                         ),
                       )
-                    : Text(_isEditing ? 'Update job' : 'Post job'),
+                    : Text(_isEditing ? 'Update job' : 'Save draft'),
               ),
             ],
           ),

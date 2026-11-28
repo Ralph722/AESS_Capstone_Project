@@ -3,6 +3,7 @@ import 'package:alumni_system/features/events/models/event_model.dart';
 
 /// Derived presentation status for event badges.
 enum EventDisplayStatus {
+  draft,
   upcoming,
   today,
   ongoing,
@@ -13,6 +14,7 @@ enum EventDisplayStatus {
 
 extension EventDisplayStatusX on EventDisplayStatus {
   String get label => switch (this) {
+    EventDisplayStatus.draft => 'Draft',
     EventDisplayStatus.upcoming => 'Upcoming',
     EventDisplayStatus.today => 'Today',
     EventDisplayStatus.ongoing => 'Ongoing',
@@ -22,6 +24,7 @@ extension EventDisplayStatusX on EventDisplayStatus {
   };
 
   Color get color => switch (this) {
+    EventDisplayStatus.draft => const Color(0xFFD97706),
     EventDisplayStatus.upcoming => const Color(0xFF2563EB),
     EventDisplayStatus.today => const Color(0xFFD97706),
     EventDisplayStatus.ongoing => const Color(0xFF059669),
@@ -39,6 +42,7 @@ EventDisplayStatus deriveEventDisplayStatus(
 }) {
   if (event.cancelled) return EventDisplayStatus.cancelled;
   if (event.status == 'Archived') return EventDisplayStatus.archived;
+  if (event.status == 'Draft') return EventDisplayStatus.draft;
 
   final clock = now ?? DateTime.now();
   final day = DateTime(clock.year, clock.month, clock.day);

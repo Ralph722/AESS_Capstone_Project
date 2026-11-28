@@ -155,7 +155,7 @@ void main() {
       await tester.pump();
       expect(
         errorOf(tester, GtsConstants.labelMobile),
-        contains('valid mobile'),
+        contains('Philippine mobile'),
       );
       expect(
         errorOf(tester, GtsConstants.labelEmail),

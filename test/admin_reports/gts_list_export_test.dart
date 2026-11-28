@@ -141,7 +141,7 @@ void main() {
         contains(equals([GtsListTables.responseRateLabel, '3 of 5', '60%'])),
       );
       expect(rows, contains(equals(['Answered', '3', '60%'])));
-      expect(rows, contains(equals(['Yes', '1', '33.3%'])));
+      expect(rows, contains(equals(['Employed', '1', '33.3%'])));
       expect(
         rows,
         contains(equals([GtsListTables.employmentRateLabel, '1 of 3', '33.3%'])),
@@ -157,7 +157,7 @@ void main() {
           equals([
             '2023',
             'Juan Dela Cruz',
-            'Yes',
+            'Employed',
             'AI engineer, team lead',
             'Others: =HYPERLINK("http://x","y")',
             'Answered',
@@ -195,7 +195,7 @@ void main() {
       expect(
         notes,
         contains(
-          equals(['Presently employed', 'Are you presently employed?']),
+          equals(['Employment status', 'Are you presently employed?']),
         ),
       );
     });
@@ -222,7 +222,7 @@ void main() {
         'PUROK 6, MOBOD, OROQUIETA CITY',
         'Jose Rizal',
         'AI engineer, team lead',
-        'Presently employed',
+        'Employment status',
         'Tracer status',
         'Untracked - not registered',
         'Total alumni',
@@ -235,8 +235,39 @@ void main() {
       }
     });
 
-    test('the PDF is landscape', () async {
+    test('the PDF is portrait A4 for typical column counts', () async {
       final bytes = await GtsListExportService.toPdf(_build());
+      expect(
+        latin1.decode(bytes),
+        matches(RegExp(r'/MediaBox\s*\[\s*0\s+0\s+595\.2')),
+      );
+    });
+
+    test('wide-column PDFs still use landscape', () async {
+      const wideColumns = [
+        'year_graduated',
+        'untracked_name',
+        'course',
+        'student_id',
+        'tracer_status',
+        'ched_1',
+        'ched_2',
+        'ched_3',
+        'ched_4',
+        'ched_5',
+        'ched_16',
+        'ched_19',
+      ];
+      expect(wideColumns.length, greaterThan(GtsListExportService.pdfWideColumns));
+      final bytes = await GtsListExportService.toPdf(
+        _build(
+          config: const GtsListConfig(
+            surveyId: 'w2',
+            chart: GtsListChart.none,
+            columns: wideColumns,
+          ),
+        ),
+      );
       expect(
         latin1.decode(bytes),
         matches(RegExp(r'/MediaBox\s*\[\s*0\s+0\s+841\.8')),

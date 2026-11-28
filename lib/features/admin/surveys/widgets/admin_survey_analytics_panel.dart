@@ -64,69 +64,13 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
   List<SurveyResponse> _cachedSubmitted = const [];
 
   final _listScrollController = ScrollController();
-  /// Overlay-only flag — avoid setState on the whole analytics tree.
-  final _canScrollMore = ValueNotifier<bool>(false);
-  bool _scrollCheckScheduled = false;
 
   Survey get survey => widget.survey;
 
   @override
-  void initState() {
-    super.initState();
-    _listScrollController.addListener(_syncScrollAffordance);
-    _scheduleScrollAffordanceCheck();
-  }
-
-  @override
-  void didUpdateWidget(covariant AdminSurveyAnalyticsPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.survey.id != widget.survey.id ||
-        oldWidget.participants.length != widget.participants.length ||
-        oldWidget.responses.length != widget.responses.length) {
-      _scheduleScrollAffordanceCheck();
-    }
-  }
-
-  @override
   void dispose() {
-    _listScrollController.removeListener(_syncScrollAffordance);
     _listScrollController.dispose();
-    _canScrollMore.dispose();
     super.dispose();
-  }
-
-  void _syncScrollAffordance() {
-    if (!_listScrollController.hasClients) return;
-    final pos = _listScrollController.position;
-    final more =
-        pos.maxScrollExtent > 8 && pos.pixels < pos.maxScrollExtent - 8;
-    if (_canScrollMore.value != more) {
-      _canScrollMore.value = more;
-    }
-  }
-
-  void _scheduleScrollAffordanceCheck() {
-    if (_scrollCheckScheduled) return;
-    _scrollCheckScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollCheckScheduled = false;
-      if (!mounted) return;
-      _syncScrollAffordance();
-    });
-  }
-
-  Future<void> _scrollAnalyticsDown() async {
-    if (!_listScrollController.hasClients) return;
-    final pos = _listScrollController.position;
-    if (pos.maxScrollExtent <= 0) return;
-    // Jump one viewport first so users see motion; if near the end, go to bottom.
-    final page = pos.viewportDimension * 0.85;
-    final target = (pos.pixels + page).clamp(0.0, pos.maxScrollExtent);
-    await _listScrollController.animateTo(
-      target,
-      duration: const Duration(milliseconds: 420),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   List<String> get _batchOptions {
@@ -267,7 +211,6 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
                       _batchFilter = null;
                       _courseFilter = null;
                     });
-                    _scheduleScrollAffordanceCheck();
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: AdminSurveyTheme.textSecondary,
@@ -295,7 +238,6 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
                 ],
                 onChanged: (v) {
                   setState(() => _batchFilter = v);
-                  _scheduleScrollAffordanceCheck();
                 },
               );
               final courseField = DirectoryFilterField<String?>(
@@ -318,7 +260,6 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
                 ],
                 onChanged: (v) {
                   setState(() => _courseFilter = v);
-                  _scheduleScrollAffordanceCheck();
                 },
               );
               if (!sideBySide) {
@@ -350,164 +291,72 @@ class _AdminSurveyAnalyticsPanelState extends State<AdminSurveyAnalyticsPanel> {
                     style: TextStyle(color: AdminSurveyTheme.textMuted),
                   ),
                 )
-              : Stack(
-                  children: [
-                    Scrollbar(
-                      controller: _listScrollController,
-                      thumbVisibility: true,
-                      thickness: 6,
-                      radius: const Radius.circular(8),
-                      child: ListView(
-                        controller: _listScrollController,
-                        padding: const EdgeInsets.only(bottom: 36, right: 10),
-                        children: [
-                          _FunnelCard(snapshot: participation),
-                          const SizedBox(height: 10),
-                          _ReminderCard(stats: reminders),
-                          const SizedBox(height: 10),
-                          _TrendCard(points: trend),
-                          const SizedBox(height: 10),
-                          if (byProgram.isNotEmpty) ...[
-                            _AudienceCard(
-                              title: 'By course / program',
-                              buckets: byProgram,
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                          if (byBatch.isNotEmpty) ...[
-                            _AudienceCard(
-                              title: 'By batch year',
-                              buckets: byBatch,
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                          if (choiceAggs.isNotEmpty) ...[
-                            const _SectionTitle('Response distribution'),
-                            const SizedBox(height: 8),
-                            for (final a in choiceAggs) ...[
-                              _ChoiceAggregateCard(aggregate: a),
-                              const SizedBox(height: 8),
-                            ],
-                          ],
-                          if (scaleAggs.isNotEmpty) ...[
-                            const _SectionTitle('Rating / scale'),
-                            const SizedBox(height: 8),
-                            for (final a in scaleAggs) ...[
-                              _ScaleAggregateCard(aggregate: a),
-                              const SizedBox(height: 8),
-                            ],
-                          ],
-                          if (skipped.isNotEmpty) ...[
-                            const _SectionTitle('Most skipped'),
-                            const SizedBox(height: 8),
-                            for (final a in skipped) ...[
-                              _SkippedRow(aggregate: a),
-                              const SizedBox(height: 6),
-                            ],
-                          ],
-                          if (submitted.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: Text(
-                                'No submitted responses for this filter yet.',
-                                style: TextStyle(
-                                  color: AdminSurveyTheme.textMuted,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _canScrollMore,
-                      builder: (context, more, _) {
-                        if (!more) return const SizedBox.shrink();
-                        return Positioned(
-                          left: 0,
-                          right: 10,
-                          bottom: 0,
-                          child: _MoreAnalyticsBelowCue(
-                            onPressed: _scrollAnalyticsDown,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MoreAnalyticsBelowCue extends StatelessWidget {
-  const _MoreAnalyticsBelowCue({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IgnorePointer(
-          child: Container(
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AdminSurveyTheme.background.withValues(alpha: 0),
-                  AdminSurveyTheme.background.withValues(alpha: 0.92),
-                  AdminSurveyTheme.background,
-                ],
-              ),
-            ),
-          ),
-        ),
-        Container(
-          width: double.infinity,
-          color: AdminSurveyTheme.background,
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Center(
-            child: Material(
-              color: AdminSurveyTheme.card,
-              borderRadius: BorderRadius.circular(999),
-              elevation: 0,
-              child: InkWell(
-                onTap: onPressed,
-                borderRadius: BorderRadius.circular(999),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: AdminSurveyTheme.border),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+              : Scrollbar(
+                  controller: _listScrollController,
+                  thumbVisibility: true,
+                  thickness: 6,
+                  radius: const Radius.circular(8),
+                  child: ListView(
+                    controller: _listScrollController,
+                    padding: const EdgeInsets.only(bottom: 8, right: 10),
                     children: [
-                      Text(
-                        'More analytics below',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AdminSurveyTheme.textSecondary,
+                      _FunnelCard(snapshot: participation),
+                      const SizedBox(height: 10),
+                      _ReminderCard(stats: reminders),
+                      const SizedBox(height: 10),
+                      _TrendCard(points: trend),
+                      const SizedBox(height: 10),
+                      if (byProgram.isNotEmpty) ...[
+                        _AudienceCard(
+                          title: 'By course / program',
+                          buckets: byProgram,
                         ),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: AdminSurveyTheme.textMuted,
-                      ),
+                        const SizedBox(height: 10),
+                      ],
+                      if (byBatch.isNotEmpty) ...[
+                        _AudienceCard(
+                          title: 'By batch year',
+                          buckets: byBatch,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      if (choiceAggs.isNotEmpty) ...[
+                        const _SectionTitle('Response distribution'),
+                        const SizedBox(height: 8),
+                        for (final a in choiceAggs) ...[
+                          _ChoiceAggregateCard(aggregate: a),
+                          const SizedBox(height: 8),
+                        ],
+                      ],
+                      if (scaleAggs.isNotEmpty) ...[
+                        const _SectionTitle('Rating / scale'),
+                        const SizedBox(height: 8),
+                        for (final a in scaleAggs) ...[
+                          _ScaleAggregateCard(aggregate: a),
+                          const SizedBox(height: 8),
+                        ],
+                      ],
+                      if (skipped.isNotEmpty) ...[
+                        const _SectionTitle('Most skipped'),
+                        const SizedBox(height: 8),
+                        for (final a in skipped) ...[
+                          _SkippedRow(aggregate: a),
+                          const SizedBox(height: 6),
+                        ],
+                      ],
+                      if (submitted.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'No submitted responses for this filter yet.',
+                            style: TextStyle(
+                              color: AdminSurveyTheme.textMuted,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-              ),
-            ),
-          ),
         ),
       ],
     );

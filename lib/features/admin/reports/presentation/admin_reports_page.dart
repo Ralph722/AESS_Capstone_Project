@@ -41,7 +41,6 @@ import 'package:alumni_system/features/admin/reports/models/reports_dashboard_fi
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_layout.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_header.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_kpi.dart';
-import 'package:alumni_system/features/admin/reports/widgets/admin_reports_insights.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_polish.dart';
 import 'package:alumni_system/features/admin/reports/widgets/admin_reports_filter_bar.dart';
 import 'package:alumni_system/features/admin/reports/widgets/ched_wave_comparison_dialog.dart';
@@ -121,13 +120,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   TracerTabStats? _tracerStatsCache;
   Object? _tracerStatsKey;
-
-  List<ReportsInsightCardData> _insightCards = const [];
-  bool _insightsGenerating = false;
-  bool _insightsAreAi = false;
-
-  /// Overview action center: 0 = needs attention, 1 = insights.
-  int _overviewActionView = 0;
 
   /// Tracer topic: 0 School-to-work, 1 Curriculum, 2 Placement, 3 Studies,
   /// 4 Waves (cross-wave compare).
@@ -216,6 +208,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           _ensureTracerOutcomesWaveSelected();
         }
         unawaited(_ensureSelectedWaveSample(_dashboardFilters.surveyId));
+      } else if (_tabController.index == 2) {
+        // Survey tab defaults to all published surveys.
+        _dashboardFilters = _dashboardFilters.copyWith(clearSurvey: true);
       }
       setState(() {});
     });
@@ -375,10 +370,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
         _registeredProfiles = registeredProfiles;
         _analytics = analytics;
         _lastLoadedAt = DateTime.now();
-        // Keep AI-generated insights across background refreshes.
-        if (!_insightsAreAi) {
-          _insightCards = _buildPlaceholderInsights(analytics, adjustedSurveys);
-        }
         if (_tabController.index == 1 && !_tracerWavesMode) {
           _ensureTracerOutcomesWaveSelected();
         }
@@ -901,7 +892,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       case 3:
         return _buildDownloadsTab(source, fitHeight: fitHeight);
       case 4:
-        return _buildBuilderTab(source);
+        return _buildBuilderTab(source, fitHeight: fitHeight);
       default:
         return _buildOverviewTab(source, fitHeight: fitHeight);
     }
@@ -909,88 +900,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   Widget _buildDashboardHeader() {
     return ReportsPageHeader(updatedAt: _lastLoadedAt);
-  }
-
-  List<ReportsInsightCardData> _insightCardsWithActions(
-    List<ReportsInsightCardData> cards,
-  ) {
-    return [
-      for (final card in cards)
-        if (card.action != null)
-          card
-        else
-          card.copyWith(
-            actionLabel: insightActionForKind(card.kind)?.$1,
-            action: insightActionForKind(card.kind)?.$2,
-          ),
-    ];
-  }
-
-  void _handleInsightAction(ReportsInsightAction action) {
-    switch (action) {
-      case ReportsInsightAction.openAlumniTracer:
-        _selectTab(1);
-      case ReportsInsightAction.openSurveys:
-      case ReportsInsightAction.openParticipation:
-        _selectTab(2);
-      case ReportsInsightAction.openExportHub:
-        _selectTab(3);
-      case ReportsInsightAction.openExportEmployment:
-        _selectTab(3);
-      case ReportsInsightAction.openRosterModule:
-        final open = widget.onOpenAdminMenu;
-        if (open != null) {
-          open(2);
-        } else {
-          _selectTab(1);
-        }
-      case ReportsInsightAction.openSurveysModule:
-        final open = widget.onOpenAdminMenu;
-        if (open != null) {
-          open(10);
-        } else {
-          _selectTab(2);
-        }
-    }
-  }
-
-  List<ReportsInsightCardData> _buildPlaceholderInsights(
-    AdminReportsAnalytics a,
-    List<Survey> surveys,
-  ) {
-    final ched = surveys.where((s) => !s.archived && s.isChedGtsBuiltin);
-    return buildHeuristicReportInsights(
-      a,
-      chedPublished: ched
-          .where((s) => s.status == SurveyStatus.published)
-          .length,
-      chedResponses: ched.fold<int>(
-        0,
-        (sum, s) => sum + a.submittedResponseCount(s),
-      ),
-    );
-  }
-
-  Future<void> _generateInsights() async {
-    final source = _analytics;
-    if (source == null || _insightsGenerating) return;
-    final a = _viewAnalytics(source);
-    setState(() => _insightsGenerating = true);
-    try {
-      final cards = await generateReportInsights(
-        analytics: a,
-        surveys: a.surveys,
-      );
-      if (!mounted) return;
-      setState(() {
-        _insightCards = cards;
-        _insightsAreAi = true;
-        _insightsGenerating = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _insightsGenerating = false);
-    }
   }
 
   /// Rounded card-framed underline section tabs (pins cleanly when scrolled).
@@ -1403,38 +1312,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   Widget _overviewActionCenter(AdminReportsAnalytics a) {
     final attention = _attentionItems(a);
-    final insights = _insightCardsWithActions(
-      _insightCards.isEmpty
-          ? _buildPlaceholderInsights(a, _surveys)
-          : _insightCards,
-    );
-    final showInsights = _overviewActionView == 1;
     return ReportsBentoCard(
       title: 'Action Center',
-      caption: showInsights
-          ? (_insightsAreAi ? 'AI-generated summary' : 'Rule-based highlights')
-          : (attention.isEmpty
-                ? 'All clear'
-                : '${attention.length} follow-ups'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ReportsSegmentedToggle(
-              options: const ['Attention', 'Insights'],
-              selected: _overviewActionView,
-              onChanged: (i) => setState(() => _overviewActionView = i),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: showInsights
-                ? _buildInsightList(insights)
-                : _buildAttentionList(attention),
-          ),
-        ],
-      ),
+      caption: attention.isEmpty
+          ? 'All clear'
+          : '${attention.length} follow-ups',
+      child: _buildAttentionList(attention),
     );
   }
 
@@ -1476,64 +1359,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  Widget _buildInsightList(List<ReportsInsightCardData> cards) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: ListView.separated(
-            padding: EdgeInsets.zero,
-            itemCount: cards.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 6),
-            itemBuilder: (context, i) {
-              final card = cards[i];
-              final action = card.action;
-              return _compactActionRow(
-                icon: card.icon,
-                color: card.isError
-                    ? AdminReportsTheme.danger
-                    : AdminReportsTheme.primary,
-                title: card.title,
-                subtitle: card.body,
-                subtitleLines: 2,
-                onTap: action == null
-                    ? null
-                    : () => _handleInsightAction(action),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: _insightsGenerating ? null : _generateInsights,
-            style: TextButton.styleFrom(
-              foregroundColor: AdminReportsTheme.primary,
-              visualDensity: VisualDensity.compact,
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            icon: _insightsGenerating
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.auto_awesome_outlined, size: 16),
-            label: Text(
-              _insightsGenerating
-                  ? 'Generating…'
-                  : (_insightsAreAi ? 'Regenerate' : 'Generate AI summary'),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   static const double _viewBarHeight = 36;
 
   static const _tracerTopicLabels = [
@@ -1555,21 +1380,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       children: [
         SizedBox(
           height: _viewBarHeight,
-          child: Row(
-            children: [
-              Flexible(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: ReportsSegmentedToggle(
-                    options: _tracerTopicLabels,
-                    selected: _tracerTopic,
-                    onChanged: _onTracerTopicChanged,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _tracerExportMenu(a),
-            ],
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: ReportsSegmentedToggle(
+              options: _tracerTopicLabels,
+              selected: _tracerTopic,
+              onChanged: _onTracerTopicChanged,
+            ),
           ),
         ),
         const SizedBox(height: AdminReportsTheme.gutter),
@@ -1728,79 +1545,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           color: ReportsBentoPalette.at(6),
         ),
     ];
-  }
-
-  Widget _tracerExportMenu(AdminReportsAnalytics a) {
-    return PopupMenuButton<String>(
-      tooltip: 'Export this filtered Tracer view',
-      enabled: !_downloadBusy,
-      onSelected: (value) {
-        if (value == 'downloads') {
-          _selectTab(3);
-          return;
-        }
-        final format = value == 'excel'
-            ? CustomReportFormat.excel
-            : CustomReportFormat.pdf;
-        unawaited(_exportTracerFilteredView(a, format: format));
-      },
-      itemBuilder: (context) => const [
-        PopupMenuItem(value: 'pdf', child: Text('Export PDF (this filter)')),
-        PopupMenuItem(
-          value: 'excel',
-          child: Text('Export Excel (this filter)'),
-        ),
-        PopupMenuDivider(),
-        PopupMenuItem(value: 'downloads', child: Text('Open Downloads tab')),
-      ],
-      child: Container(
-        height: _viewBarHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: AdminColors.card,
-          borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-          border: Border.all(color: AdminColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.download_outlined,
-              size: 15,
-              color: _downloadBusy
-                  ? AdminColors.textSecondary
-                  : AdminColors.primary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _downloadBusy ? 'Exporting…' : 'Export view',
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: _downloadBusy
-                    ? AdminColors.textSecondary
-                    : AdminColors.primary,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.arrow_drop_down,
-              size: 16,
-              color: _downloadBusy
-                  ? AdminColors.textSecondary
-                  : AdminColors.primary,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   List<Widget> _tracerKpis(
@@ -2791,99 +2535,33 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
 
   /// Surveys: response-health KPI strip plus two bento rows.
   Widget _buildSurveysTab(AdminReportsAnalytics a, {double? fitHeight}) {
-    final gridFit = fitHeight == null
-        ? null
-        : fitHeight - _viewBarHeight - AdminReportsTheme.gutter;
     final scope = _dashboardFilters.scopeLabel(
       surveys: _surveys,
       responseOrRecordCount: a.totalSurveyResponses,
       countNoun: 'submitted responses',
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: _viewBarHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: _scopePill(scope)),
-              const SizedBox(width: 8),
-              _bentoLink(
-                'Open Surveys',
-                () => _openAdminMenuOr(10, 2),
-              ),
-              const SizedBox(width: 6),
-              _bentoLink('Downloads', () => _selectTab(3)),
-            ],
-          ),
+    return ReportsBentoGrid(
+      fitHeight: fitHeight,
+      kpis: _surveyKpis(a, scope),
+      rows: [
+        ReportsBentoRow(
+          flex: const [10, 7, 7],
+          naturalHeight: 300,
+          children: [
+            _surveyParticipationCard(a),
+            _surveySplitCard(a),
+            _surveyFollowUpCard(a),
+          ],
         ),
-        const SizedBox(height: AdminReportsTheme.gutter),
-        ReportsBentoGrid(
-          fitHeight: gridFit,
-          kpis: _surveyKpis(a, scope),
-          rows: [
-            ReportsBentoRow(
-              flex: const [10, 7, 7],
-              naturalHeight: 300,
-              children: [
-                _surveyParticipationCard(a),
-                _surveySplitCard(a),
-                _surveyFollowUpCard(a),
-              ],
-            ),
-            ReportsBentoRow(
-              flex: const [6, 6],
-              naturalHeight: 300,
-              children: [
-                _surveyWindowsCard(a),
-                _surveyQuestionCompletionCard(),
-              ],
-            ),
+        ReportsBentoRow(
+          flex: const [6, 6],
+          naturalHeight: 300,
+          children: [
+            _surveyWindowsCard(a),
+            _surveyQuestionCompletionCard(),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _scopePill(String text) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Tooltip(
-        message: text,
-        waitDuration: const Duration(milliseconds: 500),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: AdminColors.surface,
-            borderRadius: BorderRadius.circular(AdminSurfaces.radiusSm),
-            border: Border.all(color: AdminColors.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.filter_list_rounded,
-                size: 13,
-                color: AdminColors.primary,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: AdminColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -3343,14 +3021,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       filterLabel:
           '${batch == null ? 'All batches' : 'Batch $batch'} · '
           '${course ?? 'All courses'}',
-      onClearFilters: batch == null && course == null
-          ? null
-          : () => setState(
-              () => _dashboardFilters = _dashboardFilters.copyWith(
-                clearBatch: true,
-                clearCourse: true,
-              ),
-            ),
       onDownload: (preset, {required format, required printPreview}) async {
         setState(() => _downloadingPresetId = preset.id);
         try {
@@ -3367,7 +3037,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
     );
   }
 
-  Widget _buildBuilderTab(AdminReportsAnalytics a) {
+  Widget _buildBuilderTab(AdminReportsAnalytics a, {double? fitHeight}) {
     DateTime opened(Survey s) => s.publishedAt ?? s.openAt ?? s.createdAt;
     final waves =
         a.surveys
@@ -3380,7 +3050,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
             )
             .toList()
           ..sort((x, y) => opened(y).compareTo(opened(x)));
-    return GtsAlumniListPanel(
+    final panel = GtsAlumniListPanel(
       waves: waves,
       roster: a.members,
       responseCache: _listResponses,
@@ -3390,6 +3060,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       initialOpen: _listOpen,
       onOpenChanged: (r) => _listOpen = r,
     );
+    if (fitHeight == null) return panel;
+    return SizedBox(height: fitHeight, child: panel);
   }
 
   CustomReportFilters _presetExportFilters([
@@ -4074,34 +3746,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
           ),
         );
     return rows;
-  }
-
-  /// One-click export of the currently filtered Tracer analytics view.
-  Future<void> _exportTracerFilteredView(
-    AdminReportsAnalytics a, {
-    required CustomReportFormat format,
-  }) async {
-    final wavesView = _tracerWavesMode;
-    final title = wavesView
-        ? 'Tracer waves comparison (filtered)'
-        : 'Tracer outcomes (filtered)';
-    final preset = ReportsDownloadPreset(
-      id: 'tracer_view',
-      title: title,
-      description: wavesView
-          ? 'Export of cross-wave Tracer comparison with current batch/course '
-                'filters.'
-          : 'Export of the selected tracer wave with current batch/course '
-                'filters.',
-      icon: Icons.filter_alt_outlined,
-      sections: const [
-        CustomReportSectionId.executiveKpis,
-        CustomReportSectionId.surveySummary,
-        CustomReportSectionId.surveyQuestions,
-        CustomReportSectionId.employmentRecords,
-      ],
-    );
-    await _downloadPreset(a, preset, format: format, printPreview: false);
   }
 
   Future<void> _downloadPreset(

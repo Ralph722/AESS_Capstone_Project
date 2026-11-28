@@ -30,7 +30,7 @@ class _FakeAnnouncementService extends AnnouncementService {
   int countAudienceCalls = 0;
   final List<String> createdTitles = [];
   final List<String> archivedIds = [];
-  final List<String> restoredIds = [];
+  final List<String> duplicatedIds = [];
   final List<String> deletedIds = [];
   final List<Announcement> updatedItems = [];
   final List<String> publishedIds = [];
@@ -117,12 +117,28 @@ class _FakeAnnouncementService extends AnnouncementService {
   }
 
   @override
-  Future<void> restoreAnnouncement(String id) async {
-    restoredIds.add(id);
-    final idx = items.indexWhere((a) => a.id == id);
-    if (idx != -1) {
-      items[idx] = items[idx].copyWith(status: AnnouncementStatus.published);
-    }
+  Future<String> duplicateAnnouncement(String sourceId) async {
+    duplicatedIds.add(sourceId);
+    final source = items.firstWhere((a) => a.id == sourceId);
+    final copy = Announcement(
+      id: 'dup-${duplicatedIds.length}',
+      title: '${source.title} (Copy)',
+      body: source.body,
+      status: AnnouncementStatus.draft,
+      priority: source.priority,
+      targetPrograms: List<String>.from(source.targetPrograms),
+      targetBatchYears: List<String>.from(source.targetBatchYears),
+      notifyInApp: source.notifyInApp,
+      notifyEmail: source.notifyEmail,
+      notifyPush: source.notifyPush,
+      urgent: source.urgent,
+      createdBy: 'admin-1',
+      createdAt: DateTime(2026, 11, 12),
+      publishedAt: null,
+      recipientCount: 0,
+    );
+    items.insert(0, copy);
+    return copy.id;
   }
 
   @override
@@ -342,6 +358,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Archive').last);
       await tester.pumpAndSettle();
+      expect(find.text('Archive announcement?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Archive'));
+      await tester.pumpAndSettle();
       expect(service.archivedIds, ['a-pub']);
 
       // Delete remaining draft with confirmation dialog.
@@ -361,7 +380,7 @@ void main() {
       expect(service.deletedIds, ['a-draft']);
     });
 
-    testWidgets('archived filter can restore a retired announcement', (
+    testWidgets('archived filter can duplicate a retired announcement', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(1280, 900);
@@ -395,14 +414,26 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Restore').last);
+      await tester.tap(find.text('Duplicate').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Duplicate announcement?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Duplicate'));
       await tester.pumpAndSettle();
 
-      expect(service.restoredIds, ['a-arch']);
+      expect(service.duplicatedIds, ['a-arch']);
       expect(
         service.items.firstWhere((a) => a.id == 'a-arch').status,
-        AnnouncementStatus.published,
+        AnnouncementStatus.archived,
       );
+      expect(
+        service.items.any(
+          (a) =>
+              a.id.startsWith('dup-') && a.status == AnnouncementStatus.draft,
+        ),
+        isTrue,
+      );
+      // Duplicate switches the toolbar filter to Drafts.
+      expect(find.text('Past Homecoming Recap (Copy)'), findsOneWidget);
     });
 
     testWidgets('shows error state on initial failure and refresh warning banner on reload failure',
